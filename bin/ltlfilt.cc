@@ -395,16 +395,6 @@ static struct opt_t
 
 static std::string unabbreviate;
 
-
-static spot::formula
-parse_formula_arg(const std::string& input)
-{
-  spot::parsed_formula pf = parse_formula(input);
-  if (pf.format_errors(std::cerr))
-    error(2, 0, "parse error when parsing an argument");
-  return pf.f;
-}
-
 static void
 parse_relabeling_style(const char* arg, const char* optname)
 {
@@ -419,7 +409,6 @@ parse_relabeling_style(const char* arg, const char* optname)
           "expecting %s", optname, arg,
           *optname ? "'abc' or 'pnn'" : "'abc', 'pnn', or 'io'");
 }
-
 
 static int
 parse_opt(int key, char* arg, struct argp_state*)

@@ -271,6 +271,7 @@ TESTS_twa = \
   core/tripprod.test \
   core/dupexp.test \
   core/exclusive-tgba.test \
+  core/given.test \
   core/remprop.test \
   core/deadends.test \
   core/degendet.test \
