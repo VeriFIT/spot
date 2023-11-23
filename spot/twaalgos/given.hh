@@ -23,48 +23,70 @@
 namespace spot
 {
   /// \ingroup twa_algorithms
-  /// \brief simplify an automaton given some a priori knowledge
+  /// \brief build "bounded automata" from knowledge
   ///
-  /// If \a aut represent the negation of a property that one want
-  /// to check on some system S, and we know (by any mean) that the
-  /// behaviors of S always satisfies \a fact, we can use that
-  /// to modify \a aut in such a way that \a aut intersects S
-  /// if an only if `given(aut,fact)` intersects S.
+  /// In a model checking context, if \a aut represents the negation
+  /// of a property that one wants to check on some system S, and we
+  /// know (by any mean) that the behaviors of S always satisfies some
+  /// \a fact (expressed as an automaton, or LTL formula), we can construct
+  /// a new automaton `aut2` that intersects S iff \a aut intersects S.
   ///
-  /// The GIVEN_RESTRICT strategy uses \a fact to restrict the labels
-  /// of the \a aut to the subset of assignments that will actually
-  /// matter.  The GIVEN_RELAX strategy is almost the opposite: it use
-  /// assignments that will never be synchronized with an edge to
-  /// enlarge the set of assignments supported by this edge. The
-  /// latter enlargment is only done if it reduces the support of the
-  /// edge label.
+  /// The update_bounds_given and update_bounds_given_here functions
+  /// do the first step of that automaton creation.  They simply
+  /// integrate the knowledge in the form of "bounds" for the labels
+  /// of the automaton.  If the labels of the automaton are chosen to
+  /// be anything between those bounds, then the above "intersection"
+  /// equivalence hold.  Bounds may be updated multiple times to
+  /// integrate multiple knowledge about the system S.
   ///
-  /// The GIVEN_STUTTER strategy tries to turn \a aut into a
-  /// stutter-invariant automaton. If the paths added to \a aut
-  /// in the process are outside the knowledge, they can be kept.
-  /// Doing so may add many more arcs to the automaton.
+  /// Then use bounds_simplify() to simplify the bounds and get
+  /// back a standard automaton.
   /// @{
-  SPOT_API
-  twa_graph_ptr update_bounds_given_here(twa_graph_ptr& aut,
-                                         const_twa_graph_ptr& fact,
-                                         bool* changed = nullptr);
-  SPOT_API
-  twa_graph_ptr bounds_simplify_here(twa_graph_ptr& aut);
-  SPOT_API
-  twa_graph_ptr bounds_simplify(const_twa_graph_ptr& aut);
+  SPOT_API twa_graph_ptr
+  update_bounds_given_here(twa_graph_ptr& aut,
+                           const_twa_graph_ptr& fact,
+                           bool* changed = nullptr);
+  SPOT_API twa_graph_ptr
+  update_bounds_given(const_twa_graph_ptr& aut,
+                      const_twa_graph_ptr& fact);
+  SPOT_API twa_graph_ptr
+  update_bounds_given_here(twa_graph_ptr& aut,
+                           formula fact,
+                           bool* changed = nullptr);
+  SPOT_API twa_graph_ptr
+  update_bounds_given(const_twa_graph_ptr& aut, formula fact);
+  /// @}
+
+  /// \ingroup twa_algorithms
+  /// \brief Choose labels in a bounded automaton.
+  ///
+  /// This uses the Minato algorithm to select a label
+  /// for each transition, between the bounds computed
+  /// by update_bounds_given().
+  /// @{
+  SPOT_API twa_graph_ptr
+  bounds_simplify_here(twa_graph_ptr& aut);
+  SPOT_API twa_graph_ptr
+  bounds_simplify(const_twa_graph_ptr& aut);
+  /// @}
+
+  /// \ingroup twa_algorithms
+  /// \brief Attempt to make an automaton stutter-invariant given some knowledge
+  ///
+  /// In a model checking context, if \a aut represents the negation
+  /// of a property that one wants to check on some system S, and we
+  /// know (by any mean) that the behaviors of S always satisfies some
+  /// \a fact (expressed as an automaton, or LTL formula), we can construct
+  /// a new automaton `aut2` that intersects S iff \a aut intersects S.
+  ///
+  /// This attempts to build an automaton `aut2` that is
+  /// stutter-invariant using all `facts` (a vector of a priori
+  /// knowledge about S).
+  ///
+  /// The algorithm has two variant (relax and restrict) that can be
+  /// selected using the \a relax argument.
   SPOT_API
   twa_graph_ptr stutterize_given(twa_graph_ptr& aut,
                                  std::vector<const_twa_graph_ptr>& facts,
                                  bool relax = true);
-  SPOT_API
-  twa_graph_ptr update_bounds_given(const_twa_graph_ptr& aut,
-                                    const_twa_graph_ptr& fact);
-  SPOT_API
-  twa_graph_ptr update_bounds_given_here(twa_graph_ptr& aut,
-                                         formula fact,
-                                         bool* changed = nullptr);
-  SPOT_API
-  twa_graph_ptr update_bounds_given(const_twa_graph_ptr& aut,
-                                    formula fact);
-  /// @}
 }

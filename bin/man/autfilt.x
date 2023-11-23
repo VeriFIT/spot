@@ -103,6 +103,14 @@ deterministic ω-automata.  Proceedings of LPAR'15 (a.k.a LPAR-20).
 LNCS 9450.
 
 Describes the \fB\-\-sat\-minimize\fR option.
+.TP
+\(bu
+Alexandre Duret-Lutz, Denis Poitrenaud, Yann Thierry-Mieg:
+Simplifying LTL Model-Checking Given Prior Knowledge.
+Proceedings of PetriNet'25.  To appear.
+
+Discusses the techniques behind the \fB\-\-given-formula\fR,
+\fB\-\-given-automaton\fR, and \fB\-\-given-strategy\fR options.
 [SEE ALSO]
 .BR spot-x (7)
 .BR dstar2tgba (1)

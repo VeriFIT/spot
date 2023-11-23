@@ -50,9 +50,8 @@ New in spot 2.12.2.dev  (not yet released)
 
   - genltl's --pps-arbiter-standard and --pps-arbiter-strict have been
     changed to rename variables {r1,r2,...,g1,g2...} as
-    {i1,i1,...,o1,o2,...} so that these formula can be fed directly to
+    {i1,i1,...,o1,o2,...} so that these formulas can be fed directly to
     ltlsynt.
-
 
   - autfilt learned --restrict-dead-end-edges, to restricts labels of
     edges leading to dead-ends.  See the description of
@@ -64,6 +63,12 @@ New in spot 2.12.2.dev  (not yet released)
   - autfilt learned --mcs[=any|scc] to reorder states according to a
     maximum cardinality search.  The argument specifies how to break
     ties.
+
+  - autfilt learned --given-formula, --given-automaton, and
+    --given-strategy to simplify automata given some knowledge.
+    This is discussed in the PN'25 paper "Simplifying LTL
+    Model-Checking Given Prior Knowledge" by Duret-Lutz, Poitrenaud,
+    and Thierry-Mieg.
 
   - ltlfilt learned --pi1, --sigma1, --delta1, --pi2, --sigma2, and
     --delta2 to filter according to classes Π₁,Σ₁,Δ₁,Π₂,Σ₂, and Δ₂.
@@ -114,6 +119,11 @@ New in spot 2.12.2.dev  (not yet released)
     spot::maximum_cardinality_search_reorder_here() are new function
     to compute (and apply) an ordering of state based on a maximum
     cardinality search.
+
+  - a new set of functions spot::update_bounds_given(),
+    spot::bounds_simplify(), and spot::stutterize_given() implements
+    simplification of automata based on apriori knowledge.
+    See https://spot.lre.epita.fr/ipynb/given.html for examples.
 
   Bug fixes:
 
