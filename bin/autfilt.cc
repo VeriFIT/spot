@@ -434,7 +434,7 @@ static const argp_option options[] =
       "simplify input automata assuming they are only used in a context where "
       "FORMULA holds", 0 },
     { "given-strategy", OPT_GIVEN_STRAT,
-      "none|minato|stutter|stutter-relax|stutter-restrict|all", 0,
+      "minato|stutter|stutter-relax|stutter-restrict|all", 0,
       "strategy to use to simplify input automata based on given knowledge: "
       "(minato) simplify edge labels based on knowledge [the default], "
       "(stutter,stutter-relax) build a stutter-invariant results if the"
@@ -573,13 +573,13 @@ enum given_strategy {
 };
 static char const *const given_args[] =
 {
-  "none", "minato",
+  "minato",
   "stutter", "stutter-relax", "stutter-restrict",
   "all", nullptr
 };
 static given_strategy const given_types[] =
 {
-  GIVEN_NONE, GIVEN_MINATO,
+  GIVEN_MINATO,
   GIVEN_STUTTER_RELAX, GIVEN_STUTTER_RELAX, GIVEN_STUTTER_RESTRICT,
   GIVEN_ALL,
 };
@@ -1710,10 +1710,11 @@ namespace
         aut = opt->rem_ap.strip(aut);
 
       bool changed = false;
-      do
-        for (spot::const_twa_graph_ptr knowledge: opt->given_automata)
-          aut = spot::update_bounds_given_here(aut, knowledge, &changed);
-      while (changed && opt_given_fixpoint);
+      if (opt_given_strat & GIVEN_MINATO)
+        do
+          for (spot::const_twa_graph_ptr knowledge: opt->given_automata)
+            aut = spot::update_bounds_given_here(aut, knowledge, &changed);
+        while (changed && opt_given_fixpoint);
       if (!opt->given_automata.empty())
         {
           if (opt_given_strat & GIVEN_MINATO)
