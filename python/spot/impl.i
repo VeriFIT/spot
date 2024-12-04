@@ -42,6 +42,7 @@
 %shared_ptr(spot::tgta)
 %shared_ptr(spot::tgta_explicit)
 %shared_ptr(spot::bdd_dict)
+%shared_ptr(spot::mtdfa)
 %shared_ptr(spot::twa)
 %shared_ptr(spot::twa_graph)
 %shared_ptr(spot::twa_product)
@@ -128,6 +129,7 @@
 #include <spot/twaalgos/lbtt.hh>
 #include <spot/twaalgos/ltl2taa.hh>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
+#include <spot/twaalgos/ltlf2dfa.hh>
 #include <spot/twaalgos/gfguarantee.hh>
 #include <spot/twaalgos/compsusp.hh>
 #include <spot/twaalgos/contains.hh>
@@ -739,6 +741,7 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/lbtt.hh>
 %include <spot/twaalgos/ltl2taa.hh>
 %include <spot/twaalgos/ltl2tgba_fm.hh>
+%include <spot/twaalgos/ltlf2dfa.hh>
 %include <spot/twaalgos/gfguarantee.hh>
 %include <spot/twaalgos/compsusp.hh>
 %include <spot/twaalgos/contains.hh>

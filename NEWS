@@ -1,6 +1,15 @@
 New in spot 2.13.0.dev  (not yet released)
 
-  Nothing yet.
+  - spot::mtdfa is a new class implementing a DFA using Multi-Terminal
+    BDDs.  The data structure is similar to what can be found in Mona.
+    This comes with convenient rendering routines for use in Jupyter
+    notebook.
+
+    spot::ltlf_to_mtdfa() is a new function that converts a LTLf formula
+    into an MTDFA.
+
+    spot::minimize_mtdfa() is a minimization function for MTDFA.  See
+    https://spot.lre.epita.fr/ipynb/ltlf2dfa.html for some illustrations.
 
 New in spot 2.13  (2025-03-24)
 

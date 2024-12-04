@@ -380,6 +380,7 @@ TESTS_ipython = \
   python/gen.ipynb \
   python/given.ipynb \
   python/highlighting.ipynb \
+  python/ltlf2dfa.ipynb \
   python/ltsmin-dve.ipynb \
   python/ltsmin-pml.ipynb \
   python/parity.ipynb \
