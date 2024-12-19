@@ -36,6 +36,7 @@ logic (LTL & PSL).
 %{_bindir}/ltl2tgta
 %{_bindir}/ltlcross
 %{_bindir}/ltldo
+%{_bindir}/ltlf2dfa
 %{_bindir}/ltlfilt
 %{_bindir}/ltlgrind
 %{_bindir}/ltlmix
@@ -51,6 +52,7 @@ logic (LTL & PSL).
 %{_mandir}/man1/ltl2tgta.1*
 %{_mandir}/man1/ltlcross.1*
 %{_mandir}/man1/ltldo.1*
+%{_mandir}/man1/ltlf2dfa.1*
 %{_mandir}/man1/ltlfilt.1*
 %{_mandir}/man1/ltlgrind.1*
 %{_mandir}/man1/ltlmix.1*
