@@ -386,8 +386,6 @@ BUDDY_API BDD      bdd_not(BDD);
 BUDDY_API BDD      bdd_apply(BDD, BDD, int);
 BUDDY_API BDD      bdd_mt_apply2(BDD, BDD, int (*)(int, int),
                                  bddExtCache*, int, int);
-BUDDY_API BDD      bdd_mt_apply2b(BDD, BDD, int (*)(int, int),
-                                  bddExtCache*, int, int);
 BUDDY_API BDD      bdd_mt_apply2_leaves(BDD, BDD, int (*)(int, int,
                                                           int, int),
                                         bddExtCache*, int, int);
@@ -677,8 +675,6 @@ protected:
    friend bdd      bdd_apply(const bdd &, const bdd &, int);
    friend bdd      bdd_mt_apply2(const bdd&, const bdd&, int (*)(int, int),
                                  bddExtCache*, int, int);
-   friend bdd      bdd_mt_apply2b(const bdd&, const bdd&, int (*)(int, int),
-                                  bddExtCache*, int, int);
    friend bdd      bdd_mt_apply2_leaves(const bdd&, const bdd&,
                                         int (*)(int, int, int, int),
                                         bddExtCache*, int, int);
@@ -927,11 +923,6 @@ inline bdd bdd_mt_apply2(const bdd &l, const bdd &r, int (*op)(int, int),
                          bddExtCache* cache, int ophash,
                          int applyop_shortcut = -1)
 { return bdd_mt_apply2(l.root, r.root, op, cache, ophash, applyop_shortcut); }
-
-inline bdd bdd_mt_apply2b(const bdd &l, const bdd &r, int (*op)(int, int),
-                          bddExtCache* cache, int ophash,
-                          int applyop_shortcut = -1)
-{ return bdd_mt_apply2b(l.root, r.root, op, cache, ophash, applyop_shortcut); }
 
 inline bdd bdd_mt_apply2_leaves(const bdd &l, const bdd &r, int (*op)(int, int,
                                                                       int, int),
