@@ -32,7 +32,8 @@
 
 enum
 {
-  OPT_NEGATE = 256,
+  OPT_COMPOSITION = 256,
+  OPT_NEGATE,
   OPT_KEEP_NAMES,
   OPT_MTDFA_DOT,
   OPT_MTDFA_STATS,
@@ -61,6 +62,10 @@ static const argp_option options[] =
       0 },
     { "minimize", OPT_MINIMIZE, "yes|no", 0,
       "Minimize the automaton (enabled by default).", 0 },
+    { "composition", OPT_COMPOSITION, "size|ap", 0,
+      "How to order n-ary compositions in the compositional translation.  "
+      "By increasing size, or trying to group operands based on their APs.",
+      0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Output options:", 20 },
     { "hoaf", 'H', "1.1|b|i|k|l|m|s|t|v", OPTION_ARG_OPTIONAL,
@@ -127,6 +132,17 @@ static bool opt_minimize = true;
 static bool opt_keep_names = false;
 
 
+static const char* const composition_args[] =
+  {
+    "size", "ap", nullptr
+  };
+static bool composition_values[] =
+  {
+    false, true,
+  };
+ARGMATCH_VERIFY(composition_args, composition_values);
+static bool opt_composition_by_ap = false;
+
 enum mtdfa_output_type { mtdfa_none, mtdfa_dot, mtdfa_stats };
 static mtdfa_output_type mtdfa_output = mtdfa_none;
 
@@ -139,6 +155,10 @@ parse_opt(int key, char *arg, struct argp_state *)
   BEGIN_EXCEPTION_PROTECT;
   switch (key)
     {
+    case OPT_COMPOSITION:
+      opt_composition_by_ap = XARGMATCH("--composition", arg,
+                                        composition_args, composition_values);
+      break;
     case OPT_NEGATE:
       negate = true;
       break;
@@ -235,6 +255,7 @@ namespace
         {
           a = spot::ltlf_to_mtdfa_compose(f, dict,
                                           opt_minimize,
+                                          opt_composition_by_ap,
                                           opt_keep_names);
         }
 
@@ -256,6 +277,7 @@ namespace
                     << "nodes: " << s.nodes << '\n'
                     << "paths: " << s.paths << '\n'
                     << "edges: " << s.edges << '\n'
+                    << "aps: " << s.aps << '\n'
                     << "has_true: " << s.has_true << '\n'
                     << "has_false: " << s.has_false << '\n';
         }

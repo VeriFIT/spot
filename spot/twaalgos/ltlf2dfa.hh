@@ -30,6 +30,7 @@ namespace spot
     unsigned long long paths;
     unsigned long long edges;
     unsigned nodes;
+    unsigned aps;
     bool has_true;
     bool has_false;
   };
@@ -49,6 +50,7 @@ namespace spot
 
     std::vector<bdd> states;
     std::vector<formula> names;
+    std::vector<formula> aps;   // sorted
     bdd_dict_ptr dict_;
 
     unsigned num_roots() const
@@ -88,7 +90,7 @@ namespace spot
 
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_compose(formula f, const bdd_dict_ptr& dict,
-                        bool minimize = true,
+                        bool minimize = true, bool order_for_aps = true,
                         bool want_names = true,
                         bool fuse_same_bdds = true,
                         bool simplify_terms = true);

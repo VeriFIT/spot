@@ -27,6 +27,7 @@
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/print.hh>
 #include <spot/priv/robin_hood.hh>
+#include <spot/misc/bitvect.hh>
 
 constexpr int hash_key_and = 1;
 constexpr int hash_key_or = 2;
@@ -522,6 +523,15 @@ namespace spot
     std::queue<formula> todo;
     terminal_to_state_map.clear();
 
+    // Keep track of atomic propositions used in he automaton.
+    // Actually the automaton might use fewer atomic propositions than
+    // what appears in the formula, but we do not pay attention to
+    // that.
+    {
+      auto a = atomic_prop_collect(f);
+      dfa->aps.assign(a->begin(), a->end());
+      delete a;
+    }
     // Keep track of whether we have seen an accepting or rejecting
     // state.  If we are missing one of them, we can reduce the
     // automaton to a single state.
@@ -798,7 +808,13 @@ namespace spot
       }
 
     mtdfa_ptr res = std::make_shared<mtdfa>(dfa->dict_);
-    res->dict_->register_all_propositions_of(dfa, res);
+    // If the automaton hasn't been reduce to true/false, assume it
+    // still use all atomic propositions.
+    if (states[0] != bddfalse && states[0] != bddtrue)
+      {
+        res->dict_->register_all_propositions_of(dfa, res);
+        res->aps = dfa->aps;
+      }
     std::swap(res->names, names);
     std::swap(res->states, states);
     return res;
@@ -847,7 +863,7 @@ namespace spot
       std::vector<product_state> terminal_to_pair;
       mtdfa_ptr left;
       mtdfa_ptr right;
-
+      std::queue<std::pair<product_state, int>> todo;
 
       std::pair<unsigned, bool> leaf_to_state(int b) const
       {
@@ -870,6 +886,7 @@ namespace spot
         int v = terminal_to_pair.size();
         terminal_to_pair.push_back({left, right});
         pair_to_terminal_map[{left, right}] = v;
+        todo.emplace(product_state{left, right}, v);
         return 2 * v + may_stop;
       }
 
@@ -985,27 +1002,18 @@ namespace spot
     res->dict_->register_all_propositions_of(dfa1, res);
     res->dict_->register_all_propositions_of(dfa2, res);
 
-    terminal_to_state_map.clear();
-    std::queue<product_state> todo;
-    todo.push({0, 0});
+    std::queue<std::pair<product_state, int>>& todo = the_product_data.todo;
+    // this will  todo with the initial state of the product
+    (void) the_product_data.pair_to_terminal(0, 0);
     while (!todo.empty())
       {
-        product_state s = todo.front();
+        auto [s, label_term] = todo.front();
         todo.pop();
-        int label_term =
-          the_product_data.pair_to_terminal(s.first, s.second) / 2;
-
-        // already processed
-        if (terminal_to_state_map.find(label_term)
-            != terminal_to_state_map.end())
-          continue;
 
         auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
         auto [right, right_f] = bdd_and_formula_from_state(s.second, dfa2);
 
         bdd b = bdd_mt_apply2b(left, right, combine, cache, hash_key);
-        unsigned n = res->states.size();
-        terminal_to_state_map[label_term] = n;
         res->states.push_back(b);
         if (left_f && right_f)
           switch (o)
@@ -1028,18 +1036,14 @@ namespace spot
             default:
               SPOT_UNREACHABLE();
             }
-
-        for (bdd leaf: leaves_of(b))
-          {
-            if (leaf == bddfalse || leaf == bddtrue)
-              continue;
-            auto [ls, rs, _] = the_product_data.leaf_to_pair(leaf);
-            (void) _;
-            if (terminal_to_state_map.find(bdd_get_terminal(leaf) / 2)
-                == terminal_to_state_map.end())
-              todo.push({ls, rs});
-          }
       }
+
+    // combine the sorted list of atomic propositions from dfa1 and dfa2
+    // keeping the result sorted
+    res->aps.reserve(dfa1->aps.size() + dfa2->aps.size());
+    std::set_union(dfa1->aps.begin(), dfa1->aps.end(),
+                   dfa2->aps.begin(), dfa2->aps.end(),
+                   std::back_inserter(res->aps));
 
     the_product_data.left = nullptr;
     the_product_data.right = nullptr;
@@ -1138,15 +1142,17 @@ namespace spot
     int opcache_iteration;
     bool fuse_same_bdds;
     bool want_minimize;
+    bool order_for_aps;
     bool want_names;
 
     compose_data(bdd_dict_ptr dict, bool simplify_terms, bool fuse_same,
-                 bool want_minimize, bool want_names)
+                 bool want_minimize, bool order_for_aps, bool want_names)
       : trans(dict, simplify_terms),
         minimize_iteration(0),
         opcache_iteration(0),
         fuse_same_bdds(fuse_same),
         want_minimize(want_minimize),
+        order_for_aps(order_for_aps),
         want_names(want_names)
     {
       bdd_extcache_init(&mincache, 0);
@@ -1175,16 +1181,11 @@ namespace spot
     {
       return ltlf_to_mtdfa_compose(data, f);
     };
-    auto byminrootcount = [&](mtdfa_ptr& left, mtdfa_ptr& right)
-    {
-      return left->num_roots() > right->num_roots();
-    };
-
 
     mtdfa_ptr dfa;
     if (f.is_boolean())
       return data.trans.ltlf_to_mtdfa(f, data.fuse_same_bdds);
-    switch (f.kind())
+    switch (op o = f.kind())
       {
       case op::tt:
       case op::ff:
@@ -1194,62 +1195,162 @@ namespace spot
         return complement_aux(rec(f[0]), &data.opcache,
                               data.opcache_iteration);
       case op::And:
-        {
-          std::vector<mtdfa_ptr> dfas;
-          dfas.reserve(f.size());
-          for (const formula& sub: f)
-            dfas.push_back(rec(sub));
-          // Build the product of all DFAs by increasing size.
-          std::make_heap(dfas.begin(), dfas.end(), byminrootcount);
-          while (dfas.size() > 1)
-            {
-              std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
-              mtdfa_ptr left = dfas.back();
-              dfas.pop_back();
-              std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
-              mtdfa_ptr right = dfas.back();
-              dfas.pop_back();
-              mtdfa_ptr prod = product_mtdfa_aux(left, right, op::And,
-                                                 &data.opcache,
-                                                 data.opcache_iteration++);
-              dfas.push_back(data.minimize(prod));
-              std::push_heap(dfas.begin(), dfas.end(), byminrootcount);
-            }
-          return dfas[0];
-        }
       case op::Or:
-        {
-          std::vector<mtdfa_ptr> dfas;
-          dfas.reserve(f.size());
-          for (const formula& sub: f)
-            dfas.push_back(rec(sub));
-          // Build the product of all DFAs by increasing size.
-          std::make_heap(dfas.begin(), dfas.end(), byminrootcount);
-          while (dfas.size() > 1)
+        if (f.size() == 2)
+          goto no_order_needed;
+        if (!data.order_for_aps)
+          {
+            auto byminrootcount = [&](const mtdfa_ptr& left,
+                                      const mtdfa_ptr& right)
             {
-              std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
-              mtdfa_ptr left = dfas.back();
-              dfas.pop_back();
-              std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
-              mtdfa_ptr right = dfas.back();
-              dfas.pop_back();
-              mtdfa_ptr prod = product_mtdfa_aux(left, right, op::Or,
-                                                 &data.opcache,
-                                                 data.opcache_iteration++);
-              dfas.push_back(data.minimize(prod));
-              std::push_heap(dfas.begin(), dfas.end(), byminrootcount);
-            }
-          return dfas[0];
-        }
+              return left->num_roots() > right->num_roots();
+            };
+            std::vector<mtdfa_ptr> dfas;
+            dfas.reserve(f.size());
+            for (const formula& sub: f)
+              dfas.push_back(rec(sub));
+            // Build the product of all DFAs by increasing size.
+            std::make_heap(dfas.begin(), dfas.end(), byminrootcount);
+            while (dfas.size() > 1)
+              {
+                std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
+                mtdfa_ptr left = dfas.back();
+                dfas.pop_back();
+                std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
+                mtdfa_ptr right = dfas.back();
+                dfas.pop_back();
+                mtdfa_ptr prod = product_mtdfa_aux(left, right, o,
+                                                   &data.opcache,
+                                                   data.opcache_iteration++);
+                bool wantmin =
+                  left->aps.size() + right->aps.size() != prod->aps.size();
+                dfas.push_back(wantmin ? data.minimize(prod) : prod);
+                // std::cerr << "op: " << (int)o
+                //           << " left: " << left->num_roots()
+                //           << " (" << left->aps.size()
+                //           << ") right: " << right->num_roots()
+                //           << " (" << right->aps.size()
+                //           << ") prod: " << prod->num_roots()
+                //           << " (" << prod->aps.size()
+                //           << ") min: " << dfas.back()->num_roots()
+                //           << (wantmin ? "" : " (skipped)") << '\n';
+                std::push_heap(dfas.begin(), dfas.end(), byminrootcount);
+              }
+            return dfas[0];
+          }
+        else
+          {
+            auto byminrootcount =
+              [&](const std::pair<mtdfa_ptr, bitvect*>& left,
+                  const std::pair<mtdfa_ptr, bitvect*>& right)
+              {
+                return left.first->num_roots() < right.first->num_roots();
+              };
+            auto* apset = atomic_prop_collect(f);
+            std::vector<formula> aps(apset->begin(), apset->end());
+            delete apset;
+            unsigned apsz = aps.size();
+            std::vector<std::pair<mtdfa_ptr, bitvect*>> dfas_and_aps;
+            dfas_and_aps.reserve(f.size());
+            for (const formula& sub: f)
+              {
+                bitvect* apsvec = make_bitvect(apsz);
+                mtdfa_ptr dfasub = rec(sub);
+                auto& apsub = dfasub->aps;
+                auto apsubit = apsub.begin();
+                for (unsigned i = 0; i < apsz; ++i)
+                  {
+                    if (apsubit == apsub.end())
+                      break;
+                    if (*apsubit == aps[i])
+                      {
+                        apsvec->set(i);
+                        ++apsubit;
+                      }
+                  }
+                // std::cerr << "sub " << sub << "\t\t"
+                //           << *apsvec << '\n';
+                dfas_and_aps.emplace_back(dfasub, apsvec);
+              }
+            std::sort(dfas_and_aps.begin(), dfas_and_aps.end(),
+                      byminrootcount);
+            std::vector<mtdfa_ptr> independent_dfas; // no AP in common
+            while (dfas_and_aps.size() > 1)
+              {
+                auto [dfa_left, aps_left] = dfas_and_aps.front();
+                // scan the rest of dfas_and_aps for the first pair
+                // that share some atomic proposition with aps_left.
+                auto it = dfas_and_aps.begin() + 1;
+                for (; it != dfas_and_aps.end(); ++it)
+                  if (aps_left->intersects(*it->second))
+                    break;
+                if (it == dfas_and_aps.end())
+                  {
+                    independent_dfas.push_back(dfa_left);
+                    dfas_and_aps.erase(dfas_and_aps.begin());
+                    continue;
+                  }
+                mtdfa_ptr dfa_right = it->first;
+                bitvect* aps_right = it->second;
+                mtdfa_ptr prod = product_mtdfa_aux(dfa_left, dfa_right, o,
+                                                   &data.opcache,
+                                                   data.opcache_iteration++);
+                mtdfa_ptr min = minimize_mtdfa(prod);
+                *aps_left |= *aps_right;
+                delete aps_right;
+                // update dfa_and_aps_size.  We have to remove the
+                // first element and the one pointed by it.
+                auto dst = dfas_and_aps.begin();
+                dst = std::copy(dst + 1, it, dst);
+                std::copy(it + 1, dfas_and_aps.end(), dst);
+                dfas_and_aps.resize(dfas_and_aps.size() - 2);
+                // Find the place where to insert the new pair.
+                auto p = std::make_pair(min, aps_left);
+                auto lb = std::lower_bound(dfas_and_aps.begin(),
+                                           dfas_and_aps.end(),
+                                           p, byminrootcount);
+                dfas_and_aps.insert(lb, p);
+                // std::cerr << "op: " << (int)o
+                //           << " left: " << dfa_left->num_roots()
+                //           << " (" << dfa_left->aps.size()
+                //           << ") right: " << dfa_right->num_roots()
+                //           << " (" << dfa_right->aps.size()
+                //           << ") prod: " << prod->num_roots()
+                //           << " (" << prod->aps.size()
+                //           << ") min: " << min->num_roots() << '\n';
+              }
+            delete dfas_and_aps[0].second;
+            if (independent_dfas.empty())
+              return dfas_and_aps[0].first;
+            mtdfa_ptr res = dfas_and_aps[0].first;
+            for (mtdfa_ptr dfa: independent_dfas)
+              {
+                // std::cerr << "op: " << (int)o
+                //           << " left: " << res->num_roots()
+                //           << " (" << res->aps.size()
+                //           << ") right: " << dfa->num_roots()
+                //           << " (" << dfa->aps.size();
+                res = product_mtdfa_aux(res, dfa, o,
+                                        &data.opcache,
+                                        data.opcache_iteration++);
+                // std::cerr << ")  prod: " << res->num_roots()
+                //           << " (" << res->aps.size()
+                //           << ") no minimization needed\n";
+              }
+            return res;
+          }
       case op::Xor:
       case op::Implies:
       case op::Equiv:
-          {
+        no_order_needed:
+        {
             mtdfa_ptr left = rec(f[0]);
             mtdfa_ptr right = rec(f[1]);
-            mtdfa_ptr prod = product_mtdfa_aux(left, right, f.kind(),
+            mtdfa_ptr prod = product_mtdfa_aux(left, right, o,
                                                &data.opcache,
                                                data.opcache_iteration++);
+            if (left->aps.size() + right->aps.size() == prod->aps.size())
+              return prod;
             return data.minimize(prod);
           }
       case op::U:
@@ -1296,11 +1397,12 @@ namespace spot
   }
 
   mtdfa_ptr ltlf_to_mtdfa_compose(formula f, const bdd_dict_ptr& dict,
-                                  bool want_minimize, bool want_names,
-                                  bool fuse_same_bdds, bool simplify_terms)
+                                  bool want_minimize, bool order_for_aps,
+                                  bool want_names, bool fuse_same_bdds,
+                                  bool simplify_terms)
   {
     compose_data data(dict, simplify_terms, fuse_same_bdds,
-                      want_minimize, want_names);
+                      want_minimize, order_for_aps, want_names);
     return ltlf_to_mtdfa_compose(data, f);
   }
 
@@ -1660,6 +1762,8 @@ namespace spot
       }
     res.nodes = bdd_anodecount(states);
     res.leaves = 0;
+    res.has_false = 0;
+    res.has_true = 0;
     for (bdd b: leaves_of(states))
       {
         ++res.leaves;
@@ -1670,6 +1774,7 @@ namespace spot
       }
     res.nodes += res.has_false;
     res.nodes += res.has_true;
+    res.aps = aps.size();
     return res;
   }
 }
