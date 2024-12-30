@@ -1381,6 +1381,114 @@ BDD bdd_mt_apply2b(BDD l, BDD r, int (*termop)(int, int),
    return res;
 }
 
+BDD bdd_mt_apply2_leaves(BDD l, BDD r, int (*termop)(int, int,
+                                                     int, int),
+                         bddExtCache* cache, int ophash,
+                         int applyop)
+{
+   LOCAL_REC_STACKS;
+   int index;
+
+   goto work;
+
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           l = POPINT_();
+           r = POPINT_();
+         work:
+           /* empty macro arguments are undefined in ISO C90 and
+              ISO C++98, so use + when we do not want to call any
+              function.*/
+           APPLY_SHORTCUTS(applyop, +);
+
+           bddExtCacheEntry *entry2 =
+             BddCache_index(cache, APPLY2HASH(l, r, ophash), index);
+           if (entry2->arg1 == l && entry2->op == ophash && entry2->arg2 == r)
+             {
+#ifdef CACHESTATS
+               bddcachestats.opHit++;
+#endif
+               /* C: -1 l r ---     */
+               /* R:        --- res */
+               RETURN(entry2->res);
+             }
+#ifdef CACHESTATS
+           bddcachestats.opMiss++;
+#endif
+
+           /* C: -1 l r --- (-1 ll rl) -1 lr rr index l r */
+           /* The element in parenthesis are not pushed, as they would
+              be popped right away.  We jump to "work" instead.*/
+           if ((ISCONST(l) || ISTERM(l)) && (ISCONST(r) || ISTERM(r)))
+             {
+               SYNC_REC_STACKS;
+               int lterm = ISCONST(l) ? 0 : TERM(l);
+               int rterm = ISCONST(r) ? 0 : TERM(r);
+               bdd res = termop(l, lterm, r, rterm);
+               UPDATE_LOCAL_REC_STACKS;
+               bddExtCacheEntry* entry = cache->table + index;
+               entry->arg1 = l;
+               entry->arg2 = r;
+               entry->op = ophash;
+               entry->res = res;
+               RETURN(res);
+             }
+           int lvl_l = LEVEL(l);
+           int lvl_r = LEVEL(r);
+           if (lvl_l == lvl_r)
+             {
+               PUSH4INT_(r, l, lvl_l, index);
+               PUSH3INT_(HIGH(r), HIGH(l), -1);
+               r = LOW(r);
+               l = LOW(l);
+             }
+           else if (lvl_l < lvl_r)
+             {
+               PUSH4INT_(r, l, lvl_l, index);
+               PUSH3INT_(r, HIGH(l), -1);
+               l = LOW(l);
+             }
+           else /* (lvl_l > lvl_r) */
+             {
+               PUSH4INT_(r, l, lvl_r, index);
+               PUSH3INT_(HIGH(r), l, -1);
+               r = LOW(r);
+             }
+           goto work;
+         }
+       else
+         {
+           /* C: index lvl l r ---     */
+           /* R: rres lres     --- res */
+           /* res=(lvl, lres, rres) is the result of apply2(l,r) */
+           /* and it should be stored in *entry.                     */
+           BDD rres = READREF_(1);
+           BDD lres = READREF_(2);
+           int lvl = POPINT_();
+           BDD l = POPINT_();
+           BDD r = POPINT_();
+           SYNC_REC_STACKS;
+           BDD res = bdd_makenode(lvl, lres, rres);
+           POPREF_(2);
+           PUSHREF_(res);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = l;
+           entry->arg2 = r;
+           entry->op = ophash;
+           entry->res = res;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+   BDD res = READREF_(1);
+   POPREF_(1);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   return res;
+}
+
 
 BDD bdd_mt_apply1(BDD r, int (*termop)(int),
                   BDD replace_false, BDD replace_true,

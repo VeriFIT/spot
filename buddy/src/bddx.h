@@ -388,6 +388,9 @@ BUDDY_API BDD      bdd_mt_apply2(BDD, BDD, int (*)(int, int),
                                  bddExtCache*, int, int);
 BUDDY_API BDD      bdd_mt_apply2b(BDD, BDD, int (*)(int, int),
                                   bddExtCache*, int, int);
+BUDDY_API BDD      bdd_mt_apply2_leaves(BDD, BDD, int (*)(int, int,
+                                                          int, int),
+                                        bddExtCache*, int, int);
 BUDDY_API BDD      bdd_mt_apply1(BDD, int (*)(int),
                                  BDD, BDD,
                                  bddExtCache*, int);
@@ -676,6 +679,9 @@ protected:
                                  bddExtCache*, int, int);
    friend bdd      bdd_mt_apply2b(const bdd&, const bdd&, int (*)(int, int),
                                   bddExtCache*, int, int);
+   friend bdd      bdd_mt_apply2_leaves(const bdd&, const bdd&,
+                                        int (*)(int, int, int, int),
+                                        bddExtCache*, int, int);
    friend bdd      bdd_mt_apply1(const bdd&, int (*)(int),
                                  const bdd&, const bdd&,
                                  bddExtCache*, int);
@@ -828,6 +834,9 @@ inline bdd bdd_high(const bdd &r)
 inline bdd bdd_terminalpp(int v)
 { return bdd_terminal(v); }
 
+inline int bdd_terminal_as_int(int v)
+{ return bdd_terminal(v); }
+
 inline int bdd_is_terminal(const bdd& r)
 { return bdd_is_terminal(r.root); }
 
@@ -923,6 +932,13 @@ inline bdd bdd_mt_apply2b(const bdd &l, const bdd &r, int (*op)(int, int),
                           bddExtCache* cache, int ophash,
                           int applyop_shortcut = -1)
 { return bdd_mt_apply2b(l.root, r.root, op, cache, ophash, applyop_shortcut); }
+
+inline bdd bdd_mt_apply2_leaves(const bdd &l, const bdd &r, int (*op)(int, int,
+                                                                      int, int),
+                                bddExtCache* cache, int ophash,
+                                int applyop_shortcut = -1)
+{ return bdd_mt_apply2_leaves(l.root, r.root, op, cache,
+                              ophash, applyop_shortcut); }
 
 inline bdd bdd_mt_apply1(const bdd &r, int (*op)(int),
                          const bdd& replace_false, const bdd& replace_true,
