@@ -206,13 +206,12 @@ namespace spot
     return int_to_formula_[v];
   }
 
-  std::pair<formula, bool> ltlf_translator::leaf_to_formula(int v) const
+  std::pair<formula, bool> ltlf_translator::leaf_to_formula(int b, int v) const
   {
-    if (v == 0)
+    if (b == 0)
       return {formula::ff(), false};
-    if (v == 1)
+    if (b == 1)
       return {formula::tt(), true};
-    v = bdd_get_terminal(v);
     return {terminal_to_formula(v), v & 1};
   }
 
@@ -251,60 +250,71 @@ namespace spot
     return formula_to_int(f) * 2 + maystop;
   }
 
-  bdd ltlf_translator::formula_to_terminal_bdd(formula f, bool maystop)
+  int ltlf_translator::formula_to_terminal_bdd_as_int(formula f,
+                                                      bool maystop)
   {
     if (SPOT_UNLIKELY(f.is_ff() && !maystop))
-      return bddfalse;
+      return 0;
     if (SPOT_UNLIKELY(f.is_tt() && maystop))
-      return bddtrue;
+      return 1;
     int v = formula_to_int(f);
     f = int_to_formula_[v];     // The formula might have been reduced to tt/ff.
     if (SPOT_UNLIKELY(f.is_ff() && !maystop))
-      return bddfalse;
+      return 0;
     if (SPOT_UNLIKELY(f.is_tt() && maystop))
-      return bddtrue;
-    return bdd_terminal(v * 2 + maystop);
+      return 1;
+    return bdd_terminal_as_int(v * 2 + maystop);
+  }
+
+  bdd ltlf_translator::formula_to_terminal_bdd(formula f, bool maystop)
+  {
+    return bdd_from_int(formula_to_terminal_bdd_as_int(f, maystop));
   }
 
   static ltlf_translator* term_combine_trans;
-  static int term_combine_and(int left, int right)
+  static int term_combine_and(int left, int left_term,
+                              int right, int right_term)
   {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right);
+    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
     formula res = formula::And({lf, rf});
-    return term_combine_trans->formula_to_terminal_bdd(res, lb && rb).id();
+    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb && rb);
   }
 
-  static int term_combine_or(int left, int right)
+  static int term_combine_or(int left, int left_term,
+                             int right, int right_term)
   {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right);
+    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
     formula res = formula::Or({lf, rf});
-    return term_combine_trans->formula_to_terminal_bdd(res, lb || rb).id();
+    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb || rb);
   }
 
-  static int term_combine_implies(int left, int right)
+  static int term_combine_implies(int left, int left_term,
+                                  int right, int right_term)
   {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right);
+    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
     formula res = formula::Implies(lf, rf);
-    return term_combine_trans->formula_to_terminal_bdd(res, !lb || rb).id();
+    return term_combine_trans->formula_to_terminal_bdd_as_int(res, !lb || rb);
   }
 
-  static int term_combine_equiv(int left, int right)
+  static int term_combine_equiv(int left, int left_term,
+                                int right, int right_term)
   {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right);
+    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
     formula res = formula::Equiv(lf, rf);
-    return term_combine_trans->formula_to_terminal_bdd(res, lb == rb).id();
+    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb == rb);
   }
 
-  static int term_combine_xor(int left, int right)
+  static int term_combine_xor(int left, int left_term,
+                              int right, int right_term)
   {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left);
-    auto [rf, rb] =  term_combine_trans->leaf_to_formula(right);
+    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+    auto [rf, rb] =  term_combine_trans->leaf_to_formula(right, right_term);
     formula res = formula::Xor(lf, rf);
-    return term_combine_trans->formula_to_terminal_bdd(res, lb != rb).id();
+    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb != rb);
   }
 
   static int term_combine_not(int left)
@@ -317,41 +327,41 @@ namespace spot
   bdd ltlf_translator::combine_and(bdd left, bdd right)
   {
     term_combine_trans = this;
-    return bdd_mt_apply2b(left, right,
-                          term_combine_and, &cache_, hash_key_and,
-                          bddop_and);
+    return bdd_mt_apply2_leaves(left, right,
+                                term_combine_and, &cache_, hash_key_and,
+                                bddop_and);
   }
 
   bdd ltlf_translator::combine_or(bdd left, bdd right)
   {
     term_combine_trans = this;
-    return bdd_mt_apply2b(left, right,
-                          term_combine_or, &cache_, hash_key_or,
-                          bddop_or);
+    return bdd_mt_apply2_leaves(left, right,
+                                term_combine_or, &cache_, hash_key_or,
+                                bddop_or);
   }
 
   bdd ltlf_translator::combine_implies(bdd left, bdd right)
   {
     term_combine_trans = this;
-    return bdd_mt_apply2b(left, right,
-                          term_combine_implies, &cache_, hash_key_implies,
-                          bddop_imp);
+    return bdd_mt_apply2_leaves(left, right,
+                                term_combine_implies, &cache_, hash_key_implies,
+                                bddop_imp);
   }
 
   bdd ltlf_translator::combine_equiv(bdd left, bdd right)
   {
     term_combine_trans = this;
-    return bdd_mt_apply2b(left, right,
-                          term_combine_equiv, &cache_, hash_key_equiv,
-                          bddop_biimp);
+    return bdd_mt_apply2_leaves(left, right,
+                                term_combine_equiv, &cache_, hash_key_equiv,
+                                bddop_biimp);
   }
 
   bdd ltlf_translator::combine_xor(bdd left, bdd right)
   {
     term_combine_trans = this;
-    return bdd_mt_apply2b(left, right,
-                          term_combine_xor, &cache_, hash_key_xor,
-                          bddop_xor);
+    return bdd_mt_apply2_leaves(left, right,
+                                term_combine_xor, &cache_, hash_key_xor,
+                                bddop_xor);
   }
 
   bdd ltlf_translator::combine_not(bdd left)
@@ -865,13 +875,12 @@ namespace spot
       mtdfa_ptr right;
       std::queue<std::pair<product_state, int>> todo;
 
-      std::pair<unsigned, bool> leaf_to_state(int b) const
+      std::pair<unsigned, bool> leaf_to_state(int b, int v) const
       {
         if (b == 0)
           return {-2U, false};
         if (b == 1)
           return {-1U, true};
-        int v = bdd_get_terminal(b);
         return {v / 2, v & 1};
       }
 
@@ -890,78 +899,77 @@ namespace spot
         return 2 * v + may_stop;
       }
 
-      bdd pair_to_terminal_bdd(unsigned left,
+      int pair_to_terminal_bdd(unsigned left,
                                unsigned right,
                                bool may_stop = false)
       {
         if (SPOT_UNLIKELY(left == -2U && right == -2U && !may_stop))
-          return bddfalse;
+          return 0;
         else if (SPOT_UNLIKELY(left == -1U && right == -1U && may_stop))
-          return bddtrue;
+          return 1;
         else
-          return bdd_terminal(pair_to_terminal(left, right, may_stop));
+          return bdd_terminal_as_int(pair_to_terminal(left, right, may_stop));
       }
-
-      std::tuple<unsigned, unsigned, bool> leaf_to_pair(bdd leaf)
-      {
-        if (leaf == bddfalse)
-          return {-2U, -2U, false};
-        if (leaf == bddtrue)
-          return {-1U, -1U, true};
-        unsigned v = bdd_get_terminal(leaf);
-        std::pair<unsigned, unsigned> res = terminal_to_pair[v / 2];
-        return {res.first, res.second, v & 1};
-      }
-
     } the_product_data;
 
-    static int leaf_combine_and(int left, int right)
+    static int leaf_combine_and(int left, int left_term,
+                                int right, int right_term)
     {
-      auto [ls, lb] = the_product_data.leaf_to_state(left);
-      auto [rs, rb] = the_product_data.leaf_to_state(right);
-      if (ls == -2U || rs == -2U)
+      if (left == 0 || right == 0)
         return 0;
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb & rb).id();
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb & rb);
     }
 
-    static int leaf_combine_or(int left, int right)
+    static int leaf_combine_or(int left, int left_term,
+                               int right, int right_term)
     {
-      auto [ls, lb] = the_product_data.leaf_to_state(left);
-      auto [rs, rb] = the_product_data.leaf_to_state(right);
-      if (ls == -1U || rs == -1U)
+      if (left == 1 || right == 1)
         return 1;
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb | rb).id();
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb | rb);
     }
 
-    static int leaf_combine_implies(int left, int right)
+    static int leaf_combine_implies(int left, int left_term,
+                                    int right, int right_term)
     {
-      auto [ls, lb] = the_product_data.leaf_to_state(left);
-      auto [rs, rb] = the_product_data.leaf_to_state(right);
-      if (ls == -2U || rs == -1U)
+      if (left == 0 || right == 1)
         return 1;
-      return the_product_data.pair_to_terminal_bdd(ls, rs, !lb | rb).id();
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, !lb | rb);
     }
 
-    static int leaf_combine_equiv(int left, int right)
+    static int leaf_combine_equiv(int left, int left_term,
+                                  int right, int right_term)
     {
-      auto [ls, lb] = the_product_data.leaf_to_state(left);
-      auto [rs, rb] = the_product_data.leaf_to_state(right);
-      if (rs == ls && (ls == -2U || ls == -1U))
-        return 1;
-      if ((ls == -1U && rs == -2U) || (ls == -2U && rs == -1U))
-        return 0;
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb == rb).id();
+      if (SPOT_UNLIKELY(left == 0 || left == 1))
+        {
+          if (left == right)
+            return 1;
+          if ((left ^ right) == 1)
+            return 0;
+        }
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb == rb);
     }
 
-    static int leaf_combine_xor(int left, int right)
+    static int leaf_combine_xor(int left, int left_term,
+                                int right, int right_term)
     {
-      auto [ls, lb] = the_product_data.leaf_to_state(left);
-      auto [rs, rb] = the_product_data.leaf_to_state(right);
-      if (rs == ls && (ls == -2U || ls == -1U))
-        return 0;
-      if ((ls == -1U && rs == -2U) || (ls == -2U && rs == -1U))
-        return 1;
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb != rb).id();
+      if (SPOT_UNLIKELY(left == 0 || left == 1))
+        {
+          if (left == right)
+            return 0;
+          if ((left ^ right) == 1)
+            return 1;
+        }
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb != rb);
     }
   }
 
@@ -973,7 +981,7 @@ namespace spot
       throw std::runtime_error
         ("product_mtdfa_and: DFAs should share their dictionaries");
 
-    int (*combine)(int, int);
+    int (*combine)(int, int, int, int);
     switch (o)
       {
         case op::And:
@@ -1012,9 +1020,9 @@ namespace spot
 
         auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
         auto [right, right_f] = bdd_and_formula_from_state(s.second, dfa2);
-
-        bdd b = bdd_mt_apply2b(left, right, combine, cache, hash_key);
+        bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key);
         res->states.push_back(b);
+
         if (left_f && right_f)
           switch (o)
             {

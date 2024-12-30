@@ -119,12 +119,13 @@ namespace spot
                             bool detect_empty_univ = true);
 
     bdd ltlf_to_mtbdd(formula f);
-    std::pair<formula, bool>  leaf_to_formula(int t) const;
+    std::pair<formula, bool>  leaf_to_formula(int b, int term) const;
 
     formula terminal_to_formula(int t) const;
     int formula_to_int(formula f);
     int formula_to_terminal(formula f, bool may_stop = false);
     bdd formula_to_terminal_bdd(formula f, bool may_stop = false);
+    int formula_to_terminal_bdd_as_int(formula f, bool may_stop = false);
 
     bdd combine_and(bdd left, bdd right);
     bdd combine_or(bdd left, bdd right);
