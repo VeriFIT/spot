@@ -82,7 +82,7 @@ int main(int argc, char** argv)
      for (auto [path, term]: paths_mt_of(arr[2]))
        std::cout << path << " -> " << term << '\n';
      std::cout << "--\n";
-     for (int term: terminals_of(arr[2]))
+     for (bdd term: silent_paths_mt_of(arr[2]))
        std::cout << "terminal " << term << '\n';
 
      std::cout << "--\n";

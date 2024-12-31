@@ -1458,7 +1458,7 @@ public:
     bool operator!=(std::nullptr_t) const;
     std::conditional_t<path,
                        std::conditional_t<mt, std::pair<bdd, bdd>, bdd>,
-                       int> operator*() const;
+                       bdd> operator*() const;
   protected:
     paths_of_* me_;
   };
@@ -1491,12 +1491,11 @@ public:
 
   std::conditional_t<path,
                      std::conditional_t<mt, std::pair<bdd, bdd>, bdd>,
-                     int>
+                     bdd>
   operator*() const
   {
-    // Update
     if constexpr (!path)
-      return bdd_get_terminal(*me_->stacktop);
+      return bdd_current_leaf(me_);
     else if constexpr (mt)
       return std::pair<bdd, bdd>(bdd_current_path(me_), bdd_current_leaf(me_));
     else
@@ -1539,15 +1538,18 @@ paths_of_<path, mt>::path_iterator::operator!=(std::nullptr_t) const
 template<bool path, bool mt>
 inline std::conditional_t<path,
                           std::conditional_t<mt, std::pair<bdd, bdd>, bdd>,
-                          int>
+                          bdd>
 paths_of_<path, mt>::path_iterator::operator*() const
 {
   return **me_;
 }
 
+// iterate on conditions that lead to a non-false leave
 typedef paths_of_<true, false> paths_of;
+// same, but returns pairs (conditions, leaves)
 typedef paths_of_<true, true> paths_mt_of;
-typedef paths_of_<false, true> terminals_of;
+// same, but returns just the leaves without building the conditions
+typedef paths_of_<false, true> silent_paths_mt_of;
 
 #endif /* CPLUSPLUS */
 
