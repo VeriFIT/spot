@@ -1750,39 +1750,33 @@ namespace spot
     return dfa;
   }
 
-  mtdfa_stats mtdfa::get_stats() const
+  mtdfa_stats mtdfa::get_stats(bool nodes, bool paths) const
   {
     mtdfa_stats res;
     res.states = states.size();
-    res.edges = 0;
-    res.paths = 0;
-    robin_hood::unordered_set<int> terms;
-    for (bdd b: states)
-      {
-        terms.clear();
-        for (auto [c, t]: paths_mt_of(b))
-          {
-            (void) c;
-            ++res.paths;
-            terms.insert(t.id());
-          }
-        res.edges += terms.size();
-      }
-    res.nodes = bdd_anodecount(states);
-    res.leaves = 0;
-    res.has_false = 0;
-    res.has_true = 0;
-    for (bdd b: leaves_of(states))
-      {
-        ++res.leaves;
-        if (b == bddfalse)
-          res.has_false = true;
-        else if (b == bddtrue)
-          res.has_true = true;
-      }
-    res.nodes += res.has_false;
-    res.nodes += res.has_true;
     res.aps = aps.size();
+    if (nodes)
+      {
+        int terms;
+        res.nodes = bdd_anodecount(states, terms, res.has_false, res.has_true);
+        res.terminals = terms;
+      }
+    if (paths)
+      {
+        res.edges = 0;
+        res.paths = 0;
+        robin_hood::unordered_set<int> terms;
+        for (bdd b: states)
+          {
+            terms.clear();
+            for (auto t: silent_paths_mt_of(b))
+              {
+                ++res.paths;
+                terms.insert(t.id());
+              }
+            res.edges += terms.size();
+          }
+      }
     return res;
   }
 }

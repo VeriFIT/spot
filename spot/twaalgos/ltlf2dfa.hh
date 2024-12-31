@@ -26,13 +26,15 @@ namespace spot
   struct SPOT_API mtdfa_stats
   {
     unsigned states;
-    unsigned leaves;
-    unsigned long long paths;
-    unsigned long long edges;
-    unsigned nodes;
     unsigned aps;
+    // filled if get_stats receive the nodes option
+    unsigned nodes;
+    unsigned terminals;
     bool has_true;
     bool has_false;
+    // filled if get_stats receive the paths option
+    unsigned long long paths;
+    unsigned long long edges;
   };
 
   struct SPOT_API mtdfa
@@ -76,7 +78,7 @@ namespace spot
     twa_graph_ptr as_twa(bool state_based = false, bool labels = true) const;
 
 
-    mtdfa_stats get_stats() const;
+    mtdfa_stats get_stats(bool nodes, bool paths) const;
   };
 
   typedef std::shared_ptr<mtdfa> mtdfa_ptr;

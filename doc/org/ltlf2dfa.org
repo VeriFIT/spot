@@ -175,7 +175,8 @@ ltlf2dfa 'a U b U c U d' --mtdfa-dot
 
 
 The =--mtdfa-stats= options replace the output by some statistics
-about the MTDFA:
+about the MTDFA.  By default, it just prints some statistics that
+can be obtained in constant time (after construction)
 
 #+BEGIN_SRC sh :exports both
 ltlf2dfa 'a U b U c U d' --mtdfa-stats
@@ -183,23 +184,101 @@ ltlf2dfa 'a U b U c U d' --mtdfa-stats
 
 #+RESULTS:
 : states: 3
-: leaves: 5
-: nodes: 12
-: paths: 15
-: edges: 9
-: has_true: 1
-: has_false: 1
+: aps: 4
+: BuDDy nodenum: 524288 (8192KB)
+: BuDDy freenodes: 524241 (99.99%)
+: BuDDy produced: 45
+: BuDDy cachesize: 16384 (256KB * 6 = 1536KB)
+: BuDDy hashsize: 524288 (2048KB)
+: BuDDy gbcnum: 0
+
+The first lines are about the automaton itself:
 
 - =states= is the number of blue nodes, i.e., the number of state in
   the automaton (not counting any sink state)
-- =leaves= is the number of magenta and orange nodes
-- =nodes= is the number of white, magenta, and orange nodes
+- =ap= is the number of atomic proposition that were involved in the
+  construction of the automaton (the automaton may use fewer in practice)
+
+The next lines, starting with BuDDy, gives statistics about the BuDDy
+library's usage.  Those statistics are global, so if multiple automats
+are translated in a single run of =ltlf2dfa=, these statistics will
+likely be different than if automata are translated one at a time.
+
+- =nodenum= is the total number of nodes currently allocated by the
+  BuDDy library.  Each node occupies 16 bytes.  This number in
+  enlarged as needed when BuDDy runs out of space, it is never
+  decreased.
+- =freenodes= is the number of unused nodes.
+- =produced= is the total number of nodes ever produced (false and true
+  are not counted).
+- =cachesize= is the size of each operation cache of BuDDy.  Each
+  entry in a cache is 16 byte, and BuDDy as 6 such caches.  The MTBDD
+  operations needed to translate LTLf to DFA will allocate a couple
+  additional temporary caches of that same size, but this is not
+  accounted here.
+- =hashsize= is the size the BuDDy's hash table used to ensure
+  unicity of nodes.  It needs only 4 bytes per entry.
+- =gbcnum= is the number of garbage collection performed by BuDDy
+  since its initialization.
+
+With the =--mtdfs-stats=nodes= options, additional information about the
+node usage of the automaton is retrieve.  This requires a linear scan of
+the entire DAG.
+
+#+BEGIN_SRC sh :exports both
+ltlf2dfa 'a U b U c U d' --mtdfa-stats=nodes
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+states: 3
+aps: 4
+internal nodes: 7
+terminal nodes: 3
+constant nodes: 2 (false and true)
+total nodes: 12 (0KB)
+BuDDy nodenum: 524288 (8192KB)
+BuDDy freenodes: 524241 (99.99%)
+BuDDy produced: 45
+BuDDy cachesize: 16384 (256KB * 6 = 1536KB)
+BuDDy hashsize: 524288 (2048KB)
+BuDDy gbcnum: 0
+#+end_example
+
+- =internal nodes= is the number of white nodes in the above pictures
+- =terminal nodes= counts magenta nodes
+- =constants nodes= counts the orange nodes)
+- =total nodes= is the sum of the above three.
+
+With =--mtdfa-stats=paths= we additionally counts paths and edges.  This
+computation can be exponential in the number of atomic propositions.
+
+#+BEGIN_SRC sh :exports both
+ltlf2dfa 'a U b U c U d' --mtdfa-stats=paths
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+states: 3
+aps: 4
+internal nodes: 7
+terminal nodes: 3
+constant nodes: 2 (false and true)
+total nodes: 12 (0KB)
+paths: 15
+edges: 9
+BuDDy nodenum: 524288 (8192KB)
+BuDDy freenodes: 524241 (99.99%)
+BuDDy produced: 45
+BuDDy cachesize: 16384 (256KB * 6 = 1536KB)
+BuDDy hashsize: 524288 (2048KB)
+BuDDy gbcnum: 0
+#+end_example
+
 - =paths= is the number of different paths leading from a blue node to
   a leave (excluding paths leading to the rejecting sink)
 - =edges= is the number of pairs (state,leaf) that are connected by a
   paths (again, paths leading to false rejecting sink are not considered)
-- =has_true= and =has_edge= indicate the presence of an accepting and
-  rejecting sink
 
 If we want to estimate the memory consumption of a MTDFA, each node
 (white, magenta, or orange) costs 16 bytes in BuDDy (four =int=), and

@@ -21,6 +21,7 @@
 #include <argp.h>
 #include <error.h>
 #include <argmatch.h>
+#include <iomanip>
 
 #include "common_aoutput.hh"
 #include "common_finput.hh"
@@ -83,8 +84,13 @@ static const argp_option options[] =
       "print the automaton in DOT format", 0 },
     { "mtdfa-dot", OPT_MTDFA_DOT, nullptr, 0,
       "print the MTDFA in DOT format", 0 },
-    { "mtdfa-stats", OPT_MTDFA_STATS, nullptr, 0,
-      "print statistics about the MTDFA", 0 },
+    { "mtdfa-stats", OPT_MTDFA_STATS, "basic|nodes|paths", OPTION_ARG_OPTIONAL,
+      "print statistics about the MTDFA: 'basic' (the default) displays "
+      "only the number of states and atomic propositions (this is obtained in "
+      "constant time), 'nodes' additionally displays nodes "
+      "counts (computing those is proportional to the size of the BDD) "
+      "'paths' additionally displays path counts (this can be exponential in "
+      " number of atomic propositions", 0 },
     { "quiet", 'q', nullptr, 0, "suppress all normal output", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
@@ -143,6 +149,19 @@ static bool composition_values[] =
 ARGMATCH_VERIFY(composition_args, composition_values);
 static bool opt_composition_by_ap = false;
 
+
+static const char* const stats_args[] =
+  {
+    "basic", "nodes", "paths", nullptr
+  };
+static int stats_values[] =
+  {
+    0, 1, 2,
+  };
+ARGMATCH_VERIFY(stats_args, stats_values);
+static int opt_stats = 0;
+
+
 enum mtdfa_output_type { mtdfa_none, mtdfa_dot, mtdfa_stats };
 static mtdfa_output_type mtdfa_output = mtdfa_none;
 
@@ -195,6 +214,9 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_MTDFA_STATS:
       mtdfa_output = mtdfa_stats;
+      if (arg)
+        opt_stats = XARGMATCH("--mtdfa-stats", arg,
+                              stats_args, stats_values);
       break;
     case ARGP_KEY_ARG:
       // FIXME: use stat() to distinguish filename from string?
@@ -271,15 +293,47 @@ namespace
         }
       else if (mtdfa_output == mtdfa_stats)
         {
-          spot::mtdfa_stats s = a->get_stats();
+          spot::mtdfa_stats s = a->get_stats(opt_stats >= 1, opt_stats >= 2);
           std::cout << "states: " << s.states << '\n'
-                    << "leaves: " << s.leaves << '\n'
-                    << "nodes: " << s.nodes << '\n'
-                    << "paths: " << s.paths << '\n'
-                    << "edges: " << s.edges << '\n'
-                    << "aps: " << s.aps << '\n'
-                    << "has_true: " << s.has_true << '\n'
-                    << "has_false: " << s.has_false << '\n';
+                    << "aps: " << s.aps << '\n';
+          if (opt_stats >= 1)
+            {
+              std::cout << "internal nodes: " << s.nodes << '\n'
+                        << "terminal nodes: " << s.terminals << '\n'
+                        << "constant nodes: " << s.has_true + s.has_false;
+              if (s.has_true && s.has_false)
+                std::cout << " (false and true)\n";
+              else if (s.has_true && !s.has_false)
+                std::cout << " (true)\n";
+              else if (!s.has_true && s.has_false)
+                std::cout << " (true)\n";
+              else
+                std::cout << '\n';
+              unsigned long long total_nodes
+                = s.nodes + s.terminals + s.has_true + s.has_false;
+              std::cout << "total nodes: " << total_nodes;
+              std::cout << " (" << (total_nodes + 32) / 64 << "KB)\n";
+            }
+          if (opt_stats >= 2)
+            std::cout << "paths: " << s.paths << '\n'
+                      << "edges: " << s.edges << '\n';
+          bddStat bs;
+          bdd_stats(&bs);
+          std::cout << "BuDDy nodenum: " << bs.nodenum
+            // a node is 16 bytes, so 64 nodes is 1KB
+                    << " (" << ((bs.nodenum+32)/64) << "KB)\n"
+                    << "BuDDy freenodes: " << bs.freenodes
+                    << " (" << std::fixed << std::setprecision(2)
+                    << (bs.freenodes * 100. / bs.nodenum) << "%)\n"
+                    << "BuDDy produced: " << bs.produced << '\n'
+                    << "BuDDy cachesize: " << bs.cachesize
+            // a cache entry is 16 bytes, but there are 6 caches.
+                    << " (" << ((bs.cachesize+32)/64) << "KB * 6 = "
+                    << ((bs.cachesize*6+32)/64) << "KB)\n"
+                    << "BuDDy hashsize: " << bs.hashsize
+            // a has entry is 4 bytes, so 256 entries is 1KB
+                    << " (" << ((bs.hashsize+128)/256) << "KB)\n"
+                    << "BuDDy gbcnum: " << bs.gbcnum << '\n';
         }
       else
         {
