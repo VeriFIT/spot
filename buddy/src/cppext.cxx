@@ -716,6 +716,52 @@ bool bdd_find_leaf(const std::vector<bdd>& b, bool (*pred)(int))
 
 }
 
+void bdd_markcount_extra(int i, int *cou,  int* terms, int* consts)
+{
+   BddNode *node;
+   if (__unlikely(i < 2))
+     {
+       if (i == 0)
+         *consts |= 1;
+       if (i == 1)
+         *consts |= 2;
+       return;
+     }
+
+   node = &bddnodes[i];
+   if (MARKEDp(node)  ||  LOWp(node) == -1)
+      return;
+
+   if (__unlikely(ISTERMp(node)))
+     {
+       ++*terms;
+       SETMARKp(node);
+       return;
+     }
+   *cou += 1;
+   SETMARKp(node);
+
+   bdd_markcount_extra(LOWp(node), cou, terms, consts);
+   bdd_markcount_extra(HIGHp(node), cou, terms, consts);
+}
+
+
+int bdd_anodecountpp(const std::vector<bdd>& b,
+                     int& terms, bool& has_true, bool& has_false)
+{
+  int count = 0;
+  int consts = 0;
+  terms = 0;
+  for (const bdd& x: b)
+    bdd_markcount_extra(x.root, &count, &terms, &consts);
+  for (const bdd& x: b)
+    bdd_unmark(x.root);
+  has_false = consts & 1;
+  has_true = consts & 2;
+  return count;
+}
+
+
 int bdd_anodecountpp(const std::vector<bdd>& b)
 {
   int count = 0;
