@@ -360,45 +360,50 @@ class formula:
             raise ValueError("unknown string format: " + format)
 
     def __format__(self, spec):
+        # Some test case print this docstring, and different
+        # Python version will handled indentation differently.
+        # (Python versions before 3.13 don't strip indentation.)
+        # So we cannot indent this until Python 3.13 is thee
+        # smallest version we support.
         """Format the formula according to `spec`.
 
-        Parameters
-        ----------
-        spec : str, optional
-            a list of letters that specify how the formula
-            should be formatted.
+Parameters
+----------
+spec : str, optional
+    a list of letters that specify how the formula
+    should be formatted.
 
-        Supported specifiers
-        --------------------
+Supported specifiers
+--------------------
 
-        - 'f': use Spot's syntax (default)
-        - '8': use Spot's syntax in UTF-8 mode
-        - 's': use Spin's syntax
-        - 'l': use LBT's syntax
-        - 'w': use Wring's syntax
-        - 'x': use LaTeX output
-        - 'X': use self-contained LaTeX output
-        - 'j': use self-contained LaTeX output, adjusted for MathJax
+- 'f': use Spot's syntax (default)
+- '8': use Spot's syntax in UTF-8 mode
+- 's': use Spin's syntax
+- 'l': use LBT's syntax
+- 'w': use Wring's syntax
+- 'x': use LaTeX output
+- 'X': use self-contained LaTeX output
+- 'j': use self-contained LaTeX output, adjusted for MathJax
 
-        Add some of those letters for additional options:
+Add some of those letters for additional options:
 
-        - 'p': use full parentheses
-        - 'c': escape the formula for CSV output (this will
-               enclose the formula in double quotes, and escape
-               any included double quotes)
-        - 'h': escape the formula for HTML output
-        - 'd': escape double quotes and backslash,
-               for use in C-strings (the outermost double
-               quotes are *not* added)
-        - 'q': quote and escape for shell output, using single
-               quotes or double quotes depending on the contents.
-        - '[...]': rewrite away all the operators specified in brackets,
-               using spot.unabbreviate().
+- 'p': use full parentheses
+- 'c': escape the formula for CSV output (this will
+       enclose the formula in double quotes, and escape
+       any included double quotes)
+- 'h': escape the formula for HTML output
+- 'd': escape double quotes and backslash,
+       for use in C-strings (the outermost double
+       quotes are *not* added)
+- 'q': quote and escape for shell output, using single
+       quotes or double quotes depending on the contents.
+- '[...]': rewrite away all the operators specified in brackets,
+       using spot.unabbreviate().
 
-        - ':spec': pass the remaining specification to the
-                   formating function for strings.
+- ':spec': pass the remaining specification to the
+           formating function for strings.
 
-        """
+"""
 
         syntax = 'f'
         parent = False
