@@ -20,6 +20,7 @@
 #include <queue>
 #include <unordered_map>
 #include <algorithm>
+#include <array>
 #include <spot/misc/bddlt.hh>
 #include <spot/misc/escape.hh>
 #include <spot/twaalgos/ltlf2dfa.hh>
@@ -868,12 +869,27 @@ namespace spot
 
     struct product_data
     {
-      std::unordered_map<product_state, int,
+      // Cache the BDD node representing the terminals associated to a
+      // pair of states.  We may have up to two terminals par state,
+      // to distinguish between accepting states (2*value+1) or
+      // rejecting state (2*value).  However, while we know we need at
+      // least one of terminal, we may not always need the second one.
+      // So in the interest of reducing the calls to BuDDy, we store
+      // the 1-complement of value until in the other field until we
+      // find we actually need that terminal.
+      //
+      // The array can therefore hold either
+      //    [bdd_terminal(value*2), ~value]
+      // or [~value, bdd_terminal(value*2+1)]
+      // or [bdd_terminai(value*2), bdd_terminal(value*2+1)]
+      //
+      // The distinction between the three case can be made with
+      // the sign bit of the array element.
+      std::unordered_map<product_state, std::array<int, 2>,
                          product_state_hash> pair_to_terminal_map;
-      std::vector<product_state> terminal_to_pair;
       mtdfa_ptr left;
       mtdfa_ptr right;
-      std::queue<std::pair<product_state, int>> todo;
+      std::queue<product_state> todo;
 
       std::pair<unsigned, bool> leaf_to_state(int b, int v) const
       {
@@ -890,13 +906,24 @@ namespace spot
       {
         if (auto it = pair_to_terminal_map.find({left, right});
             it != pair_to_terminal_map.end())
-          return 2 * it->second + may_stop;
+          {
+            int& id = it->second[may_stop];
+            if (id < 0)
+              id = bdd_terminal_as_int(2 * ~id + may_stop);
+            return id;
+          }
 
-        int v = terminal_to_pair.size();
-        terminal_to_pair.push_back({left, right});
-        pair_to_terminal_map[{left, right}] = v;
-        todo.emplace(product_state{left, right}, v);
-        return 2 * v + may_stop;
+        unsigned v = pair_to_terminal_map.size();
+        std::array<int, 2> entry;
+        int id = bdd_terminal_as_int(2 * v + may_stop);
+        entry[may_stop] = id;
+        entry[!may_stop] = ~v;
+
+        product_state ps{left, right};
+        pair_to_terminal_map.emplace(ps, entry);
+        todo.emplace(ps);
+
+        return id;
       }
 
       int pair_to_terminal_bdd(unsigned left,
@@ -908,7 +935,7 @@ namespace spot
         else if (SPOT_UNLIKELY(left == -1U && right == -1U && may_stop))
           return 1;
         else
-          return bdd_terminal_as_int(pair_to_terminal(left, right, may_stop));
+          return pair_to_terminal(left, right, may_stop);
       }
     } the_product_data;
 
@@ -1010,12 +1037,12 @@ namespace spot
     res->dict_->register_all_propositions_of(dfa1, res);
     res->dict_->register_all_propositions_of(dfa2, res);
 
-    std::queue<std::pair<product_state, int>>& todo = the_product_data.todo;
+    std::queue<product_state>& todo = the_product_data.todo;
     // this will  todo with the initial state of the product
     (void) the_product_data.pair_to_terminal(0, 0);
     while (!todo.empty())
       {
-        auto [s, label_term] = todo.front();
+        product_state s = todo.front();
         todo.pop();
 
         auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
@@ -1056,7 +1083,6 @@ namespace spot
     the_product_data.left = nullptr;
     the_product_data.right = nullptr;
     the_product_data.pair_to_terminal_map.clear();
-    the_product_data.terminal_to_pair.clear();
     return res;
   }
 
