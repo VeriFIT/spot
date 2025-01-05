@@ -1360,3 +1360,16 @@ REALIZABLE
 REALIZABLE
 EOF
 diff out expected
+
+# Additional test for global equivalences
+# Specifically if the output is set to the negation of another output
+
+ltlsynt -f "((G((p0)<->(!(p1))))&&(((F(a))||(G(b)))<->(G(F(p0)))))" \
+        --outs "p1, p0" \
+        --verify --aiger | tail -n 1 > out
+
+cat > expected <<EOF
+Circuit was verified
+EOF
+diff out expected
+

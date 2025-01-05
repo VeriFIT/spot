@@ -2061,7 +2061,10 @@ namespace
                       assert(it2 != output_names_all.end());
                       unsigned outnum = it2 - output_names_all.begin();
                       unsigned outvar = circuit.output(outnum);
-                      circuit.set_output(i, outvar + neg_repr);
+                      assert(outvar != -1u);
+                      if (neg_repr)
+                        outvar = circuit.aig_not(outvar);
+                      circuit.set_output(i, outvar);
                     }
               }
           }
