@@ -1218,6 +1218,12 @@ namespace spot
       return ltlf_to_mtdfa_compose(data, f);
     };
 
+    auto byminrootcount = [&](const mtdfa_ptr& left,
+                              const mtdfa_ptr& right)
+    {
+      return left->num_roots() > right->num_roots();
+    };
+
     mtdfa_ptr dfa;
     if (f.is_boolean())
       return data.trans.ltlf_to_mtdfa(f, data.fuse_same_bdds);
@@ -1236,17 +1242,17 @@ namespace spot
           goto no_order_needed;
         if (!data.order_for_aps)
           {
-            auto byminrootcount = [&](const mtdfa_ptr& left,
-                                      const mtdfa_ptr& right)
-            {
-              return left->num_roots() > right->num_roots();
-            };
             std::vector<mtdfa_ptr> dfas;
             dfas.reserve(f.size());
             for (const formula& sub: f)
               dfas.push_back(rec(sub));
             // Build the product of all DFAs by increasing size.
             std::make_heap(dfas.begin(), dfas.end(), byminrootcount);
+            // bddCacheStat cs;
+            // bdd_cachestats(&cs);
+            // std::cerr << "opHit " << cs.opHit
+            //           << "\nopMiss " << cs.opMiss << '\n'
+            //           << "\ncachesize " << data.opcache.tablesize << '\n';
             while (dfas.size() > 1)
               {
                 std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
@@ -1271,12 +1277,15 @@ namespace spot
                 //           << ") min: " << dfas.back()->num_roots()
                 //           << (wantmin ? "" : " (skipped)") << '\n';
                 std::push_heap(dfas.begin(), dfas.end(), byminrootcount);
+                // bdd_cachestats(&cs);
+                // std::cerr << "opHit " << cs.opHit
+                //           << "\nopMiss " << cs.opMiss << '\n';
               }
             return dfas[0];
           }
         else
           {
-            auto byminrootcount =
+            auto byminrootcountp =
               [&](const std::pair<mtdfa_ptr, bitvect*>& left,
                   const std::pair<mtdfa_ptr, bitvect*>& right)
               {
@@ -1309,7 +1318,7 @@ namespace spot
                 dfas_and_aps.emplace_back(dfasub, apsvec);
               }
             std::sort(dfas_and_aps.begin(), dfas_and_aps.end(),
-                      byminrootcount);
+                      byminrootcountp);
             std::vector<mtdfa_ptr> independent_dfas; // no AP in common
             while (dfas_and_aps.size() > 1)
               {
@@ -1344,7 +1353,7 @@ namespace spot
                 auto p = std::make_pair(min, aps_left);
                 auto lb = std::lower_bound(dfas_and_aps.begin(),
                                            dfas_and_aps.end(),
-                                           p, byminrootcount);
+                                           p, byminrootcountp);
                 dfas_and_aps.insert(lb, p);
                 // std::cerr << "op: " << (int)o
                 //           << " left: " << dfa_left->num_roots()
@@ -1358,22 +1367,33 @@ namespace spot
             delete dfas_and_aps[0].second;
             if (independent_dfas.empty())
               return dfas_and_aps[0].first;
-            mtdfa_ptr res = dfas_and_aps[0].first;
-            for (mtdfa_ptr dfa: independent_dfas)
+            std::make_heap(independent_dfas.begin(), independent_dfas.end(),
+                           byminrootcount);
+            while (independent_dfas.size() > 1)
               {
+                std::pop_heap(independent_dfas.begin(), independent_dfas.end(),
+                              byminrootcount);
+                mtdfa_ptr left = independent_dfas.back();
+                independent_dfas.pop_back();
+                std::pop_heap(independent_dfas.begin(), independent_dfas.end(),
+                              byminrootcount);
+                mtdfa_ptr right = independent_dfas.back();
+                independent_dfas.pop_back();
+                mtdfa_ptr prod = product_mtdfa_aux(left, right, o,
+                                                   &data.opcache,
+                                                   data.opcache_iteration++);
                 // std::cerr << "op: " << (int)o
-                //           << " left: " << res->num_roots()
-                //           << " (" << res->aps.size()
-                //           << ") right: " << dfa->num_roots()
-                //           << " (" << dfa->aps.size();
-                res = product_mtdfa_aux(res, dfa, o,
-                                        &data.opcache,
-                                        data.opcache_iteration++);
-                // std::cerr << ")  prod: " << res->num_roots()
-                //           << " (" << res->aps.size()
+                //           << " left: " << left->num_roots()
+                //           << " (" << left->aps.size()
+                //           << ") right: " << right->num_roots()
+                //           << " (" << right->aps.size()
+                //           << ") prod: " << prod->num_roots()
+                //           << " (" << prod->aps.size()
                 //           << ") no minimization needed\n";
+                std::push_heap(independent_dfas.begin(), independent_dfas.end(),
+                               byminrootcount);
               }
-            return res;
+            return independent_dfas.front();
           }
       case op::Xor:
       case op::Implies:
