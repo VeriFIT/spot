@@ -303,7 +303,7 @@ extern int   *fdddec2bin(int, int);
 extern int    bdd_operator_init(int);
 extern void   bdd_operator_done(void);
 extern void   bdd_operator_varresize(void);
-extern void   bdd_operator_reset(void);
+extern void   bdd_operator_reset(int from_gc);
 
 extern void   bdd_pairs_init(void);
 extern void   bdd_pairs_done(void);

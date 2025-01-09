@@ -51,7 +51,7 @@ int main(int argc, char** argv)
      bdd arr[4] = {x, y};
 
      bddExtCache mt_cache;
-     bdd_extcache_init(&mt_cache, 100);
+     bdd_extcache_init(&mt_cache, 100, true);
      arr[2] = bdd_mt_apply2(x, y,
                             [](int a , int b) { return a + b; },
                             &mt_cache, 1);

@@ -155,7 +155,7 @@ void bdd_reorder_init(void)
 void bdd_reorder_done(void)
 {
    bddtree_del(vartree);
-   bdd_operator_reset();
+   bdd_operator_reset(0);
    vartree = NULL;
 }
 

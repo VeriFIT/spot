@@ -45,7 +45,8 @@
 // This is the root of the circular list of external caches.
 // It is declared as an external cache itself, but is only used
 // for the next/prev pointers.
-bddExtCache external_caches = { NULL, 0, &external_caches, &external_caches };
+bddExtCache external_caches = { NULL, 0, &external_caches, &external_caches,
+                                0, 0, };
 
 
 /*************************************************************************
@@ -86,22 +87,50 @@ int BddCache_resize(BddCache *cache, int newsize)
 }
 
 
-void bdd_extcache_init(bddExtCache* cache, int size)
+// If size is negative, it is interpreted as a ratio over the global
+// node table.
+void bdd_extcache_init(bddExtCache* cache, int size, int erase_on_gc)
 {
+  int ratio = 0;
   if (size <= 0)
-    size = bddcachesize;
+    {
+      ratio = -size;
+      if (size == 0)
+        size = bddcachesize;
+      else
+        size = bddnodesize / ratio;
+    }
 
   size = bdd_nextpower(size);
   if ((cache->table=NEW(bddExtCacheEntry, size)) == NULL)
     bdd_error(BDD_MEMORY);
   cache->tablesize = size;
+  cache->erase_on_gc = erase_on_gc;
+  cache->ratio = 0;
   bdd_extcache_reset(cache);
+  cache->ratio = ratio;
 
   // register the new cache in the circular list
   cache->next_ext_cache = external_caches.next_ext_cache;
   cache->prev_ext_cache = &external_caches;
   external_caches.next_ext_cache->prev_ext_cache = cache;
   external_caches.next_ext_cache = cache;
+}
+
+void bdd_extcache_reserve(bddExtCache* cache, int size)
+{
+  if (size <= cache->tablesize)
+    return;
+
+  size = bdd_nextpower(size);
+  //fprintf(stderr, "BDD extcache %p resize: %d -> %d\n", cache,
+  //        cache->tablesize, size);
+  free(cache->table);
+  if ((cache->table=NEW(bddExtCacheEntry, size)) == NULL)
+    bdd_error(BDD_MEMORY);
+  cache->tablesize = size;
+  for (int n = 0; n < size; n++)
+    cache->table[n].arg1 = -1;
 }
 
 void bdd_extcache_done(bddExtCache* cache)
@@ -117,7 +146,17 @@ void bdd_extcache_done(bddExtCache* cache)
 
 void bdd_extcache_reset(bddExtCache* cache)
 {
-  for (int n = 0; n < cache->tablesize; n++)
+  if (cache->ratio > 0)
+    {
+      int newsize = bddnodesize / cache->ratio;
+      if (newsize > cache->tablesize)
+        {
+          bdd_extcache_reserve(cache, newsize);
+          return;
+        }
+    }
+  int end = cache->tablesize;
+  for (int n = 0; n < end; n++)
     cache->table[n].arg1 = -1;
 }
 

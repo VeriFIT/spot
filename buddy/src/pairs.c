@@ -81,7 +81,8 @@ static int update_pairsid(void)
       pairsid = 0;
       for (p=pairs ; p!=NULL ; p=p->next)
 	 p->id = pairsid++;
-      bdd_operator_reset();
+      // shouldn't this just reset the replace cache?
+      bdd_operator_reset(0);
    }
 
    return pairsid;

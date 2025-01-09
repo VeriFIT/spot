@@ -252,7 +252,7 @@ void bdd_operator_done(void)
 }
 
 
-void bdd_operator_reset(void)
+void bdd_operator_reset(int from_gc)
 {
    BddCache_reset(&applycache);
    BddCache_reset(&itecache);
@@ -265,7 +265,8 @@ void bdd_operator_reset(void)
    // reset all external caches
    for (bddExtCache* cache = external_caches.next_ext_cache;
         cache != &external_caches; cache = cache->next_ext_cache)
-     bdd_extcache_reset(cache);
+     if (!from_gc || cache->erase_on_gc)
+       bdd_extcache_reset(cache);
 }
 
 
@@ -343,7 +344,6 @@ static void checkresize(void)
       bdd_operator_noderesize();
    bddresized = 0;
 }
-
 
 /*=== BUILD A CUBE =====================================================*/
 
@@ -1171,11 +1171,9 @@ BDD bdd_mt_apply2(BDD l, BDD r, int (*termop)(int, int),
                   int applyop)
 {
    LOCAL_REC_STACKS;
-
    int index;
 
    goto work;
-
    do
      {
        index = POPINT_();

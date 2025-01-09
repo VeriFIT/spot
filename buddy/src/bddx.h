@@ -267,6 +267,13 @@ typedef struct bddExtCache
      the garbage collector can reset them. */
   struct bddExtCache* next_ext_cache;
   struct bddExtCache* prev_ext_cache;
+  /* Whether to wipe the cache on garbage collection.
+     The cache needs to be erased only if it can contains
+     reference to BDD node that can be garbage collected. */
+  int erase_on_gc;
+  /* if >0, the number of nodes in the main table, per
+     entries in this cache */
+  int ratio;
 } bddExtCache;
 
 
@@ -363,8 +370,9 @@ BUDDY_API void     bdd_resetpair(bddPair *);
 BUDDY_API void     bdd_freepair(bddPair*);
 BUDDY_API int      bdd_stable_cmp(BDD, BDD);
 
-BUDDY_API void     bdd_extcache_init(bddExtCache*, int);
+BUDDY_API void     bdd_extcache_init(bddExtCache*, int, int);
 BUDDY_API void     bdd_extcache_reset(bddExtCache*);
+BUDDY_API void     bdd_extcache_reserve(bddExtCache*, int);
 BUDDY_API void     bdd_extcache_done(bddExtCache*);
 
   /* In bddop.c */

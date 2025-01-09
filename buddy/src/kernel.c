@@ -516,7 +516,7 @@ ALSO    {* bdd\_error\_hook, bdd\_setmaxnodenum *}
 void bdd_clear_error(void)
 {
    bdderrorcond = 0;
-   bdd_operator_reset();
+   bdd_operator_reset(0);
 }
 
 
@@ -1198,7 +1198,7 @@ void bdd_gbc(void)
       }
    }
 
-   bdd_operator_reset();
+   bdd_operator_reset(1);
 
    c2 = clock();
    gbcclock += c2-c1;
