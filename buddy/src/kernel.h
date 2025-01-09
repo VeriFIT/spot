@@ -172,8 +172,8 @@ extern int bddreordermethod;
 
    /* Hashfunctions */
 
-#define PAIR(a,b)     (((unsigned)a)+((unsigned)b)*12582917U)
-#define TRIPLE(a,b,c) (((unsigned)a)+((unsigned)b)*12582917U+((unsigned)c)*4256249U)
+#define PAIR(a,b)     (((unsigned)a)+((unsigned)b)*4256249U)
+#define TRIPLE(a,b,c) (((unsigned)c)+((unsigned)b)*12582917U+((unsigned)a)*4256249U)
 
    /* Inspection of BDD nodes */
 #define ISTERM(a) (LEVEL(a) == TERMNODE)
