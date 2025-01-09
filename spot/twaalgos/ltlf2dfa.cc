@@ -818,12 +818,12 @@ namespace spot
                               cache, iteration);
       }
 
-    mtdfa_ptr res = std::make_shared<mtdfa>(dfa->dict_);
+    mtdfa_ptr res = std::make_shared<mtdfa>(dfa->get_dict());
     // If the automaton hasn't been reduce to true/false, assume it
     // still use all atomic propositions.
     if (states[0] != bddfalse && states[0] != bddtrue)
       {
-        res->dict_->register_all_propositions_of(dfa, res);
+        res->get_dict()->register_all_propositions_of(dfa, res);
         res->aps = dfa->aps;
       }
     std::swap(res->names, names);
@@ -1004,7 +1004,7 @@ namespace spot
                               const mtdfa_ptr& dfa2, op o,
                               bddExtCache* cache, int hash_key)
   {
-    if (dfa1->dict_ != dfa2->dict_)
+    if (dfa1->get_dict() != dfa2->get_dict())
       throw std::runtime_error
         ("product_mtdfa_and: DFAs should share their dictionaries");
 
@@ -1033,9 +1033,10 @@ namespace spot
     the_product_data.left = dfa1;
     the_product_data.right = dfa2;
 
-    mtdfa_ptr res = std::make_shared<mtdfa>(dfa1->dict_);
-    res->dict_->register_all_propositions_of(dfa1, res);
-    res->dict_->register_all_propositions_of(dfa2, res);
+    bdd_dict_ptr dict = dfa1->get_dict();
+    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+    dict->register_all_propositions_of(dfa1, res);
+    dict->register_all_propositions_of(dfa2, res);
 
     std::queue<product_state>& todo = the_product_data.todo;
     // this will  todo with the initial state of the product
@@ -1142,8 +1143,9 @@ namespace spot
     unsigned n = dfa->states.size();
     unsigned ns = dfa->names.size();
 
-    mtdfa_ptr res = std::make_shared<mtdfa>(dfa->dict_);
-    res->dict_->register_all_propositions_of(dfa, res);
+    bdd_dict_ptr dict = dfa->get_dict();
+    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+    dict->register_all_propositions_of(dfa, res);
     res->names.reserve(n);
     res->states.reserve(ns);
 
@@ -1717,8 +1719,9 @@ namespace spot
   {
     if (!is_deterministic(twa))
       throw std::runtime_error("twadfa_to_mtdfa: input is not deterministic");
-    mtdfa_ptr dfa = std::make_shared<mtdfa>(twa->get_dict());
-    dfa->dict_->register_all_propositions_of(&twa, dfa);
+    bdd_dict_ptr dict = twa->get_dict();
+    mtdfa_ptr dfa = std::make_shared<mtdfa>(dict);
+    dict->register_all_propositions_of(&twa, dfa);
     unsigned n = twa->num_states();
     unsigned init = twa->get_init_state_number();
 
