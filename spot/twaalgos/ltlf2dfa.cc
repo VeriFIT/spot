@@ -291,7 +291,7 @@ namespace spot
         auto it = formula_to_int_.find(g);
         if (it == formula_to_int_.end())
           {
-            // This can occur if propeq_representative simplify
+            // This can occur if propeq_representative simplifies
             // the formula.
             int v = int_to_formula_.size();
             int_to_formula_.push_back(g);
@@ -300,7 +300,7 @@ namespace spot
             return v;
           }
         int v = it->second;
-        formula_to_int_[g] = v;
+        formula_to_int_[f] = v;
         return v;
       }
 
