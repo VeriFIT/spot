@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <array>
+#include <climits>
 #include <spot/misc/bddlt.hh>
 #include <spot/misc/escape.hh>
 #include <spot/twaalgos/ltlf2dfa.hh>
@@ -40,12 +41,75 @@ constexpr int hash_key_rename = 7;
 
 namespace spot
 {
+  static int size_estimate_product(int left_states,
+                                   int right_states,
+                                   int sum_aps)
+  {
+    if (right_states > left_states)
+      std::swap(left_states, right_states);
+    left_states /= 4;
+    ++left_states;
+    int prod1 = left_states * right_states;
+    if (prod1 / left_states != right_states) // overflow
+        return INT_MAX / 16;
+    int prod2 = prod1 * sum_aps;
+    if ((prod2 / sum_aps != prod1) || // overflow
+        prod2 > (INT_MAX / 16))
+      return INT_MAX / 16;
+    if (prod2 < (1 << 14))
+      return 1 << 14;
+    return prod2;
+  }
+
+  static int size_estimate_product(const mtdfa_ptr& left,
+                                   const mtdfa_ptr& right)
+  {
+    // Compute the number of atomic propositions in the product.
+    // The logic is similar to std::set_union except we only
+    // count the number of elements in the union.
+    auto lbegin = left->aps.begin();
+    auto lend = left->aps.end();
+    auto rbegin = right->aps.begin();
+    auto rend = right->aps.end();
+    int apsz = 0;
+    while (lbegin != lend && rbegin != rend)
+      {
+        ++apsz;
+        bool adv_left = *lbegin <= *rbegin;
+        bool adv_right = *rbegin <= *lbegin;
+        lbegin += adv_left;
+        rbegin += adv_right;
+      }
+    // Parentheses are important here, because rend should not be
+    // added to (lend - lbegin) in theory even if it's ok in
+    // practice..  (Compile the STL in debug mode will catch this.)
+    apsz += (lend - lbegin) + (rend - rbegin);
+
+    return size_estimate_product(left->num_roots(),
+                                 right->num_roots(),
+                                 apsz);
+  }
+
+  static int size_estimate_unary(const mtdfa_ptr& aut)
+  {
+    int states = aut->num_roots();
+    states /= 2;
+    ++states;
+    int num_aps = aut->aps.size();
+    int prod = states * num_aps;
+    if ((prod / num_aps != states) || // overflow
+        prod > (INT_MAX / 16))
+      return INT_MAX / 16;
+    if (prod < (1 << 14))
+      return 1<<14;
+    return prod;
+  }
 
   ltlf_translator::ltlf_translator(const bdd_dict_ptr& dict,
                                    bool simplify_terms)
     : dict_(dict), simplify_terms_(simplify_terms)
   {
-    bdd_extcache_init(&cache_, 0);
+    bdd_extcache_init(&cache_, -4, true);
 
     int_to_formula_.reserve(32);
   }
@@ -657,6 +721,8 @@ namespace spot
                            bddExtCache* cache,
                            int& iteration)
   {
+    //std::cerr << "minimize_mtdfa DFA has " << dfa->num_roots()
+    // << " roots, cachesize=" << cache->tablesize << '\n';
     if (iteration >= (1 << 20))
       {
         bdd_extcache_reset(cache);
@@ -834,7 +900,7 @@ namespace spot
   mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa)
   {
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0);
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
     int iteration = 0;
     mtdfa_ptr res = minimize_mtdfa(dfa, &cache, iteration);
     bdd_extcache_done(&cache);
@@ -1090,7 +1156,7 @@ namespace spot
   mtdfa_ptr product(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
   {
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0);
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
     mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::And, &cache, 0);
     bdd_extcache_done(&cache);
     return res;
@@ -1099,7 +1165,7 @@ namespace spot
   mtdfa_ptr product_or(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
   {
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0);
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
     mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Or, &cache, 0);
     bdd_extcache_done(&cache);
     return res;
@@ -1108,7 +1174,7 @@ namespace spot
   mtdfa_ptr product_xnor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
   {
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0);
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
     mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Equiv, &cache, 0);
     bdd_extcache_done(&cache);
     return res;
@@ -1117,7 +1183,7 @@ namespace spot
   mtdfa_ptr product_xor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
   {
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0);
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
     mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Xor, &cache, 0);
     bdd_extcache_done(&cache);
     return res;
@@ -1126,7 +1192,7 @@ namespace spot
   mtdfa_ptr product_implies(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
   {
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0);
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
     mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Implies, &cache, 0);
     bdd_extcache_done(&cache);
     return res;
@@ -1148,6 +1214,7 @@ namespace spot
     dict->register_all_propositions_of(dfa, res);
     res->names.reserve(n);
     res->states.reserve(ns);
+    res->aps = dfa->aps;
 
     for (unsigned i = 0; i < n; ++i)
       res->states.push_back(bdd_mt_apply1(dfa->states[i], complement_term,
@@ -1162,7 +1229,7 @@ namespace spot
   mtdfa_ptr complement(const mtdfa_ptr& dfa)
   {
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0);
+    bdd_extcache_init(&cache, 0, true);
     mtdfa_ptr res = complement_aux(dfa, &cache, 0);
     bdd_extcache_done(&cache);
     return res;
@@ -1171,11 +1238,12 @@ namespace spot
 
   struct compose_data
   {
-    ltlf_translator trans;
+    bdd_dict_ptr dict;
     bddExtCache mincache;
     int minimize_iteration;
     bddExtCache opcache;
     int opcache_iteration;
+    bool simplify_terms;
     bool fuse_same_bdds;
     bool want_minimize;
     bool order_for_aps;
@@ -1183,16 +1251,17 @@ namespace spot
 
     compose_data(bdd_dict_ptr dict, bool simplify_terms, bool fuse_same,
                  bool want_minimize, bool order_for_aps, bool want_names)
-      : trans(dict, simplify_terms),
+      : dict(dict),
         minimize_iteration(0),
         opcache_iteration(0),
+        simplify_terms(simplify_terms),
         fuse_same_bdds(fuse_same),
         want_minimize(want_minimize),
         order_for_aps(order_for_aps),
         want_names(want_names)
     {
-      bdd_extcache_init(&mincache, 0);
-      bdd_extcache_init(&opcache, 0);
+      bdd_extcache_init(&mincache, 0, false);
+      bdd_extcache_init(&opcache, 0, false);
     }
 
     ~compose_data()
@@ -1201,14 +1270,25 @@ namespace spot
       bdd_extcache_done(&opcache);
     }
 
+    mtdfa_ptr trans(formula left)
+    {
+      return ltlf_to_mtdfa(left, dict, fuse_same_bdds, simplify_terms);
+    }
+
+    mtdfa_ptr product_aux(mtdfa_ptr left, mtdfa_ptr right, op o)
+    {
+      bdd_extcache_reserve(&opcache, size_estimate_product(left, right));
+      return product_mtdfa_aux(left, right, o, &opcache, opcache_iteration++);
+    }
+
     mtdfa_ptr minimize(mtdfa_ptr dfa)
     {
       if (!want_minimize)
         return dfa;
+      bdd_extcache_reserve(&mincache, size_estimate_unary(dfa));
       return minimize_mtdfa(dfa, &mincache, minimize_iteration);
     }
   };
-
 
   static mtdfa_ptr
   ltlf_to_mtdfa_compose(compose_data& data, formula f)
@@ -1226,7 +1306,7 @@ namespace spot
 
     mtdfa_ptr dfa;
     if (f.is_boolean())
-      return data.trans.ltlf_to_mtdfa(f, data.fuse_same_bdds);
+      return data.trans(f);
     switch (op o = f.kind())
       {
       case op::tt:
@@ -1234,8 +1314,11 @@ namespace spot
       case op::ap:
         SPOT_UNREACHABLE();
       case op::Not:
-        return complement_aux(rec(f[0]), &data.opcache,
-                              data.opcache_iteration);
+        {
+          mtdfa_ptr sub = rec(f[0]);
+          bdd_extcache_reserve(&data.opcache, size_estimate_unary(sub));
+          return complement_aux(sub, &data.opcache, data.opcache_iteration++);
+        }
       case op::And:
       case op::Or:
         if (f.size() == 2)
@@ -1251,8 +1334,8 @@ namespace spot
             // bddCacheStat cs;
             // bdd_cachestats(&cs);
             // std::cerr << "opHit " << cs.opHit
-            //           << "\nopMiss " << cs.opMiss << '\n'
-            //           << "\ncachesize " << data.opcache.tablesize << '\n';
+            //           << " opMiss " << cs.opMiss
+            //           << " cachesize " << data.opcache.tablesize << '\n';
             while (dfas.size() > 1)
               {
                 std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
@@ -1261,9 +1344,7 @@ namespace spot
                 std::pop_heap(dfas.begin(), dfas.end(), byminrootcount);
                 mtdfa_ptr right = dfas.back();
                 dfas.pop_back();
-                mtdfa_ptr prod = product_mtdfa_aux(left, right, o,
-                                                   &data.opcache,
-                                                   data.opcache_iteration++);
+                mtdfa_ptr prod = data.product_aux(left, right, o);
                 bool wantmin =
                   left->aps.size() + right->aps.size() != prod->aps.size();
                 dfas.push_back(wantmin ? data.minimize(prod) : prod);
@@ -1279,7 +1360,8 @@ namespace spot
                 std::push_heap(dfas.begin(), dfas.end(), byminrootcount);
                 // bdd_cachestats(&cs);
                 // std::cerr << "opHit " << cs.opHit
-                //           << "\nopMiss " << cs.opMiss << '\n';
+                //           << " opMiss " << cs.opMiss
+                //           << " cachesize " << data.opcache.tablesize << '\n';
               }
             return dfas[0];
           }
@@ -1337,10 +1419,8 @@ namespace spot
                   }
                 mtdfa_ptr dfa_right = it->first;
                 bitvect* aps_right = it->second;
-                mtdfa_ptr prod = product_mtdfa_aux(dfa_left, dfa_right, o,
-                                                   &data.opcache,
-                                                   data.opcache_iteration++);
-                mtdfa_ptr min = minimize_mtdfa(prod);
+                mtdfa_ptr prod = data.product_aux(dfa_left, dfa_right, o);
+                mtdfa_ptr min = data.minimize(prod);
                 *aps_left |= *aps_right;
                 delete aps_right;
                 // update dfa_and_aps_size.  We have to remove the
@@ -1367,6 +1447,7 @@ namespace spot
             delete dfas_and_aps[0].second;
             if (independent_dfas.empty())
               return dfas_and_aps[0].first;
+            independent_dfas.push_back(dfas_and_aps[0].first);
             std::make_heap(independent_dfas.begin(), independent_dfas.end(),
                            byminrootcount);
             while (independent_dfas.size() > 1)
@@ -1379,9 +1460,7 @@ namespace spot
                               byminrootcount);
                 mtdfa_ptr right = independent_dfas.back();
                 independent_dfas.pop_back();
-                mtdfa_ptr prod = product_mtdfa_aux(left, right, o,
-                                                   &data.opcache,
-                                                   data.opcache_iteration++);
+                mtdfa_ptr prod = data.product_aux(left, right, o);
                 // std::cerr << "op: " << (int)o
                 //           << " left: " << left->num_roots()
                 //           << " (" << left->aps.size()
@@ -1390,6 +1469,7 @@ namespace spot
                 //           << ") prod: " << prod->num_roots()
                 //           << " (" << prod->aps.size()
                 //           << ") no minimization needed\n";
+                independent_dfas.push_back(prod);
                 std::push_heap(independent_dfas.begin(), independent_dfas.end(),
                                byminrootcount);
               }
@@ -1402,9 +1482,7 @@ namespace spot
         {
             mtdfa_ptr left = rec(f[0]);
             mtdfa_ptr right = rec(f[1]);
-            mtdfa_ptr prod = product_mtdfa_aux(left, right, o,
-                                               &data.opcache,
-                                               data.opcache_iteration++);
+            mtdfa_ptr prod = data.product_aux(left, right, o);
             if (left->aps.size() + right->aps.size() == prod->aps.size())
               return prod;
             return data.minimize(prod);
@@ -1418,7 +1496,7 @@ namespace spot
       case op::X:
       case op::strong_X:
         {
-          mtdfa_ptr dfa  = data.trans.ltlf_to_mtdfa(f, data.fuse_same_bdds);
+          mtdfa_ptr dfa  = data.trans(f);
           if (!data.want_names)
             dfa->names.clear();
           return data.minimize(dfa);

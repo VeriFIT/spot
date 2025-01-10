@@ -33,3 +33,32 @@ for i in range(200):
    tc.assertTrue(spot.product_xor(a4, a3).is_empty());
    a5 = spot.ltlf_to_mtdfa_compose(f, True, True)
    tc.assertTrue(spot.product_xor(a5, a3).is_empty());
+
+gen = spot.randltl(4, output='ltl', tree_size=15)
+for i in range(100):
+   f = spot.formula_And([next(gen), spot.formula_Not(next(gen)),
+                         next(gen), spot.formula_Not(next(gen))])
+   print(f)
+   a1 = spot.ltlf_to_mtdfa(f)
+   a1b = spot.minimize_mtdfa(a1)
+   a2 = spot.translate(f, "finite", "deterministic", )
+   a3 = spot.twadfa_to_mtdfa(a2)
+   tc.assertTrue(spot.product_xor(a1b, a3).is_empty());
+   a4 = spot.ltlf_to_mtdfa_compose(f, True, False)
+   tc.assertTrue(spot.product_xor(a4, a3).is_empty());
+   a5 = spot.ltlf_to_mtdfa_compose(f, True, True)
+   tc.assertTrue(spot.product_xor(a5, a3).is_empty());
+
+for i in range(100):
+   f = spot.formula_Or([next(gen), spot.formula_Not(next(gen)),
+                        next(gen), spot.formula_Not(next(gen))])
+   print(f)
+   a1 = spot.ltlf_to_mtdfa(f)
+   a1b = spot.minimize_mtdfa(a1)
+   a2 = spot.translate(f, "finite", "deterministic", )
+   a3 = spot.twadfa_to_mtdfa(a2)
+   tc.assertTrue(spot.product_xor(a1b, a3).is_empty());
+   a4 = spot.ltlf_to_mtdfa_compose(f, True, False)
+   tc.assertTrue(spot.product_xor(a4, a3).is_empty());
+   a5 = spot.ltlf_to_mtdfa_compose(f, True, True)
+   tc.assertTrue(spot.product_xor(a5, a3).is_empty());
