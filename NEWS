@@ -1,12 +1,17 @@
-New in spot 2.12.1.dev  (not yet released)
+New in spot 2.12.2  (2025-01-18)
 
-  Nothing yet.
+  Bug fixes:
 
   - to_finite() was dealing incorrectly with edges that were
     both alive and dead.  (Issue #596.)
 
   - LaTeX output of the X[!] operator with broken in both
     LaTeX and self-contained LaTeX mode.  (Issue #597)
+
+  - Fix a bug in the AIGER encoding with certain forms of
+    global-equivalence.
+
+  - Work around a spurious test failure with Python 3.13.
 
 New in spot 2.12.1  (2024-09-23)
 
