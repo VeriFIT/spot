@@ -517,8 +517,10 @@ class acd:
         num = _acdnum
         _acdnum += 1
         style = '''
-.acdhigh ellipse,.acdacc ellipse,.acdacc path,.acdacc polygon{stroke:green;}
-.acdhigh polygon,.acdrej ellipse,.acdrej path,.acdrej polygon{stroke:red;}
+.acdhigh ellipse,.acdacc ellipse{stroke:green;fill:rgb(220,255,220);}
+.acdhigh polygon,.acdrej ellipse{stroke:red;fill:rgb(255,220,220);}
+.acdacc polygon,.acdacc path{stroke:green;filter:drop-shadow(green 0 0 2px);}
+.acdrej polygon,.acdrej path{stroke:red;filter:drop-shadow(red 0 0 2px);}
 .acdbold ellipse,.acdbold polygon,.acdbold path{stroke-width:2;}
 .acdrej polygon{fill:red;}
 .acdacc polygon{fill:green;}
