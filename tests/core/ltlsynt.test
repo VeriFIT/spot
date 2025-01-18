@@ -1332,7 +1332,6 @@ ltlsynt -f "$f2" --polarity=before-decom --verbose 2>out 1>&2
 sed 's/ [0-9.e-]* seconds/ X seconds/g;s/ -> /->/g;' out > outx
 diff outx exp
 
-
 genltl --lily-patterns | ltlsynt --realizability > out && exit 2
 cat >expected <<EOF
 UNREALIZABLE
@@ -1363,13 +1362,8 @@ diff out expected
 
 # Additional test for global equivalences
 # Specifically if the output is set to the negation of another output
-
 ltlsynt -f "((G((p0)<->(!(p1))))&&(((F(a))||(G(b)))<->(G(F(p0)))))" \
         --outs "p1, p0" \
         --verify --aiger | tail -n 1 > out
-
-cat > expected <<EOF
-Circuit was verified
-EOF
+echo 'Circuit was verified' >expected
 diff out expected
-
