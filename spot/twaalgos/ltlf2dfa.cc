@@ -1075,22 +1075,28 @@ namespace spot
         ("product_mtdfa_and: DFAs should share their dictionaries");
 
     int (*combine)(int, int, int, int);
+    int applyop_shortcut = -1;
     switch (o)
       {
         case op::And:
           combine = leaf_combine_and;
+          applyop_shortcut = bddop_and_zero;
           break;
         case op::Or:
           combine = leaf_combine_or;
+          applyop_shortcut = bddop_or_one;
           break;
         case op::Implies:
           combine = leaf_combine_implies;
+          applyop_shortcut = bddop_imp_one;
           break;
         case op::Equiv:
           combine = leaf_combine_equiv;
+          applyop_shortcut = -1;
           break;
         case op::Xor:
           combine = leaf_combine_xor;
+          applyop_shortcut = -1;
           break;
         default:
           throw std::runtime_error("product_mtdfa_aux: unsupported operator");
@@ -1114,7 +1120,8 @@ namespace spot
 
         auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
         auto [right, right_f] = bdd_and_formula_from_state(s.second, dfa2);
-        bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key);
+        bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
+                                     applyop_shortcut);
         res->states.push_back(b);
 
         if (left_f && right_f)
