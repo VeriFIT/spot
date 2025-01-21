@@ -988,6 +988,18 @@ BDD bdd_apply(BDD l, BDD r, int op)
        if (ISZERO(r))                           \
          RETURN(rec(l));                        \
        break;                                   \
+     case bddop_and_zero:                       \
+       if (ISZERO(l) || ISZERO(r))              \
+         RETURN(0);                             \
+       break;                                   \
+     case bddop_or_one:                         \
+       if (ISONE(l) || ISONE(r))                \
+         RETURN(1);                             \
+       break;                                   \
+     case bddop_imp_one:                        \
+       if (ISONE(r) || ISZERO(l))               \
+         RETURN(1);                             \
+       break;                                   \
      }
 
 //__attribute__((optimize("no-tree-vectorize")))

@@ -108,7 +108,10 @@
    /* Should *not* be used in bdd_apply calls !!! */
 #define bddop_not      10
 #define bddop_simplify 11
-
+   /* for bdd_apply2_leaves */
+#define bddop_and_zero  12
+#define bddop_or_one    13
+#define bddop_imp_one   14
 
 /*=== User BDD types ===================================================*/
 
