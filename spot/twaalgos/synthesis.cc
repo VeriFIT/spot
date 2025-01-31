@@ -2520,7 +2520,7 @@ namespace // anonymous for subsformula
     const auto ass_size = assumptions.size();
     std::vector<bool> done(ass_size, false);
     std::pair<std::set<formula>, std::set<formula>> result;
-    // // An output is in the result.
+    // An output is in the result.
     for (auto &o : outs)
       result.second.insert(formula::ap(o));
     std::stack<unsigned> todo;
@@ -2597,8 +2597,7 @@ namespace // anonymous for subsformula
     // We merge two assumpt or guar. that share a proposition from decRelProps
     std::vector<formula> assumptions_split, guarantees_split;
 
-    auto fus = [&](std::vector<formula> &forms,
-                                                 std::vector<formula> &res)
+    auto fus = [&](std::vector<formula> &forms, std::vector<formula> &res)
     {
       std::stack<unsigned> todo;
       todo.emplace(0);
@@ -2633,7 +2632,7 @@ namespace // anonymous for subsformula
                     continue;
                   auto [ins_i, outs_i] = form2props.aps_of(forms[i]);
                   if (are_intersecting(ins_i, ins_f_dec)
-                   || are_intersecting(outs_i, outs_f_dec))
+                      || are_intersecting(outs_i, outs_f_dec))
                     todo.emplace(i);
                 }
             }
@@ -2742,22 +2741,25 @@ namespace // anonymous for subsformula
   extract_and(const formula& f, const std::set<std::string>& outs,
               bool can_extract_impl, formula_2_inout_props& form2props)
   {
+    auto rec = [&] (const formula& fi)
+    {
+      return extract_and(fi, outs, false, form2props);
+    };
     if (f.is(op::And))
       {
         std::vector<formula> children;
-        for (auto fi : f)
-          children.push_back(
-            extract_and(fi, outs, false, form2props));
+        for (formula fi: f)
+          children.push_back(rec(fi));
         return formula::And(children);
       }
-    if (f.is(op::Not))
+    else if (f.is(op::Not))
     {
       auto child = extract_and(f[0], outs, false, form2props);
       // ¬(⋀¬xᵢ) ≡ ⋁xᵢ
       if (child.is(op::And))
         {
           bool ok = true;
-          for (auto sub : child)
+          for (formula sub: child)
             if (!(sub.is(op::Not)))
               {
                 ok = false;
@@ -2766,72 +2768,61 @@ namespace // anonymous for subsformula
           if (ok)
             {
               std::vector<formula> children;
-              for (auto fi : child)
-                children.push_back(
-                  extract_and(formula::Not(fi), outs, false, form2props));
+              for (formula fi: child)
+                children.push_back(rec(formula::Not(fi)));
               return formula::Or(children);
             }
         }
       // ¬Fφ ≡ G¬φ
-      if (child.is(op::F))
+      else if (child.is(op::F))
         {
           // The result can be G(And).
-          return
-            extract_and(
-              formula::G(
-                extract_and(formula::Not(child[0]), outs, false, form2props)),
-              outs, false, form2props);
+          return rec(formula::G(rec(formula::Not(child[0]))));
         }
       // ¬(φ→ψ) ≡ φ ∧ ¬ψ
       else if (child.is(op::Implies))
         {
-          return formula::And({
-            extract_and(child[0], outs, false, form2props),
-            extract_and(formula::Not(child[1]), outs, false, form2props)
-          });
+          return formula::And({rec(child[0]), rec(formula::Not(child[1]))});
         }
       // ¬(φ ∨ ψ) ≡ ¬φ ∧ ¬ψ
       else if (child.is(op::Or))
         {
           std::vector<formula> children;
-          for (auto fi : child)
-            children.push_back(
-              extract_and(formula::Not(fi), outs, false, form2props));
+          for (formula fi: child)
+            children.push_back(rec(formula::Not(fi)));
           return formula::And(children);
         }
     }
     // G(⋀φᵢ) = ⋀(G(φᵢ))
     // X(⋀φᵢ) = ⋀(X(φᵢ))
-    if (f.is(op::G, op::X))
+    // X[!](⋀φᵢ) = ⋀(X[!](φᵢ))
+    else if (f.is(op::G, op::X, op::strong_X))
       {
-        auto child_ex = extract_and(f[0], outs, false, form2props);
-        if (child_ex.is(op::And))
+        if (formula child_ex = rec(f[0]); child_ex.is(op::And))
           {
             std::vector<formula> children;
-            const auto f_kind = f.kind();
-            for (auto fi : child_ex)
-              children.push_back(
-                extract_and(
-                  formula::unop(f_kind, fi), outs, false, form2props));
+            op f_kind = f.kind();
+            for (formula fi: child_ex)
+              children.push_back(rec(formula::unop(f_kind, fi)));
             return formula::And(children);
           }
       }
     // ⋀φᵢ U ψ ≡ ⋀(φᵢ U ψ)
-    if (f.is(op::U))
+    else if (f.is(op::U))
       {
-        auto left_child_ex = extract_and(f[0], outs, false, form2props);
-        if (left_child_ex.is(op::And))
+
+        if (formula left_ex = rec(f[0]); left_ex.is(op::And))
           {
             std::vector<formula> children;
-            for (auto fi : left_child_ex)
+            for (formula fi: left_ex)
               children.push_back(formula::U(fi, f[1]));
             return formula::And(children);
           }
       }
-    if (f.is(op::Implies))
+    else if (f.is(op::Implies))
       {
-        auto right_extr = extract_and(f[1], outs, false, form2props);
-        auto left_extr = extract_and(f[0], outs, false, form2props);
+        formula right_extr = rec(f[1]);
+        formula left_extr = rec(f[0]);
         // φ → (⋀ψᵢ) ≡ ⋀(φ → ψᵢ)
         if (!(left_extr.is(op::And)))
           {
@@ -2846,7 +2837,7 @@ namespace // anonymous for subsformula
         // ⋀φᵢ → ⋀ψᵢ
         else if (right_extr.is(op::And) && can_extract_impl)
           {
-            auto extr_f = formula::Implies(left_extr, right_extr);
+            formula extr_f = formula::Implies(left_extr, right_extr);
             return split_implication(extr_f, outs, form2props);
           }
       }

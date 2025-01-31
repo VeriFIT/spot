@@ -1990,7 +1990,8 @@ namespace spot
 
 
   static bdd
-  ap_to_bdd(mtdfa_ptr dfa, const std::vector<std::string>& controllable)
+  ap_to_bdd(mtdfa_ptr dfa, const std::vector<std::string>& controllable,
+            bool ignore_non_registered_ap)
   {
     bdd_dict_ptr dict = dfa->get_dict();
     // build the conjunction of all controllable variables
@@ -1999,8 +2000,12 @@ namespace spot
       {
         int v = dict->has_registered_proposition(formula::ap(s), dfa);
         if (v < 0)
-          throw std::runtime_error
-            ("atomic proposition " + s + " is not registered by automaton");
+          {
+            if (ignore_non_registered_ap)
+              continue;
+            throw std::runtime_error
+              ("atomic proposition " + s + " is not registered by automaton");
+          }
         controllable_bdd &= bdd_ithvar(v);
       }
     return controllable_bdd;
@@ -2008,9 +2013,11 @@ namespace spot
 
   std::vector<bool>
   mtdfa_winning_region(mtdfa_ptr dfa,
-                       const std::vector<std::string>& controllable)
+                       const std::vector<std::string>& controllable,
+                       bool ignore_non_registered_ap)
   {
-    return mtdfa_winning_region(dfa, ap_to_bdd(dfa, controllable));
+    return mtdfa_winning_region(dfa, ap_to_bdd(dfa, controllable,
+                                               ignore_non_registered_ap));
   }
 
 
@@ -2069,9 +2076,11 @@ namespace spot
 
   std::vector<bool>
   mtdfa_winning_region_lazy(mtdfa_ptr dfa,
-                            const std::vector<std::string>& controllable)
+                            const std::vector<std::string>& controllable,
+                            bool ignore_non_registered_ap)
   {
-    return mtdfa_winning_region_lazy(dfa, ap_to_bdd(dfa, controllable));
+    return mtdfa_winning_region_lazy(dfa, ap_to_bdd(dfa, controllable,
+                                                    ignore_non_registered_ap));
   }
 
   int is_winning_terminal_lazy(int v)
@@ -2252,9 +2261,11 @@ namespace spot
 
   mtdfa_ptr
   mtdfa_winning_strategy(mtdfa_ptr dfa,
-                         const std::vector<std::string>& controllable)
+                         const std::vector<std::string>& controllable,
+                         bool ignore_non_registered_ap)
   {
-    return mtdfa_winning_strategy(dfa, ap_to_bdd(dfa, controllable));
+    return mtdfa_winning_strategy(dfa, ap_to_bdd(dfa, controllable,
+                                                 ignore_non_registered_ap));
   }
 
   mtdfa_ptr

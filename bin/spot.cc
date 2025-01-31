@@ -51,6 +51,7 @@ static const argp_option options[] =
           "Transition-based Büchi automata.") },
     { DOC("ltlsynt",
           "Synthesize AIGER circuits from LTL/PSL specifications.") },
+    { DOC("ltlfsynt", "Check realizability of LTLf specifications.") },
     { nullptr, 0, nullptr, 0, "Tools that run other tools:", 0 },
     { DOC("autcross", "Cross-compare tools processing ω-automata,"
           " watch for bugs, and generate statistics.") },

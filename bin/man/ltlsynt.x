@@ -16,3 +16,6 @@ Dissecting ltlsynt.  In Formal Methods in System Design, 2023.
 Thibaud Michaud and Maximilien Colange.
 Reactive Synthesis from LTL Specification with Spot.
 In proceedings of SYNT@CAV'18.
+
+[SEE ALSO]
+.BR ltlfsynt (1)

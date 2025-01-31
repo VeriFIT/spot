@@ -407,7 +407,8 @@ namespace spot
   /// \@{
   SPOT_API std::vector<bool>
   mtdfa_winning_region(mtdfa_ptr dfa,
-                   const std::vector<std::string>& controllable);
+                       const std::vector<std::string>& controllable,
+                       bool ignore_unknown_ap = false);
   SPOT_API std::vector<bool>
   mtdfa_winning_region(mtdfa_ptr dfa, bdd controllable);
   /// @}
@@ -418,11 +419,11 @@ namespace spot
   /// This is similar to mtdfa_winning_region, but it will only
   /// compute the winning status of states that are reachable from the
   /// initial state without crossing any accepting terminal.
-  ///
   /// \@{
   SPOT_API std::vector<bool>
   mtdfa_winning_region_lazy(mtdfa_ptr dfa,
-                            const std::vector<std::string>& controllable);
+                            const std::vector<std::string>& controllable,
+                            bool ignore_unknown_ap = false);
   SPOT_API std::vector<bool>
   mtdfa_winning_region_lazy(mtdfa_ptr dfa, bdd controllable);
   /// @}
@@ -450,7 +451,8 @@ namespace spot
   /// \@{
   SPOT_API mtdfa_ptr
   mtdfa_winning_strategy(mtdfa_ptr dfa,
-                         const std::vector<std::string>& controllable);
+                         const std::vector<std::string>& controllable,
+                         bool ignore_unknown_ap = false);
   SPOT_API mtdfa_ptr
   mtdfa_winning_strategy(mtdfa_ptr dfa, bdd controllable);
   /// \@}

@@ -99,10 +99,13 @@ namespace spot
     enum realizability_simplifier_option {
       /// \brief remove APs with single polarity
       polarity = 1,
-      /// \brief remove equivalent APs
+      /// \brief remove equivalent APs (Mealy semantics)
       global_equiv = 2,
-      /// \brief likewise, but don't consider equivalent input and output
+      /// \brief likewise, but don't consider equivalent input and
+      /// output (Mealy semantics)
       global_equiv_output_only = 6,
+      /// \brief remove equivalent APs (Moore semantics)
+      global_equiv_moore = 10,
     };
     realizability_simplifier_base(const std::vector<std::string>& in_or_out,
                                   bool is_input,

@@ -1,0 +1,163 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. ./defs || exit 1
+
+cat >formulas.ltlf <<EOF
+Gi0
+Gi0&Fo0
+Gi0&Fo0&Fi1
+Gi0&Fo0&Fi1&Fo1
+Gi0&Fo0&Fi1&Fo1&Fi2
+Gi0&Fo0&Fi1&Fo1&Fi2&Fi3
+Gi0&Fo0&Fi1&Fo1&Fi2&Fi3&Fo2
+Gi0&Fo0&Fi1&Fo1&Fi2&Fi3&Fo2&Fi4
+Gi0&Fo0&Fi1&Fo1&Fi2&Fi3&Fo2&Fi4&Fo3
+i0
+i0 U o0
+i0 U(i1 U o0)
+i0 U(i1 U(o0 U o1))
+i0 U(i1 U(i2 U(o0 U o1)))
+i0 U(i1 U(i2 U(o0 U(o1 U o2))))
+i0 U(i1 U(i2 U(i3 U(o0 U(o1 U o2)))))
+i0 U(i1 U(i2 U(i3 U(o0 U(o1 U(o2 U o3))))))
+G(i0->X[!](!o0 U i5))&G(i4->X[!](!o1 U i3))&G(i1->X[!](!o0 U i2))
+!(G(i3->Fo3)&G(i5->Fo2))&!(G(i0->Fo1)&G(i1->Fo0))&!(G(i4->Fo4)&G(i2->Fo4))
+G(i0->X[!](!o1 U i3))&G(i4->X[!](!o2 U i1))&G(i2->X[!](!o0 U o0))
+G(o1->X[!]!o1)&G(o0->X[!]!o0)&G(o2->X[!]!o2)
+!(G(i4->Fo3)&G(i2->Fo0))&!(G(i1->Fo4)&G(i0->Fo2))&!(G(i5->Fo2)&G(i3->Fo1))
+G(i2->X[!](!o0 U i0))&G(i5->X[!](!o2 U i1))&G(i3->X[!](!o1 U i4))
+G(i3->X[!](!o0 U i5))&G(i1->X[!](!o2 U i4))&G(i2->X[!](!o1 U i0))
+!(G(i1->Fo0)&G(i3->Fo4))&!(G(i2->Fo2)&G(i0->Fo3))&!(G(i3->Fo5)&G(o3->Fo1))
+(GFi1->GFo1)&(GFi2->GFo0)&(GFi0->GFo2)
+G(o2->X[!]!o2)&G(o3->X[!]!o3)&G(o1->X[!]!o1)&G(o0->X[!]!o0)
+(GFi3->GFo1)&(GFi1->GFo0)&(GFi2->GFo2)&(GFi0->GFo3)
+G(i1->X[!](o0 U i4))&G(i0->X(o3 U i3))&G(i5->X[!](o1 U i6))&G(i7->X[!](o2 U i2))
+(GFi1->GFo1)&(GFi3->GFo3)&(GFi0->GFo0)&(GFi2->GFo2)
+G(o1->X[!]!o1)&G(o0->X[!]!o0)&G(o3->X[!]!o3)&G(o2->X[!]!o2)
+G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&G(i3|!X[!]o4)&G(i4|!X[!]o0)
+G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&((GFi3|Fi4)->(GFo4|Go0))
+G(o1->X[!]!o1)&(Gi0->Fo2)&(G!i0->F!o2)&G(i1|!X[!]o3)&G(i2|!X[!]o4)&G(o->X[!]!o)
+G(o<->i)
+G(i1->Fo1)&G(o1<->X!o1)&G(i2->Fo2)&G(o2<->X!o2)
+!i0 xor o0
+F((o0<->(i0<->i1))<->((i2&Fo0&Go2)W((!i2->i0)->X!o1)))
+FG((FG(G!o0 R o1)R((i0 W i1)<->G!Fi1))<->(o0 W Go2))
+G(o1&((Xo0 xor(Fo0 xor F!G!i0))<->X(!o0|o1|Go0)))
+FG(i0 W(i1<->Fo0))
+(!o0 xor((Go0 M!(Xi1&Fo1))U Xi0))<->((i2 U i0)W 0)
+(o0<->(i2->i0))->((!i2&Fi2)M(Gi2 xor(!i1 M((i1 W o1)M(i0|o1)))))
+!(X((i0 xor o1)|((o0 xor!o1)U i1))&(FXo0 R(o0 R!(i1 M 1))))
+(XX(0)M(F(Xi0 W(i0 W o0))xor(i1 U o0)))<->(!i1 M i2)
+Fo0 xor((o0<->Fi0)->Fi0)
+(i0<->o1)|((0 R((o2 M i2)U i0))R((!o2&Go0)R(Xo1 M!Xi1)))
+!((Gi1 M(!i1 R o0))M!(o1 M 1))M(o2 xor G(i0 U i1))
+FG((X!o2 M Fi0)M Fi0)xor(Fi1<->(o0 xor(o1|o2|Xo1)))
+(F!o1 U!XFo0)R(i0<->o0)
+EOF
+
+
+
+line=0
+while read f; do
+
+   line=`expr $line + 1`
+   prev=
+   res="$line"
+
+   for sem in Moore Mealy; do
+     for dec in yes no; do
+     for tra in dir comp; do
+     for min in yes no; do
+     for geq in yes no; do
+     for pol in yes no; do
+
+       rez=`ltlfsynt -f "$f" --decomp=$dec --trans=$tra --min=$min \
+                     --semantics=$sem --global-equiv=$geq \
+                     --polarity=$pol --realizability`
+       test $? -le 1 || exit 2
+       test "$rez" = "$prev" || test "$prev" = "" || exit 2
+       prev=$rez
+     done
+     done
+     done
+     done
+     done
+     prev=
+     res="$res $rez"
+   done
+   echo "$res"
+done <formulas.ltlf >results
+
+set -e
+
+cat >expected <<EOF
+1 UNREALIZABLE UNREALIZABLE
+2 UNREALIZABLE UNREALIZABLE
+3 UNREALIZABLE UNREALIZABLE
+4 UNREALIZABLE UNREALIZABLE
+5 UNREALIZABLE UNREALIZABLE
+6 UNREALIZABLE UNREALIZABLE
+7 UNREALIZABLE UNREALIZABLE
+8 UNREALIZABLE UNREALIZABLE
+9 UNREALIZABLE UNREALIZABLE
+10 UNREALIZABLE UNREALIZABLE
+11 REALIZABLE REALIZABLE
+12 REALIZABLE REALIZABLE
+13 REALIZABLE REALIZABLE
+14 REALIZABLE REALIZABLE
+15 REALIZABLE REALIZABLE
+16 REALIZABLE REALIZABLE
+17 REALIZABLE REALIZABLE
+18 UNREALIZABLE UNREALIZABLE
+19 UNREALIZABLE UNREALIZABLE
+20 UNREALIZABLE UNREALIZABLE
+21 REALIZABLE REALIZABLE
+22 UNREALIZABLE UNREALIZABLE
+23 UNREALIZABLE UNREALIZABLE
+24 UNREALIZABLE UNREALIZABLE
+25 UNREALIZABLE UNREALIZABLE
+26 REALIZABLE REALIZABLE
+27 REALIZABLE REALIZABLE
+28 REALIZABLE REALIZABLE
+29 UNREALIZABLE UNREALIZABLE
+30 REALIZABLE REALIZABLE
+31 REALIZABLE REALIZABLE
+32 REALIZABLE REALIZABLE
+33 REALIZABLE REALIZABLE
+34 REALIZABLE REALIZABLE
+35 UNREALIZABLE REALIZABLE
+36 REALIZABLE REALIZABLE
+37 UNREALIZABLE REALIZABLE
+38 UNREALIZABLE REALIZABLE
+39 UNREALIZABLE REALIZABLE
+40 UNREALIZABLE REALIZABLE
+41 UNREALIZABLE REALIZABLE
+42 UNREALIZABLE REALIZABLE
+43 UNREALIZABLE REALIZABLE
+44 UNREALIZABLE REALIZABLE
+45 UNREALIZABLE REALIZABLE
+46 UNREALIZABLE REALIZABLE
+47 UNREALIZABLE REALIZABLE
+48 UNREALIZABLE REALIZABLE
+49 UNREALIZABLE REALIZABLE
+50 UNREALIZABLE REALIZABLE
+EOF
+
+diff expected results

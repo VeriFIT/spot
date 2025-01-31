@@ -1,0 +1,600 @@
+// -*- coding: utf-8 -*-
+// Copyright (C) by the Spot authors, see the AUTHORS file for details.
+//
+// This file is part of Spot, a model checking library.
+//
+// Spot is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 3 of the License, or
+// (at your option) any later version.
+//
+// Spot is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+// License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#include "common_sys.hh"
+
+#include <argp.h>
+#include <error.h>
+#include <argmatch.h>
+#include <iomanip>
+
+#include "common_aoutput.hh"
+#include "common_finput.hh"
+#include "common_setup.hh"
+#include "common_trans.hh"
+#include "common_ioap.hh"
+#include <spot/priv/robin_hood.hh>
+#include <spot/tl/formula.hh>
+#include <spot/tl/apcollect.hh>
+#include <spot/tl/print.hh>
+#include <spot/twaalgos/synthesis.hh> // for split_independent_formulas
+#include <spot/twaalgos/ltlf2dfa.hh>
+
+enum
+{
+  OPT_COMPOSITION = 256,
+  OPT_DECOMPOSE,
+  OPT_GEQUIV,
+  OPT_HIDE,
+  OPT_INPUT,
+  OPT_MINIMIZE,
+  OPT_OUTPUT,
+  OPT_PART_FILE,
+  OPT_POLARITY,
+  OPT_REALIZABILITY,
+  OPT_SEMANTICS,
+  OPT_TLSF,
+  OPT_TRANS,
+  OPT_VERBOSE,
+};
+
+
+static const argp_option options[] =
+  {
+    /**************************************************/
+    { nullptr, 0, nullptr, 0, "Input options:", 1 },
+    { "outs", OPT_OUTPUT, "PROPS", 0,
+      "comma-separated list of controllable (a.k.a. output) atomic"
+      " propositions, , interpreted as a regex if enclosed in slashes", 0 },
+    { "ins", OPT_INPUT, "PROPS", 0,
+      "comma-separated list of uncontrollable (a.k.a. input) atomic"
+      " propositions, interpreted as a regex if enclosed in slashes", 0 },
+    { "part-file", OPT_PART_FILE, "FILENAME", 0,
+      "read the I/O partition of atomic propositions from FILENAME", 0 },
+    { "tlsf", OPT_TLSF, "FILENAME", 0,
+      "Read a TLSF specification from FILENAME, and call syfco to "
+      "convert it into LTL.", 0 },
+    { "semantics", OPT_SEMANTICS, "Moore|Mealy", 0,
+      "Whether to work under Mealy (input-first) or Mealy "
+      "(output-first) semantics.  The default is Mealy.", 0 },
+    /**************************************************/
+    { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
+    { "translation", OPT_TRANS, "direct|compositional", 0,
+      "Whether to translate the formula directly as a whole, or to "
+      "assemble translations from subformulas.  Default is compositional.",
+      0 },
+    { "minimize", OPT_MINIMIZE, "yes|no", 0,
+      "Minimize the automaton (enabled by default).", 0 },
+    { "composition", OPT_COMPOSITION, "size|ap", 0,
+      "How to order n-ary compositions in the compositional translation.  "
+      "By increasing size, or trying to group operands based on their APs.",
+      0 },
+    { "decompose", OPT_DECOMPOSE, "yes|no", 0,
+      "whether to decompose the specification as multiple output-disjoint "
+      "problems to solve independently (enabled by default)", 0 },
+    { "polarity", OPT_POLARITY, "yes|no|before-decompose", 0,
+      "whether to remove atomic propositions that always have the same "
+      "polarity in the formula to speed things up (enabled by default, "
+      "both before and after decomposition)", 0 },
+    { "global-equivalence", OPT_GEQUIV, "yes|no|before-decompose", 0,
+      "whether to remove atomic propositions that are always equivalent to "
+      "another one (enabled by default, both before and after decomposition)",
+      0 },
+    /**************************************************/
+    { nullptr, 0, nullptr, 0, "Output options:", 20 },
+    { "quiet", 'q', nullptr, 0, "suppress all normal output", 0 },
+    { "hide-status", OPT_HIDE, nullptr, 0,
+      "Hide the REALIZABLE or UNREALIZABLE line.  (Hint: exit status "
+      "is enough of an indication.)", 0 },
+    { "realizability", OPT_REALIZABILITY, nullptr, 0,
+      "realizability only, do not compute a winning strategy", 0 },
+    /**************************************************/
+    { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
+    { "verbose", OPT_VERBOSE, nullptr, 0, "verbose mode", 0 },
+    { nullptr, 0, nullptr, 0, nullptr, 0 },
+  };
+
+static const struct argp_child children[] =
+  {
+    { &finput_argp_headless, 0, nullptr, 0 },
+    { &misc_argp, 0, nullptr, 0 },
+    { nullptr, 0, nullptr, 0 }
+  };
+
+static const char argp_program_doc[] = "\
+Convert LTLf formulas to transition-based deterministic finite automata.\n\n\
+If multiple formulas are supplied, several automata will be output.";
+
+enum translation_type { translation_direct, translation_compositional };
+
+static const char* const translation_args[] =
+  {
+    "direct", "compositional", "compose", nullptr
+  };
+static translation_type translation_values[] =
+  {
+    translation_direct, translation_compositional, translation_compositional,
+  };
+ARGMATCH_VERIFY(translation_args, translation_values);
+static translation_type opt_trans = translation_compositional;
+
+static const char* const minimize_args[] =
+  {
+    "yes", "true", "enabled", "1",
+    "no", "false", "disabled", "0",
+    nullptr
+  };
+static bool minimize_values[] =
+  {
+    true, true, true, true,
+    false, false, false, false,
+  };
+ARGMATCH_VERIFY(minimize_args, minimize_values);
+static bool opt_minimize = true;
+
+
+static std::ostream* opt_verbose = nullptr;
+
+static const char* const composition_args[] =
+  {
+    "size", "ap", nullptr
+  };
+static bool composition_values[] =
+  {
+    false, true,
+  };
+ARGMATCH_VERIFY(composition_args, composition_values);
+static bool opt_composition_by_ap = false;
+
+static const char* const decompose_args[] =
+  {
+    "yes", "true", "enabled", "1",
+    "no", "false", "disabled", "0",
+    nullptr
+  };
+static bool decompose_values[] =
+  {
+    true, true, true, true,
+    false, false, false, false,
+  };
+ARGMATCH_VERIFY(decompose_args, decompose_values);
+static const char* const polarity_args[] =
+  {
+    "yes", "true", "enabled", "1",
+    "no", "false", "disabled", "0",
+    "before-decompose",
+    nullptr
+  };
+enum polarity_choice { pol_no, pol_yes, pol_before_decompose };
+static polarity_choice polarity_values[] =
+  {
+    pol_yes, pol_yes, pol_yes, pol_yes,
+    pol_no, pol_no, pol_no, pol_no,
+    pol_before_decompose
+  };
+ARGMATCH_VERIFY(polarity_args, polarity_values);
+
+static const char* const semantics_args[] =
+  {
+    "mealy", "moore",
+    "Mealy", "Moore",
+    nullptr
+  };
+enum semantics_choice { semantics_default, semantics_mealy, semantics_moore };
+static semantics_choice semantics_values[] =
+  {
+    semantics_mealy, semantics_moore,
+    semantics_mealy, semantics_moore,
+  };
+ARGMATCH_VERIFY(semantics_args, semantics_values);
+
+static bool opt_decompose_ltl = true;
+static polarity_choice opt_polarity = pol_yes;
+static polarity_choice opt_gequiv = pol_yes;
+static bool opt_realizability = false;
+static semantics_choice opt_semantics = semantics_default;
+static bool opt_show_status = true;
+
+static int
+parse_opt(int key, char *arg, struct argp_state *)
+{
+  // Called from C code, so should not raise any exception.
+  BEGIN_EXCEPTION_PROTECT;
+  switch (key)
+    {
+    case OPT_COMPOSITION:
+      opt_composition_by_ap = XARGMATCH("--composition", arg,
+                                        composition_args, composition_values);
+      break;
+    case OPT_DECOMPOSE:
+      opt_decompose_ltl = XARGMATCH("--decompose", arg,
+                                    decompose_args, decompose_values);
+      break;
+    case OPT_COMPOSITION:
+      opt_composition_by_ap = XARGMATCH("--composition", arg,
+                                        composition_args, composition_values);
+      break;
+    case OPT_DECOMPOSE:
+      opt_decompose_ltl = XARGMATCH("--decompose", arg,
+                                    decompose_args, decompose_values);
+      break;
+    case OPT_GEQUIV:
+      opt_gequiv = XARGMATCH("--global-equivalence", arg,
+                               polarity_args, polarity_values);
+      break;
+    case OPT_HIDE:
+      opt_show_status = false;
+      break;
+    case OPT_INPUT:
+      all_input_aps.emplace();
+      split_aps(arg, *all_input_aps);
+      break;
+    case OPT_MINIMIZE:
+      opt_minimize = XARGMATCH("--minimize", arg,
+                               minimize_args, minimize_values);
+      break;
+    case OPT_OUTPUT:
+      all_output_aps.emplace();
+      split_aps(arg, *all_output_aps);
+      break;
+    case OPT_PART_FILE:
+      read_part_file(arg);
+      break;
+    case OPT_POLARITY:
+      opt_polarity = XARGMATCH("--polarity", arg,
+                               polarity_args, polarity_values);
+      break;
+    case OPT_REALIZABILITY:
+      opt_realizability = true;
+      break;
+    case OPT_SEMANTICS:
+      opt_semantics = XARGMATCH("--semantics", arg,
+                                semantics_args, semantics_values);
+      break;
+    case OPT_TLSF:
+      jobs.emplace_back(arg, job_type::TLSF_FILENAME);
+      break;
+    case OPT_TRANS:
+      opt_trans = XARGMATCH("--translation", arg,
+                            translation_args, translation_values);
+      break;
+    case OPT_VERBOSE:
+      opt_verbose = &std::cerr;
+      break;
+    case 'q':
+      automaton_format = Quiet;
+      opt_show_status = false;
+      break;
+    case ARGP_KEY_ARG:
+      // FIXME: use stat() to distinguish filename from string?
+      jobs.emplace_back(arg, ((*arg == '-' && !arg[1])
+                              ? job_type::LTL_FILENAME
+                              : job_type::LTL_STRING));
+      break;
+
+    default:
+      return ARGP_ERR_UNKNOWN;
+    }
+  END_EXCEPTION_PROTECT;
+  return 0;
+}
+
+namespace
+{
+  static int
+  solve_formula(spot::formula original_f,
+                const std::vector<std::string>& input_aps,
+                const std::vector<std::string>& output_aps,
+                bool mealy_semantics)
+  {
+    if (opt_verbose)
+      *opt_verbose << "using "
+                   << (mealy_semantics ? "Mealy" : "Moore")
+                   << " semantics\n";
+    spot::formula f = original_f;
+
+    spot::bdd_dict_preorder dict;
+    {
+      std::unordered_set<spot::formula> outputs;
+      for (const std::string& s: output_aps)
+        outputs.insert(spot::formula::ap(s));
+      // For Mealy semantics, inputs should appear first in the
+      // MTBDDs.  For Moore semantics, outputs should be first.
+      // Pre-registering those variables will ensure that.  We want to
+      // register them in the order they are found in the formula,
+      // this this ways variables that are used together are more
+      // likely to be close in the order.
+      f.traverse([&](const spot::formula& f)
+      {
+        if (f.is(spot::op::ap) &&
+            ((outputs.find(f) == outputs.end()) == mealy_semantics))
+          dict.register_proposition(f);
+        return false;
+      });
+    }
+
+    // Attempt to remove superfluous atomic propositions
+    spot::realizability_simplifier* rs = nullptr;
+    if (opt_polarity != pol_no || opt_gequiv != pol_no)
+      {
+        unsigned opt = 0;
+        if (opt_polarity != pol_no)
+          opt |= spot::realizability_simplifier::polarity;
+        if (opt_gequiv != pol_no)
+          opt |= mealy_semantics ?
+            spot::realizability_simplifier::global_equiv :
+            spot::realizability_simplifier::global_equiv_moore;
+        rs = new spot::realizability_simplifier(original_f, input_aps,
+                                                opt, opt_verbose);
+        f = rs->simplified_formula();
+      }
+
+
+    std::vector<spot::formula> sub_form;
+    std::vector<std::set<spot::formula>> sub_outs;
+    if (opt_decompose_ltl)
+    {
+      auto subs = split_independent_formulas(f, output_aps);
+      if (subs.first.size() > 1)
+        {
+          if (opt_verbose)
+            *opt_verbose << "there are " << subs.first.size()
+                         << " subformulas\n";
+          sub_form = subs.first;
+          sub_outs = subs.second;
+        }
+      else if (opt_verbose)
+        *opt_verbose << "no decomposition found\n";
+    }
+
+    // FIXME: revisit this after split_independent_formulas() has
+    // been tuned to LTLf.
+    //
+    // When trying to split the formula, we can apply transformations
+    // that increase its size. This is why we will use the original
+    // formula if it has not been cut.
+    if (sub_form.empty())
+      {
+        sub_form = { f };
+        sub_outs.resize(1);
+        // Gather the list of output APs, including those that have
+        // been removed during simplification.
+        if (rs)
+          {
+            robin_hood::unordered_set<spot::formula> removed_outputs;
+            for (auto [from, from_is_input, to] : rs->get_mapping())
+              {
+                (void) to;
+                if (!from_is_input)
+                  removed_outputs.insert(from);
+              }
+            for (const std::string& apstr: output_aps)
+              {
+                spot::formula ap = spot::formula::ap(apstr);
+                if (removed_outputs.find(ap) == removed_outputs.end())
+                  sub_outs[0].insert(ap);
+              }
+          }
+        else
+          {
+            for (const std::string& apstr: output_aps)
+              sub_outs[0].insert(spot::formula::ap(apstr));
+          }
+      }
+
+    // convert sub_outs (which is a vector of vectors of formulas) to
+    // a vector of vectors of strings.
+    std::vector<std::vector<std::string>> sub_outs_str;
+    std::transform(sub_outs.begin(), sub_outs.end(),
+                   std::back_inserter(sub_outs_str),
+                   [](const auto& forms) {
+                     std::vector<std::string> r;
+                     r.reserve(forms.size());
+                     for (auto f: forms)
+                       r.push_back(f.ap_name());
+                     return r;
+                   });
+
+    assert((sub_form.size() == sub_outs.size())
+           && (sub_form.size() == sub_outs_str.size()));
+
+    std::vector<spot::mtdfa_ptr> arenas;
+
+    auto sub_f = sub_form.begin();
+    auto sub_o = sub_outs_str.begin();
+    unsigned numsubs = sub_form.size();
+
+    for (; sub_f != sub_form.end(); ++sub_f, ++sub_o)
+      {
+        if (numsubs > 1 && (opt_polarity == pol_yes || opt_gequiv == pol_yes))
+          {
+            unsigned opt = 0;
+            if (opt_polarity == pol_yes)
+              opt |= spot::realizability_simplifier::polarity;
+            if (opt_gequiv == pol_yes)
+              opt |= spot::realizability_simplifier::global_equiv;
+            if (opt_verbose)
+              *opt_verbose << "working on subformula " << *sub_f << '\n';
+            spot::realizability_simplifier rsub(*sub_f, input_aps, opt,
+                                                opt_verbose);
+            *sub_f = rsub.simplified_formula();
+            rs->merge_mapping(rsub);
+          }
+
+        spot::stopwatch st;
+        st.start();
+        spot::mtdfa_ptr a;
+        if (opt_trans == translation_direct)
+          {
+            a = spot::ltlf_to_mtdfa(*sub_f, dict);
+            if (opt_minimize)
+              a = spot::minimize_mtdfa(a);
+          }
+        else
+          {
+            a = spot::ltlf_to_mtdfa_compose(*sub_f, dict,
+                                            opt_minimize,
+                                            opt_composition_by_ap,
+                                            false);
+          }
+        double trans_time = st.stop();
+        if (opt_verbose)
+          *opt_verbose << "translation took " << trans_time << " seconds\n"
+                       << "MTDFA has " << a->num_roots() << " roots, "
+                       << a->aps.size() << " APs\n";
+
+        if (opt_realizability)
+          {
+            st.start();
+            std::vector<bool> winreg =
+              mtdfa_winning_region_lazy(a, *sub_o, true);
+            double region_time = st.stop();
+            if (opt_verbose)
+              *opt_verbose << "winning region found in " << region_time
+                           << " seconds\n";
+            if (!winreg[0])
+              {
+                if (opt_show_status)
+                  std::cout << "UNREALIZABLE" << std::endl;
+                return 1;
+              }
+          }
+        else
+          {
+            st.start();
+            a = spot::mtdfa_winning_strategy(a, *sub_o, true);
+            double strat_time = st.stop();
+            if (opt_verbose)
+              *opt_verbose << "winning strategy found in " << strat_time
+                           << " seconds\n";
+            if (a->states[0] == bddfalse)
+              {
+                if (opt_show_status)
+                  std::cout << "UNREALIZABLE" << std::endl;
+                return 1;
+              }
+          }
+      }
+    if (opt_show_status)
+      std::cout << "REALIZABLE" << std::endl;
+    return 0;
+  }
+
+  class trans_processor final: public job_processor
+  {
+  public:
+    automaton_printer printer{ltl_input};
+
+    int
+    process_formula(spot::formula f,
+                    const char* filename = nullptr, int linenum = 0) override
+    {
+      if (!f.is_ltl_formula())
+        {
+          std::string s = spot::str_psl(f);
+          error_at_line(2, 0, filename, linenum,
+                        "formula '%s' is not an LTLf formula",
+                        s.c_str());
+        }
+
+      auto [input_aps, output_aps] =
+        filter_list_of_aps(f, filename, linenum);
+      return solve_formula(f, input_aps, output_aps,
+                           opt_semantics != semantics_moore);
+    }
+
+    int
+    process_tlsf_file(const char* filename) override
+    {
+      static char arg0[] = "syfco";
+      static char arg1[] = "-f";
+      static char arg2[] = "ltlxba-fin";
+      static char arg3[] = "-m";
+      static char arg4[] = "fully";
+      char* command[] = { arg0, arg1, arg2, arg3, arg4,
+                          const_cast<char*>(filename), nullptr };
+      std::string tlsf_string = read_stdout_of_command(command);
+
+      // The set of atomic proposition will be temporary set to those
+      // given by syfco, unless they were forced from the command-line.
+      bool reset_aps = false;
+      if (!all_input_aps.has_value() && !all_output_aps.has_value())
+        {
+          reset_aps = true;
+          static char arg5[] = "--print-output-signals";
+          char* command[] = { arg0, arg5,
+                              const_cast<char*>(filename), nullptr };
+          std::string res = read_stdout_of_command(command);
+
+          all_output_aps.emplace(std::vector<std::string>{});
+          split_aps(res, *all_output_aps);
+          for (const std::string& a: *all_output_aps)
+            identifier_map.emplace(a, true);
+        }
+      semantics_choice old_semantics = opt_semantics;
+      if (old_semantics == semantics_default)
+        {
+          static char arg5[] = "--print-target";
+          char* command[] = { arg0, arg5,
+                              const_cast<char*>(filename), nullptr };
+          std::string res = read_stdout_of_command(command);
+
+          auto not_space = [](unsigned char c){ return !std::isspace(c); };
+          res.erase(std::find_if(res.rbegin(), res.rend(), not_space).base(),
+                    res.end());
+          if (res == "Mealy")
+            opt_semantics = semantics_mealy;
+          else if (res == "Moore")
+            opt_semantics = semantics_moore;
+          else
+            error(2, 0, "%s: unknown target: `%s'", filename, res.c_str());
+        }
+      int res = process_string(tlsf_string, filename);
+      opt_semantics = old_semantics;
+      if (reset_aps)
+        {
+          all_output_aps.reset();
+          identifier_map.clear();
+        }
+      return res;
+    }
+
+  };
+}
+
+int
+main(int argc, char** argv)
+{
+  return protected_main(argv, [&] {
+      // By default we name automata using the formula.
+      opt_name = "%f";
+
+      const argp ap = { options, parse_opt, "[FORMULA...]",
+                        argp_program_doc, children, nullptr, nullptr };
+
+      if (int err = argp_parse(&ap, argc, argv, ARGP_NO_HELP, nullptr, nullptr))
+        exit(err);
+
+      check_no_formula();
+
+      trans_processor processor;
+      if (int res = processor.run(); res == 0 || res == 1)
+        return res;
+      return 2;
+  });
+}

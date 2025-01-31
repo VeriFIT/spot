@@ -319,7 +319,7 @@ namespace spot
           }
         // Each SCC will appear twice.  Because if {a,!b,c,!d,!e} are
         // equivalent literals, then so are {!a,b,!c,d,e}.   We will
-        // keep the SCC with the fewer negation if we can.
+        // keep the SCC with the fewer negations if we can.
         unsigned neg_count = 0;
         for (formula f: scc[i])
           {
@@ -457,12 +457,19 @@ namespace spot
                          != data_->ins_or_outs.end())
                         == data_->is_inputs)
                       {
-                        if (input_seen)
+                        if (input_seen || ((options & global_equiv_moore)
+                                           == global_equiv_moore))
                           {
-                            // ouch! we have two equivalent inputs.
-                            // This means the formula is simply
-                            // unrealizable.  Make it false for the
-                            // rest of the algorithm.
+                            // If we are working with Moore semantics,
+                            // no input should appear in sets of
+                            // equivalent literals.
+                            //
+                            // If we are working with Mealy semantics,
+                            // only one input may appear in an
+                            // equivalence set.
+                            if (verbose)
+                              *verbose << ("global equivalence reduces "
+                                           "the formula to false\n");
                             f = spot::formula::ff();
                             return make_pair(f, mapping);
                           }

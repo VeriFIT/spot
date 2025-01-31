@@ -74,6 +74,7 @@ bin_PROGRAMS = \
   ltlgrind \
   ltlmix \
   ltlsynt \
+  ltlfsynt \
   randaut \
   randltl
 
@@ -95,6 +96,7 @@ ltl2tgba_SOURCES = ltl2tgba.cc
 ltl2tgta_SOURCES = ltl2tgta.cc
 ltlcross_SOURCES = ltlcross.cc
 ltlf2dfa_SOURCES = ltlf2dfa.cc
+ltlfsynt_SOURCES = ltlfsynt.cc
 ltlgrind_SOURCES = ltlgrind.cc
 ltldo_SOURCES = ltldo.cc
 ltlmix_SOURCES = ltlmix.cc

@@ -350,6 +350,7 @@ TESTS_twa = \
   core/parity.test \
   core/parity2.test \
   core/pgsolver.test \
+  core/ltlfsynt.test \
   core/ltlsynt.test \
   core/ltlsynt2.test \
   core/ltlsynt-pgame.test \
