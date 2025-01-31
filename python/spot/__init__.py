@@ -1640,3 +1640,25 @@ def to_parity(aut, options = None, **kwargs):
             if not key.startswith('_') and key != "thisown" and key in kwargs:
                 setattr(options, key, kwargs.get(key))
     return impl.to_parity(aut, options)
+
+
+__bdpinit_tmp = bdd_dict_preorder.__init__
+
+
+def __bdpinit_new(self, *args):
+    __bdpinit_tmp(self)
+    for ap in args:
+        self.register_proposition(ap)
+
+
+bdd_dict_preorder.__init__ = __bdpinit_new
+
+
+@_extend(bdd_dict_preorder)
+class bdd_dict_preorder:
+
+    def __enter__(self):
+        return self.get_dict()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False

@@ -393,5 +393,66 @@ namespace spot
     bool simplify_terms_;
     };
 
+  /// \brief Compute the winning region of the MTDFA interpreted
+  /// as a game.
+  ///
+  /// This assumes that all variables listed in \a controllable are
+  /// controllable.  The winning region is the set of states from
+  /// which the controllable variables can force the automaton to
+  /// reach an accepting state.
+  ///
+  /// \return a Boolean vector indicating whether a state is winning
+  /// (true) or losing (false).
+  ///
+  /// \@{
+  SPOT_API std::vector<bool>
+  mtdfa_winning_region(mtdfa_ptr dfa,
+                   const std::vector<std::string>& controllable);
+  SPOT_API std::vector<bool>
+  mtdfa_winning_region(mtdfa_ptr dfa, bdd controllable);
   /// @}
+
+  /// \brief Compute the winning region of the MTDFA interpreted
+  /// as a game.  Lazy version.
+  ///
+  /// This is similar to mtdfa_winning_region, but it will only
+  /// compute the winning status of states that are reachable from the
+  /// initial state without crossing any accepting terminal.
+  ///
+  /// \@{
+  SPOT_API std::vector<bool>
+  mtdfa_winning_region_lazy(mtdfa_ptr dfa,
+                            const std::vector<std::string>& controllable);
+  SPOT_API std::vector<bool>
+  mtdfa_winning_region_lazy(mtdfa_ptr dfa, bdd controllable);
+  /// @}
+
+  /// \brief Build a generalized strategy from a set of winning states.
+  ///
+  /// This maps all accepting terminal to true.  If a winning_states
+  /// array is given, this also maps all non-winning terminal to false.
+  ///
+  /// This will renumber all states.
+  /// @{
+  SPOT_API mtdfa_ptr mtdfa_restrict_as_game(mtdfa_ptr dfa);
+  SPOT_API mtdfa_ptr
+  mtdfa_restrict_as_game(mtdfa_ptr dfa,
+                         const std::vector<bool>& winning_states);
+  /// @}
+
+  /// \brief Compute a strategy for an MTDFA interpreted
+  /// as a game.
+  ///
+  /// This is similar to mtdfa_winning_region, but it will only
+  /// compute the winning status of states that are reachable from the
+  /// initial state without crossing any accepting terminal.
+  ///
+  /// \@{
+  SPOT_API mtdfa_ptr
+  mtdfa_winning_strategy(mtdfa_ptr dfa,
+                         const std::vector<std::string>& controllable);
+  SPOT_API mtdfa_ptr
+  mtdfa_winning_strategy(mtdfa_ptr dfa, bdd controllable);
+  /// \@}
+
 }

@@ -272,4 +272,37 @@ namespace spot
   {
     return std::make_shared<bdd_dict>();
   }
+
+  class bdd_dict_preorder
+  {
+  public:
+    operator bdd_dict_ptr() const
+    {
+      return dict_;
+    }
+
+    bdd_dict_ptr get_dict() const
+    {
+      return dict_;
+    }
+
+    int register_proposition(formula f)
+    {
+      return dict_->register_proposition(f, this);
+    }
+
+    int register_proposition(const std::string& f)
+    {
+      return register_proposition(formula::ap(f));
+    }
+
+    ~bdd_dict_preorder()
+    {
+      dict_->unregister_all_my_variables(this);
+    }
+
+  private:
+    bdd_dict_ptr dict_ = make_bdd_dict();
+  };
+
 }

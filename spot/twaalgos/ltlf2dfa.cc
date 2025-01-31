@@ -1913,4 +1913,442 @@ namespace spot
       }
     return res;
   }
+
+  // Build the reverse graph of the subautomaton reachable from the
+  // initial state of 0 without traversing any accepting terminal.
+  //
+  // For each path root->leaf in DFA where leaf is not bddfalse, and not
+  // a terminal with value 0, this create the following edges in the
+  // returned digraph:
+  //    (terminal value / 2) -> root    if terminal is even (non accepting)
+  //    0 -> root         if the leaf is bddtrue or an odd terminal value
+  static digraph<void, void>
+  build_reverse_of_reachable_graph(mtdfa_ptr dfa)
+  {
+    unsigned n = dfa->num_roots();
+    digraph<void, void> reverse(n, n);
+    reverse.new_states(n);
+
+    std::queue<int> todo;
+    std::vector<bool> seen(n, false); // added to todo
+    std::vector<int> seen_local(n, -1); // seen as predecessor of src
+    todo.push(0);
+    seen[0] = true;
+    while (!todo.empty())
+      {
+        int src = todo.front();
+        todo.pop();
+        bool has_acc = false;   // already seen an accepting terminal
+        for (auto t: silent_paths_mt_of(dfa->states[src]))
+          {
+            if (t == bddfalse)
+              continue;
+            if (t == bddtrue)
+              {
+                if (!has_acc)
+                  {
+                    reverse.new_edge(0, src);
+                    has_acc = true;
+                  }
+                continue;
+              }
+            int dst = bdd_get_terminal(t);
+            if (dst & 1)
+              {
+                if (!has_acc)
+                  {
+                    reverse.new_edge(0, src);
+                    has_acc = true;
+                  }
+                continue;
+              }
+            dst /= 2;
+            if (seen_local[dst] == src)
+              continue;
+            seen_local[dst] = src;
+            reverse.new_edge(dst, src);
+            if (!seen[dst])
+              {
+                todo.push(dst);
+                seen[dst] = true;
+              }
+          }
+      }
+    // print the reverse graph for debugging
+    // std::cerr << "reverse graph:\n";
+    // for (unsigned i = 0; i < n; ++i)
+    //   {
+    //     if (reverse.states()[i].succ == 0)
+    //       continue;
+    //     std::cerr << i << ':';
+    //     for (auto e: reverse.out(i))
+    //       std::cerr << ' ' << e.dst;
+    //     std::cerr << '\n';
+    //   }
+    return reverse;
+  }
+
+
+  static bdd
+  ap_to_bdd(mtdfa_ptr dfa, const std::vector<std::string>& controllable)
+  {
+    bdd_dict_ptr dict = dfa->get_dict();
+    // build the conjunction of all controllable variables
+    bdd controllable_bdd = bddtrue;
+    for (const std::string& s: controllable)
+      {
+        int v = dict->has_registered_proposition(formula::ap(s), dfa);
+        if (v < 0)
+          throw std::runtime_error
+            ("atomic proposition " + s + " is not registered by automaton");
+        controllable_bdd &= bdd_ithvar(v);
+      }
+    return controllable_bdd;
+  }
+
+  std::vector<bool>
+  mtdfa_winning_region(mtdfa_ptr dfa,
+                       const std::vector<std::string>& controllable)
+  {
+    return mtdfa_winning_region(dfa, ap_to_bdd(dfa, controllable));
+  }
+
+
+  const std::vector<bool>* global_is_winning;
+  int is_winning_terminal(int v)
+  {
+    int dst = v / 2;
+    assert((v >= 0) && (global_is_winning->size() > (unsigned) dst));
+    return (v & 1) || (*global_is_winning)[dst];
+  }
+
+  std::vector<bool>
+  mtdfa_winning_region(mtdfa_ptr dfa, bdd controllable)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+    int iteration = 0;
+
+    unsigned nroots = dfa->num_roots();
+    std::vector<bool> winning(nroots, false);
+    global_is_winning = &winning;
+
+    bdd_mt_quantify_prepare(controllable);
+
+    bool has_changed;
+    do
+      {
+        has_changed = false;
+        for (unsigned i = 0; i < nroots; ++i)
+          {
+            if (winning[i])
+              continue;
+            bdd b = dfa->states[i];
+            if (bdd_mt_quantify_to_bool(b, is_winning_terminal,
+                                        &cache, iteration))
+              {
+                has_changed = true;
+                // By modifying winning, we modify the behavior of
+                // is_winning_terminal.  That should normally call for
+                // an invalidation of the cache (or equivalently, an
+                // increment of the iteration number), but it is
+                // actually OK if the cache uses previous values, as
+                // if winning was constant during one iteration.  The
+                // new values are sure to be used on next iteration.
+                winning[i] = true;
+              }
+          }
+        ++iteration;
+      }
+    while (has_changed);
+
+    bdd_extcache_done(&cache);
+    return winning;
+  }
+
+
+  std::vector<bool>
+  mtdfa_winning_region_lazy(mtdfa_ptr dfa,
+                            const std::vector<std::string>& controllable)
+  {
+    return mtdfa_winning_region_lazy(dfa, ap_to_bdd(dfa, controllable));
+  }
+
+  int is_winning_terminal_lazy(int v)
+  {
+    int dst = v / 2;
+    assert((v >= 0) && (global_is_winning->size() > (unsigned) dst));
+    return ((v & 1) || (*global_is_winning)[dst]);
+  }
+
+  std::vector<bool>
+  mtdfa_winning_region_lazy(mtdfa_ptr dfa, bdd controllable)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+
+    digraph<void, void> reverse = build_reverse_of_reachable_graph(dfa);
+
+    unsigned nroots = dfa->num_roots();
+    std::vector<bool> winning(nroots, false);
+    std::vector<int> seen(nroots, -1); // last iteration seen
+    global_is_winning = &winning;
+
+    bdd_mt_quantify_prepare(controllable);
+
+    std::queue<unsigned> todo;
+    // states that can reach an accepting terminal are listed as
+    // predecessors of 0 in the reverse graph.
+    for (auto e: reverse.out(0))
+      todo.push(e.dst);
+    std::queue<unsigned> visit_next;
+
+    int iteration = 0;
+    for (;;)
+      {
+        // FIXME: rewrite todo/visit_next, so that we do not
+        // compute the
+        while (!todo.empty())
+          {
+            unsigned i = todo.front();
+            todo.pop();
+            // state i may have been added to visit_next before
+            // knowing it was winning.
+            if (winning[i])
+              continue;
+            bdd b = dfa->states[i];
+            if (bdd_mt_quantify_to_bool(b, is_winning_terminal_lazy,
+                                        &cache, iteration))
+              {
+                // By modifying winning, we modify the behavior of
+                // is_winning_terminal.  That should normally call for
+                // an invalidation of the cache (or equivalently, an
+                // increment of the iteration number), but it is
+                // actually OK if the cache uses previous values, as
+                // if winning was constant during one iteration.  The
+                // new values are sure to be used on next iteration.
+                winning[i] = true;
+                // if the initial state is winning, we can stop
+                if (i == 0)
+                  goto done;
+                // Schedule predecessors for next iteration.  While we
+                // are at it, remove the predecessors that are already
+                // known to be winning.
+                auto it = reverse.out_iteraser(i);
+                while (it)
+                  {
+                    unsigned prev = it->dst;
+                    if (winning[prev])
+                      {
+                        it.erase();
+                        continue;
+                      }
+                    if (seen[prev] != iteration)
+                      {
+                        seen[prev] = iteration;
+                        visit_next.push(prev);
+                      }
+                    ++it;
+                  }
+              }
+          }
+        ++iteration;
+        if (visit_next.empty())
+          break;
+        std::swap(todo, visit_next);
+      }
+  done:
+    bdd_extcache_done(&cache);
+    return winning;
+  }
+
+  static std::unordered_map<int, int>* global_term_map;
+  static std::queue<int>* global_todo;
+
+  static int map_restrict_as_game(int root, int term)
+  {
+    if (root == 0 || root == 1)
+      return root;
+    if (term & 1)
+      return 1;
+    int dst = term / 2;
+    if (global_is_winning && !(*global_is_winning)[dst])
+      return 0;
+
+    int new_term = global_term_map->size() * 2;
+    auto [it, b] = global_term_map->emplace(term, new_term);
+    if (b)
+      global_todo->push(dst);
+    else
+      new_term = it->second;
+    if (term == new_term)
+      return root;
+    return bdd_terminal_as_int(new_term);
+  }
+
+  static mtdfa_ptr
+  mtdfa_restrict_as_game_aux(mtdfa_ptr dfa,
+                             const std::vector<bool>* winning_states)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+
+    bdd_dict_ptr dict = dfa->get_dict();
+    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+    dict->register_all_propositions_of(dfa, res);
+
+    bool keep_names = dfa->names.size() == dfa->states.size();
+
+    global_is_winning = winning_states;
+
+    std::unordered_map<int, int> term_map;
+    global_term_map = &term_map;
+    term_map.emplace(0, 0);
+
+    std::queue<int> todo;
+    global_todo = &todo;
+    todo.push(0);
+    do
+      {
+        int state = todo.front();
+        todo.pop();
+        bdd b = dfa->states[state];
+        b = bdd_mt_apply1_leaves(b, map_restrict_as_game,
+                                 &cache, 0);
+        res->states.push_back(b);
+        if (keep_names)
+          res->names.push_back(dfa->names[state]);
+      }
+    while (!todo.empty());
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr
+  mtdfa_restrict_as_game(mtdfa_ptr dfa)
+  {
+    return mtdfa_restrict_as_game_aux(dfa, nullptr);
+  }
+
+  mtdfa_ptr
+  mtdfa_restrict_as_game(mtdfa_ptr dfa,
+                         const std::vector<bool>& winning_states)
+  {
+    return mtdfa_restrict_as_game_aux(dfa, &winning_states);
+  }
+
+
+  static int strategy_term_map(int* root_ptr, int term)
+  {
+    // replace accepting terminals by bddtrue
+    if (term & 1)
+      {
+        *root_ptr = 1;
+        return 1;
+      }
+    term /= 2;
+    return (*global_is_winning)[term];
+  }
+
+  mtdfa_ptr
+  mtdfa_winning_strategy(mtdfa_ptr dfa,
+                         const std::vector<std::string>& controllable)
+  {
+    return mtdfa_winning_strategy(dfa, ap_to_bdd(dfa, controllable));
+  }
+
+  mtdfa_ptr
+  mtdfa_winning_strategy(mtdfa_ptr dfa, bdd controllable)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+
+    digraph<void, void> reverse = build_reverse_of_reachable_graph(dfa);
+
+    bdd_dict_ptr dict = dfa->get_dict();
+    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+    dict->register_all_propositions_of(dfa, res);
+    res->states = dfa->states;
+    res->names = dfa->names;
+
+    unsigned nroots = res->states.size();
+
+    std::vector<bool> winning(nroots, false);
+    global_is_winning = &winning;
+
+    std::vector<int> seen(nroots, -1); // last iteration seen
+
+    bdd_mt_quantify_prepare(controllable);
+
+    std::queue<unsigned> todo;
+    // states that can reach an accepting terminal are listed as
+    // predecessors of 0 in the reverse graph.
+    for (auto e: reverse.out(0))
+      todo.push(e.dst);
+    std::queue<unsigned> visit_next;
+
+    int iteration = 0;
+    for (;;)
+      {
+        while (!todo.empty())
+          {
+            int i = todo.front();
+            todo.pop();
+
+            // State i may have been aded to visit_next before knowing
+            // it was winning.
+            if (winning[i])
+              continue;
+            bdd b = res->states[i];
+            if (bdd_mt_apply1_synthesis(b,
+                                        strategy_term_map,
+                                        &cache, iteration))
+              {
+                // By modifying winning, we modify the behavior of
+                // is_winning_terminal.  That should normally call for
+                // an invalidation of the cache (or equivalently, an
+                // increment of the iteration number), but it is
+                // actually OK if the cache uses previous values, as
+                // if winning was constant during one iteration.  The
+                // new values are sure to be used on next iteration.
+                winning[i] = true;
+                res->states[i] = b;
+                // if the initial state is winning, we can stop
+                if (i == 0)
+                  goto done;
+                // Schedule predecessors for next iteration.  While we
+                // are at it, remove the predecessors that are already
+                // known to be winning.
+                auto it = reverse.out_iteraser(i);
+                while (it)
+                  {
+                    unsigned prev = it->dst;
+                    if (winning[prev])
+                      {
+                        it.erase();
+                        continue;
+                      }
+                    if (seen[prev] != iteration)
+                      {
+                        seen[prev] = iteration;
+                        visit_next.push(prev);
+                      }
+                    ++it;
+                  }
+              }
+          }
+        if (visit_next.empty())
+          break;
+        ++iteration;
+        std::swap(todo, visit_next);
+      }
+  done:
+    for (unsigned i = 0; i < nroots; ++i)
+      if (!winning[i])
+        res->states[i] = bddfalse;
+
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
 }
