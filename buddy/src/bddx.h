@@ -403,10 +403,19 @@ BUDDY_API BDD      bdd_mt_apply2_leaves(BDD, BDD, int (*)(int, int,
 BUDDY_API BDD      bdd_mt_apply1(BDD, int (*)(int),
                                  BDD, BDD,
                                  bddExtCache*, int);
+BUDDY_API BDD      bdd_mt_apply1_leaves(BDD, int (*)(int, int),
+                                 bddExtCache*, int);
+BUDDY_API int      bdd_mt_apply1_synthesis(BDD*,
+                                           int (*)(int*, int),
+                                           bddExtCache*, int);
 BUDDY_API BDD      bdd_const_to_terminal(BDD, BDD, BDD,
                                          bddExtCache*, int);
 BUDDY_API BDD      bdd_terminal_to_const(BDD, BDD, BDD,
                                          bddExtCache*, int);
+BUDDY_API void     bdd_mt_quantify_prepare(BDD);
+BUDDY_API int      bdd_mt_quantify_to_bool(BDD, int (*)(int),
+                                           bddExtCache*, int);
+
 BUDDY_API BDD      bdd_and(BDD, BDD);
 BUDDY_API BDD      bdd_or(BDD, BDD);
 BUDDY_API BDD      bdd_xor(BDD, BDD);
@@ -692,10 +701,18 @@ protected:
    friend bdd      bdd_mt_apply1(const bdd&, int (*)(int),
                                  const bdd&, const bdd&,
                                  bddExtCache*, int);
+   friend bdd      bdd_mt_apply1_leaves(const bdd&, int (*)(int, int),
+                                        bddExtCache*, int);
+   friend int      bdd_mt_apply1_synthesis(bdd&,
+                                           int (*)(int*, int),
+                                           bddExtCache*, int);
    friend bdd      bdd_const_to_terminal(const bdd&, const bdd&, const bdd&,
                                          bddExtCache*, int);
    friend bdd      bdd_terminal_to_const(const bdd&, const bdd&, const bdd&,
                                          bddExtCache*, int);
+   friend void     bdd_mt_quantify_prepare(const bdd&);
+   friend int      bdd_mt_quantify_to_bool(const bdd&,
+                                           int (*)(int), bddExtCache*, int);
    friend bdd      bdd_and(const bdd &, const bdd &);
    friend bdd      bdd_or(const bdd &, const bdd &);
    friend bdd      bdd_xor(const bdd &, const bdd &);
@@ -954,6 +971,23 @@ inline bdd bdd_mt_apply1(const bdd &r, int (*op)(int),
                        cache, ophash);
 }
 
+inline bdd bdd_mt_apply1_leaves(const bdd &r, int (*op)(int, int),
+                                bddExtCache* cache, int ophash)
+{
+  return bdd_mt_apply1_leaves(r.root, op, cache, ophash);
+}
+
+inline int bdd_mt_apply1_synthesis(bdd& r,
+                                   int (*opleaf)(int*, int),
+                                   bddExtCache* cache, int ophash)
+{
+  int root = r.root;
+  int res = bdd_mt_apply1_synthesis(&root, opleaf, cache, ophash);
+  bdd r2 = root;
+  r = r2;
+  return res;
+}
+
 inline bdd bdd_const_to_terminal(const bdd& r,
                                  const bdd& for_false,
                                  const bdd& for_true,
@@ -970,6 +1004,18 @@ inline bdd bdd_terminal_to_const(const bdd& r,
 {
   return bdd_terminal_to_const(r.root, map_to_false.root, map_to_true.root,
                                cache, ophash);
+}
+
+inline void bdd_mt_quantify_prepare(const bdd& exist_var)
+{
+  return bdd_mt_quantify_prepare(exist_var.root);
+}
+
+inline int bdd_mt_quantify_to_bool(const bdd& r,
+                                   int (*op)(int),
+                                   bddExtCache* cache, int ophash)
+{
+  return bdd_mt_quantify_to_bool(r.root, op, cache, ophash);
 }
 
 

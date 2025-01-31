@@ -239,6 +239,8 @@ static inline int PUSHREF(int a)
 #define PUSH3INT_(a, b, c) {PUSHINT_(a); PUSHINT_(b); PUSHINT_(c);}
 #define PUSH4INT_(a, b, c, d) {PUSHINT_(a); PUSHINT_(b); PUSHINT_(c); PUSHINT_(d);}
 #define POPINT_() *(--localbddrecstacktop)
+#define POPINTS_(a) localbddrecstacktop -= (a)
+#define READINT_(a) *(localbddrecstacktop-(a))
 
 #define LOCAL_REC_STACKS                                \
   int* restrict localbddrefstacktop = bddrefstacktop;   \

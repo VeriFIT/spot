@@ -745,7 +745,6 @@ static BDD not_rec(BDD r)
          {
            r = POPINT_();
          work:;
-           /* C: NULL --- */
            /* I: r --- */
            /* R: --- r */
            if (ISCONST(r))
@@ -768,7 +767,7 @@ static BDD not_rec(BDD r)
 #ifdef CACHESTATS
                    bddcachestats.opMiss++;
 #endif
-                   /* C: -1 r ---  (-1 lr) -1 rr index r */
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
                    PUSH4INT_(r, index, HIGH(r), -1);
                    r = LOW(r);
                    goto work;
@@ -777,7 +776,7 @@ static BDD not_rec(BDD r)
          }
        else
          {
-           /* C: -1 r --- */
+           /* I: -1 r --- */
            /* R: rres lres --- res */
            BDD rres = READREF_(1);
            BDD lres = READREF_(2);
@@ -1024,7 +1023,7 @@ static BDD apply_rec(BDD l, BDD r)
            APPLY_SHORTCUTS(applyop, +);
 
            if (__unlikely(ISCONST(l) && ISCONST(r)))
-             /* C: -1 l r ---     */
+             /* I: -1 l r ---     */
              /* R:        --- res */
              RETURN(oprres[applyop][l<<1 | r]);
 
@@ -1038,14 +1037,14 @@ static BDD apply_rec(BDD l, BDD r)
 #ifdef CACHESTATS
                bddcachestats.opHit++;
 #endif
-               /* C: -1 l r ---     */
+               /* I: -1 l r ---     */
                /* R:        --- res */
                RETURN(entry2->i.res);
              }
 #ifdef CACHESTATS
            bddcachestats.opMiss++;
 #endif
-           /* C: -1 l r --- (-1 ll rl) -1 lr rr index l r */
+           /* I: -1 l r --- (-1 ll rl) -1 lr rr index l r */
            /* The element in parenthesis are not pushed, as they would
               be popped right away.  We jump to "work" instead.*/
            int lvl_l = LEVEL(l);
@@ -1073,7 +1072,7 @@ static BDD apply_rec(BDD l, BDD r)
          }
        else
          {
-           /* C: index lvl l r ---     */
+           /* I: index lvl l r ---     */
            /* R: rres lres     --- res */
            /* res=(lvl, lres, rres) is the result of applyop(l,r) */
            /* and it should be stored in *entry.                     */
@@ -1209,7 +1208,7 @@ BDD bdd_mt_apply2(BDD l, BDD r, int (*termop)(int, int),
 #ifdef CACHESTATS
                bddcachestats.opHit++;
 #endif
-               /* C: -1 l r ---     */
+               /* I: -1 l r ---     */
                /* R:        --- res */
                RETURN(entry2->res);
              }
@@ -1217,7 +1216,7 @@ BDD bdd_mt_apply2(BDD l, BDD r, int (*termop)(int, int),
            bddcachestats.opMiss++;
 #endif
 
-           /* C: -1 l r --- (-1 ll rl) -1 lr rr index l r */
+           /* I: -1 l r --- (-1 ll rl) -1 lr rr index l r */
            /* The element in parenthesis are not pushed, as they would
               be popped right away.  We jump to "work" instead.*/
            int lvl_l = LEVEL(l);
@@ -1258,7 +1257,7 @@ BDD bdd_mt_apply2(BDD l, BDD r, int (*termop)(int, int),
          }
        else
          {
-           /* C: index lvl l r ---     */
+           /* I: index lvl l r ---     */
            /* R: rres lres     --- res */
            /* res=(lvl, lres, rres) is the result of apply2(l,r) */
            /* and it should be stored in *entry.                     */
@@ -1316,7 +1315,7 @@ BDD bdd_mt_apply2_leaves(BDD l, BDD r, int (*termop)(int, int,
 #ifdef CACHESTATS
                bddcachestats.opHit++;
 #endif
-               /* C: -1 l r ---     */
+               /* I: -1 l r ---     */
                /* R:        --- res */
                RETURN(entry2->res);
              }
@@ -1324,7 +1323,7 @@ BDD bdd_mt_apply2_leaves(BDD l, BDD r, int (*termop)(int, int,
            bddcachestats.opMiss++;
 #endif
 
-           /* C: -1 l r --- (-1 ll rl) -1 lr rr index l r */
+           /* I: -1 l r --- (-1 ll rl) -1 lr rr index l r */
            /* The element in parenthesis are not pushed, as they would
               be popped right away.  We jump to "work" instead.*/
            if ((ISCONST(l) || ISTERM(l)) && (ISCONST(r) || ISTERM(r)))
@@ -1366,7 +1365,7 @@ BDD bdd_mt_apply2_leaves(BDD l, BDD r, int (*termop)(int, int,
          }
        else
          {
-           /* C: index lvl l r ---     */
+           /* I: index lvl l r ---     */
            /* R: rres lres     --- res */
            /* res=(lvl, lres, rres) is the result of apply2(l,r) */
            /* and it should be stored in *entry.                     */
@@ -1413,7 +1412,6 @@ BDD bdd_mt_apply1(BDD r, int (*termop)(int),
            if (ISCONST(r))
              RETURN(ISZERO(r) ? replace_false : replace_true);
 
-           /* C: NULL --- */
            /* I: r --- */
            /* R: --- r */
            if (ISTERM(r))
@@ -1439,7 +1437,7 @@ BDD bdd_mt_apply1(BDD r, int (*termop)(int),
 #ifdef CACHESTATS
                    bddcachestats.opMiss++;
 #endif
-                   /* C: -1 r ---  (-1 lr) -1 rr index r */
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
                    PUSH4INT_(r, index, HIGH(r), -1);
                    r = LOW(r);
                    goto work;
@@ -1448,7 +1446,7 @@ BDD bdd_mt_apply1(BDD r, int (*termop)(int),
          }
        else
          {
-           /* C: -1 r --- */
+           /* I: -1 r --- */
            /* R: rres lres --- res */
            BDD rres = READREF_(1);
            BDD lres = READREF_(2);
@@ -1470,6 +1468,212 @@ BDD bdd_mt_apply1(BDD r, int (*termop)(int),
    SYNC_REC_STACKS;
    CHECK_EMPTY_STACK;
    return res;
+}
+
+BDD bdd_mt_apply1_leaves(BDD r, int (*termop)(int, int),
+                         bddExtCache* cache, int ophash)
+{
+   LOCAL_REC_STACKS;
+   int index;
+
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           r = POPINT_();
+         work:;
+           /* I: r --- */
+           /* R: --- r */
+           if (ISCONST(r) || ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int term = ISCONST(r) ? 0 : TERM(r);
+               bdd i = termop(r, term);
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(i);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, ophash), index);
+               if (entry1->arg1 == r && entry1->op == ophash)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, HIGH(r), -1);
+                   r = LOW(r);
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: -1 r --- */
+           /* R: rres lres --- res */
+           BDD rres = READREF_(1);
+           BDD lres = READREF_(2);
+           BDD r = POPINT_();
+           SYNC_REC_STACKS;
+           BDD res = bdd_makenode(LEVEL(r), lres, rres);
+           POPREF_(2);
+           PUSHREF_(res);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->op = ophash;
+           entry->res = res;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   BDD res = READREF_(1);
+   POPREF_(1);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   return res;
+}
+
+
+// call quantify_prepare first
+int bdd_mt_apply1_synthesis(BDD* ptr_r,
+                            int (*opleaf)(int*, int),
+                            bddExtCache* cache, int ophash)
+{
+   LOCAL_REC_STACKS;
+   int index;
+   int r = *ptr_r;
+
+   if (ISCONST(r))
+     return r;
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           /* I: -1 r --- */
+           /* R: --- val r */
+           r = POPINT_();
+
+           if (ISCONST(r))
+             {
+               PUSHREF_(r);     /* BDD result*/
+               PUSHREF_(r);     /* bool for realizability */
+               continue;
+             }
+           // This like is only executed in the right branch of
+           // the recursion.  If the left branch is known to be
+           // realizable and the variable is is being worked on
+           // is existential, then we can replace the result of
+           // the right branch with false right a away.
+           //
+           // This optimization is currently disabled because checking
+           // for quantvarset[LEVEL(READINT_(2)) everytime seems to
+           // make this slower.
+           // if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
+           //   {
+           //     PUSHREF_(0);
+           //     PUSHREF_(0);
+           //     continue;
+           //   }
+         work:;
+           if (ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int term = TERM(r);
+               bdd i = r;
+               int data = opleaf(&i, term);
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(i);
+               PUSHREF_(data);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, ophash), index);
+               if (entry1->arg1 == r && entry1->op == ophash)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                   PUSHREF_(entry1->arg2); /* data */
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, HIGH(r), -1);
+                   r = LOW(r);
+
+                   if (ISCONST(r))
+                     {
+                       PUSHREF_(r);     /* BDD result*/
+                       PUSHREF_(r);     /* boolean representing acceptance */
+                       continue;
+                     }
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: index r --- */
+           /* R: rval rres lval lres --- val res */
+           int rval = READREF_(1);
+           BDD rres = READREF_(2);
+           int lval = READREF_(3);
+           BDD lres = READREF_(4);
+           BDD r = POPINT_();
+           int val = lval;
+           if (quantvarset[LEVEL(r)])
+             {
+               val |= rval;       /* existential quantification */
+               if (val)           /* let's pick a unique winning path */
+                 {
+                   if (lval)
+                     rres = 0;
+                   else
+                     lres = 0;
+                 }
+             }
+           else
+             {
+               val &= rval;       /* universal quantification */
+             }
+           SYNC_REC_STACKS;
+           BDD res = bdd_makenode(LEVEL(r), lres, rres);
+           POPREF_(4);
+           PUSHREF_(res);
+           PUSHREF_(val);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->op = ophash;
+           entry->res = res;
+           entry->arg2 = val;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   int val = READREF_(1);
+   BDD res = READREF_(2);
+   POPREF_(2);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   *ptr_r = res;
+   return val;
 }
 
 
@@ -1496,7 +1700,6 @@ static BDD bdd_mt_map_leaves(BDD r,
            if (ISCONST(r) || ISTERM(r))
              RETURN(r);
 
-           /* C: NULL --- */
            /* I: r --- */
            /* R: --- r */
            bddExtCacheEntry *entry1 =
@@ -1513,7 +1716,7 @@ static BDD bdd_mt_map_leaves(BDD r,
 #ifdef CACHESTATS
                bddcachestats.opMiss++;
 #endif
-               /* C: -1 r ---  (-1 lr) -1 rr index r */
+               /* I: -1 r ---  (-1 lr) -1 rr index r */
                PUSH4INT_(r, index, HIGH(r), -1);
                r = LOW(r);
                goto work;
@@ -1521,7 +1724,7 @@ static BDD bdd_mt_map_leaves(BDD r,
          }
        else
          {
-           /* C: -1 r --- */
+           /* I: -1 r --- */
            /* R: rres lres --- res */
            BDD rres = READREF_(1);
            BDD lres = READREF_(2);
@@ -1563,6 +1766,95 @@ BDD bdd_terminal_to_const(BDD r,
   return bdd_mt_map_leaves(r, map_to_false, 0,
                            map_to_true, 1,
                            cache, ophash);
+}
+
+void bdd_mt_quantify_prepare(BDD r)
+{
+   /* make sure the next use of next use of quantvarset
+      by the regular quantify() resets this array. */
+   quantvarsetID = INT_MAX;
+   memset(quantvarset, 0, sizeof(int)*bddvarnum);
+
+   for (BDD n=r; n > 1; n=HIGH(n))
+     quantvarset[LEVEL(n)] = 1;
+}
+
+int bdd_mt_quantify_to_bool(BDD r, int (*termop)(int),
+                            bddExtCache* cache, int ophash)
+{
+   LOCAL_REC_STACKS;
+   int index;
+
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           r = POPINT_();
+         work:;
+           if (ISCONST(r))
+             RETURN(r);
+
+           /* I: r --- */
+           /* R: --- r */
+           if (ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int i = termop(TERM(r));
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(i);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, ophash), index);
+               if (entry1->arg1 == r && entry1->op == ophash)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, HIGH(r), -1);
+                   r = LOW(r);
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: -1 r --- */
+           /* R: rres lres --- res */
+           int rres = READREF_(1);
+           int lres = READREF_(2);
+           BDD r = POPINT_();
+           int res = lres;
+           if (quantvarset[LEVEL(r)])
+             res |= rres;       /* existential quantification */
+           else
+             res &= rres;       /* universal quantification */
+           POPREF_(2);
+           PUSHREF_(res);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->op = ophash;
+           entry->res = res;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   BDD res = READREF_(1);
+   POPREF_(1);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   return res;
 }
 
 
@@ -1835,14 +2127,14 @@ static BDD ite_rec(BDD f, BDD g, BDD h)
 #ifdef CACHESTATS
                bddcachestats.opHit++;
 #endif
-               /* C: -1 f g h  ---     */
+               /* I: -1 f g h  ---     */
                /* R:           --- res */
                RETURN(entry2->i.res);
              }
 #ifdef CACHESTATS
            bddcachestats.opMiss++;
 #endif
-           /* C: -1 f g h --- (-1 fl gl hl) -1 fr gr hr index lvl f g h */
+           /* I: -1 f g h --- (-1 fl gl hl) -1 fr gr hr index lvl f g h */
            int lvl_f = LEVEL(f);
            int lvl_g = LEVEL(g);
            int lvl_h = LEVEL(h);
@@ -1927,7 +2219,7 @@ static BDD ite_rec(BDD f, BDD g, BDD h)
          }
        else
          {
-           /* C: index lvl f g h ---     */
+           /* I: index lvl f g h ---     */
            /* R: rres lres       --- res */
            /* res=(lvl, lres, rres) is the result of ite(f,g,h) */
            /* and it should be stored in *entry.                   */
@@ -2043,7 +2335,7 @@ static BDD restrict_rec(BDD r)
          {
            r = POPINT_();
          work:
-           /* C: -1 r ---   */
+           /* I: -1 r ---   */
            /* R:      --- r */
            if (ISCONST(r)  ||  LEVEL(r) > quantlast)
              RETURN(r);
@@ -2055,7 +2347,7 @@ static BDD restrict_rec(BDD r)
 #ifdef CACHESTATS
                bddcachestats.opHit++;
 #endif
-               /* C: -1 r --- */
+               /* I: -1 r --- */
                /* R: --- res */
                RETURN(entry2->i.res);
              }
@@ -2064,7 +2356,7 @@ static BDD restrict_rec(BDD r)
 #endif
            if (INSVARSET(LEVEL(r)))
              {
-               /* C: -1 r --- (-1 r') */
+               /* I: -1 r --- (-1 r') */
                if (quantvarset[LEVEL(r)] > 0)
                  r = HIGH(r);
                else
@@ -2073,7 +2365,7 @@ static BDD restrict_rec(BDD r)
              }
            else
              {
-               /* C: -1 r ---  (-1 lr) -1 rr index r */
+               /* I: -1 r ---  (-1 lr) -1 rr index r */
                PUSH4INT_(r, index, HIGH(r), -1);
                r = LOW(r);
              }
@@ -2081,7 +2373,7 @@ static BDD restrict_rec(BDD r)
          }
        else
          {
-           /* C: index r   ---     */
+           /* I: index r   ---     */
            /* R: rres lres --- res */
            BDD rres = READREF_(1);
            BDD lres = READREF_(2);
@@ -2448,7 +2740,7 @@ static BDD compose_rec(BDD l, BDD r)
 #ifdef CACHESTATS
                bddcachestats.opHit++;
 #endif
-               /* C: -1 l r  --- */
+               /* I: -1 l r  --- */
                /* R: --- res */
                RETURN(entry2->i.res);
              }
@@ -2457,7 +2749,7 @@ static BDD compose_rec(BDD l, BDD r)
 #endif
            if (lvl_l < composelevel)
              {
-               /* C: -1 l r --- (-1 ll rl) -1 lr rr index lvl l r */
+               /* I: -1 l r --- (-1 ll rl) -1 lr rr index lvl l r */
                int lvl_r = LEVEL(r);
                if (lvl_l == lvl_r)
                  {
@@ -2482,7 +2774,7 @@ static BDD compose_rec(BDD l, BDD r)
              }
            else
              {
-               /* C: -1 l r ---      */
+               /* I: -1 l r ---      */
                /* R:        ---  res */
                SYNC_REC_STACKS;
                BDD res = ite_rec(r, HIGH(l), LOW(l));
@@ -2495,7 +2787,7 @@ static BDD compose_rec(BDD l, BDD r)
          }
        else
          {
-           /* C: index lvl l r ---     */
+           /* I: index lvl l r ---     */
            /* R: rres lres     --- res */
            /* res=(lvl, lres, rres) is the result of applyop(l,r) */
            /* and it should be stored in *entry.                     */
@@ -2898,7 +3190,7 @@ static int quant_rec(BDD r)
          {
            r = POPINT_();
          work:;
-           /* C: -1 r ---   */
+           /* I: -1 r ---   */
            /* R:      --- r */
            if (ISCONST(r) || LEVEL(r) > quantlast)
              {
@@ -2913,7 +3205,7 @@ static int quant_rec(BDD r)
 #ifdef CACHESTATS
                    bddcachestats.opHit++;
 #endif
-                   /* C: -1 r ---     */
+                   /* I: -1 r ---     */
                    /* R:      --- res */
                    PUSHREF_(entry2->i.res);
                  }
@@ -2922,7 +3214,7 @@ static int quant_rec(BDD r)
 #ifdef CACHESTATS
                    bddcachestats.opMiss++;
 #endif
-                   /* C: -1 r --- (-1 lr) -1 rr index r */
+                   /* I: -1 r --- (-1 lr) -1 rr index r */
                    PUSH4INT_(r, index, HIGH(r), -1)
                    r = LOW(r);
                    goto work;
@@ -2931,7 +3223,7 @@ static int quant_rec(BDD r)
          }
        else
          {
-           /* C: index r ---     */
+           /* I: index r ---     */
            /* R: rres lres --- res */
            BDD r = POPINT_();
            BDD rres = READREF_(1);
@@ -3170,7 +3462,7 @@ static BDD appquant_rec(BDD l, BDD r)
            l = POPINT_();
            r = POPINT_();
          work:
-           /* C: -1 l r ---    */
+           /* I: -1 l r ---    */
            /* R:        --- res */
            if (ISCONST(l) && ISCONST(r))
              RETURN(oprres[appexop][l<<1 | r]);
@@ -3202,14 +3494,14 @@ static BDD appquant_rec(BDD l, BDD r)
 #ifdef CACHESTATS
                bddcachestats.opHit++;
 #endif
-               /* C: -1 l r ---     */
+               /* I: -1 l r ---     */
                /* R:        --- res */
                RETURN(entry2->i.res);
              }
 #ifdef CACHESTATS
            bddcachestats.opMiss++;
 #endif
-           /* C: -1 l r --- (-1 ll rl) -1 lr rr index lvl l r */
+           /* I: -1 l r --- (-1 ll rl) -1 lr rr index lvl l r */
            int lvl_l = LEVEL(l);
            int lvl_r = LEVEL(r);
            if (lvl_l == lvl_r)
@@ -3235,7 +3527,7 @@ static BDD appquant_rec(BDD l, BDD r)
          }
        else
          {
-           /* C: index lvl l r ---     */
+           /* I: index lvl l r ---     */
            /* R: rres lres     --- res */
            BDD rres = READREF_(1);
            BDD lres = READREF_(2);
@@ -3453,7 +3745,7 @@ static BDD satone_rec(BDD r)
    PUSHREF_(r);
    while (NONEMPTY_REC_STACK)
      {
-       /* C: lvl --- */
+       /* I: lvl --- */
        /* R: r   --- res */
        BDD r = READREF_(1);
        int lvl = POPINT_();
