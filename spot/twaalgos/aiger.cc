@@ -1503,7 +1503,7 @@ namespace
   state_to_vec(std::vector<unsigned>& v, unsigned s,
                unsigned offset)
   {
-    assert(s != -1u && "-1u is not a valid sstate");
+    assert(s != -1u && "-1u is not a valid state");
     v.clear();
     unsigned i = offset;
     while (s > 0)
@@ -1553,7 +1553,7 @@ namespace
                 const std::vector<std::string>& unused_outs = {},
                 const realizability_simplifier* rs = nullptr)
   {
-    // The aiger circuit can currently noly encode separated mealy machines
+    // The aiger circuit can currently only encode separated mealy machines
 
     for (const auto& astrat : strat_vec)
       if (!astrat.first->acc().is_t())
@@ -1681,49 +1681,30 @@ namespace
         state_numbers.emplace_back(N, -1u);
         auto& sn = state_numbers.back();
         unsigned max_index = 0;
-        // Check if named
-        auto sp_ptr = astrat.first->get_named_prop<region_t>("state-player");
-        if (const auto* s_names =
-                astrat.first->
-                  get_named_prop<std::vector<std::string>>("state-names"))
+        if (auto sp_ptr =
+            astrat.first->get_named_prop<region_t>("state-player"))
           {
+            const region_t& sp = *sp_ptr;
+            // Split
+            unsigned n_next = 0;
+            // Player -1u
+            // Env: Succesively numbered according to appearance
             for (unsigned n = 0; n < N; ++n)
-              {
-                if (sp_ptr && (*sp_ptr)[n])
-                  continue;
-                // Remains -1u
-                unsigned su = std::stoul((*s_names)[n]);
-                max_index = std::max(max_index, su);
-                sn[n] = su;
-              }
-            ++max_index;
+              if (!sp[n])
+                sn[n] = n_next++;
+            max_index = n_next;
           }
         else
           {
-            if (sp_ptr)
-              {
-                auto sp = *sp_ptr;
-                // Split
-                unsigned n_next = 0;
-                // Player -1u
-                // Env: Succesively numbered according to appearance
-                for (unsigned n = 0; n < N; ++n)
-                  if (!sp[n])
-                    sn[n] = n_next++;
-                max_index = n_next;
-              }
-            else
-              {
-                std::iota(state_numbers.back().begin(),
-                          state_numbers.back().end(), 0);
-                max_index = N;
-              }
-
-            // Ensure 0 <-> init state
-            std::swap(state_numbers.back()[0],
-                      state_numbers.back()[astrat.first->
-                                             get_init_state_number()]);
+            std::iota(state_numbers.back().begin(),
+                      state_numbers.back().end(), 0);
+            max_index = N;
           }
+        // Ensure 0 <-> init state
+        std::swap(state_numbers.back()[0],
+                  state_numbers.back()[astrat.first->
+                                       get_init_state_number()]);
+
         // Largest index to encode -> num_states()-1
         log2n.push_back(std::ceil(std::log2(max_index)));
         latch_offset.push_back(n_latches);
