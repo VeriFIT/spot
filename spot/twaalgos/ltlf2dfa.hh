@@ -166,7 +166,7 @@ namespace spot
                             int index = -1,
                             bool labels = true) const;
 
-    /// \brief Convert this automaton in a spot::twa_graph
+    /// \brief Convert this automaton to a spot::twa_graph
     ///
     /// The twa_graph is not meant to represent finite automata, so
     /// this will actually abuse the twa_graph class by creating a
@@ -457,4 +457,14 @@ namespace spot
   mtdfa_winning_strategy(mtdfa_ptr dfa, bdd controllable);
   /// \@}
 
+  /// \brief Convert an MTDFA representing a strategy to a TwA with
+  /// the "synthesis-output" property.
+  ///
+  /// By default the created automaton will have its states named
+  /// using the LTLf formula for the original state if available.
+  /// Set \a labels to `false` if you do not want that.
+  SPOT_API twa_graph_ptr
+  mtdfa_strategy_to_mealy(mtdfa_ptr strategy,
+                          const std::vector<std::string>& controllable,
+                          bool labels = true);
 }

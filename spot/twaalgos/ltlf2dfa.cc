@@ -1764,7 +1764,7 @@ namespace spot
               }
         res->merge_edges();
       }
-    else                        // transition-based
+    else                        // state-based
       {
         robin_hood::unordered_map<int, unsigned> bdd_to_state_map;
         std::vector<bdd> states;
@@ -1772,7 +1772,7 @@ namespace spot
         bdd init_state = bdd_terminal(0);
         states.push_back(init_state);
         bdd_to_state_map[init_state.id()] = res->new_state();
-        // List of dead stats that should be accepting. We
+        // List of dead states that should be accepting. We
         // expect at most one in practice, but more could occur
         // if the translation is change.
         std::vector<int> dead_acc;
@@ -2115,8 +2115,8 @@ namespace spot
     int iteration = 0;
     for (;;)
       {
-        // FIXME: rewrite todo/visit_next, so that we do not
-        // compute the
+        // FIXME: rewrite todo/visit_next, so that we do not compute
+        // visit_next before the end of the iteration.
         while (!todo.empty())
           {
             unsigned i = todo.front();
@@ -2361,5 +2361,98 @@ namespace spot
     bdd_extcache_done(&cache);
     return res;
   }
+
+  twa_graph_ptr
+  mtdfa_strategy_to_mealy(mtdfa_ptr strategy,
+                          const std::vector<std::string>& controllable,
+                          bool labels)
+  {
+    bdd_dict_ptr dict = strategy->get_dict();
+    twa_graph_ptr res = make_twa_graph(dict);
+    dict->register_all_propositions_of(strategy, res);
+    res->register_aps_from_dict();
+    res->prop_universal(true);
+
+    unsigned n = strategy->num_roots();
+    assert(n > 0);
+
+    bdd outputs = ap_to_bdd(strategy, controllable, true);
+    res->set_named_prop<bdd>("synthesis-outputs", new bdd(outputs));
+
+    std::vector<std::string>* names = nullptr;
+    if (labels && strategy->names.size() == strategy->states.size())
+      {
+        names = new std::vector<std::string>;
+        names->reserve(n);
+        res->set_named_prop("state-names", names);
+      }
+
+    robin_hood::unordered_map<int, unsigned> bdd_to_state_map;
+    std::vector<bdd> states;
+    states.reserve(n);
+
+    auto map_state = [&](int state_index) {
+      bdd succs = bddtrue;
+      if (state_index >= 0)
+        succs = strategy->states[state_index];
+      auto [it, b] = bdd_to_state_map.emplace(succs.id(), 0);
+      if (!b)
+        return it->second;
+      unsigned res_index = res->new_state();
+      assert(res_index == states.size());
+      it->second = res_index;
+      states.push_back(succs);
+      if (names)
+        {
+          if (state_index >= 0)
+            names->push_back(str_psl(strategy->names[state_index]));
+          else
+            names->push_back("1");
+        }
+      return res_index;
+    };
+
+    map_state(0);
+    // states.size() will increase in this loop
+    for (unsigned i = 0; i < states.size(); ++i)
+      {
+        bdd succs = states[i];
+        if (succs == bddfalse)
+          continue;
+        if (succs == bddtrue)
+          {
+            res->new_edge(i, i, bddtrue);
+            continue;
+          }
+        bdd previous_output_label = bddfalse;
+        unsigned previous_dst = -1U;
+        unsigned previous_edge = 0;
+        for (auto [b, t]: paths_mt_of(succs))
+          {
+            int dst = -1;
+            if (t != bddtrue)
+              {
+                int term = bdd_get_terminal(t);
+                if ((term & 1) == 0)
+                  dst = term / 2;
+              }
+            unsigned dst_idx = map_state(dst);
+            bdd output_label = bdd_existcomp(b, outputs);
+            if (previous_dst == dst_idx
+                && previous_output_label == output_label)
+              {
+                res->edge_storage(previous_edge).cond |= b;
+                continue;
+              }
+            previous_edge = res->new_edge(i, dst_idx, b);
+            previous_dst = dst_idx;
+            previous_output_label = output_label;
+          }
+      }
+    return res;
+  }
+
+
+
 
 }
