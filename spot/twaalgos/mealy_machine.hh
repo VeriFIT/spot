@@ -60,7 +60,7 @@ namespace spot
   /// \brief Checks whether or not the automaton is a split mealy machine
   ///
   /// A split mealy machine is a mealy machine machine that has
-  /// be converted into a game.  It should have the named property
+  /// been converted into a game.  It should have the named property
   /// `"state-player"`, moreover the game should be alternating
   /// between the two players.  Transitions leaving states owned by
   /// player 0 (the environment) should use only input propositions,
