@@ -106,6 +106,40 @@ New in spot 2.13  (2025-03-24)
 
   Library:
 
+  - (BACKWARD INCOMPATIBILITY) op::strong_X, the strong next operator
+    of LTLf is now defined by default.  Support for this operator was
+    added in version 2.9 but its name was not defined publicly by
+    default because that would have broken existing code for something
+    very niche. Now, since this version is bringing more support for
+    LTLf we are removing this special treatement and defining this
+    operator publicly.  This is likely to cause compilation warning or
+    errors in some user code, for instance when a switch is performed
+    over all possible operators: simply add the support for
+    op::strong_X.  If you need your code to support older versions of
+    Spot, you have two option.
+
+    Option 1: define SPOT_USES_STRONG_X before including formula.hh:
+
+      #define SPOT_USES_STRONG_X 1
+      #include <spot/tl/formula.hh>
+
+    This will force any version of Spot since 2.9 to define
+    strong_X.  It won't work with older Spot versions, where
+    strong_X did not exist.
+
+    Option 2: make any code using strong_X conditional on
+    SPOT_HAS_STRONG_X.  Typically, a switch over all possible
+    operators would include something like this:
+
+      #if SPOT_HAS_STRONG_X
+         case op::strong_X:
+            /* do something */
+      #endif
+
+    These two options are NOT mutually exclusive.  Setting
+    SPOT_USES_STRONG_X will cause SPOT_HAS_STRONG_X to be defined in
+    Spot versions ≥ 2.9.
+
   - restrict_dead_end_edges_here() can reduce non-determinism (but
     not remove it) by restricting the label L of some edge (S)-L->(D)
     going to a state D that does not have other successors than

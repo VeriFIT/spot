@@ -56,17 +56,16 @@
 #include <cstddef>
 #include <limits>
 
-// The strong_X operator was introduced in Spot 2.8.2 to fix an issue
-// with from_ltlf().  As adding a new operator is a backward
-// incompatibility, causing new warnings from the compiler.
-#if defined(SPOT_BUILD) || defined(SPOT_USES_STRONG_X)
-// Use #if SPOT_HAS_STRONG_X in code that need to be backward
-// compatible with older Spot versions.
+// strong_X was conditionally defined starting with version 2.9.
+// You had to "#define SPOT_USES_STRONG_X 1" before including this
+// file to get the definition.  Since Spot 2.13, it is always defined,
+// so users may have to update their code.  The following macro
+// is only defined when strong_X exists.
 #  define SPOT_HAS_STRONG_X 1
-// You may #define SPOT_WANT_STRONG_X yourself before including
-// this file to force the use of STRONG_X
+// This was defined since 2.9 along with SPOT_HAS_STRONG_X when
+// SPOT_USES_STRONG_X was defined so we are keeping it just in case
+// someone depends on it.
 #  define SPOT_WANT_STRONG_X 1
-#endif
 
 namespace spot
 {
@@ -111,9 +110,36 @@ namespace spot
     Star,                      ///< Star
     FStar,                     ///< Fustion Star
     first_match,               ///< first_match(sere)
-#ifdef SPOT_WANT_STRONG_X
+    // strong_X was introduced in Spot 2.9, but was hidden from the
+    // public API by default in order not to break existing code.
+    //
+    // Starting with Spot 2.13, strong_X will be part of the public
+    // API by default.  If you have a switch case listing all possible
+    // operators, strong_X needs to be part of it.  If you have code
+    // using Spot but that you also want to support versions older
+    // than 2.13, there are two ways to do that
+    //
+    // Option 1: define SPOT_USES_STRONG_X before including this file.
+    //
+    //   #define SPOT_USES_STRONG_X 1
+    //   #include <spot/tl/formula.hh>
+    //
+    // This will force any version of Spot since 2.9 to define
+    // strong_X.  It won't work with older Spot versions, where
+    // strong_X did not exist.
+    //
+    // Option 2: make any code using strong_X conditional on
+    // SPOT_HAS_STRONG_X.  Typically, a switch over all possible
+    // operators would include something like this:
+    //
+    //   #if SPOT_HAS_STRONG_X
+    //      case op::strong_X:
+    //         /* do something */
+    //   #endif
+    //
+    // The two options are not mutually exclusive.  Using both allows
+    // you to use strong_X whenever it exists.
     strong_X,                  ///< strong Next
-#endif
   };
 
 #ifndef SWIG
@@ -973,7 +999,6 @@ namespace spot
       return nested_unop_range(op::X, op::Or /* unused */, level, level, f);
     }
 
-#if SPOT_WANT_STRONG_X
     /// \brief Construct a strong_X
     /// @{
     SPOT_DEF_UNOP(strong_X);
@@ -987,7 +1012,6 @@ namespace spot
       return nested_unop_range(op::strong_X, op::Or /* unused */,
                                level, level, f);
     }
-#endif
 
     /// \brief Construct an F
     /// @{
