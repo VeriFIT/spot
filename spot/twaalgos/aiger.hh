@@ -496,6 +496,12 @@ namespace spot
                         const std::vector<std::vector<std::string>>& outs,
                         const realizability_simplifier* rs = nullptr);
   SPOT_API aig_ptr
+  mealy_machines_to_aig(const std::vector<twa_graph_ptr>& m_vec,
+                        const char* mode,
+                        const std::vector<std::string>& ins,
+                        const std::vector<std::vector<std::string>>& outs,
+                        const realizability_simplifier* rs = nullptr);
+  SPOT_API aig_ptr
   mealy_machines_to_aig(const std::vector<mealy_like>& m_vec,
                         const char* mode,
                         const std::vector<std::string>& ins,

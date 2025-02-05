@@ -1,0 +1,81 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. ./defs || exit 1
+
+set -e
+
+f='G(i1->Fo1)&G(o1<->X!o1)&G(i2->Fo2)&G(o2<->X!o2)'
+test 14 = `ltlfsynt -f "$f" --decomp=no --dot=game | grep ' -> ' | wc -l`
+test 20 = `ltlfsynt -f "$f" --decomp=yes --dot=game | grep ' -> ' | wc -l`
+test 3 = `ltlfsynt -f "$f" --decomp=no --dot=strat | grep ' -> ' | wc -l`
+test 3 = `ltlfsynt -f "$f" --decomp=yes --dot=strat | grep ' -> ' | wc -l`
+
+# See issue #601 for the effect of decomposition on this AIGER
+test 3 = `ltlfsynt -f "$f" --decomp=no --dot=aig | grep ' -> ' | wc -l`
+test 4 = `ltlfsynt -f "$f" --decomp=yes --dot=aig | grep ' -> ' | wc -l`
+
+run 0 ltlfsynt -f "$f" -H >out
+cat >expected <<EOF
+REALIZABLE
+HOA: v1
+States: 2
+Start: 0
+AP: 4 "i1" "i2" "o1" "o2"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic
+controllable-AP: 2 3
+--BODY--
+State: 0
+[2&3] 1
+State: 1
+[t] 1
+--END--
+EOF
+diff out expected
+
+run 0 ltlfsynt -f "$f" --aiger --hide-status >out
+cat >expected <<EOF
+aag 4 2 2 2 0
+2
+4
+6 1
+8 1
+7
+9
+i0 i2
+i1 i1
+o0 o1
+o1 o2
+EOF
+diff out expected
+
+
+cat >ctr1.part <<EOF
+.inputs in ic
+.outputs ca c0
+EOF
+
+F='X[!]c0->ic&&(ic->X c0)&&(G(!in->X[!]in)->(X[!](G(X[!]ca->in&&'
+F=$F'(in->X ca)&&(X[!]c0->!(c0<->X[!]ca)&&(!(c0<->X ca)->X c0))))'
+F=$F'&&X[!](F(!c0))))'
+echo "$F" >ctr1.ltlf
+
+run 0 ltlfsynt -F ctr1.ltlf --part ctr1.part --real

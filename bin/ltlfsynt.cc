@@ -32,13 +32,18 @@
 #include <spot/tl/formula.hh>
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/print.hh>
+#include <spot/twaalgos/dot.hh>
 #include <spot/twaalgos/synthesis.hh> // for split_independent_formulas
 #include <spot/twaalgos/ltlf2dfa.hh>
+#include <spot/twaalgos/aiger.hh>
+#include <spot/twaalgos/mealy_machine.hh>
 
 enum
 {
-  OPT_COMPOSITION = 256,
+  OPT_AIGER = 256,
+  OPT_COMPOSITION,
   OPT_DECOMPOSE,
+  OPT_GAME,
   OPT_GEQUIV,
   OPT_HIDE,
   OPT_INPUT,
@@ -97,6 +102,24 @@ static const argp_option options[] =
       0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Output options:", 20 },
+    { "aiger", OPT_AIGER, "ite|isop|both[+ud][+dc]"
+                                 "[+sub0|sub1|sub2]", OPTION_ARG_OPTIONAL,
+      "encode the winning strategy as an AIG circuit and print it in AIGER"
+      " format. The first word indicates the encoding to used: \"ite\" for "
+      "If-Then-Else normal form; "
+      "\"isop\" for irreducible sum of products; "
+      "\"both\" tries both and keeps the smaller one. "
+      "Other options further "
+      "refine the encoding, see aiger::encode_bdd. Defaults to \"ite\".", 0 },
+    { "dot", 'd', "game|strategy:OPT|aig:OPT", OPTION_ARG_OPTIONAL,
+      "Use dot format when printing the result (game, strategy, or "
+      "AIG circuit).  The options that may be used as OPT "
+      "depend on the nature of what is printed. "
+      "For strategy, standard automata rendering "
+      "options are supported (e.g., see ltl2tgba --dot).  For AIG circuit, "
+      "use (h) for horizontal and (v) for vertical layouts.", 0 },
+    { "hoaf", 'H', hoa_option_doc_short, OPTION_ARG_OPTIONAL,
+      hoa_option_doc_long, 0 },
     { "quiet", 'q', nullptr, 0, "suppress all normal output", 0 },
     { "hide-status", OPT_HIDE, nullptr, 0,
       "Hide the REALIZABLE or UNREALIZABLE line.  (Hint: exit status "
@@ -203,11 +226,25 @@ static semantics_choice semantics_values[] =
   };
 ARGMATCH_VERIFY(semantics_args, semantics_values);
 
+static const char* const dot_args[] =
+  {
+    "game", "strategy", "aig", nullptr
+  };
+enum dot_choice { dot_none = 0, dot_game, dot_strategy, dot_aig };
+static dot_choice dot_values[] =
+  {
+    dot_game, dot_strategy, dot_aig
+  };
+ARGMATCH_VERIFY(dot_args, dot_values);
+
 static bool opt_decompose_ltl = true;
 static polarity_choice opt_polarity = pol_yes;
 static polarity_choice opt_gequiv = pol_yes;
 static bool opt_realizability = false;
 static semantics_choice opt_semantics = semantics_default;
+static const char* opt_aiger = nullptr;
+static dot_choice opt_dot = dot_none;
+static const char* opt_dot_arg = "";
 static bool opt_show_status = true;
 
 static int
@@ -217,13 +254,37 @@ parse_opt(int key, char *arg, struct argp_state *)
   BEGIN_EXCEPTION_PROTECT;
   switch (key)
     {
-    case OPT_COMPOSITION:
-      opt_composition_by_ap = XARGMATCH("--composition", arg,
-                                        composition_args, composition_values);
+    case 'd':
+      {
+        automaton_format = Dot;
+        automaton_format_opt = "";
+        if (!arg)
+          {
+            opt_dot = dot_aig;
+            break;
+          }
+        // split arg on ':'
+        char *colon = strchr(arg, ':');
+        if (colon)
+          {
+            automaton_format_opt = opt_dot_arg = colon + 1;
+            *colon = 0;
+          }
+        if (arg)
+          opt_dot = XARGMATCH("--dot", arg, dot_args, dot_values);
+        else
+          opt_dot = dot_aig;
+        if (opt_dot == dot_aig && opt_aiger == nullptr)
+          opt_aiger = "ite";
+        break;
+      }
+    case 'H':
+      opt_dot = dot_none;
+      automaton_format = Hoa;
+      automaton_format_opt = arg;
       break;
-    case OPT_DECOMPOSE:
-      opt_decompose_ltl = XARGMATCH("--decompose", arg,
-                                    decompose_args, decompose_values);
+    case OPT_AIGER:
+      opt_aiger = arg ? arg : "ite";
       break;
     case OPT_COMPOSITION:
       opt_composition_by_ap = XARGMATCH("--composition", arg,
@@ -329,7 +390,7 @@ namespace
     }
 
     // Attempt to remove superfluous atomic propositions
-    spot::realizability_simplifier* rs = nullptr;
+    std::unique_ptr<spot::realizability_simplifier> rs = nullptr;
     if (opt_polarity != pol_no || opt_gequiv != pol_no)
       {
         unsigned opt = 0;
@@ -339,8 +400,8 @@ namespace
           opt |= mealy_semantics ?
             spot::realizability_simplifier::global_equiv :
             spot::realizability_simplifier::global_equiv_moore;
-        rs = new spot::realizability_simplifier(original_f, input_aps,
-                                                opt, opt_verbose);
+        rs.reset(new spot::realizability_simplifier(original_f, input_aps,
+                                                    opt, opt_verbose));
         f = rs->simplified_formula();
       }
 
@@ -413,11 +474,12 @@ namespace
     assert((sub_form.size() == sub_outs.size())
            && (sub_form.size() == sub_outs_str.size()));
 
-    std::vector<spot::mtdfa_ptr> arenas;
-
     auto sub_f = sub_form.begin();
     auto sub_o = sub_outs_str.begin();
     unsigned numsubs = sub_form.size();
+
+    std::vector<spot::twa_graph_ptr> mealy_machines;
+    const char* indent = "";
 
     for (; sub_f != sub_form.end(); ++sub_f, ++sub_o)
       {
@@ -427,13 +489,16 @@ namespace
             if (opt_polarity == pol_yes)
               opt |= spot::realizability_simplifier::polarity;
             if (opt_gequiv == pol_yes)
-              opt |= spot::realizability_simplifier::global_equiv;
+              opt |= mealy_semantics ?
+                spot::realizability_simplifier::global_equiv :
+                spot::realizability_simplifier::global_equiv_moore;
             if (opt_verbose)
               *opt_verbose << "working on subformula " << *sub_f << '\n';
             spot::realizability_simplifier rsub(*sub_f, input_aps, opt,
                                                 opt_verbose);
             *sub_f = rsub.simplified_formula();
             rs->merge_mapping(rsub);
+            indent = "  ";
           }
 
         spot::stopwatch st;
@@ -454,10 +519,16 @@ namespace
           }
         double trans_time = st.stop();
         if (opt_verbose)
-          *opt_verbose << "translation took " << trans_time << " seconds\n"
-                       << "MTDFA has " << a->num_roots() << " roots, "
-                       << a->aps.size() << " APs\n";
+          *opt_verbose << indent << "translation to MTDFA ("
+                       << a->num_roots() << " roots, "
+                       << a->aps.size() << " APs) took "
+                       << trans_time << " seconds\n";
 
+        if (opt_dot == dot_game)
+          {
+            a->print_dot(std::cout, -1, false);
+            continue;
+          }
         if (opt_realizability)
           {
             st.start();
@@ -465,8 +536,8 @@ namespace
               mtdfa_winning_region_lazy(a, *sub_o, true);
             double region_time = st.stop();
             if (opt_verbose)
-              *opt_verbose << "winning region found in " << region_time
-                           << " seconds\n";
+              *opt_verbose << indent << "winning region found in "
+                           << region_time << " seconds\n";
             if (!winreg[0])
               {
                 if (opt_show_status)
@@ -478,20 +549,78 @@ namespace
           {
             st.start();
             a = spot::mtdfa_winning_strategy(a, *sub_o, true);
-            double strat_time = st.stop();
+            double time = st.stop();
             if (opt_verbose)
-              *opt_verbose << "winning strategy found in " << strat_time
-                           << " seconds\n";
+              {
+                // count number of non-false roots
+                unsigned nf = 0;
+                for (bdd r: a->states)
+                  nf += r != bddfalse;
+                *opt_verbose << indent << "winning strategy (" << nf
+                             << " roots) found in " << time
+                             << " seconds\n";
+              }
             if (a->states[0] == bddfalse)
               {
                 if (opt_show_status)
                   std::cout << "UNREALIZABLE" << std::endl;
                 return 1;
               }
+            st.start();
+            spot::twa_graph_ptr m =
+              spot::mtdfa_strategy_to_mealy(a, *sub_o, false);
+            time = st.stop();
+            if (opt_verbose)
+              *opt_verbose << indent << "Mealy machine ("
+                           << m->num_states() << " states) created in "
+                           << time << " seconds\n";
+            mealy_machines.push_back(m);
           }
       }
+    if (opt_dot == dot_game)
+      return 0;
     if (opt_show_status)
       std::cout << "REALIZABLE" << std::endl;
+    if (opt_realizability)
+      return 0;
+
+    if (!opt_aiger && (opt_dot == dot_strategy
+                       || automaton_format == Hoa))
+      {
+        spot::twa_graph_ptr strat = nullptr;
+        for (auto m: mealy_machines)
+          if (strat)
+            strat = spot::mealy_product(strat, m);
+          else
+            strat = m;
+        if (rs)        // Add any AP we removed
+          rs->patch_mealy(strat);
+        automaton_printer printer;
+        spot::process_timer timer_printer_dummy;
+        printer.print(strat, timer_printer_dummy);
+        return 0;
+      }
+
+    spot::stopwatch sw2;
+    sw2.start();
+    spot::aig_ptr saig = spot::mealy_machines_to_aig(mealy_machines,
+                                                     opt_aiger,
+                                                     input_aps,
+                                                     sub_outs_str, rs.get());
+    double aigtime = sw2.stop();
+    if (opt_verbose)
+      *opt_verbose << "AIG circuit ("
+                   << saig->num_latches() << " latches, "
+                   << saig->num_gates() << " gates) created in "
+                   << aigtime << " seconds\n";
+
+    if (automaton_format != Quiet)
+      {
+        if (opt_dot == dot_aig)
+          spot::print_dot(std::cout, saig, opt_dot_arg);
+        else
+          spot::print_aiger(std::cout, saig) << '\n';
+      }
     return 0;
   }
 
@@ -511,7 +640,6 @@ namespace
                         "formula '%s' is not an LTLf formula",
                         s.c_str());
         }
-
       auto [input_aps, output_aps] =
         filter_list_of_aps(f, filename, linenum);
       return solve_formula(f, input_aps, output_aps,
@@ -581,9 +709,6 @@ int
 main(int argc, char** argv)
 {
   return protected_main(argv, [&] {
-      // By default we name automata using the formula.
-      opt_name = "%f";
-
       const argp ap = { options, parse_opt, "[FORMULA...]",
                         argp_program_doc, children, nullptr, nullptr };
 
@@ -591,6 +716,7 @@ main(int argc, char** argv)
         exit(err);
 
       check_no_formula();
+      process_io_options();
 
       trans_processor processor;
       if (int res = processor.run(); res == 0 || res == 1)

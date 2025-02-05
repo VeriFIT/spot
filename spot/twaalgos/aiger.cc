@@ -2183,13 +2183,14 @@ namespace spot
     return mealy_machines_to_aig(new_vec, mode);
   }
 
-  // Note: This ignores the named property
+  // Note: This ignores the "synthesis-outputs" named property
+  template<class T>
   aig_ptr
-  mealy_machines_to_aig(const std::vector<const_twa_graph_ptr>& m_vec,
-                        const char *mode,
-                        const std::vector<std::string>& ins,
-                        const std::vector<std::vector<std::string>>& outs,
-                        const realizability_simplifier* rs)
+  mealy_machines_to_aig_aux(const std::vector<T>& m_vec,
+                            const char *mode,
+                            const std::vector<std::string>& ins,
+                            const std::vector<std::vector<std::string>>& outs,
+                            const realizability_simplifier* rs)
   {
     if (m_vec.empty())
       throw std::runtime_error("mealy_machines_to_aig(): No strategy given.");
@@ -2247,6 +2248,26 @@ namespace spot
         unused_ins.push_back(ai);
 
     return auts_to_aiger(new_vec, mode, unused_ins, unused_outs, rs);
+  }
+
+  aig_ptr
+  mealy_machines_to_aig(const std::vector<const_twa_graph_ptr>& m_vec,
+                        const char *mode,
+                        const std::vector<std::string>& ins,
+                        const std::vector<std::vector<std::string>>& outs,
+                        const realizability_simplifier* rs)
+  {
+    return mealy_machines_to_aig_aux(m_vec, mode, ins, outs, rs);
+  }
+
+  aig_ptr
+  mealy_machines_to_aig(const std::vector<twa_graph_ptr>& m_vec,
+                        const char *mode,
+                        const std::vector<std::string>& ins,
+                        const std::vector<std::vector<std::string>>& outs,
+                        const realizability_simplifier* rs)
+  {
+    return mealy_machines_to_aig_aux(m_vec, mode, ins, outs, rs);
   }
 
   aig_ptr
