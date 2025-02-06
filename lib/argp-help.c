@@ -931,6 +931,9 @@ indent_to (argp_fmtstream_t stream, unsigned col)
   int needed = col - __argp_fmtstream_point (stream);
   while (needed-- > 0)
     __argp_fmtstream_putc (stream, ' ');
+  /* Flush stream to avoid spurious newline before overlong word
+     (see argp-test.c).  */
+  __argp_fmtstream_update(stream);
 }
 
 /* Output to STREAM either a space, or a newline if there isn't room for at

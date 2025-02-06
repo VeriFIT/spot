@@ -68,7 +68,6 @@ __argp_make_fmtstream (FILE *stream,
       fs->rmargin = rmargin;
       fs->wmargin = wmargin;
       fs->point_col = 0;
-      fs->point_offs = 0;
 
       fs->buf = (char *) malloc (INIT_BUF_SIZE);
       if (! fs->buf)
@@ -115,8 +114,19 @@ weak_alias (__argp_fmtstream_free, argp_fmtstream_free)
 #endif
 #endif
 
-/* Process FS's buffer so that line wrapping is done from POINT_OFFS to the
-   end of its buffer.  This code is mostly from glibc stdio/linewrap.c.  */
+
+static void
+write_block (argp_fmtstream_t fs, char *buf, int len)
+{
+#ifdef _LIBC
+  __fxprintf (fs->stream, "%.*s", len, buf);
+#else
+  fwrite_unlocked (buf, 1, len, fs->stream);
+#endif
+}
+
+/* Process FS's buffer so that line wrapping is done and flush all of it. So
+   after return fs->p will be set to fb->buf.  */
 void
 __argp_fmtstream_update (argp_fmtstream_t fs)
 {
@@ -124,7 +134,7 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
   size_t len;
 
   /* Scan the buffer for newlines.  */
-  buf = fs->buf + fs->point_offs;
+  buf = fs->buf;
   while (buf < fs->p)
     {
       size_t r;
@@ -132,31 +142,10 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
       if (fs->point_col == 0 && fs->lmargin != 0)
         {
           /* We are starting a new line.  Print spaces to the left margin.  */
-          const size_t pad = fs->lmargin;
-          if (fs->p + pad < fs->end)
-            {
-              /* We can fit in them in the buffer by moving the
-                 buffer text up and filling in the beginning.  */
-              memmove (buf + pad, buf, fs->p - buf);
-              fs->p += pad; /* Compensate for bigger buffer. */
-              memset (buf, ' ', pad); /* Fill in the spaces.  */
-              buf += pad; /* Don't bother searching them.  */
-            }
-          else
-            {
-              /* No buffer space for spaces.  Must flush.  */
-              size_t i;
-              for (i = 0; i < pad; i++)
-                {
-#ifdef _LIBC
-                  if (_IO_fwide (fs->stream, 0) > 0)
-                    putwc_unlocked (L' ', fs->stream);
-                  else
-#endif
-                    putc_unlocked (' ', fs->stream);
-                }
-            }
-          fs->point_col = pad;
+	  size_t i;
+	  for (i = 0; i < fs->lmargin; i++)
+	    write_block(fs, " ", 1);
+          fs->point_col = fs->lmargin;
         }
 
       len = fs->p - buf;
@@ -172,8 +161,9 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
           if (fs->point_col + len < fs->rmargin)
             {
               /* The remaining buffer text is a partial line and fits
-                 within the maximum line width.  Advance point for the
-                 characters to be written and stop scanning.  */
+                 within the maximum line width. Output the line and increment
+                 point.  */
+	      write_block(fs, buf, len);
               fs->point_col += len;
               break;
             }
@@ -185,7 +175,9 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
       else if (fs->point_col + (nl - buf) < (ssize_t) fs->rmargin)
         {
           /* The buffer contains a full line that fits within the maximum
-             line width.  Reset point and scan the next line.  */
+             line width.  Output the line, reset point and scan the next
+             line.  */
+	  write_block(fs, buf, nl + 1 - buf);
           fs->point_col = 0;
           buf = nl + 1;
           continue;
@@ -196,23 +188,23 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
 
       if (fs->wmargin < 0)
         {
-          /* Truncate the line by overwriting the excess with the
-             newline and anything after it in the buffer.  */
+          /* Truncated everything past the right margin.  */
           if (nl < fs->p)
             {
-              memmove (buf + (r - fs->point_col), nl, fs->p - nl);
-              fs->p -= buf + (r - fs->point_col) - nl;
+	      write_block(fs, buf, r - fs->point_col);
+	      write_block(fs, "\n", 1);
               /* Reset point for the next line and start scanning it.  */
               fs->point_col = 0;
-              buf += r + 1; /* Skip full line plus \n. */
+              buf = nl + 1; /* Skip full line plus \n. */
+	      continue;
             }
           else
             {
               /* The buffer ends with a partial line that is beyond the
                  maximum line width.  Advance point for the characters
                  written, and discard those past the max from the buffer.  */
-              fs->point_col += len;
-              fs->p -= fs->point_col - r;
+	      write_block(fs, buf, r - fs->point_col);
+	      fs->point_col += len;
               break;
             }
         }
@@ -249,99 +241,26 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
                 do
                   ++p;
                 while (p < nl && !isblank ((unsigned char) *p));
-              if (p == nl)
-                {
-                  /* It already ends a line.  No fussing required.  */
-                  fs->point_col = 0;
-                  buf = nl + 1;
-                  continue;
-                }
-              /* We will move the newline to replace the first blank.  */
-              nl = p;
-              /* Swallow separating blanks.  */
-              do
-                ++p;
-              while (isblank ((unsigned char) *p));
-              /* The next line will start here.  */
-              nextline = p;
-            }
+	      nl = p;
+	      nextline = nl + 1;
+	    }
 
-          /* Note: There are a bunch of tests below for
-             NEXTLINE == BUF + LEN + 1; this case is where NL happens to fall
-             at the end of the buffer, and NEXTLINE is in fact empty (and so
-             we need not be careful to maintain its contents).  */
-
-          if ((nextline == buf + len + 1
-               ? fs->end - nl < fs->wmargin + 1
-               : nextline - (nl + 1) < fs->wmargin)
-              && fs->p > nextline)
-            {
-              /* The margin needs more blanks than we removed.  */
-              if (fs->end - fs->p > fs->wmargin + 1)
-                /* Make some space for them.  */
-                {
-                  size_t mv = fs->p - nextline;
-                  memmove (nl + 1 + fs->wmargin, nextline, mv);
-                  nextline = nl + 1 + fs->wmargin;
-                  len = nextline + mv - buf;
-                  *nl++ = '\n';
-                }
-              else
-                /* Output the first line so we can use the space.  */
-                {
-#ifdef _LIBC
-                  __fxprintf (fs->stream, "%.*s\n",
-                              (int) (nl - fs->buf), fs->buf);
-#else
-                  if (nl > fs->buf)
-                    fwrite_unlocked (fs->buf, 1, nl - fs->buf, fs->stream);
-                  putc_unlocked ('\n', fs->stream);
-#endif
-
-                  len += buf - fs->buf;
-                  nl = buf = fs->buf;
-                }
-            }
-          else
-            /* We can fit the newline and blanks in before
-               the next word.  */
-            *nl++ = '\n';
-
-          if (nextline - nl >= fs->wmargin
-              || (nextline == buf + len + 1 && fs->end - nextline >= fs->wmargin))
-            /* Add blanks up to the wrap margin column.  */
-            for (i = 0; i < fs->wmargin; ++i)
-              *nl++ = ' ';
-          else
-            for (i = 0; i < fs->wmargin; ++i)
-#ifdef _LIBC
-              if (_IO_fwide (fs->stream, 0) > 0)
-                putwc_unlocked (L' ', fs->stream);
-              else
-#endif
-                putc_unlocked (' ', fs->stream);
-
-          /* Copy the tail of the original buffer into the current buffer
-             position.  */
-          if (nl < nextline)
-            memmove (nl, nextline, buf + len - nextline);
-          len -= nextline - buf;
-
-          /* Continue the scan on the remaining lines in the buffer.  */
-          buf = nl;
-
-          /* Restore bufp to include all the remaining text.  */
-          fs->p = nl + len;
-
-          /* Reset the counter of what has been output this line.  If wmargin
-             is 0, we want to avoid the lmargin getting added, so we set
-             point_col to a magic value of -1 in that case.  */
-          fs->point_col = fs->wmargin ? fs->wmargin : -1;
-        }
+	  write_block(fs, buf, nl - buf);
+	  if (nextline < fs->p)
+	    {
+	      /* There are more lines to process. Do line break and print
+		 blanks up to the wrap margin.  */
+	      write_block(fs, "\n", 1);
+	      for (i = 0; i < fs->wmargin; ++i)
+		write_block(fs, " ", 1);
+	      fs->point_col = fs->wmargin;
+	    }
+	  buf = nextline;
+	}
     }
 
-  /* Remember that we've scanned as far as the end of the buffer.  */
-  fs->point_offs = fs->p - fs->buf;
+  /* Remember that we've flushed everything.  */
+  fs->p = fs->buf;
 }
 
 /* Ensure that FS has space for AMOUNT more bytes in its buffer, either by
@@ -351,29 +270,8 @@ __argp_fmtstream_ensure (struct argp_fmtstream *fs, size_t amount)
 {
   if ((size_t) (fs->end - fs->p) < amount)
     {
-      ssize_t wrote;
-
       /* Flush FS's buffer.  */
       __argp_fmtstream_update (fs);
-
-#ifdef _LIBC
-      __fxprintf (fs->stream, "%.*s", (int) (fs->p - fs->buf), fs->buf);
-      wrote = fs->p - fs->buf;
-#else
-      wrote = fwrite_unlocked (fs->buf, 1, fs->p - fs->buf, fs->stream);
-#endif
-      if (wrote == fs->p - fs->buf)
-        {
-          fs->p = fs->buf;
-          fs->point_offs = 0;
-        }
-      else
-        {
-          fs->p -= wrote;
-          fs->point_offs -= wrote;
-          memmove (fs->buf, fs->buf + wrote, fs->p - fs->buf);
-          return 0;
-        }
 
       if ((size_t) (fs->end - fs->buf) < amount)
         /* Gotta grow the buffer.  */
