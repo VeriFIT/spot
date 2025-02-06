@@ -117,6 +117,8 @@ New in spot 2.12.2.dev  (not yet released)
     status and the AIG circuit; it now does the job silently as
     requested.
 
+  - ltlsynt had a minor memory leak
+
 New in spot 2.12.2  (2025-01-18)
 
   Bug fixes:

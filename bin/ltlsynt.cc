@@ -489,7 +489,7 @@ namespace
     };
 
     // Attempt to remove superfluous atomic propositions
-    spot::realizability_simplifier* rs = nullptr;
+    std::unique_ptr<spot::realizability_simplifier> rs = nullptr;
     if (opt_polarity != pol_no || opt_gequiv != pol_no)
       {
         unsigned opt = 0;
@@ -502,9 +502,9 @@ namespace
             else
               opt |= spot::realizability_simplifier::global_equiv;
           }
-        rs =
-          new spot::realizability_simplifier(original_f, input_aps, opt,
-                                             gi ? gi->verbose_stream : nullptr);
+        rs.reset(new spot::realizability_simplifier(original_f, input_aps, opt,
+                                                    gi ? gi->verbose_stream
+                                                       : nullptr));
         f = rs->simplified_formula();
       }
 
@@ -646,7 +646,7 @@ namespace
             }
           if (want_game())
             {
-              dispatch_print_hoa(arena, rs);
+              dispatch_print_hoa(arena, rs.get());
               continue;
             }
           if (!spot::solve_game(arena, *gi))
@@ -732,7 +732,7 @@ namespace
         if (gi->bv)
           sw2.start();
         saig = spot::mealy_machines_to_aig(mealy_machines, opt_aiger,
-                                           input_aps, sub_outs_str, rs);
+                                           input_aps, sub_outs_str, rs.get());
         if (gi->bv)
           {
             gi->bv->aig_time = sw2.stop();
