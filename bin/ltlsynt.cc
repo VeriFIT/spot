@@ -53,7 +53,6 @@ enum
   OPT_CSV_WITH_FORMULA,
   OPT_CSV_WITHOUT_FORMULA,
   OPT_DECOMPOSE,
-  OPT_DOT,
   OPT_FROM_PGAME,
   OPT_GEQUIV,
   OPT_HIDE,
@@ -143,13 +142,15 @@ static const argp_option options[] =
       "\"both\" tries both and keeps the smaller one. "
       "Other options further "
       "refine the encoding, see aiger::encode_bdd. Defaults to \"ite\".", 0 },
-    { "dot", OPT_DOT, "options", OPTION_ARG_OPTIONAL,
+    { "dot", 'd', "options", OPTION_ARG_OPTIONAL,
       "Use dot format when printing the result (game, strategy, or "
       "AIG circuit, depending on other options).  The options that "
       "may be passed to --dot depend on the nature of what is printed. "
       "For games and strategies, standard automata rendering "
       "options are supported (e.g., see ltl2tgba --dot).  For AIG circuit, "
       "use (h) for horizontal and (v) for vertical layouts.", 0 },
+    { "hoaf", 'H', hoa_option_doc_short, OPTION_ARG_OPTIONAL,
+      hoa_option_doc_long, 0 },
     { "csv", OPT_CSV_WITHOUT_FORMULA, "[>>]FILENAME", OPTION_ARG_OPTIONAL,
       "output statistics as CSV in FILENAME or on standard output "
       "(if '>>' is used to request append mode, the header line is "
@@ -159,8 +160,9 @@ static const argp_option options[] =
       OPTION_ARG_OPTIONAL,
       "like --csv, but with an additional 'fomula' column", 0 },
     { "hide-status", OPT_HIDE, nullptr, 0,
-      "Hide the REALIZABLE or UNREALIZABLE line.  (Hint: exit status "
+      "hide the REALIZABLE or UNREALIZABLE line (The exit status "
       "is enough of an indication.)", 0 },
+    { "quiet", 'q', nullptr, 0, "suppress all normal output", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
     { "extra-options", 'x', "OPTS", 0,
@@ -174,7 +176,6 @@ static const argp_option options[] =
 static const struct argp_child children[] =
   {
     { &finput_argp_headless, 0, nullptr, 0 },
-    { &aoutput_argp, 0, nullptr, 0 },
     { &misc_argp, 0, nullptr, 0 },
     { nullptr, 0, nullptr, 0 }
   };
@@ -1044,6 +1045,15 @@ parse_opt(int key, char *arg, struct argp_state *)
   BEGIN_EXCEPTION_PROTECT;
   switch (key)
     {
+    case 'd':
+      opt_dot = true;
+      automaton_format_opt = opt_dot_arg = arg;
+      automaton_format = Dot;
+      break;
+    case 'q':
+      automaton_format = Quiet;
+      show_status = false;
+      break;
     case OPT_ALGO:
       gi->s = XARGMATCH("--algo", arg, algo_args, algo_types);
       break;
@@ -1061,11 +1071,6 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_DECOMPOSE:
       opt_decompose_ltl = XARGMATCH("--decompose", arg,
                                     decompose_args, decompose_values);
-      break;
-    case OPT_DOT:
-      opt_dot = true;
-      automaton_format_opt = opt_dot_arg = arg;
-      automaton_format = Dot;
       break;
     case OPT_FROM_PGAME:
       jobs.emplace_back(arg, job_type::AUT_FILENAME);
