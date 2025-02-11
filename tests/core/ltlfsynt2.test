@@ -21,15 +21,19 @@
 
 set -e
 
+C='ltlfsynt --trans=comp'
+
 f='G(i1->Fo1)&G(o1<->X!o1)&G(i2->Fo2)&G(o2<->X!o2)'
-test 14 = `ltlfsynt -f "$f" --decomp=no --dot=game | grep ' -> ' | wc -l`
-test 20 = `ltlfsynt -f "$f" --decomp=yes --dot=game | grep ' -> ' | wc -l`
-test 3 = `ltlfsynt -f "$f" --decomp=no --dot=strat | grep ' -> ' | wc -l`
-test 3 = `ltlfsynt -f "$f" --decomp=yes --dot=strat | grep ' -> ' | wc -l`
+test 14 = `$C -f "$f" --decomp=no --dot=game | grep ' -> ' | wc -l`
+test 20 = `$C -f "$f" --decomp=yes --dot=game | grep ' -> ' | wc -l`
+test 3 = `$C -f "$f" --decomp=no --dot=strat | grep ' -> ' | wc -l`
+test 3 = `$C -f "$f" --decomp=yes --dot=strat | grep ' -> ' | wc -l`
+test 11 = `ltlfsynt -f "$f" --decomp=no --dot=game | grep ' -> ' | wc -l`
+test 11 = `ltlfsynt -f "$f" --decomp=yes --dot=game | grep ' -> ' | wc -l`
 
 # See issue #601 for the effect of decomposition on this AIGER
-test 3 = `ltlfsynt -f "$f" --decomp=no --dot=aig | grep ' -> ' | wc -l`
-test 4 = `ltlfsynt -f "$f" --decomp=yes --dot=aig | grep ' -> ' | wc -l`
+test 3 = `$C -f "$f" --decomp=no --dot=aig | grep ' -> ' | wc -l`
+test 4 = `$C -f "$f" --decomp=yes --dot=aig | grep ' -> ' | wc -l`
 
 run 0 ltlfsynt -f "$f" -H >out
 cat >expected <<EOF

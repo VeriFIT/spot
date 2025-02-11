@@ -83,7 +83,7 @@ while read f; do
 
    for sem in Moore Mealy; do
      for dec in yes no; do
-     for tra in dir comp; do
+     for tra in restricted full compose; do
      for min in yes no; do
      for geq in yes no; do
      for pol in yes no; do

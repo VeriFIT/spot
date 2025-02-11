@@ -79,10 +79,11 @@ static const argp_option options[] =
       "(output-first) semantics.  The default is Mealy.", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
-    { "translation", OPT_TRANS, "direct|compositional", 0,
+    { "translation", OPT_TRANS, "retricted-direct|full-direct|compositional", 0,
       "Whether to translate the formula directly as a whole, or to "
-      "assemble translations from subformulas.  Default is compositional.",
-      0 },
+      "assemble translations from subformulas.  The restricted-direct version,"
+      " which is the default, will only build the useful part of the game"
+      " arena.", 0 },
     { "minimize", OPT_MINIMIZE, "yes|no", 0,
       "Minimize the automaton (enabled by default).", 0 },
     { "composition", OPT_COMPOSITION, "size|ap", 0,
@@ -143,18 +144,28 @@ static const char argp_program_doc[] = "\
 Convert LTLf formulas to transition-based deterministic finite automata.\n\n\
 If multiple formulas are supplied, several automata will be output.";
 
-enum translation_type { translation_direct, translation_compositional };
+enum translation_type {
+  translation_direct_restricted,
+  translation_direct_full,
+  translation_compositional,
+};
 
 static const char* const translation_args[] =
   {
-    "direct", "compositional", "compose", nullptr
+    "direct", "direct-restricted", "restricted-direct",
+    "direct-full", "full-direct",
+    "compositional", "compose",
+    nullptr
   };
 static translation_type translation_values[] =
   {
-    translation_direct, translation_compositional, translation_compositional,
+    translation_direct_restricted, translation_direct_restricted,
+    translation_direct_restricted,
+    translation_direct_full, translation_direct_full,
+    translation_compositional, translation_compositional,
   };
 ARGMATCH_VERIFY(translation_args, translation_values);
-static translation_type opt_trans = translation_compositional;
+static translation_type opt_trans = translation_direct_restricted;
 
 static const char* const minimize_args[] =
   {
@@ -504,18 +515,26 @@ namespace
         spot::stopwatch st;
         st.start();
         spot::mtdfa_ptr a;
-        if (opt_trans == translation_direct)
+        switch (opt_trans)
           {
+          case translation_direct_restricted:
+            a = spot::ltlf_to_mtdfa(*sub_f, dict, true, true, true, *sub_o);
+            if (opt_minimize)
+              a = spot::minimize_mtdfa(a);
+            break;
+          case translation_direct_full:
             a = spot::ltlf_to_mtdfa(*sub_f, dict);
             if (opt_minimize)
               a = spot::minimize_mtdfa(a);
-          }
-        else
-          {
+            a->set_controllable_variables(*sub_o, true);
+            break;
+          case translation_compositional:
             a = spot::ltlf_to_mtdfa_compose(*sub_f, dict,
                                             opt_minimize,
                                             opt_composition_by_ap,
                                             false);
+            a->set_controllable_variables(*sub_o, true);
+            break;
           }
         double trans_time = st.stop();
         if (opt_verbose)
@@ -532,8 +551,7 @@ namespace
         if (opt_realizability)
           {
             st.start();
-            std::vector<bool> winreg =
-              mtdfa_winning_region_lazy(a, *sub_o, true);
+            std::vector<bool> winreg = mtdfa_winning_region_lazy(a);
             double region_time = st.stop();
             if (opt_verbose)
               *opt_verbose << indent << "winning region found in "
@@ -548,7 +566,7 @@ namespace
         else
           {
             st.start();
-            a = spot::mtdfa_winning_strategy(a, *sub_o, true);
+            a = spot::mtdfa_winning_strategy(a);
             double time = st.stop();
             if (opt_verbose)
               {
@@ -567,8 +585,7 @@ namespace
                 return 1;
               }
             st.start();
-            spot::twa_graph_ptr m =
-              spot::mtdfa_strategy_to_mealy(a, *sub_o, false);
+            spot::twa_graph_ptr m = spot::mtdfa_strategy_to_mealy(a);
             time = st.stop();
             if (opt_verbose)
               *opt_verbose << indent << "Mealy machine ("

@@ -38,6 +38,7 @@ constexpr int hash_key_equiv = 4;
 constexpr int hash_key_xor = 5;
 constexpr int hash_key_not = 6;
 constexpr int hash_key_rename = 7;
+constexpr int hash_key_strat = 8;
 
 namespace spot
 {
@@ -243,11 +244,20 @@ namespace spot
             return res;
           }
         case op::Xor:
-          return rec(f[0], rec) ^ rec(f[1], rec);
+          {
+            bdd left = rec(f[0], rec);
+            return left ^ rec(f[1], rec);
+          }
         case op::Implies:
-          return rec(f[0], rec) >> rec(f[1], rec);
+          {
+            bdd left = rec(f[0], rec);
+            return left >> rec(f[1], rec);
+          }
         case op::Equiv:
-          return bdd_biimp(rec(f[0], rec), rec(f[1], rec));
+          {
+            bdd left = rec(f[0], rec);
+            return bdd_biimp(left, rec(f[1], rec));
+          }
         default:
           return bdd_ithvar(formula_to_bddvar(f));
         }
@@ -586,9 +596,23 @@ namespace spot
     return 2 * v + (terminal & 1);
   }
 
-  mtdfa_ptr ltlf_translator::ltlf_to_mtdfa(formula f,
-                                           bool fuse_same_bdds,
-                                           bool detect_empty_univ)
+  static int strategy_map_true(int* root_ptr, int term)
+  {
+    // replace accepting terminals by bddtrue
+    if (term & 1)
+      {
+        *root_ptr = 1;
+        return 1;
+      }
+    return 0;
+  }
+
+
+  mtdfa_ptr
+  ltlf_translator::ltlf_to_mtdfa(formula f,
+                                 bool fuse_same_bdds,
+                                 bool detect_empty_univ,
+                                 const std::vector<std::string>* outvars)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
@@ -603,8 +627,33 @@ namespace spot
     // what appears in the formula, but we do not pay attention to
     // that.
     {
-      auto a = atomic_prop_collect(f);
+      atomic_prop_set* a = atomic_prop_collect(f);
       dfa->aps.assign(a->begin(), a->end());
+
+      if (outvars)
+        {
+          bdd out = bddtrue;
+          // We need to register the output variables already so we can
+          // call bdd_mt_quantify_prepare.  Let's do it in the order in
+          // which they will be discovered in the formula.
+          std::unordered_set<spot::formula> outputs;
+          for (const std::string& s: *outvars)
+            outputs.insert(spot::formula::ap(s));
+          f.traverse([&](const spot::formula& f)
+          {
+            if (f.is(spot::op::ap) && outputs.find(f) != outputs.end()
+                && a->erase(f))
+              {
+                int i = dict_->register_proposition(f, dfa);
+                out &= bdd_ithvar(i);
+              }
+            return false;
+          });
+          bdd_mt_quantify_prepare(out);
+          dfa->set_controllable_variables(out);
+        }
+
+
       delete a;
     }
     // Keep track of whether we have seen an accepting or rejecting
@@ -626,6 +675,9 @@ namespace spot
           continue;
 
         bdd b = ltlf_to_mtbdd(label);
+        if (outvars)
+          bdd_mt_apply1_synthesis(b, strategy_map_true,
+                                  &cache_, hash_key_strat);
         if (fuse_same_bdds)
           if (auto it = bdd_to_state.find(b); it != bdd_to_state.end())
             {
@@ -892,6 +944,7 @@ namespace spot
         res->get_dict()->register_all_propositions_of(dfa, res);
         res->aps = dfa->aps;
       }
+    res->set_controllable_variables(dfa->get_controllable_variables());
     std::swap(res->names, names);
     std::swap(res->states, states);
     return res;
@@ -1537,6 +1590,15 @@ namespace spot
     return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ);
   }
 
+  mtdfa_ptr ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
+                          bool fuse_same_bdds, bool simplify_terms,
+                          bool detect_empty_univ,
+                          const std::vector<std::string>& outvars)
+  {
+    ltlf_translator trans(dict, simplify_terms);
+    return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ, &outvars);
+  }
+
   mtdfa_ptr ltlf_to_mtdfa_compose(formula f, const bdd_dict_ptr& dict,
                                   bool want_minimize, bool order_for_aps,
                                   bool want_names, bool fuse_same_bdds,
@@ -1568,6 +1630,15 @@ namespace spot
                                  int state, bool labels) const
   {
     std::ostringstream edges;
+    std::unordered_set<int> controllable;
+    {
+      bdd b = get_controllable_variables();
+      while (b != bddtrue)
+        {
+          controllable.insert(bdd_var(b));
+          b = bdd_high(b);
+        }
+    }
 
     os << "digraph mtdfa {\n  rankdir=TB;\n  node [shape=circle];\n";
 
@@ -1685,8 +1756,13 @@ namespace spot
         else
           label = "var" + std::to_string(var);
 
+        bool outputnode = (!controllable.empty()
+                           && controllable.find(var) != controllable.end());
+        const char* shape = outputnode ? "diamond" : "circle";
+
         os << "    B" << n.id()
-           << " [style=filled, fillcolor=\"#ffffff\", label=\"" << label
+           << " [shape=" << shape
+           << ", style=filled, fillcolor=\"#ffffff\", label=\"" << label
            << "\", tooltip=\"bdd(" << n.id() << ")\"];\n";
 
         bdd low = bdd_low(n);
@@ -1701,11 +1777,20 @@ namespace spot
             nodes.push_back(high);
             std::push_heap(nodes.begin(), nodes.end(), bylvl);
           }
+        const char* colorlow = "";
+        const char* colorhigh = "";
+        if (outputnode)
+          {
+            if (low == bddfalse)
+              colorlow = ",color=LightGray";
+            else if (high == bddfalse)
+              colorhigh = ",color=LightGray";
+          }
         edges << "  B" << n.id() << " -> B" << low.id()
               << " [style=dotted, tooltip=\"" << label
-              << "=0\"];\n  B" << n.id()
+              << "=0\"" << colorlow << "];\n  B" << n.id()
               << " -> B" << high.id() << " [style=filled, tooltip=\""
-              << label << "=1\"];\n";
+              << label << "=1\"" << colorhigh << "];\n";
       }
 
     os << "  }\n";
@@ -1988,7 +2073,6 @@ namespace spot
     return reverse;
   }
 
-
   static bdd
   ap_to_bdd(mtdfa_ptr dfa, const std::vector<std::string>& controllable,
             bool ignore_non_registered_ap)
@@ -2011,15 +2095,19 @@ namespace spot
     return controllable_bdd;
   }
 
-  std::vector<bool>
-  mtdfa_winning_region(mtdfa_ptr dfa,
-                       const std::vector<std::string>& controllable,
-                       bool ignore_non_registered_ap)
+  void
+  mtdfa::set_controllable_variables(bdd vars)
   {
-    return mtdfa_winning_region(dfa, ap_to_bdd(dfa, controllable,
-                                               ignore_non_registered_ap));
+    controllable_variables_ = vars;
   }
 
+  void
+  mtdfa::set_controllable_variables(const std::vector<std::string>& vars,
+                                    bool ignore_non_registered_ap)
+  {
+    set_controllable_variables(ap_to_bdd(shared_from_this(), vars,
+                                         ignore_non_registered_ap));
+  }
 
   const std::vector<bool>* global_is_winning;
   int is_winning_terminal(int v)
@@ -2030,11 +2118,13 @@ namespace spot
   }
 
   std::vector<bool>
-  mtdfa_winning_region(mtdfa_ptr dfa, bdd controllable)
+  mtdfa_winning_region(mtdfa_ptr dfa)
   {
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
     int iteration = 0;
+
+    bdd controllable = dfa->get_controllable_variables();
 
     unsigned nroots = dfa->num_roots();
     std::vector<bool> winning(nroots, false);
@@ -2074,15 +2164,6 @@ namespace spot
   }
 
 
-  std::vector<bool>
-  mtdfa_winning_region_lazy(mtdfa_ptr dfa,
-                            const std::vector<std::string>& controllable,
-                            bool ignore_non_registered_ap)
-  {
-    return mtdfa_winning_region_lazy(dfa, ap_to_bdd(dfa, controllable,
-                                                    ignore_non_registered_ap));
-  }
-
   int is_winning_terminal_lazy(int v)
   {
     int dst = v / 2;
@@ -2091,10 +2172,12 @@ namespace spot
   }
 
   std::vector<bool>
-  mtdfa_winning_region_lazy(mtdfa_ptr dfa, bdd controllable)
+  mtdfa_winning_region_lazy(mtdfa_ptr dfa)
   {
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+
+    bdd controllable = dfa->get_controllable_variables();
 
     digraph<void, void> reverse = build_reverse_of_reachable_graph(dfa);
 
@@ -2205,6 +2288,7 @@ namespace spot
     bdd_dict_ptr dict = dfa->get_dict();
     mtdfa_ptr res = std::make_shared<mtdfa>(dict);
     dict->register_all_propositions_of(dfa, res);
+    res->set_controllable_variables(dfa->get_controllable_variables());
 
     bool keep_names = dfa->names.size() == dfa->states.size();
 
@@ -2260,19 +2344,12 @@ namespace spot
   }
 
   mtdfa_ptr
-  mtdfa_winning_strategy(mtdfa_ptr dfa,
-                         const std::vector<std::string>& controllable,
-                         bool ignore_non_registered_ap)
-  {
-    return mtdfa_winning_strategy(dfa, ap_to_bdd(dfa, controllable,
-                                                 ignore_non_registered_ap));
-  }
-
-  mtdfa_ptr
-  mtdfa_winning_strategy(mtdfa_ptr dfa, bdd controllable)
+  mtdfa_winning_strategy(mtdfa_ptr dfa)
   {
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+
+    bdd controllable = dfa->get_controllable_variables();
 
     digraph<void, void> reverse = build_reverse_of_reachable_graph(dfa);
 
@@ -2281,6 +2358,7 @@ namespace spot
     dict->register_all_propositions_of(dfa, res);
     res->states = dfa->states;
     res->names = dfa->names;
+    res->set_controllable_variables(dfa->get_controllable_variables());
 
     unsigned nroots = res->states.size();
 
@@ -2310,8 +2388,7 @@ namespace spot
             // it was winning.
             if (winning[i])
               continue;
-            bdd b = res->states[i];
-            if (bdd_mt_apply1_synthesis(b,
+            if (bdd_mt_apply1_synthesis(res->states[i],
                                         strategy_term_map,
                                         &cache, iteration))
               {
@@ -2323,7 +2400,6 @@ namespace spot
                 // if winning was constant during one iteration.  The
                 // new values are sure to be used on next iteration.
                 winning[i] = true;
-                res->states[i] = b;
                 // if the initial state is winning, we can stop
                 if (i == 0)
                   goto done;
@@ -2364,7 +2440,6 @@ namespace spot
 
   twa_graph_ptr
   mtdfa_strategy_to_mealy(mtdfa_ptr strategy,
-                          const std::vector<std::string>& controllable,
                           bool labels)
   {
     bdd_dict_ptr dict = strategy->get_dict();
@@ -2376,7 +2451,7 @@ namespace spot
     unsigned n = strategy->num_roots();
     assert(n > 0);
 
-    bdd outputs = ap_to_bdd(strategy, controllable, true);
+    bdd outputs = strategy->get_controllable_variables();
     res->set_named_prop<bdd>("synthesis-outputs", new bdd(outputs));
 
     std::vector<std::string>* names = nullptr;

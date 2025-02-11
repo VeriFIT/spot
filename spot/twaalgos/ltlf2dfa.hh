@@ -101,7 +101,8 @@ namespace spot
   /// If a transition should reach state V, the terminal stores the
   /// value 2*V if the transition is rejecting, or 2*V+1 if the
   /// transition is accepting.
-  struct SPOT_API mtdfa
+  struct SPOT_API mtdfa: public std::enable_shared_from_this<mtdfa>
+
     {
     public:
     /// \brief create an empty mtdfa
@@ -205,8 +206,33 @@ namespace spot
     {
       return dict_;
     }
+
+    /// \brief declare a list of controllable variables
+    ///
+    /// Doing so affect the way the automaton is printed in dot
+    /// format, but this is also a prerequisite for interpreting
+    /// the automaton as a game.
+    ///
+    /// This function should only be called after the state have been
+    /// registered by the automaton.  If \a ignore_non_registered_ap
+    /// is set, variable listed as output but not registered by the
+    /// automaton will be dropped.  Else, an exception will be raised
+    /// for those variables.
+    /// @{
+    void set_controllable_variables(const std::vector<std::string>& vars,
+                                    bool ignore_non_registered_ap = false);
+    void set_controllable_variables(bdd vars);
+    /// @}
+
+    /// \brief Returns the conjunction of controllable variables.
+    bdd get_controllable_variables() const
+    {
+      return controllable_variables_;
+    }
+
     private:
     bdd_dict_ptr dict_;
+    bdd controllable_variables_ = bddtrue;
     };
 
   typedef std::shared_ptr<mtdfa> mtdfa_ptr;
@@ -234,13 +260,27 @@ namespace spot
   ///   the automaton is reduced to a rejecting or accepting sink
   ///   state (\a detect_empty_univ)
   ///
+  /// - if \a outputvar is given, it is assumed that the MTDFA will be
+  ///   used for LTLf synthesis, therefore accepting terminals will be
+  ///   replaced by true, and some output variables will be already
+  ///   assigned if such an assignment ensure they can always reach
+  ///   true.
+  ///
   /// States will be labeled using LTLf formulas, this is required by
   /// the construction.
+  /// @{
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                 bool fuse_same_bdds = true,
                 bool simplify_terms = true,
                 bool detect_empty_univ = true);
+  SPOT_API mtdfa_ptr
+  ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
+                bool fuse_same_bdds,
+                bool simplify_terms,
+                bool detect_empty_univ,
+                const std::vector<std::string>& outvars);
+  /// @}
 
   /// \ingroup mtdfa
   /// \brief Convert an LTLf formula into a MTDFA, with a compositional
@@ -355,7 +395,8 @@ namespace spot
                     bool simplify_terms = true);
 
     mtdfa_ptr ltlf_to_mtdfa(formula f, bool fuse_same_bdds,
-                            bool detect_empty_univ = true);
+                            bool detect_empty_univ = true,
+                            const std::vector<std::string>* outvars = nullptr);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;
@@ -396,22 +437,17 @@ namespace spot
   /// \brief Compute the winning region of the MTDFA interpreted
   /// as a game.
   ///
-  /// This assumes that all variables listed in \a controllable are
-  /// controllable.  The winning region is the set of states from
-  /// which the controllable variables can force the automaton to
-  /// reach an accepting state.
+  /// This assumes that controllable variable have been registered by
+  /// set_controllable_variables().
+  ///
+  /// The winning region is the set of states from which the
+  /// controllable variables can force the automaton to reach an
+  /// accepting state.
   ///
   /// \return a Boolean vector indicating whether a state is winning
   /// (true) or losing (false).
-  ///
-  /// \@{
   SPOT_API std::vector<bool>
-  mtdfa_winning_region(mtdfa_ptr dfa,
-                       const std::vector<std::string>& controllable,
-                       bool ignore_unknown_ap = false);
-  SPOT_API std::vector<bool>
-  mtdfa_winning_region(mtdfa_ptr dfa, bdd controllable);
-  /// @}
+  mtdfa_winning_region(mtdfa_ptr dfa);
 
   /// \brief Compute the winning region of the MTDFA interpreted
   /// as a game.  Lazy version.
@@ -419,14 +455,8 @@ namespace spot
   /// This is similar to mtdfa_winning_region, but it will only
   /// compute the winning status of states that are reachable from the
   /// initial state without crossing any accepting terminal.
-  /// \@{
   SPOT_API std::vector<bool>
-  mtdfa_winning_region_lazy(mtdfa_ptr dfa,
-                            const std::vector<std::string>& controllable,
-                            bool ignore_unknown_ap = false);
-  SPOT_API std::vector<bool>
-  mtdfa_winning_region_lazy(mtdfa_ptr dfa, bdd controllable);
-  /// @}
+  mtdfa_winning_region_lazy(mtdfa_ptr dfa);
 
   /// \brief Build a generalized strategy from a set of winning states.
   ///
@@ -447,15 +477,8 @@ namespace spot
   /// This is similar to mtdfa_winning_region, but it will only
   /// compute the winning status of states that are reachable from the
   /// initial state without crossing any accepting terminal.
-  ///
-  /// \@{
   SPOT_API mtdfa_ptr
-  mtdfa_winning_strategy(mtdfa_ptr dfa,
-                         const std::vector<std::string>& controllable,
-                         bool ignore_unknown_ap = false);
-  SPOT_API mtdfa_ptr
-  mtdfa_winning_strategy(mtdfa_ptr dfa, bdd controllable);
-  /// \@}
+  mtdfa_winning_strategy(mtdfa_ptr dfa);
 
   /// \brief Convert an MTDFA representing a strategy to a TwA with
   /// the "synthesis-output" property.
@@ -464,7 +487,5 @@ namespace spot
   /// using the LTLf formula for the original state if available.
   /// Set \a labels to `false` if you do not want that.
   SPOT_API twa_graph_ptr
-  mtdfa_strategy_to_mealy(mtdfa_ptr strategy,
-                          const std::vector<std::string>& controllable,
-                          bool labels = true);
+  mtdfa_strategy_to_mealy(mtdfa_ptr strategy, bool labels = true);
 }
