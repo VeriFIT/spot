@@ -618,25 +618,29 @@ namespace
         return 0;
       }
 
-    spot::stopwatch sw2;
-    sw2.start();
-    spot::aig_ptr saig = spot::mealy_machines_to_aig(mealy_machines,
-                                                     opt_aiger,
-                                                     input_aps,
-                                                     sub_outs_str, rs.get());
-    double aigtime = sw2.stop();
-    if (opt_verbose)
-      *opt_verbose << "AIG circuit ("
-                   << saig->num_latches() << " latches, "
-                   << saig->num_gates() << " gates) created in "
-                   << aigtime << " seconds\n";
-
-    if (automaton_format != Quiet)
+    if (opt_aiger)
       {
-        if (opt_dot == dot_aig)
-          spot::print_dot(std::cout, saig, opt_dot_arg);
-        else
-          spot::print_aiger(std::cout, saig) << '\n';
+        spot::stopwatch sw2;
+        sw2.start();
+        spot::aig_ptr saig = spot::mealy_machines_to_aig(mealy_machines,
+                                                         opt_aiger,
+                                                         input_aps,
+                                                         sub_outs_str,
+                                                         rs.get());
+        double aigtime = sw2.stop();
+        if (opt_verbose)
+          *opt_verbose << "AIG circuit ("
+                       << saig->num_latches() << " latches, "
+                       << saig->num_gates() << " gates) created in "
+                       << aigtime << " seconds\n";
+
+        if (automaton_format != Quiet)
+          {
+            if (opt_dot == dot_aig)
+              spot::print_dot(std::cout, saig, opt_dot_arg);
+            else
+              spot::print_aiger(std::cout, saig) << '\n';
+          }
       }
     return 0;
   }

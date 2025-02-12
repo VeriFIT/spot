@@ -71,6 +71,9 @@ o1 o2
 EOF
 diff out expected
 
+run 0 ltlfsynt -f "$f" -q >out
+: >expected
+diff out expected
 
 cat >ctr1.part <<EOF
 .inputs in ic
