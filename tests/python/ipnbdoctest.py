@@ -83,6 +83,9 @@ def canonicalize(s, type, ignores):
     # remove timings in ms
     s = re.sub(r'\s+\d+\.\d+ms\b', ' timing', s)
 
+    # remove comparisons between timings
+    s = re.sub(r'timing [<>] timing', ' timing ? timing', s)
+
     # remove hex addresses:
     s = re.sub(r'at 0x[a-f0-9]+', 'object', s)
 
