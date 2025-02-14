@@ -37,6 +37,10 @@ New in spot 2.12.2.dev  (not yet released)
     be inferred from their name.  (This suspports a --part-file option
     as well.)
 
+  - ltlfilt learned --save-part-file[=FILENAME] option that can be
+    used to create partition files suitable for many synthesis tools
+    (including ltlsynt).
+
   - genltl learned --lily-patterns to generate the example LTL
     synthesis specifications from Lily 1.0.2.  Those come with input
     and output atomic proposition rewriten in the form "iNN" or "oNN",

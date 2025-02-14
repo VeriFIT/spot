@@ -301,14 +301,18 @@ ltldo ltl3ba -f '"proc@loc1" U "proc@loc2"' --spin
 This case also relabels the formula before calling =ltl3ba=, and it
 then renames all the atomic propositions in the output.
 
+An example showing how to use the =--from-ltlf= option is on [[file:tut12.org][a
+separate page]].
+
+* I/O-partitioned formulas
 
 A special relabeling mode related to LTL synthesis is =--relabel=io=.
 In LTL synthesis (see [[file:ltlsynt.org][=ltlsynt=]]), atomic propositions are partitioned
 in two sets: the /input/ propositions represent choices from the
-environment, while /output/ proposition represent choices by the
+environment, while /output/ propositions represent choices by the
 controller to be synthesized.  For instance
 =G(req -> Fack) & G(go -> Fgrant)=
-represents could be a specification where =req= and =go= are inputs,
+could be a specification where =req= and =go= are inputs,
 while =ack= and =grant= are outputs.   Tool such as =ltlsynt= need
 to be told using options such as =--ins= or =--outs= which atomic
 propositions are input or output.  Often these atomic propositions
@@ -331,8 +335,24 @@ when these two options are missing the convention is that anything
 starting with =i= is an input, and anything starting with =o= is an
 output.
 
-An example showing how to use the =--from-ltlf= option is on [[file:tut12.org][a
-separate page]].
+=ltlfilt= can also be instructed to create a partition file (usually
+named =*.part=) that can be used by synthesis tools.
+
+#+BEGIN_SRC sh
+ltlfilt -f 'G(req -> Fack) & G(go -> Fgrant)' --relabel=io \
+    --ins=req,go --save-part=out.part
+#+END_SRC
+#+RESULTS:
+: G(i1 -> Fo0) & G(i0 -> Fo1)
+
+In addition to the relabeling, this also created a file =out.part=
+containing the following:
+#+BEGIN_SRC sh :exports results
+cat out.part
+#+END_SRC
+#+RESULTS:
+: .inputs i0 i1
+: .outputs o0 o1
 
 * Filtering
 

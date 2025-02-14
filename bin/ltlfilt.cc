@@ -103,6 +103,7 @@ enum {
   OPT_REMOVE_WM,
   OPT_REMOVE_X,
   OPT_SAFETY,
+  OPT_SAVE_PART_FILE,
   OPT_SIGMA2,
   OPT_SIZE,
   OPT_SIZE_MAX,
@@ -184,13 +185,18 @@ static const argp_option options[] =
       " proposition", 0 },
     { "ins", OPT_INS, "PROPS", 0,
       "comma-separated list of input atomic propositions to use with "
-      "--relabel=io, interpreted as a regex if enclosed in slashes", 0 },
+      "--relabel=io or --save-part-file, interpreted as a regex if enclosed "
+      "in slashes", 0 },
     { "outs", OPT_OUTS, "PROPS", 0,
       "comma-separated list of output atomic propositions to use with "
-      "--relabel=io, interpreted as a regex if enclosed in slashes", 0 },
+      "--relabel=io or --save-part-file, interpreted as a regex if "
+      "enclosed in slashes", 0 },
     { "part-file", OPT_PART_FILE, "FILENAME", 0,
       "file containing the partition of atomic propositions to use with "
       "--relabel=io", 0 },
+    { "save-part-file", OPT_SAVE_PART_FILE, "FILENAME", OPTION_ARG_OPTIONAL,
+      "file containing the partition of atomic propositions, "
+      "readable by --part-file", 0 },
     DECLARE_OPT_R,
     LEVEL_DOC(4),
     /**************************************************/
@@ -377,6 +383,7 @@ static struct opt_t
 {
   spot::bdd_dict_ptr dict = spot::make_bdd_dict();
   spot::exclusive_ap excl_ap;
+  std::unique_ptr<output_file> output_part = nullptr;
   std::unique_ptr<output_file> output_define = nullptr;
   std::unique_ptr<output_file> output_sonf = nullptr;
   spot::formula implied_by = nullptr;
@@ -595,6 +602,9 @@ parse_opt(int key, char* arg, struct argp_state*)
       break;
     case OPT_SAFETY:
       safety = obligation = true;
+      break;
+    case OPT_SAVE_PART_FILE:
+      opt->output_part.reset(new output_file(arg ? arg : "-"));
       break;
     case OPT_SIZE:
       size = parse_range(arg, 0, std::numeric_limits<int>::max());
@@ -954,6 +964,40 @@ namespace
                                oldname, filename,
                                std::to_string(linenum).c_str()) << ")\n";
             }
+          if (opt->output_part
+              && output_format != count_output
+              && output_format != quiet_output)
+            {
+              std::vector<spot::formula> ins;
+              std::vector<spot::formula> outs;
+              spot::atomic_prop_set* s = atomic_prop_collect(f);
+              for (spot::formula ap: *s)
+                {
+                  spot::formula apo = ap;
+                  if (auto it = relmap.find(ap); it != relmap.end())
+                    apo = it->second;
+                  if (is_output(apo.ap_name(), filename, linenum))
+                    outs.push_back(ap);
+                  else
+                    ins.push_back(ap);
+                }
+              delete s;
+              auto& os = opt->output_part->ostream();
+              if (!ins.empty())
+                {
+                  os << ".inputs";
+                  for (const auto& ap: ins)
+                    os << ' ' << str_psl(ap);
+                  os << '\n';
+                }
+              if (!outs.empty())
+                {
+                  os << ".outputs";
+                  for (const auto& ap: outs)
+                    os << ' ' << str_psl(ap);
+                  os << '\n';
+                }
+            }
           one_match = true;
           output_formula_checked(f, &timer, filename, linenum,
                                  match_count, prefix, suffix);
@@ -982,7 +1026,7 @@ main(int argc, char** argv)
       if (jobs.empty())
         jobs.emplace_back("-", job_type::LTL_FILENAME);
 
-      if (relabeling == IOApRelabeling)
+      if (relabeling == IOApRelabeling || opt->output_part)
         process_io_options();
 
       if (boolean_to_isop && simplification_level == 0)
