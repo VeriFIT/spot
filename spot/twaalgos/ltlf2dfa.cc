@@ -622,6 +622,12 @@ namespace spot
     std::queue<formula> todo;
     terminal_to_state_map.clear();
 
+
+    bdd bddoutvars = bddtrue;      // used if outvars was passed;
+    // this is the number of variable we had the last time
+    // we called bdd_mt_quantify_prepare().
+    int varnum = 0;
+
     // Keep track of atomic propositions used in he automaton.
     // Actually the automaton might use fewer atomic propositions than
     // what appears in the formula, but we do not pay attention to
@@ -632,7 +638,6 @@ namespace spot
 
       if (outvars)
         {
-          bdd out = bddtrue;
           // We need to register the output variables already so we can
           // call bdd_mt_quantify_prepare.  Let's do it in the order in
           // which they will be discovered in the formula.
@@ -645,12 +650,11 @@ namespace spot
                 && a->erase(f))
               {
                 int i = dict_->register_proposition(f, dfa);
-                out &= bdd_ithvar(i);
+                bddoutvars &= bdd_ithvar(i);
               }
             return false;
           });
-          bdd_mt_quantify_prepare(out);
-          dfa->set_controllable_variables(out);
+          dfa->set_controllable_variables(bddoutvars);
         }
 
 
@@ -676,8 +680,19 @@ namespace spot
 
         bdd b = ltlf_to_mtbdd(label);
         if (outvars)
-          bdd_mt_apply1_synthesis(b, strategy_map_true,
-                                  &cache_, hash_key_strat);
+          {
+            // Everytime a new variable is created, the quantifycation
+            // buffer is wiped out.  We only have to call
+            // bdd_mt_quantify_prepare when the number of variables
+            // changed.
+            if (int vn = bdd_varnum(); vn != varnum)
+              {
+                bdd_mt_quantify_prepare(bddoutvars);
+                varnum = vn;
+              }
+            bdd_mt_apply1_synthesis(b, strategy_map_true,
+                                    &cache_, hash_key_strat);
+          }
         if (fuse_same_bdds)
           if (auto it = bdd_to_state.find(b); it != bdd_to_state.end())
             {
