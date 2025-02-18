@@ -1652,6 +1652,10 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
            else
              {
                val &= rval;       /* universal quantification */
+               if (!val)
+                 // If any branch can lose, let's simplify
+                  if (lres == 0 || rres == 0)
+                    lres = rres = 0;
              }
            SYNC_REC_STACKS;
            BDD res = bdd_makenode(LEVEL(r), lres, rres);

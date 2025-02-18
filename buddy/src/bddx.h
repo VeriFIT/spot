@@ -1606,6 +1606,7 @@ typedef paths_of_<true, false> paths_of;
 // same, but returns pairs (conditions, leaves)
 typedef paths_of_<true, true> paths_mt_of;
 // same, but returns just the leaves without building the conditions
+// a leaf might be returned several times if there are multiple paths to it.
 typedef paths_of_<false, true> silent_paths_mt_of;
 
 #endif /* CPLUSPLUS */
