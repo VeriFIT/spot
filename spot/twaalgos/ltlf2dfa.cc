@@ -18,6 +18,7 @@
 
 #include "config.h"
 #include <queue>
+#include <deque>
 #include <unordered_map>
 #include <algorithm>
 #include <array>
@@ -2063,6 +2064,10 @@ namespace spot
                 continue;
               }
             dst /= 2;
+            // we don't record predecessors from 0, as they are not
+            // needed for backward propagation.
+            if (dst == 0)
+              continue;
             if (seen_local[dst] == src)
               continue;
             seen_local[dst] = src;
@@ -2201,68 +2206,57 @@ namespace spot
     std::vector<int> seen(nroots, -1); // last iteration seen
     global_is_winning = &winning;
 
+    // The upcoming calls to bdd_mt_quantify_to_bool depend on this
+    // setup.
     bdd_mt_quantify_prepare(controllable);
 
-    std::queue<unsigned> todo;
-    // states that can reach an accepting terminal are listed as
-    // predecessors of 0 in the reverse graph.
-    for (auto e: reverse.out(0))
-      todo.push(e.dst);
-    std::queue<unsigned> visit_next;
+    std::deque<unsigned> todo;
+    // By convention, states that can reach an accepting terminal are
+    // listed as predecessors of 0 in the reverse graph.  (Since the
+    // predecessors of 0 would never be needed otherwise.)
+    for (auto& e: reverse.out(0))
+      todo.push_back(e.dst);
 
-    int iteration = 0;
-    for (;;)
+    std::deque<unsigned> changed;
+
+    for (int iteration = 0; !todo.empty(); ++iteration)
       {
-        // FIXME: rewrite todo/visit_next, so that we do not compute
-        // visit_next before the end of the iteration.
-        while (!todo.empty())
+        do
           {
             unsigned i = todo.front();
-            todo.pop();
-            // state i may have been added to visit_next before
-            // knowing it was winning.
-            if (winning[i])
-              continue;
-            bdd b = dfa->states[i];
-            if (bdd_mt_quantify_to_bool(b, is_winning_terminal_lazy,
+            todo.pop_front();
+            assert(!winning[i]);
+
+            if (bdd_mt_quantify_to_bool(dfa->states[i],
+                                        is_winning_terminal_lazy,
                                         &cache, iteration))
               {
                 // By modifying winning, we modify the behavior of
-                // is_winning_terminal.  That should normally call for
-                // an invalidation of the cache (or equivalently, an
-                // increment of the iteration number), but it is
-                // actually OK if the cache uses previous values, as
-                // if winning was constant during one iteration.  The
-                // new values are sure to be used on next iteration.
+                // is_winning_terminal_lazy.  That should normally
+                // call for an invalidation of the cache (or
+                // equivalently, an increment of the iteration
+                // number), but it is actually OK if the cache uses
+                // previous values, as if winning was constant during
+                // one iteration.  The new values are sure to be used
+                // on next iteration.
                 winning[i] = true;
                 // if the initial state is winning, we can stop
                 if (i == 0)
                   goto done;
-                // Schedule predecessors for next iteration.  While we
-                // are at it, remove the predecessors that are already
-                // known to be winning.
-                auto it = reverse.out_iteraser(i);
-                while (it)
-                  {
-                    unsigned prev = it->dst;
-                    if (winning[prev])
-                      {
-                        it.erase();
-                        continue;
-                      }
-                    if (seen[prev] != iteration)
-                      {
-                        seen[prev] = iteration;
-                        visit_next.push(prev);
-                      }
-                    ++it;
-                  }
+                changed.push_back(i);
               }
           }
-        ++iteration;
-        if (visit_next.empty())
-          break;
-        std::swap(todo, visit_next);
+        while (!todo.empty());
+        // Schedule non-winning predecessors for next iteration.
+        for (unsigned i: changed)
+          for (auto& e: reverse.out(i))
+            if (unsigned prev = e.dst;
+                !winning[prev] && seen[prev] != iteration)
+              {
+                seen[prev] = iteration;
+                todo.push_front(prev);
+              }
+        changed.clear();
       }
   done:
     bdd_extcache_done(&cache);
@@ -2384,20 +2378,19 @@ namespace spot
 
     bdd_mt_quantify_prepare(controllable);
 
-    std::queue<unsigned> todo;
+    std::deque<unsigned> todo;
     // states that can reach an accepting terminal are listed as
     // predecessors of 0 in the reverse graph.
     for (auto e: reverse.out(0))
-      todo.push(e.dst);
-    std::queue<unsigned> visit_next;
+      todo.push_back(e.dst);
+    std::deque<unsigned> changed;
 
-    int iteration = 0;
-    for (;;)
+    for (int iteration = 0; !todo.empty(); ++iteration)
       {
-        while (!todo.empty())
+        do
           {
             int i = todo.front();
-            todo.pop();
+            todo.pop_front();
 
             // State i may have been aded to visit_next before knowing
             // it was winning.
@@ -2418,31 +2411,20 @@ namespace spot
                 // if the initial state is winning, we can stop
                 if (i == 0)
                   goto done;
-                // Schedule predecessors for next iteration.  While we
-                // are at it, remove the predecessors that are already
-                // known to be winning.
-                auto it = reverse.out_iteraser(i);
-                while (it)
-                  {
-                    unsigned prev = it->dst;
-                    if (winning[prev])
-                      {
-                        it.erase();
-                        continue;
-                      }
-                    if (seen[prev] != iteration)
-                      {
-                        seen[prev] = iteration;
-                        visit_next.push(prev);
-                      }
-                    ++it;
-                  }
+                changed.push_back(i);
               }
           }
-        if (visit_next.empty())
-          break;
-        ++iteration;
-        std::swap(todo, visit_next);
+        while (!todo.empty());
+        // Schedule non-winning predecessors for next iteration.
+        for (unsigned i: changed)
+          for (auto& e: reverse.out(i))
+            if (unsigned prev = e.dst;
+                !winning[prev] && seen[prev] != iteration)
+              {
+                seen[prev] = iteration;
+                todo.push_front(prev);
+              }
+        changed.clear();
       }
   done:
     for (unsigned i = 0; i < nroots; ++i)
