@@ -459,6 +459,9 @@ namespace spot
                 auto i = ecs_->h.find(curr);
                 assert(i != ecs_->h.end());
                 assert(i->first == curr);
+                // work around g++-14.2.0 spurious "potential null
+                // pointer dereference" warning.
+                SPOT_ASSUME(i != ecs_->h.end());
                 ecs_->root.rem().push_front(i->first);
                 inc_depth();
               }
