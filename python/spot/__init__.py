@@ -353,6 +353,26 @@ class mtdtwa:
         from spot.jupyter import SVG
         return SVG(self._repr_svg_(**args))
 
+@_extend(backprop_graph)
+class backprop_graph:
+    def _repr_svg_(self):
+        """Output the backward-propagation graph as SVG"""
+        ostr = ostringstream()
+        self.print_dot(ostr)
+        return _ostream_to_svg(ostr)
+
+    # see spot.jupyter.SVG for why we need _repr_html_ instead of _repr_svg_
+    def _repr_html_(self):
+        return self._repr_svg_()
+
+    def show(self, **args):
+        """Display the automaton as SVG, in the IPython/Jupyter notebook"""
+        # Load the SVG function only if we need it. This way the
+        # bindings can still be used outside of IPython if IPython is
+        # not installed.
+        from spot.jupyter import SVG
+        return SVG(self._repr_svg_(**args))
+
 @_extend(formula)
 class formula:
     def __init__(self, str):

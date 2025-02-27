@@ -24,5 +24,6 @@ AM_CXXFLAGS = $(WARNING_CXXFLAGS)
 graphdir = $(pkgincludedir)/graph
 
 graph_HEADERS = \
+  adjlist.hh \
   graph.hh \
   ngraph.hh

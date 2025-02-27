@@ -374,6 +374,7 @@ TESTS_ipython = \
   python/atva16-fig2b.ipynb \
   python/automata-io.ipynb \
   python/automata.ipynb \
+  python/backprop.ipynb \
   python/cav22-figs.ipynb \
   python/contains.ipynb \
   python/decompose.ipynb \

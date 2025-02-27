@@ -112,6 +112,7 @@
 
 #include <spot/twaalgos/aiger.hh>
 #include <spot/twaalgos/alternation.hh>
+#include <spot/twaalgos/backprop.hh>
 #include <spot/twaalgos/cleanacc.hh>
 #include <spot/twaalgos/cobuchi.hh>
 #include <spot/twaalgos/copy.hh>
@@ -725,6 +726,7 @@ def state_is_accepting(self, src) -> "bool":
 
 %include <spot/twaalgos/aiger.hh>
 %include <spot/twaalgos/alternation.hh>
+%include <spot/twaalgos/backprop.hh>
 %include <spot/twaalgos/cleanacc.hh>
 %include <spot/twaalgos/cobuchi.hh>
 %include <spot/twaalgos/copy.hh>

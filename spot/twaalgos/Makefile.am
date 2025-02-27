@@ -28,7 +28,7 @@ twaalgos_HEADERS = \
   aiger.hh \
   alternation.hh \
   are_isomorphic.hh \
-  given.hh \
+  backprop.hh \
   bfssteps.hh \
   canonicalize.hh \
   cleanacc.hh \
@@ -53,6 +53,7 @@ twaalgos_HEADERS = \
   forq_contains.hh \
   game.hh \
   genem.hh \
+  given.hh \
   gfguarantee.hh \
   gv04.hh \
   hoa.hh \
@@ -110,7 +111,7 @@ libtwaalgos_la_SOURCES = \
   aiger.cc \
   alternation.cc \
   are_isomorphic.cc \
-  given.cc \
+  backprop.cc \
   bfssteps.cc \
   canonicalize.cc \
   cleanacc.cc \
@@ -140,6 +141,7 @@ libtwaalgos_la_SOURCES = \
   isunamb.cc \
   isweakscc.cc \
   game.cc \
+  given.cc \
   langmap.cc \
   lbtt.cc \
   ltl2taa.cc \
