@@ -31,6 +31,7 @@
 #include <spot/tl/print.hh>
 #include <spot/priv/robin_hood.hh>
 #include <spot/misc/bitvect.hh>
+#include <spot/graph/adjlist.hh>
 
 constexpr int hash_key_and = 1;
 constexpr int hash_key_or = 2;
@@ -2023,11 +2024,11 @@ namespace spot
   // returned digraph:
   //    (terminal value / 2) -> root    if terminal is even (non accepting)
   //    0 -> root         if the leaf is bddtrue or an odd terminal value
-  static digraph<void, void>
+  static adjlist<void>
   build_reverse_of_reachable_graph(mtdfa_ptr dfa)
   {
     unsigned n = dfa->num_roots();
-    digraph<void, void> reverse(n, n);
+    adjlist<void> reverse(n, n);
     reverse.new_states(n);
 
     std::queue<int> todo;
@@ -2079,17 +2080,6 @@ namespace spot
               }
           }
       }
-    // print the reverse graph for debugging
-    // std::cerr << "reverse graph:\n";
-    // for (unsigned i = 0; i < n; ++i)
-    //   {
-    //     if (reverse.states()[i].succ == 0)
-    //       continue;
-    //     std::cerr << i << ':';
-    //     for (auto e: reverse.out(i))
-    //       std::cerr << ' ' << e.dst;
-    //     std::cerr << '\n';
-    //   }
     return reverse;
   }
 
@@ -2199,7 +2189,7 @@ namespace spot
 
     bdd controllable = dfa->get_controllable_variables();
 
-    digraph<void, void> reverse = build_reverse_of_reachable_graph(dfa);
+    adjlist<void> rev = build_reverse_of_reachable_graph(dfa);
 
     unsigned nroots = dfa->num_roots();
     std::vector<bool> winning(nroots, false);
@@ -2212,10 +2202,10 @@ namespace spot
 
     std::deque<unsigned> todo;
     // By convention, states that can reach an accepting terminal are
-    // listed as predecessors of 0 in the reverse graph.  (Since the
-    // predecessors of 0 would never be needed otherwise.)
-    for (auto& e: reverse.out(0))
-      todo.push_back(e.dst);
+    // listed as predecessors of 0.  (Since the predecessors of 0
+    // would never be needed otherwise.)
+    for (unsigned p: rev.out(0))
+      todo.push_back(p);
 
     std::deque<unsigned> changed;
 
@@ -2249,12 +2239,11 @@ namespace spot
         while (!todo.empty());
         // Schedule non-winning predecessors for next iteration.
         for (unsigned i: changed)
-          for (auto& e: reverse.out(i))
-            if (unsigned prev = e.dst;
-                !winning[prev] && seen[prev] != iteration)
+          for (unsigned p: rev.out(i))
+            if (!winning[p] && seen[p] != iteration)
               {
-                seen[prev] = iteration;
-                todo.push_front(prev);
+                seen[p] = iteration;
+                todo.push_front(p);
               }
         changed.clear();
       }
@@ -2360,7 +2349,7 @@ namespace spot
 
     bdd controllable = dfa->get_controllable_variables();
 
-    digraph<void, void> reverse = build_reverse_of_reachable_graph(dfa);
+    adjlist<void> rev = build_reverse_of_reachable_graph(dfa);
 
     bdd_dict_ptr dict = dfa->get_dict();
     mtdfa_ptr res = std::make_shared<mtdfa>(dict);
@@ -2381,8 +2370,8 @@ namespace spot
     std::deque<unsigned> todo;
     // states that can reach an accepting terminal are listed as
     // predecessors of 0 in the reverse graph.
-    for (auto e: reverse.out(0))
-      todo.push_back(e.dst);
+    for (unsigned p: rev.out(0))
+      todo.push_front(p);
     std::deque<unsigned> changed;
 
     for (int iteration = 0; !todo.empty(); ++iteration)
@@ -2417,12 +2406,11 @@ namespace spot
         while (!todo.empty());
         // Schedule non-winning predecessors for next iteration.
         for (unsigned i: changed)
-          for (auto& e: reverse.out(i))
-            if (unsigned prev = e.dst;
-                !winning[prev] && seen[prev] != iteration)
+          for (unsigned p: rev.out(i))
+            if (!winning[p] && seen[p] != iteration)
               {
-                seen[prev] = iteration;
-                todo.push_front(prev);
+                seen[p] = iteration;
+                todo.push_front(p);
               }
         changed.clear();
       }
