@@ -20,11 +20,12 @@
 #include <deque>
 #include <bddx.h>
 #include <spot/twaalgos/backprop.hh>
+#include <spot/misc/escape.hh>
 
 namespace spot
 {
 
-  bool backprop_graph::new_edge(int src, int dst)
+  bool backprop_graph::new_edge(unsigned src, unsigned dst)
   {
     backprop_state& ss = (*this)[src];
     if (SPOT_UNLIKELY(ss.frozen))
@@ -51,7 +52,7 @@ namespace spot
     return false;
   }
 
-  bool backprop_graph::freeze_state(int state)
+  bool backprop_graph::freeze_state(unsigned state)
   {
     backprop_state& ss = (*this)[state];
     ss.frozen = true;
@@ -60,18 +61,18 @@ namespace spot
     return false;
   }
 
-  bool backprop_graph::set_status(int state, bool new_status)
+  bool backprop_graph::set_status(unsigned state, bool new_status)
   {
     if (SPOT_UNLIKELY(!(*this)[state].status.is_maybe()))
       throw std::runtime_error
         ("backprop_graph: cannot change status of determined state");
     (*this)[state].status = new_status;
-    std::deque<int> todo;
+    std::deque<unsigned> todo;
     todo.push_back(state);
     bool result = false;
     do
       {
-        int s = todo.front();
+        unsigned s = todo.front();
         todo.pop_front();
 
         backprop_state& bs = (*this)[state];
@@ -118,7 +119,12 @@ namespace spot
         os << "\" fillcolor="
            << (bs.status.is_true() ? "\"#33A02C\""
                : bs.status.is_false() ? "\"#E31A1C\"" : "white")
-           << ", label=\"" << state << "\"];\n";
+           << ", label=\"";
+        if (auto it = names_.find(state); it != names_.end())
+          escape_str(os, it->second);
+        else
+          os << state;
+        os << "\"];\n";
       }
     for (unsigned state = 0; state < num_states; ++state)
       for (unsigned p: reverse_.out(state))

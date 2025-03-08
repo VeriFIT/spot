@@ -19,6 +19,7 @@
 #pragma once
 
 #include <iosfwd>
+#include <unordered_map>
 #include <spot/misc/common.hh>
 #include <spot/misc/trival.hh>
 #include <spot/graph/adjlist.hh>
@@ -53,24 +54,29 @@ namespace spot
       return reverse_.new_state(owner);
     }
 
-    const backprop_state& operator[](int state) const
+    void set_name(unsigned state, const std::string& s)
+    {
+      names_.emplace(state, s);
+    }
+
+    const backprop_state& operator[](unsigned state) const
     {
       return reverse_.state_data(state);
     }
 
     // return true if the status of src is now known
-    bool new_edge(int src, int dst);
+    bool new_edge(unsigned src, unsigned dst);
 
     // call once the successors of a state have all been declared to
     // see if the status of that state can be determined already
-    bool freeze_state(int state);
+    bool freeze_state(unsigned state);
 
-    trival status_of(int state) const
+    trival status_of(unsigned state) const
     {
       return (*this)[state].status;
     }
 
-    bool set_status(int state, bool status);
+    bool set_status(unsigned state, bool status);
 
     std::ostream& print_dot(std::ostream& os) const;
 
@@ -82,8 +88,9 @@ namespace spot
   private:
     adjlist<backprop_state> reverse_;
     bool stop_asap_;
+    std::unordered_map<unsigned, std::string> names_;
 
-    backprop_state& operator[](int state)
+    backprop_state& operator[](unsigned state)
     {
       return reverse_.state_data(state);
     }
