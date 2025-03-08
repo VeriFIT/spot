@@ -87,13 +87,15 @@ while read f; do
      for min in yes no; do
      for geq in yes no; do
      for pol in yes no; do
+     for bp in states nodes; do
 
        rez=`ltlfsynt -f "$f" --decomp=$dec --trans=$tra --min=$min \
                      --semantics=$sem --global-equiv=$geq \
-                     --polarity=$pol --realizability`
+                     --polarity=$pol --backprop=$bp --realizability`
        test $? -le 1 || exit 2
        test "$rez" = "$prev" || test "$prev" = "" || exit 2
        prev=$rez
+     done
      done
      done
      done

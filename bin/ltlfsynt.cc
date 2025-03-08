@@ -41,6 +41,7 @@
 enum
 {
   OPT_AIGER = 256,
+  OPT_BACKPROP,
   OPT_COMPOSITION,
   OPT_DECOMPOSE,
   OPT_GAME,
@@ -93,6 +94,9 @@ static const argp_option options[] =
     { "decompose", OPT_DECOMPOSE, "yes|no", 0,
       "whether to decompose the specification as multiple output-disjoint "
       "problems to solve independently (enabled by default)", 0 },
+    { "backprop", OPT_BACKPROP, "nodes|states", 0,
+      "whether backpropagation should be done at the node or state level "
+      "(states by default)", 0 },
     { "polarity", OPT_POLARITY, "yes|no|before-decompose", 0,
       "whether to remove atomic propositions that always have the same "
       "polarity in the formula to speed things up (enabled by default, "
@@ -184,11 +188,22 @@ static bool opt_minimize = true;
 
 static std::ostream* opt_verbose = nullptr;
 
+static const char* const backprop_args[] =
+  {
+    "states", "nodes", nullptr
+  };
+static const bool backprop_values[] =
+  {
+    false, true,
+  };
+ARGMATCH_VERIFY(backprop_args, backprop_values);
+static bool opt_backprop = false;
+
 static const char* const composition_args[] =
   {
     "size", "ap", nullptr
   };
-static bool composition_values[] =
+static const bool composition_values[] =
   {
     false, true,
   };
@@ -201,7 +216,7 @@ static const char* const decompose_args[] =
     "no", "false", "disabled", "0",
     nullptr
   };
-static bool decompose_values[] =
+static const bool decompose_values[] =
   {
     true, true, true, true,
     false, false, false, false,
@@ -215,7 +230,7 @@ static const char* const polarity_args[] =
     nullptr
   };
 enum polarity_choice { pol_no, pol_yes, pol_before_decompose };
-static polarity_choice polarity_values[] =
+static const polarity_choice polarity_values[] =
   {
     pol_yes, pol_yes, pol_yes, pol_yes,
     pol_no, pol_no, pol_no, pol_no,
@@ -230,7 +245,7 @@ static const char* const semantics_args[] =
     nullptr
   };
 enum semantics_choice { semantics_default, semantics_mealy, semantics_moore };
-static semantics_choice semantics_values[] =
+static const semantics_choice semantics_values[] =
   {
     semantics_mealy, semantics_moore,
     semantics_mealy, semantics_moore,
@@ -242,7 +257,7 @@ static const char* const dot_args[] =
     "game", "strategy", "aig", nullptr
   };
 enum dot_choice { dot_none = 0, dot_game, dot_strategy, dot_aig };
-static dot_choice dot_values[] =
+static const dot_choice dot_values[] =
   {
     dot_game, dot_strategy, dot_aig
   };
@@ -296,6 +311,10 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_AIGER:
       opt_aiger = arg ? arg : "ite";
+      break;
+    case OPT_BACKPROP:
+      opt_backprop = XARGMATCH("--backprop", arg,
+                               backprop_args, backprop_values);
       break;
     case OPT_COMPOSITION:
       opt_composition_by_ap = XARGMATCH("--composition", arg,
@@ -513,36 +532,76 @@ namespace
           }
 
         spot::stopwatch st;
+        auto stop_trans = [&] (spot::mtdfa_ptr a)
+        {
+          if (!opt_verbose)
+            return;
+          double trans_time = st.stop();
+          *opt_verbose << indent << "translation to MTDFA ("
+                       << a->num_roots() << " roots, "
+                       << a->aps.size() << " APs) took "
+                       << trans_time << " seconds\n";
+        };
+        auto minimize_maybe = [&] (spot::mtdfa_ptr& a)
+        {
+          if (!opt_minimize)
+            return;
+          st.start();
+          a = spot::minimize_mtdfa(a);
+          if (!opt_verbose)
+            return;
+          double trans_time = st.stop();
+          *opt_verbose << indent << "minimization of MTDFA (now "
+                       << a->num_roots() << " roots, "
+                       << a->aps.size() << " APs) took "
+                       << trans_time << " seconds\n";
+        };
+
         st.start();
         spot::mtdfa_ptr a;
+        bool a_is_strategy_already = false;
         switch (opt_trans)
           {
           case translation_direct_restricted:
-            a = spot::ltlf_to_mtdfa(*sub_f, dict, true, true, true, *sub_o);
-            if (opt_minimize)
-              a = spot::minimize_mtdfa(a);
+            if (opt_verbose)
+              *opt_verbose << indent
+                           << "starting restricted translation with"
+                           << (opt_backprop ? "" : "out")
+                           << " on-the-fly backpropagation\n";
+            a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
+                                                  opt_backprop,
+                                                  opt_realizability);
+            a->names.clear();
+            stop_trans(a);
+            if (opt_backprop)
+              a_is_strategy_already = true;
+            minimize_maybe(a);
             break;
           case translation_direct_full:
+            if (opt_verbose)
+              *opt_verbose << indent << "starting full translation\n";
             a = spot::ltlf_to_mtdfa(*sub_f, dict);
-            if (opt_minimize)
-              a = spot::minimize_mtdfa(a);
+            a->names.clear();
             a->set_controllable_variables(*sub_o, true);
+            stop_trans(a);
+            minimize_maybe(a);
             break;
           case translation_compositional:
+            if (opt_verbose)
+              *opt_verbose << indent
+                           << "starting compositional translation with"
+                           << (opt_minimize ? "" : "out")
+                           << " minimization, with "
+                           << (opt_composition_by_ap ? "AP" : "size")
+                           << "-based ordering\n";
             a = spot::ltlf_to_mtdfa_compose(*sub_f, dict,
                                             opt_minimize,
                                             opt_composition_by_ap,
                                             false);
             a->set_controllable_variables(*sub_o, true);
+            stop_trans(a);
             break;
           }
-        double trans_time = st.stop();
-        if (opt_verbose)
-          *opt_verbose << indent << "translation to MTDFA ("
-                       << a->num_roots() << " roots, "
-                       << a->aps.size() << " APs) took "
-                       << trans_time << " seconds\n";
-
         if (opt_dot == dot_game)
           {
             a->print_dot(std::cout, -1, false);
@@ -550,13 +609,32 @@ namespace
           }
         if (opt_realizability)
           {
-            st.start();
-            std::vector<bool> winreg = mtdfa_winning_region_lazy(a);
-            double region_time = st.stop();
-            if (opt_verbose)
-              *opt_verbose << indent << "winning region found in "
-                           << region_time << " seconds\n";
-            if (!winreg[0])
+            bool unrealizable = false;
+            if (a_is_strategy_already)
+              {
+                if (opt_verbose)
+                  *opt_verbose << indent
+                               << "MTDFA game was solved during translation\n";
+                unrealizable = a->states[0] == bddfalse;
+              }
+            else
+              {
+                if (opt_verbose)
+                  *opt_verbose << indent
+                               << "solving game by backpropagation at "
+                               << (opt_backprop ? "node" : "state")
+                               << " level\n";
+                st.start();
+                if (opt_backprop)
+                  unrealizable = !mtdfa_to_backprop(a).status_of(0).is_true();
+                else
+                  unrealizable = !mtdfa_winning_region_lazy(a)[0];
+                double solve_time = st.stop();
+                if (opt_verbose)
+                  *opt_verbose << indent << "game solved in "
+                               << solve_time << " seconds\n";
+              }
+            if (unrealizable)
               {
                 if (opt_show_status)
                   std::cout << "UNREALIZABLE" << std::endl;
@@ -565,18 +643,32 @@ namespace
           }
         else
           {
-            st.start();
-            a = spot::mtdfa_winning_strategy(a);
-            double time = st.stop();
-            if (opt_verbose)
+            if (a_is_strategy_already)
               {
-                // count number of non-false roots
-                unsigned nf = 0;
-                for (bdd r: a->states)
-                  nf += r != bddfalse;
-                *opt_verbose << indent << "winning strategy (" << nf
-                             << " roots) found in " << time
-                             << " seconds\n";
+                if (opt_verbose)
+                  *opt_verbose << indent
+                               << "translation produced a strategy already\n";
+              }
+            else
+              {
+                if (opt_verbose)
+                  *opt_verbose << indent
+                               << "solving game by backpropagation at "
+                               << (opt_backprop ? "node" : "state")
+                               << " level\n";
+                st.start();
+                a = spot::mtdfa_winning_strategy(a, opt_backprop);
+                double time = st.stop();
+                if (opt_verbose)
+                  {
+                    // count number of non-false roots
+                    unsigned nf = 0;
+                    for (const bdd& r: a->states)
+                      nf += r != bddfalse;
+                    *opt_verbose << indent << "strategy (" << nf
+                                 << " roots) found in " << time
+                                 << " seconds\n";
+                  }
               }
             if (a->states[0] == bddfalse)
               {
@@ -586,7 +678,7 @@ namespace
               }
             st.start();
             spot::twa_graph_ptr m = spot::mtdfa_strategy_to_mealy(a);
-            time = st.stop();
+            double time = st.stop();
             if (opt_verbose)
               *opt_verbose << indent << "Mealy machine ("
                            << m->num_states() << " states) created in "
@@ -612,6 +704,7 @@ namespace
             strat = m;
         if (rs)        // Add any AP we removed
           rs->patch_mealy(strat);
+        strat->merge_edges();
         automaton_printer printer;
         spot::process_timer timer_printer_dummy;
         printer.print(strat, timer_printer_dummy);

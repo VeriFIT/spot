@@ -32,6 +32,7 @@
 #include <spot/priv/robin_hood.hh>
 #include <spot/misc/bitvect.hh>
 #include <spot/graph/adjlist.hh>
+#include <spot/twaalgos/backprop.hh>
 
 constexpr int hash_key_and = 1;
 constexpr int hash_key_or = 2;
@@ -41,6 +42,7 @@ constexpr int hash_key_xor = 5;
 constexpr int hash_key_not = 6;
 constexpr int hash_key_rename = 7;
 constexpr int hash_key_strat = 8;
+constexpr int hash_key_finalstrat = 9;
 
 namespace spot
 {
@@ -56,8 +58,8 @@ namespace spot
     if (prod1 / left_states != right_states) // overflow
         return INT_MAX / 16;
     int prod2 = prod1 * sum_aps;
-    if ((prod2 / sum_aps != prod1) || // overflow
-        prod2 > (INT_MAX / 16))
+    if ((sum_aps > 0) && ((prod2 / sum_aps != prod1) || // overflow
+                          prod2 > (INT_MAX / 16)))
       return INT_MAX / 16;
     if (prod2 < (1 << 14))
       return 1 << 14;
@@ -100,8 +102,8 @@ namespace spot
     ++states;
     int num_aps = aut->aps.size();
     int prod = states * num_aps;
-    if ((prod / num_aps != states) || // overflow
-        prod > (INT_MAX / 16))
+    if ((num_aps > 0) && ((prod / num_aps != states) || // overflow
+                          prod > (INT_MAX / 16)))
       return INT_MAX / 16;
     if (prod < (1 << 14))
       return 1<<14;
@@ -609,21 +611,169 @@ namespace spot
     return 0;
   }
 
+  namespace
+  {
+    struct backprop_bdd_encoder
+    {
+      backprop_graph backprop;
+      robin_hood::unordered_map<int, unsigned> rootnum_to_backprop_state;
+      robin_hood::unordered_map<int, unsigned> bdd_to_backprop_state;
+
+      trival root_status(unsigned root_number)
+      {
+        auto it = rootnum_to_backprop_state.find(root_number);
+        if (it == rootnum_to_backprop_state.end())
+          return trival::maybe();
+        return backprop.status_of(it->second);
+      }
+
+      bool encode_state(unsigned root_number, bdd mtbdd,
+                        std::string* name = nullptr,
+                        std::vector<int>* new_rootnums = nullptr)
+      {
+        // hold (backprop state, low bdd, high bdd)
+        std::deque<std::tuple<unsigned, int, int>> todo;
+
+        auto rootnum_to_state = [&] (int t) -> unsigned
+        {
+          auto [it, is_new] = rootnum_to_backprop_state.emplace(t, 0);
+          if (is_new)
+            {
+              // owner does not matter, because this state will have only
+              // one successor.
+              it->second = backprop.new_state(false);
+              if (new_rootnums)
+                new_rootnums->push_back(t);
+            }
+          return it->second;
+        };
+
+        auto bdd_to_state = [&] (int b, auto self) -> unsigned
+        {
+          auto [it, is_new] = bdd_to_backprop_state.emplace(b, 0);
+          if (!is_new)
+            return it->second;
+          if (b == 0 || b == 1)
+            {
+              unsigned s = backprop.new_state(!b);
+              it->second = s;
+              backprop.set_status(s, b);
+              if (name)
+                backprop.set_name(s, b ? "true" : "false");
+              return s;
+            }
+          if (bdd_is_terminal(b))
+            {
+              int term = bdd_get_terminal(b);
+              if (term & 1)
+                {
+                  unsigned n = self(1, self);
+                  // it might have been invalidated by the recursive call
+                  bdd_to_backprop_state[b] = n;
+                  return n;
+                }
+              return it->second = rootnum_to_state(term / 2);
+            }
+          auto [owner, low, high] = bdd_mt_quantified_low_high(b);
+          unsigned s = backprop.new_state(owner);
+          it->second = s;
+          todo.emplace_back(s, low, high);
+          return s;
+        };
+
+        // create one state for the root number (if it does not exist yet)
+        unsigned root_state = rootnum_to_state(root_number);
+        if (name)
+          backprop.set_name(root_state, *name);
+
+        // link it to the actual BDD root, as the only child
+        if (backprop.new_edge(root_state,
+                              bdd_to_state(mtbdd.id(), bdd_to_state)))
+          return true;
+        if (backprop.freeze_state(root_state))
+          return true;
+
+        // now encode all that BDD, when they reach terminal, this
+        // will create "root number" nodes for those, and those can
+        // latter be connnected to their BDD encoding once we know it.
+        while (!todo.empty())
+          {
+            auto [state, low, high] = todo.front();
+            todo.pop_front();
+            // We could swap low and high here if we wanted.  That
+            // makes sense if we know that a state for high already
+            // exist and is determined.  However, deciding this is an
+            // extra hash lookup, so this should be evaluated.
+            unsigned low_state = bdd_to_state(low, bdd_to_state);
+            if (backprop.new_edge(state, low_state))
+              return true;
+            // If the previous edge determined the source state, no
+            // need to process the other branch.
+            if (backprop.status_of(state).is_known())
+              continue;
+            unsigned high_state = bdd_to_state(high, bdd_to_state);
+            if (backprop.new_edge(state, high_state))
+              return true;
+            if (backprop.freeze_state(state))
+              return true;
+          }
+        return false;
+      }
+    };
+
+  }
+
+  static backprop_bdd_encoder* global_backprop = nullptr;
+
+  static int strategy_map_finalize(int* root_ptr, int term)
+  {
+    // replace accepting terminals by bddtrue
+    if (term & 1)
+      {
+        *root_ptr = 1;
+        return 1;
+      }
+    term /= 2;
+    // remplace losing terminals by bddfalse
+    if (!global_backprop->root_status(term).is_true())
+      {
+        *root_ptr = 0;
+        return 0;
+      }
+    // keep winning terminals, just replace them by their state number
+#if NDEBUG
+    int v = terminal_to_state_map[term];
+#else
+    int v = terminal_to_state_map.at(term);
+#endif
+    *root_ptr = bdd_terminal_as_int(2 * v + (term & 1));
+    return 1;
+  }
 
   mtdfa_ptr
   ltlf_translator::ltlf_to_mtdfa(formula f,
                                  bool fuse_same_bdds,
                                  bool detect_empty_univ,
-                                 const std::vector<std::string>* outvars)
+                                 const std::vector<std::string>* outvars,
+                                 bool do_backprop,
+                                 bool realizability)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
     std::unordered_map<formula, int> formula_to_state;
     std::vector<bdd> states;
+    std::vector<int> new_rootnums; // used only if do_backprop
     std::vector<formula> names;
     std::queue<formula> todo;
     terminal_to_state_map.clear();
 
+    if (do_backprop && outvars == nullptr)
+      throw std::runtime_error
+        ("ltlf_to_mtdfa: backpropagation requires outvars");
+
+    std::unique_ptr<backprop_bdd_encoder> backprop;
+    if (do_backprop)
+      backprop.reset(global_backprop = new backprop_bdd_encoder());
 
     bdd bddoutvars = bddtrue;      // used if outvars was passed;
     // this is the number of variable we had the last time
@@ -658,10 +808,9 @@ namespace spot
           });
           dfa->set_controllable_variables(bddoutvars);
         }
-
-
       delete a;
     }
+
     // Keep track of whether we have seen an accepting or rejecting
     // state.  If we are missing one of them, we can reduce the
     // automaton to a single state.
@@ -684,8 +833,9 @@ namespace spot
         if (outvars)
           {
             // Everytime a new variable is created, the quantifycation
-            // buffer is wiped out.  We only have to call
-            // bdd_mt_quantify_prepare when the number of variables
+            // buffer is wiped out.  This can happen as a side-effect
+            // of ltlf_to_mtbdd().  We only have to call
+            // bdd_mt_quantify_prepare() when the number of variables
             // changed.
             if (int vn = bdd_varnum(); vn != varnum)
               {
@@ -694,6 +844,8 @@ namespace spot
               }
             bdd_mt_apply1_synthesis(b, strategy_map_true,
                                     &cache_, hash_key_strat);
+            if (do_backprop)
+              backprop->encode_state(label_term, b, nullptr, &new_rootnums);
           }
         if (fuse_same_bdds)
           if (auto it = bdd_to_state.find(b); it != bdd_to_state.end())
@@ -708,6 +860,21 @@ namespace spot
         states.push_back(b);
         names.push_back(label);
         terminal_to_state_map[label_term] = n;
+
+        if (do_backprop)
+          {
+            trival init_status = backprop->root_status(0);
+            if (SPOT_UNLIKELY(init_status.is_known()))
+              break;
+            if (backprop->root_status(label_term).is_known())
+              continue;
+            // We stored all successors in new_rootnums to
+            // avoid calling leaves_of.
+            for (unsigned root: new_rootnums)
+              todo.push(int_to_formula_[root]);
+            new_rootnums.clear();
+            continue;
+          }
 
         for (bdd leaf: leaves_of(b))
           {
@@ -730,6 +897,35 @@ namespace spot
                 == terminal_to_state_map.end())
               todo.push(terminal_to_formula(term));
           }
+      }
+
+    if (do_backprop)            // finalize backpropagation
+      {
+        trival init_status = backprop->root_status(0);
+        if (realizability)
+          {
+            if (init_status.is_true())
+              {
+                dfa->states.push_back(bddtrue);
+                dfa->names.push_back(formula::tt());
+                return dfa;
+              }
+            else
+              {
+                dfa->states.push_back(bddfalse);
+                dfa->names.push_back(formula::ff());
+                return dfa;
+              }
+          }
+        // backprop->backprop.print_dot(std::cerr);
+        unsigned sz = states.size();
+        for (unsigned i = 0; i < sz; ++i)
+          bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
+                                  &cache_, hash_key_finalstrat);
+        dfa->states = std::move(states);
+        dfa->names = std::move(names);
+        dict_->register_all_propositions_of(this, dfa);
+        return dfa;
       }
 
     if (detect_empty_univ)
@@ -1607,13 +1803,17 @@ namespace spot
     return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ);
   }
 
-  mtdfa_ptr ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
-                          bool fuse_same_bdds, bool simplify_terms,
-                          bool detect_empty_univ,
-                          const std::vector<std::string>& outvars)
+  mtdfa_ptr ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
+                                        const std::vector<std::string>& outvars,
+                                        bool backprop,
+                                        bool realizability,
+                                        bool fuse_same_bdds,
+                                        bool simplify_terms,
+                                        bool detect_empty_univ)
   {
     ltlf_translator trans(dict, simplify_terms);
-    return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ, &outvars);
+    return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+                               &outvars, backprop, realizability);
   }
 
   mtdfa_ptr ltlf_to_mtdfa_compose(formula f, const bdd_dict_ptr& dict,
@@ -2341,8 +2541,8 @@ namespace spot
     return (*global_is_winning)[term];
   }
 
-  mtdfa_ptr
-  mtdfa_winning_strategy(mtdfa_ptr dfa)
+  static mtdfa_ptr
+  mtdfa_winning_strategy_by_refinement(mtdfa_ptr dfa)
   {
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
@@ -2421,6 +2621,67 @@ namespace spot
 
     bdd_extcache_done(&cache);
     return res;
+  }
+
+  static int strategy_finalize(int* root_ptr, int term)
+  {
+    // replace accepting terminals by bddtrue
+    if (term & 1)
+      {
+        *root_ptr = 1;
+        return 1;
+      }
+    // remplace losing terminals by bddfalse
+    if (!global_backprop->root_status(term / 2).is_true())
+      {
+        *root_ptr = 0;
+        return 0;
+      }
+    // keep winning terminals as-is
+    return 1;
+  }
+
+  static mtdfa_ptr
+  mtdfa_winning_strategy_by_backprop(mtdfa_ptr dfa)
+  {
+    bdd_dict_ptr dict = dfa->get_dict();
+    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+    backprop_bdd_encoder enc;
+    unsigned ns = dfa->num_roots();
+    bdd outputs = dfa->get_controllable_variables();
+    bdd_mt_quantify_prepare(outputs);
+    for (unsigned i = 0; i < ns; ++i)
+      if (enc.encode_state(i, dfa->states[i]))
+        break;
+    if (!enc.backprop.status_of(0).is_true())
+      {
+        res->states.push_back(bddfalse);
+        res->names.push_back(formula::ff());
+        return res;
+      }
+    global_backprop = &enc;
+
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+
+    res->states = dfa->states;
+    res->names = dfa->names;
+    for (unsigned i = 0; i < ns; ++i)
+      bdd_mt_apply1_synthesis(res->states[i], strategy_finalize,
+                              &cache, hash_key_finalstrat);
+    dict->register_all_propositions_of(dfa, res);
+    res->set_controllable_variables(outputs);
+
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr
+  mtdfa_winning_strategy(mtdfa_ptr dfa, bool backprop)
+  {
+    if (backprop)
+      return mtdfa_winning_strategy_by_backprop(dfa);
+    return mtdfa_winning_strategy_by_refinement(dfa);
   }
 
   twa_graph_ptr
@@ -2512,7 +2773,28 @@ namespace spot
     return res;
   }
 
-
-
-
+  backprop_graph mtdfa_to_backprop(mtdfa_ptr dfa, bool early_stop,
+                                   bool preserve_names)
+  {
+    backprop_bdd_encoder enc;
+    unsigned ns = dfa->num_roots();
+    std::string name;
+    bdd_mt_quantify_prepare(dfa->get_controllable_variables());
+    for (unsigned i = 0; i < ns; ++i)
+      {
+        std::string* nameptr = nullptr;
+        if (preserve_names)
+          {
+            if (dfa->names.size() > i)
+              name = str_psl(dfa->names[i]);
+            else
+              name = "state " + std::to_string(i);
+            nameptr = &name;
+          }
+        bool res = enc.encode_state(i, dfa->states[i], nameptr);
+        if (res && early_stop)
+          break;
+      }
+    return enc.backprop;
+  }
 }

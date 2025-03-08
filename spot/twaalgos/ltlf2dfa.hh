@@ -20,6 +20,7 @@
 
 #include <spot/twa/twagraph.hh>
 #include <spot/misc/bddlt.hh>
+#include <spot/twaalgos/backprop.hh>
 
 namespace spot
 {
@@ -260,27 +261,49 @@ namespace spot
   ///   the automaton is reduced to a rejecting or accepting sink
   ///   state (\a detect_empty_univ)
   ///
-  /// - if \a outputvar is given, it is assumed that the MTDFA will be
-  ///   used for LTLf synthesis, therefore accepting terminals will be
-  ///   replaced by true, and some output variables will be already
-  ///   assigned if such an assignment ensure they can always reach
-  ///   true.
-  ///
   /// States will be labeled using LTLf formulas, this is required by
   /// the construction.
-  /// @{
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                 bool fuse_same_bdds = true,
                 bool simplify_terms = true,
                 bool detect_empty_univ = true);
+
+  /// \ingroup mtdfa
+  /// \brief Solve (or start solving) LTLf synthesis
+  ///
+  /// This is similar to ltlf_to_mtdfa, but with the intent of solving
+  /// LTLf synthesis problems.  Typically, all accepting terminals
+  /// will be replaced by bddtrue, and some nodes will be simplified
+  /// according to their controllability.
+  ///
+  /// The sent of output variables should be specified with \a outvars.
+  ///
+  /// If \a do_backprop is set to `true`, then a backpropagation graph
+  /// it constructed while the automaton for \a f is explored.  This
+  /// may help to abort the construction earlier, and it is enough to
+  /// solve the game and return a strategy.  That strategy is returned
+  /// if \a realizability is set to `false` (if a strategy does not
+  /// exist, a DFA that has a single bddfalse state is reaturned.
+  /// When \a realizability is `true`, then the returned MTDFA will
+  /// just have a single state that is bddtrue (realizable) or
+  /// bddfalse (unrealizable).
+  ///
+  /// When \a do_backprop is set to `false`, each state is locally
+  /// simplified according to the accepting terminals/bddtrue/bddfalse
+  /// it can reach, but the game still needs to be solved by other
+  /// means.
+  ///
+  /// See ltlf_to_mtdfa for the purpose of \a fuse_same_bdds, \a
+  /// simplify_terms, \a detect_empty_univ.
   SPOT_API mtdfa_ptr
-  ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
-                bool fuse_same_bdds,
-                bool simplify_terms,
-                bool detect_empty_univ,
-                const std::vector<std::string>& outvars);
-  /// @}
+  ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
+                              const std::vector<std::string>& outvars,
+                              bool do_backprop = true,
+                              bool realizability = false,
+                              bool fuse_same_bdds = true,
+                              bool simplify_terms = true,
+                              bool detect_empty_univ = true);
 
   /// \ingroup mtdfa
   /// \brief Convert an LTLf formula into a MTDFA, with a compositional
@@ -396,7 +419,9 @@ namespace spot
 
     mtdfa_ptr ltlf_to_mtdfa(formula f, bool fuse_same_bdds,
                             bool detect_empty_univ = true,
-                            const std::vector<std::string>* outvars = nullptr);
+                            const std::vector<std::string>* outvars = nullptr,
+                            bool do_backprop = false,
+                            bool realizability = false);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;
@@ -434,6 +459,7 @@ namespace spot
     bool simplify_terms_;
     };
 
+  /// \ingroup mtdfa
   /// \brief Compute the winning region of the MTDFA interpreted
   /// as a game.
   ///
@@ -458,6 +484,10 @@ namespace spot
   SPOT_API std::vector<bool>
   mtdfa_winning_region_lazy(mtdfa_ptr dfa);
 
+  #include <spot/graph/adjlist.hh>
+
+
+  /// \ingroup mtdfa
   /// \brief Build a generalized strategy from a set of winning states.
   ///
   /// This maps all accepting terminal to true.  If a winning_states
@@ -471,15 +501,44 @@ namespace spot
                          const std::vector<bool>& winning_states);
   /// @}
 
+
+  /// \ingroup mtdfa
+  /// \brief Build a backprop_graph from \a dfa
+  ///
+  /// This creates a backprop_graph based in the game interpretation
+  /// of \a dfa.
+  ///
+  /// Set \a early_stop to `false` if you want to build the entire
+  /// graph.  Otherwise, this will stop as soon as the initial state is
+  /// determined.
+  ///
+  /// Set \a preserve_names to `true` if you want to decorate the
+  /// backprop_graph with a few annotations indicating which the
+  /// correspondence between some states of the backprop_graph and the
+  /// roots of \a dfa.
+  SPOT_API backprop_graph
+  mtdfa_to_backprop(mtdfa_ptr dfa, bool early_stop = true,
+                    bool preserve_names = false);
+
+  /// \ingroup mtdfa
   /// \brief Compute a strategy for an MTDFA interpreted
   /// as a game.
   ///
-  /// This is similar to mtdfa_winning_region, but it will only
-  /// compute the winning status of states that are reachable from the
-  /// initial state without crossing any accepting terminal.
+  /// Create a strategy, i.e, an MTDFA in which each controllable
+  /// node has exactly one "bddfalse" child.  If the initial state
+  /// cannot be won by the controller, the strategy returned is bddfalse.
+  ///
+  /// The \a backprop_node argument controls the algorithm used to
+  /// solve the game.  If is `true`, a `backprop_graph` is constructed
+  /// from the MTDFA, mapping each MTBDD node to a node of the graph.
+  /// This allows a linear-time resolution.  If `false`, the game is
+  /// solved by refining the MTDFA in-place; this use some kind of
+  /// state-based back propagation that does not have linear
+  /// complexity.
   SPOT_API mtdfa_ptr
-  mtdfa_winning_strategy(mtdfa_ptr dfa);
+  mtdfa_winning_strategy(mtdfa_ptr dfa, bool backprop_nodes);
 
+  /// \ingroup mtdfa
   /// \brief Convert an MTDFA representing a strategy to a TwA with
   /// the "synthesis-output" property.
   ///
