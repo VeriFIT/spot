@@ -771,4 +771,13 @@ int bdd_anodecountpp(const std::vector<bdd>& b)
     bdd_unmark(x.root);
   return count;
 }
+
+extern int *quantvarset;
+
+std::tuple<bool, int, int> bdd_mt_quantified_low_high(int r)
+{
+  bool is_quant = quantvarset[LEVEL(r)];
+  return make_tuple(is_quant, LOW(r), HIGH(r));
+}
+
 /* EOF */

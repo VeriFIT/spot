@@ -109,7 +109,7 @@ static int applyop;                 /* Current operator for apply */
 static int appexop;                 /* Current operator for appex */
 static int appexid;                 /* Current cache id for appex */
 static int quantid;                 /* Current cache id for quantifications */
-static int *quantvarset;            /* Current variable set for quant. */
+int *quantvarset;                   /* Current variable set for quant. */
 static int quantvarsetcomp;         /* Should quantvarset be complemented?  */
 static int quantvarsetID;           /* Current id used in quantvarset */
 static int quantlast;               /* Current last variable to be quant. */

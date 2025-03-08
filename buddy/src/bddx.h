@@ -1011,6 +1011,8 @@ inline void bdd_mt_quantify_prepare(const bdd& exist_var)
   return bdd_mt_quantify_prepare(exist_var.root);
 }
 
+BUDDY_API std::tuple<bool, int, int> bdd_mt_quantified_low_high(int);
+
 inline int bdd_mt_quantify_to_bool(const bdd& r,
                                    int (*op)(int),
                                    bddExtCache* cache, int ophash)
