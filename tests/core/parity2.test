@@ -26,7 +26,19 @@ for x in P 'Pmin odd' 'Pmax even' p 'pmin odd' 'pmax even'; do
     autfilt --name=%M --high "-$x" >>res2
   ltl2tgba -D "-$x" FGa 'GFa & GFb' '(p0 W XXGp0) & GFp1 & FGp2' >>res3
   ltl2tgba FGa 'GFa & GFb' '(p0 W XXGp0) & GFp1 & FGp2' |
-    autfilt -D --name=%M --high "-$x" >>res4
+      autfilt -D --name=%M --high "-$x" >>res4
+  (
+      ## --colored is normally short for --colored-parity=any
+      ## But in case someone types something like
+      ##   --parity='max odd' --colored
+      ## let's make sure we handle it like --colored-parity='max odd'.
+      echo "=== -$x ==="
+      ltl2tgba FGa 'GFa & GFb' '(p0 W XXGp0) & GFp1 & FGp2' \
+               "-$x" --stats='%[]g'
+      echo "=== -$x --colored ==="
+      ltl2tgba FGa 'GFa & GFb' '(p0 W XXGp0) & GFp1 & FGp2' \
+               "-$x" --colored --stats='%[]g'
+  ) >> res5
 done
 
 cat >expected<<EOF
@@ -1422,6 +1434,58 @@ State: 4
 --END--
 EOF
 diff expected4 res4
+
+cat >expected5 <<EOF
+=== -P ===
+co-Buchi
+Buchi
+Rabin 1
+=== -P --colored ===
+parity max even 2
+Streett 1
+parity min odd 3
+=== -Pmin odd ===
+co-Buchi
+Rabin 1
+Rabin 1
+=== -Pmin odd --colored ===
+Rabin 1
+parity min odd 3
+parity min odd 3
+=== -Pmax even ===
+parity max even 2
+Buchi
+parity max even 2
+=== -Pmax even --colored ===
+parity max even 2
+parity max even 3
+parity max even 4
+=== -p ===
+parity max even 2
+Streett 1
+parity min odd 3
+=== -p --colored ===
+parity max even 2
+Streett 1
+parity min odd 3
+=== -pmin odd ===
+Rabin 1
+parity min odd 3
+parity min odd 3
+=== -pmin odd --colored ===
+Rabin 1
+parity min odd 3
+parity min odd 3
+=== -pmax even ===
+parity max even 2
+parity max even 3
+parity max even 4
+=== -pmax even --colored ===
+parity max even 2
+parity max even 3
+parity max even 4
+EOF
+diff expected5 res5
 
 ltlcross 'ltl2tgba -P' 'ltl2tgba -P"odd max"' 'ltl2tgba -P"even min"' \
          'ltl2tgba -p' 'ltl2tgba -p"odd max"' 'ltl2tgba -p"even min"' \

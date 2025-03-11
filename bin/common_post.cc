@@ -231,7 +231,14 @@ parse_opt_post(int key, char* arg, struct argp_state*)
         if (arg)
           type = XARGMATCH(key == 'P' ? "--parity" : "--colored-parity",
                            arg, parity_args, parity_types);
-        else
+        else if (!(type & spot::postprocessor::Parity))
+          // If no argument was given, we just require Parity.
+          // However, if a Parity condition was already set before,
+          // don't overwrite it.  This way if someone mistakenly write
+          // `--parity='max even' --colored` without realizing that
+          // `--colored` is just the abbreviation for
+          // `--colored-parity=...` with the default argument, we
+          // won't reset the 'max even' setting.
           type = spot::postprocessor::Parity;
         if (key == 'p')
           colored = spot::postprocessor::Colored;
