@@ -91,17 +91,15 @@ static const argp_option options[] =
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
     { "algo", OPT_ALGO, "sd|ds|ps|lar|lar.old|acd", 0,
-      "choose the algorithm for synthesis:"
-      " \"sd\": translate to tgba, split, then determinize;"
-      " \"ds\": translate to tgba, determinize, then split;"
-      " \"ps\": translate to dpa, then split;"
-      " \"lar\": translate to a deterministic automaton with arbitrary"
-      " acceptance condition, then use LAR to turn to parity,"
-      " then split (default);"
-      " \"lar.old\": old version of LAR, for benchmarking;"
-      " \"acd\": translate to a deterministic automaton with arbitrary"
-      " acceptance condition, then use ACD to turn to parity,"
-      " then split.\n", 0 },
+      "choose the algorithm for synthesis:\n"
+      "  sd: translate to TGBA, split, determinize\n"
+      "  ds: translate to TGBA, determinize, split\n"
+      "  ps: translate to DPA, split\n"
+      "  lar: translate to a deterministic TELA, convert to DPA"
+      " with LAR, split (default)\n"
+      "  lar.old: old version of LAR, for benchmarking;\n"
+      "  acd: translate to a deterministic TELA, convert to DPA"
+      " with ACD, split", 0 },
     { "bypass", OPT_BYPASS, "yes|no", 0,
       "whether to try to avoid to construct a parity game "
       "(enabled by default)", 0},

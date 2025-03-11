@@ -52,6 +52,11 @@ do
             echo "bin/man/$manpage is not listed in man/Makefile.am"
             exit_status=2
         fi
+        if ! grep -q "%{_mandir}/man./$manpage\*\$" $top_srcdir/spot.spec.in;
+        then
+            echo "$manpage is not listed in spot.spec.in"
+            exit_status=2
+        fi
     fi
 
     case $binary in
@@ -74,7 +79,7 @@ do
             ;;
     esac
 
-    # All man pages
+    # All tools
     case $manpage in
         *.1)
             if ! test -f $top_srcdir/doc/org/$binary.org; then
@@ -94,7 +99,19 @@ do
                 echo "$binary does not occur in doc/org/arch.tex"
                 exit_status=2
             fi
+            if ! grep -q "%{_bindir}/$binary\$" $top_srcdir/spot.spec.in; then
+                echo "$binary does is not listed in spot.spec.in";
+                exit_status=2
+            fi
+
     esac
+
+    if test -f $top_srcdir/bin/.gitignore; then
+        if ! grep -q "^$binary\$" $top_srcdir/bin/.gitignore; then
+            echo "$binary is not listed in bin/.gitignore"
+            exit_status=2
+        fi
+    fi
 
     # Check --help text.  Set a high rmargin to workaround some
     # bug in argp where an extra line it sometimes added if the end
@@ -107,6 +124,7 @@ do
         echo "bin/$binary --help has options after blank line;" \
              "missing section header?"
         cat help-err
+        exit_status=2
     fi
     rm -f help-$binary.tmp help-err
 

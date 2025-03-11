@@ -38,6 +38,7 @@ logic (LTL & PSL).
 %{_bindir}/ltldo
 %{_bindir}/ltlfilt
 %{_bindir}/ltlgrind
+%{_bindir}/ltlmix
 %{_bindir}/ltlsynt
 %{_bindir}/randaut
 %{_bindir}/randltl
@@ -52,11 +53,12 @@ logic (LTL & PSL).
 %{_mandir}/man1/ltldo.1*
 %{_mandir}/man1/ltlfilt.1*
 %{_mandir}/man1/ltlgrind.1*
+%{_mandir}/man1/ltlmix.1*
 %{_mandir}/man1/ltlsynt.1*
 %{_mandir}/man1/randaut.1*
 %{_mandir}/man1/randltl.1*
-%{_mandir}/man7/spot-x.7*
 %{_mandir}/man7/spot.7*
+%{_mandir}/man7/spot-x.7*
 %license COPYING
 %doc AUTHORS COPYING NEWS README THANKS
 
