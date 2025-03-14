@@ -269,6 +269,13 @@ namespace spot
                 bool simplify_terms = true,
                 bool detect_empty_univ = true);
 
+
+  enum ltlf_synthesis_backprop {
+    node_backprop,              // on-the-fly
+    state_refine,               // no backpropagation, just local refinement
+    node_and_scc_backprop,      // on-the-fly
+  };
+
   /// \ingroup mtdfa
   /// \brief Solve (or start solving) LTLf synthesis
   ///
@@ -279,17 +286,17 @@ namespace spot
   ///
   /// The sent of output variables should be specified with \a outvars.
   ///
-  /// If \a do_backprop is set to `true`, then a backpropagation graph
-  /// it constructed while the automaton for \a f is explored.  This
-  /// may help to abort the construction earlier, and it is enough to
-  /// solve the game and return a strategy.  That strategy is returned
-  /// if \a realizability is set to `false` (if a strategy does not
-  /// exist, a DFA that has a single bddfalse state is reaturned.
-  /// When \a realizability is `true`, then the returned MTDFA will
-  /// just have a single state that is bddtrue (realizable) or
-  /// bddfalse (unrealizable).
+  /// If \a backprop is set to `node_backprop`, then a backpropagation
+  /// graph it constructed while the automaton for \a f is explored.
+  /// This may help to abort the construction earlier, and it is
+  /// enough to solve the game and return a strategy.  That strategy
+  /// is returned if \a realizability is set to `false` (if a strategy
+  /// does not exist, a DFA that has a single bddfalse state is
+  /// reaturned.  When \a realizability is `true`, then the returned
+  /// MTDFA will just have a single state that is bddtrue (realizable)
+  /// or bddfalse (unrealizable).
   ///
-  /// When \a do_backprop is set to `false`, each state is locally
+  /// When \a backprop is set to `state_refine`, each state is locally
   /// simplified according to the accepting terminals/bddtrue/bddfalse
   /// it can reach, but the game still needs to be solved by other
   /// means.
@@ -299,7 +306,7 @@ namespace spot
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,
-                              bool do_backprop = true,
+                              ltlf_synthesis_backprop backprop = node_backprop,
                               bool realizability = false,
                               bool fuse_same_bdds = true,
                               bool simplify_terms = true,
@@ -422,6 +429,11 @@ namespace spot
                             const std::vector<std::string>* outvars = nullptr,
                             bool do_backprop = false,
                             bool realizability = false);
+
+    mtdfa_ptr ltlf_synthesis_with_scc(formula f,
+                                      const std::vector<std::string>*
+                                      outvars = nullptr,
+                                      bool realizability = false);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;

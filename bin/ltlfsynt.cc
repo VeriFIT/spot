@@ -80,7 +80,8 @@ static const argp_option options[] =
       "(output-first) semantics.  The default is Mealy.", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
-    { "translation", OPT_TRANS, "retricted-direct|full-direct|compositional", 0,
+    { "translation", OPT_TRANS,
+      "retricted|full|compositional|on-the-fly|scc-on-the-fly", 0,
       "Whether to translate the formula directly as a whole, or to "
       "assemble translations from subformulas.  The restricted-direct version,"
       " which is the default, will only build the useful part of the game"
@@ -149,6 +150,8 @@ Convert LTLf formulas to transition-based deterministic finite automata.\n\n\
 If multiple formulas are supplied, several automata will be output.";
 
 enum translation_type {
+  translation_otf,
+  translation_otf_scc,
   translation_direct_restricted,
   translation_direct_full,
   translation_compositional,
@@ -156,6 +159,8 @@ enum translation_type {
 
 static const char* const translation_args[] =
   {
+    "otf", "on-the-fly",
+    "scc", "scc-otf", "scc-on-the-fly",
     "direct", "direct-restricted", "restricted-direct",
     "direct-full", "full-direct",
     "compositional", "compose",
@@ -163,6 +168,8 @@ static const char* const translation_args[] =
   };
 static translation_type translation_values[] =
   {
+    translation_otf, translation_otf,
+    translation_otf_scc, translation_otf_scc, translation_otf_scc,
     translation_direct_restricted, translation_direct_restricted,
     translation_direct_restricted,
     translation_direct_full, translation_direct_full,
@@ -569,12 +576,9 @@ namespace
                            << (opt_backprop ? "" : "out")
                            << " on-the-fly backpropagation\n";
             a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
-                                                  opt_backprop,
-                                                  opt_realizability);
+                                                  spot::state_refine);
             a->names.clear();
             stop_trans(a);
-            if (opt_backprop)
-              a_is_strategy_already = true;
             minimize_maybe(a);
             break;
           case translation_direct_full:
@@ -601,6 +605,24 @@ namespace
             a->set_controllable_variables(*sub_o, true);
             stop_trans(a);
             break;
+          case translation_otf:
+          case translation_otf_scc:
+            {
+              bool scc = opt_trans == translation_otf_scc;
+              if (opt_verbose)
+                *opt_verbose << indent
+                             << ("starting on-the-fly translation with "
+                                 "node-based backpropagation")
+                             << (scc ? " with SCC\n" : " without SCC\n");
+              auto bp = scc ? spot::node_and_scc_backprop : spot::node_backprop;
+              a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
+                                                    bp, opt_realizability);
+              a->names.clear();
+              stop_trans(a);
+              a_is_strategy_already = true;
+              minimize_maybe(a);
+              break;
+            }
           }
         if (opt_dot == dot_game)
           {

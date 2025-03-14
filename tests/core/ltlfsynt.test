@@ -83,22 +83,25 @@ while read f; do
 
    for sem in Moore Mealy; do
      for dec in yes no; do
-     for tra in restricted full compose; do
-     for min in yes no; do
-     for geq in yes no; do
-     for pol in yes no; do
-     for bp in states nodes; do
-
-       rez=`ltlfsynt -f "$f" --decomp=$dec --trans=$tra --min=$min \
+     for tra in restr full comp otf scc; do
+       bpvalues="states nodes"
+       case $tra in
+           otf | scc) bpvalues=nodes;
+       esac
+       for min in yes no; do
+       for geq in yes no; do
+       for pol in yes no; do
+       for bp in $bpvalues; do
+           rez=`ltlfsynt -f "$f" --decomp=$dec --trans=$tra --min=$min \
                      --semantics=$sem --global-equiv=$geq \
                      --polarity=$pol --backprop=$bp --realizability`
-       test $? -le 1 || exit 2
-       test "$rez" = "$prev" || test "$prev" = "" || exit 2
-       prev=$rez
-     done
-     done
-     done
-     done
+           test $? -le 1 || exit 2
+           test "$rez" = "$prev" || test "$prev" = "" || exit 2
+           prev=$rez
+       done
+       done
+       done
+       done
      done
      done
      prev=
