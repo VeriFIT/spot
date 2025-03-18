@@ -301,12 +301,18 @@ namespace spot
   /// it can reach, but the game still needs to be solved by other
   /// means.
   ///
+  /// If \a one_step_preprocess is set, the formula for each step is
+  /// first simplified in attempt to prove realizability or
+  /// unrealizability in one step.  This require translating two
+  /// different Boolean formulas to BDDs and then quantifying them.
+  ///
   /// See ltlf_to_mtdfa for the purpose of \a fuse_same_bdds, \a
   /// simplify_terms, \a detect_empty_univ.
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,
                               ltlf_synthesis_backprop backprop = node_backprop,
+                              bool one_step_preprocess = false,
                               bool realizability = false,
                               bool fuse_same_bdds = true,
                               bool simplify_terms = true,
@@ -428,12 +434,14 @@ namespace spot
                             bool detect_empty_univ = true,
                             const std::vector<std::string>* outvars = nullptr,
                             bool do_backprop = false,
-                            bool realizability = false);
+                            bool realizability = false,
+                            bool one_step_preprocess = false);
 
     mtdfa_ptr ltlf_synthesis_with_scc(formula f,
                                       const std::vector<std::string>*
                                       outvars = nullptr,
-                                      bool realizability = false);
+                                      bool realizability = false,
+                                      bool ont_step_preprocess = false);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;

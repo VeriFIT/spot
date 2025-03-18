@@ -740,6 +740,151 @@ namespace spot
       }
     };
 
+    formula one_step_real_rewrite(formula f)
+    {
+      if (f.is_boolean())
+        return f;
+      switch (f.kind())
+        {
+        case op::ap:
+        case op::tt:
+        case op::ff:
+          return f;
+        case op::X:
+          return formula::tt();
+        case op::strong_X:
+          return formula::ff();
+        case op::G:
+        case op::F:
+          return one_step_real_rewrite(f[0]);
+        case op::R:
+        case op::U:
+          return one_step_real_rewrite(f[1]);
+        case op::W:
+          return formula::Or({one_step_real_rewrite(f[0]),
+                              one_step_real_rewrite(f[1])});
+        case op::M:
+          return formula::And({one_step_real_rewrite(f[0]),
+                               one_step_real_rewrite(f[1])});
+        case op::And:
+        case op::Or:
+        case op::Not:
+        case op::Xor:
+        case op::Equiv:
+        case op::Implies:
+          return f.map(one_step_real_rewrite);
+        case op::eword:
+        case op::AndNLM:
+        case op::AndRat:
+        case op::Closure:
+        case op::Concat:
+        case op::EConcat:
+        case op::EConcatMarked:
+        case op::first_match:
+        case op::FStar:
+        case op::Fusion:
+        case op::NegClosure:
+        case op::NegClosureMarked:
+        case op::OrRat:
+        case op::Star:
+        case op::UConcat:
+          throw std::runtime_error
+            ("one_step_real_rewrite(): unsupported operator");
+        }
+      SPOT_UNREACHABLE();
+      return f;
+    }
+
+    formula one_step_unreal_rewrite(formula f, bool negate = false)
+    {
+      if (f.is_boolean())
+        return negate ? formula::Not(f) : f;
+      switch (op o = f.kind())
+        {
+        case op::Not:
+          return one_step_unreal_rewrite(f[0], !negate);
+        case op::ap:
+        case op::tt:
+        case op::ff:
+          if (negate)
+            return formula::Not(f);
+          else
+            return f;
+        case op::X:
+        case op::strong_X:
+          return formula::tt();
+          return formula::tt();
+        case op::F:
+          if (negate)           // G
+            return one_step_unreal_rewrite(f[0], true);
+          else
+            return formula::tt();
+        case op::Xor:
+        case op::Equiv:
+        case op::G:
+          if (negate)           // F
+            return formula::tt();
+          else
+            return one_step_unreal_rewrite(f[0]);
+        case op::R:
+        case op::M:
+          if (negate)           // U, W
+            return formula::Or({one_step_unreal_rewrite(f[0], true),
+                                one_step_unreal_rewrite(f[1], true)});
+          else
+            return one_step_unreal_rewrite(f[1]);
+        case op::U:
+        case op::W:
+          if (negate)         // R, M
+            return one_step_unreal_rewrite(f[1], true);
+          else
+            return formula::Or({one_step_unreal_rewrite(f[0]),
+                                one_step_unreal_rewrite(f[1])});
+        case op::Implies:
+          if (negate)
+            // !(a => b) == a & !b
+            {
+              formula f2 = one_step_unreal_rewrite(f[1], true);
+              return formula::And({one_step_unreal_rewrite(f[0], false), f2});
+            }
+          else // a => b == !a | b
+            {
+              formula f2 = one_step_unreal_rewrite(f[1], false);
+              return formula::Or({one_step_unreal_rewrite(f[0], true), f2});
+            }
+        case op::And:
+        case op::Or:
+          {
+            unsigned mos = f.size();
+            std::vector<formula> v;
+            for (unsigned i = 0; i < mos; ++i)
+              v.emplace_back(one_step_unreal_rewrite(f[i], negate));
+            op on = o;
+            if (negate)
+              on = o == op::Or ? op::And : op::Or;
+            return formula::multop(on, v);
+          }
+        case op::eword:
+        case op::AndNLM:
+        case op::AndRat:
+        case op::Closure:
+        case op::Concat:
+        case op::EConcat:
+        case op::EConcatMarked:
+        case op::first_match:
+        case op::FStar:
+        case op::Fusion:
+        case op::NegClosure:
+        case op::NegClosureMarked:
+        case op::OrRat:
+        case op::Star:
+        case op::UConcat:
+          throw std::runtime_error
+            ("one_step_unreal_rewrite(): unsupported operator");
+        }
+      SPOT_UNREACHABLE();
+      return f;
+    }
   }
 
   static backprop_bdd_encoder* global_backprop = nullptr;
@@ -794,7 +939,8 @@ namespace spot
                                  bool detect_empty_univ,
                                  const std::vector<std::string>* outvars,
                                  bool do_backprop,
-                                 bool realizability)
+                                 bool realizability,
+                                 bool preprocess)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
@@ -809,6 +955,7 @@ namespace spot
       throw std::runtime_error
         ("ltlf_to_mtdfa: backpropagation requires outvars");
 
+    std::unique_ptr<realizability_simplifier_base> realsimp;
     std::unique_ptr<backprop_bdd_encoder> backprop;
     if (do_backprop)
       backprop.reset(global_backprop = new backprop_bdd_encoder());
@@ -817,6 +964,22 @@ namespace spot
     // this is the number of variable we had the last time
     // we called bdd_mt_quantify_prepare().
     int varnum = 0;
+
+
+    auto restrict_bdd = [&](bdd& b) -> bool {
+      // Everytime a new variable is created, the quantifycation
+      // buffer is wiped out.  This can happen as a side-effect
+      // of ltlf_to_mtbdd().  We only have to call
+      // bdd_mt_quantify_prepare() when the number of variables
+      // changed.
+      if (int vn = bdd_varnum(); vn != varnum)
+        {
+          bdd_mt_quantify_prepare(bddoutvars);
+          varnum = vn;
+        }
+      return bdd_mt_apply1_synthesis(b, strategy_map_true,
+                                     &cache_, hash_key_strat);
+    };
 
     // Keep track of atomic propositions used in he automaton.
     // Actually the automaton might use fewer atomic propositions than
@@ -828,6 +991,12 @@ namespace spot
 
       if (outvars)
         {
+          if (preprocess)
+            {
+              unsigned o = realizability_simplifier_base::polarity;
+              realsimp.reset(new realizability_simplifier_base(*outvars,
+                                                               false, o));
+            }
           // We need to register the output variables already so we can
           // call bdd_mt_quantify_prepare.  Let's do it in the order in
           // which they will be discovered in the formula.
@@ -867,24 +1036,66 @@ namespace spot
             != terminal_to_state_map.end())
           continue;
 
-        bdd b = ltlf_to_mtbdd(label);
-        if (outvars)
+
+        bool b_done = false;
+        bdd b;
+
+        if (realsimp && !label.is_boolean())
           {
-            // Everytime a new variable is created, the quantifycation
-            // buffer is wiped out.  This can happen as a side-effect
-            // of ltlf_to_mtbdd().  We only have to call
-            // bdd_mt_quantify_prepare() when the number of variables
-            // changed.
-            if (int vn = bdd_varnum(); vn != varnum)
+            formula g = one_step_real_rewrite(label);
+
+            realizability_simplifier_base::mapping_t simpl_map;
+            std::tie(g, simpl_map) = realsimp->simplify(g);
+
+            b = ltlf_to_mtbdd(g);
+            if (restrict_bdd(b))
               {
-                bdd_mt_quantify_prepare(bddoutvars);
-                varnum = vn;
+                assert(b != bddfalse);
+                b_done = true;
+                if (do_backprop)
+                  backprop->encode_state(label_term, b, nullptr, &new_rootnums);
+                if (!realizability)
+                  {
+                    bdd fix = bddtrue;
+                    for (auto [k, k_is_input, v]: simpl_map)
+                      {
+                        if (k_is_input)
+                          continue;
+                        int i = dict_->register_proposition(k, this);
+                        if (v.is_tt())
+                          fix &= bdd_ithvar(i);
+                        else
+                          fix &= bdd_nithvar(i);
+                      }
+                    b &= fix;
+                  }
               }
-            bdd_mt_apply1_synthesis(b, strategy_map_true,
-                                    &cache_, hash_key_strat);
-            if (do_backprop)
-              backprop->encode_state(label_term, b, nullptr, &new_rootnums);
+            else
+              {
+                g = one_step_unreal_rewrite(label);
+                b = ltlf_to_mtbdd(g);
+                restrict_bdd(b);
+                if (b == bddfalse)
+                  {
+                    b_done = true;
+                    if (do_backprop)
+                      backprop->encode_state(label_term, b, nullptr,
+                                             &new_rootnums);
+                  }
+
+              }
           }
+        if (!b_done)
+          {
+            b = ltlf_to_mtbdd(label);
+            if (outvars)
+              {
+                restrict_bdd(b);
+                if (do_backprop)
+                  backprop->encode_state(label_term, b, nullptr, &new_rootnums);
+              }
+          }
+
         if (fuse_same_bdds)
           if (auto it = bdd_to_state.find(b); it != bdd_to_state.end())
             {
@@ -1004,7 +1215,8 @@ namespace spot
   ltlf_translator::ltlf_synthesis_with_scc(formula f,
                                            const std::vector<std::string>*
                                            outvars,
-                                           bool realizability)
+                                           bool realizability,
+                                           bool preprocess)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
@@ -1026,12 +1238,30 @@ namespace spot
 
     terminal_to_state_map.clear();
 
+    realizability_simplifier_base
+      realsimp(*outvars, false, realizability_simplifier_base::polarity);
+
     backprop_bdd_encoder backprop;
     global_backprop = &backprop;
     bdd bddoutvars = bddtrue;
     // this is the number of variable we had the last time
     // we called bdd_mt_quantify_prepare().
     int varnum = 0;
+
+    auto restrict_bdd = [&](bdd& b) -> bool {
+      // Everytime a new variable is created, the quantifycation
+      // buffer is wiped out.  This can happen as a side-effect
+      // of ltlf_to_mtbdd().  We only have to call
+      // bdd_mt_quantify_prepare() when the number of variables
+      // changed.
+      if (int vn = bdd_varnum(); vn != varnum)
+        {
+          bdd_mt_quantify_prepare(bddoutvars);
+          varnum = vn;
+        }
+      return bdd_mt_apply1_synthesis(b, strategy_map_true,
+                                     &cache_, hash_key_strat);
+    };
 
     // Keep track of atomic propositions used in he automaton.
     // Actually the automaton might use fewer atomic propositions than
@@ -1116,21 +1346,60 @@ namespace spot
         // will only be popped when we leave the current SCC.
         live_states.push_back(label_term);
 
-        bdd b = ltlf_to_mtbdd(label);
-        // Everytime a new variable is created, the quantifycation
-        // buffer is wiped out.  This can happen as a side-effect
-        // of ltlf_to_mtbdd().  We only have to call
-        // bdd_mt_quantify_prepare() when the number of variables
-        // changed.
-        if (int vn = bdd_varnum(); vn != varnum)
+        bdd b;
+        bool b_done = false;
+        if (preprocess && !label.is_boolean())
           {
-            bdd_mt_quantify_prepare(bddoutvars);
-            varnum = vn;
+            formula g = one_step_real_rewrite(label);
+
+            realizability_simplifier_base::mapping_t simpl_map;
+            std::tie(g, simpl_map) = realsimp.simplify(g);
+
+            b = ltlf_to_mtbdd(g);
+            if (restrict_bdd(b))
+              {
+                assert(b != bddfalse);
+                b_done = true;
+                backprop.encode_state(label_term, b, nullptr,
+                                      &new_rootnums, &old_rootnums);
+                if (!realizability)
+                  {
+                    bdd fix = bddtrue;
+                    for (auto [k, k_is_input, v]: simpl_map)
+                      {
+                        if (k_is_input)
+                          continue;
+                        int i = dict_->register_proposition(k, this);
+                        if (v.is_tt())
+                          fix &= bdd_ithvar(i);
+                        else
+                          fix &= bdd_nithvar(i);
+                      }
+                    b &= fix;
+                  }
+              }
+            else
+              {
+                g = one_step_unreal_rewrite(label);
+                std::tie(g, simpl_map) = realsimp.simplify(g);
+                b = ltlf_to_mtbdd(g);
+                restrict_bdd(b);
+                if (b == bddfalse)
+                  {
+                    b_done = true;
+                    backprop.encode_state(label_term, b, nullptr,
+                                          &new_rootnums, &old_rootnums);
+                  }
+              }
           }
-        bdd_mt_apply1_synthesis(b, strategy_map_true,
-                                &cache_, hash_key_strat);
-        backprop.encode_state(label_term, b, nullptr,
-                              &new_rootnums, &old_rootnums);
+        if (!b_done)
+          {
+            b = ltlf_to_mtbdd(label);
+            restrict_bdd(b);
+            backprop.encode_state(label_term, b, nullptr,
+                                  &new_rootnums, &old_rootnums);
+          }
+
         // For the purpose of cycle detection, n is also the rank in
         // the DFS order.
         unsigned n = states.size();
@@ -1195,7 +1464,7 @@ namespace spot
     // backprop.backprop.print_dot(std::cerr);
     unsigned sz = states.size();
     for (unsigned i = 0; i < sz; ++i)
-      bdd_mt_apply1_synthesis(states[i], strategy_finalize,
+      bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
                               &cache_, hash_key_finalstrat);
     dfa->states = std::move(states);
     dfa->names = std::move(names);
@@ -1394,12 +1663,14 @@ namespace spot
     mtdfa_ptr res = std::make_shared<mtdfa>(dfa->get_dict());
     // If the automaton hasn't been reduce to true/false, assume it
     // still use all atomic propositions.
-    if (states[0] != bddfalse && states[0] != bddtrue)
+    bdd controllable = dfa->get_controllable_variables();
+    if ((states[0] != bddfalse && states[0] != bddtrue)
+        || (controllable != bddtrue))
       {
         res->get_dict()->register_all_propositions_of(dfa, res);
         res->aps = dfa->aps;
       }
-    res->set_controllable_variables(dfa->get_controllable_variables());
+    res->set_controllable_variables(controllable);
     std::swap(res->names, names);
     std::swap(res->states, states);
     return res;
@@ -2048,6 +2319,7 @@ namespace spot
   mtdfa_ptr ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                                         const std::vector<std::string>& outvars,
                                         ltlf_synthesis_backprop backprop,
+                                        bool preprocess,
                                         bool realizability,
                                         bool fuse_same_bdds,
                                         bool simplify_terms,
@@ -2058,12 +2330,15 @@ namespace spot
         {
         case node_backprop:
           return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
-                                     &outvars, true, realizability);
+                                     &outvars, true, realizability,
+                                     preprocess);
         case state_refine:
           return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
-                                     &outvars, false, realizability);
+                                     &outvars, false, realizability,
+                                     preprocess);
         case node_and_scc_backprop:
-          return trans.ltlf_synthesis_with_scc(f, &outvars, realizability);
+          return trans.ltlf_synthesis_with_scc(f, &outvars, realizability,
+                                               preprocess);
         }
     SPOT_UNREACHABLE();
     return nullptr;

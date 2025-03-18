@@ -49,6 +49,7 @@ enum
   OPT_HIDE,
   OPT_INPUT,
   OPT_MINIMIZE,
+  OPT_ONE_STEP,
   OPT_OUTPUT,
   OPT_PART_FILE,
   OPT_POLARITY,
@@ -106,6 +107,8 @@ static const argp_option options[] =
       "whether to remove atomic propositions that are always equivalent to "
       "another one (enabled by default, both before and after decomposition)",
       0 },
+    { "one-step-preprocess", OPT_ONE_STEP, "yes|no", 0,
+      "attempt to speedup solve each state locally", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Output options:", 20 },
     { "aiger", OPT_AIGER, "ite|isop|both[+ud][+dc]"
@@ -191,7 +194,7 @@ static bool minimize_values[] =
   };
 ARGMATCH_VERIFY(minimize_args, minimize_values);
 static bool opt_minimize = true;
-
+static bool opt_one_step = false;
 
 static std::ostream* opt_verbose = nullptr;
 
@@ -345,6 +348,10 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_MINIMIZE:
       opt_minimize = XARGMATCH("--minimize", arg,
                                minimize_args, minimize_values);
+      break;
+    case OPT_ONE_STEP:
+      opt_one_step = XARGMATCH("--one-step", arg,
+                               decompose_args, decompose_values);
       break;
     case OPT_OUTPUT:
       all_output_aps.emplace();
@@ -573,10 +580,12 @@ namespace
             if (opt_verbose)
               *opt_verbose << indent
                            << "starting restricted translation with"
-                           << (opt_backprop ? "" : "out")
-                           << " on-the-fly backpropagation\n";
+                           << (opt_one_step ? "" : "out")
+                           << " one-step preprocess\n";
             a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
-                                                  spot::state_refine);
+                                                  spot::state_refine,
+                                                  opt_one_step,
+                                                  false /* realizability */);
             a->names.clear();
             stop_trans(a);
             minimize_maybe(a);
@@ -612,11 +621,15 @@ namespace
               if (opt_verbose)
                 *opt_verbose << indent
                              << ("starting on-the-fly translation with "
-                                 "node-based backpropagation")
-                             << (scc ? " with SCC\n" : " without SCC\n");
+                                 "node-based backpropagation, with")
+                             << (scc ? "" : "out")
+                             << " SCC, with"
+                             << (opt_one_step ? "" : "out")
+                             << " one-step preprocess\n";
               auto bp = scc ? spot::node_and_scc_backprop : spot::node_backprop;
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
-                                                    bp, opt_realizability);
+                                                    bp, opt_one_step,
+                                                    opt_realizability);
               a->names.clear();
               stop_trans(a);
               a_is_strategy_already = true;
