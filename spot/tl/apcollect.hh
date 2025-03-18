@@ -20,6 +20,7 @@
 
 #include <spot/tl/formula.hh>
 #include <set>
+#include <map>
 #include <vector>
 #include <bddx.h>
 #include <spot/twa/fwd.hh>
@@ -68,6 +69,18 @@ namespace spot
   SPOT_API
   atomic_prop_set collect_literals(formula f);
 
+
+  /// \brief Collect the APs occurring in f, along with their polarities
+  ///
+  /// This function records each atomic proposition occurring in f
+  /// along with the polarity of its occurrence.  For instance if the
+  /// formula is `G(a -> b) & X(!b & c)`, then this will output
+  /// the map `{a: 0b01, b: 0b11, c: 0b10}` where 0x01 means negative
+  /// polarity, 0x10 is positive polarity, and 0x11 is both.
+  SPOT_API std::map<formula, unsigned char>
+  collect_aps_with_polarities(formula f);
+
+
   /// \brief Collect equivalent APs
   ///
   /// Looks for patterns like `...&G(...&(x->y)&...)&...` or
@@ -78,11 +91,11 @@ namespace spot
   collect_equivalent_literals(formula f);
 
 
-
   /// \brief Simplify a reactive specification, preserving realizability
-  class SPOT_API realizability_simplifier final
+  class SPOT_API realizability_simplifier_base
   {
   public:
+    typedef std::vector<std::tuple<formula, bool, formula>> mapping_t;
     enum realizability_simplifier_option {
       /// \brief remove APs with single polarity
       polarity = 1,
@@ -91,7 +104,25 @@ namespace spot
       /// \brief likewise, but don't consider equivalent input and output
       global_equiv_output_only = 6,
     };
+    realizability_simplifier_base(const std::vector<std::string>& in_or_out,
+                                  bool is_input,
+                                  unsigned options = polarity | global_equiv,
+                                  std::ostream* verbose = nullptr);
+    ~realizability_simplifier_base();
 
+    /// \brief Simplify a formula, returning a mapping.
+    std::pair<formula, mapping_t> simplify(formula f);
+  protected:
+    struct data;
+    data* data_;
+  };
+
+
+  /// \brief Simplify a reactive specification, preserving realizability
+  class SPOT_API realizability_simplifier final:
+    public realizability_simplifier_base
+  {
+  public:
     realizability_simplifier(formula f,
                              const std::vector<std::string>& inputs,
                              unsigned options = polarity | global_equiv,
@@ -120,10 +151,8 @@ namespace spot
     void patch_game(twa_graph_ptr mealy) const;
 
   private:
-    void add_to_mapping(formula from, bool from_is_input, formula to);
     std::vector<std::tuple<formula, bool, formula>> mapping_;
     formula f_;
-    bool global_equiv_output_only_;
   };
 
   /// @}

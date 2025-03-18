@@ -65,6 +65,77 @@ namespace spot
     return res;
   }
 
+
+  std::map<formula, unsigned char>
+  collect_aps_with_polarities(formula f)
+  {
+    std::map<formula, unsigned char> res;
+
+    // polarity: 0 = negative, 1 = positive, 2 or 3 = both.
+    auto rec = [&res](formula f, unsigned polarity, auto self)
+    {
+      switch (f.kind())
+        {
+        case op::ff:
+        case op::tt:
+        case op::eword:
+          return;
+        case op::ap:
+          {
+            unsigned char bits = (polarity == 0 ? 0b01 :
+                                  polarity == 1 ? 0b10 :
+                                  0b11);
+            res[f] |= bits;
+          }
+          return;
+        case op::Not:
+        case op::NegClosure:
+        case op::NegClosureMarked:
+          self(f[0], polarity ^ 1, self);
+          return;
+        case op::Xor:
+        case op::Equiv:
+          self(f[0], 2, self);
+          self(f[1], 2, self);
+          return;
+        case op::Implies:
+        case op::UConcat:
+          self(f[0], polarity ^ 1, self);
+          self(f[1], polarity, self);
+          return;
+        case op::U:
+        case op::R:
+        case op::W:
+        case op::M:
+        case op::EConcat:
+        case op::EConcatMarked:
+          self(f[0], polarity, self);
+          self(f[1], polarity, self);
+          return;
+        case op::X:
+        case op::F:
+        case op::G:
+        case op::Closure:
+        case op::Or:
+        case op::OrRat:
+        case op::And:
+        case op::AndRat:
+        case op::AndNLM:
+        case op::Concat:
+        case op::Fusion:
+        case op::Star:
+        case op::FStar:
+        case op::first_match:
+        case op::strong_X:
+          for (formula c: f)
+            self(c, polarity, self);
+          return;
+        }
+    };
+    rec(f, 1, rec);
+    return res;
+  }
+
   atomic_prop_set collect_literals(formula f)
   {
     atomic_prop_set res;
@@ -278,15 +349,43 @@ namespace spot
     return scc;
   }
 
-  realizability_simplifier::realizability_simplifier
-  (formula f, const std::vector<std::string>& inputs,
+
+  struct realizability_simplifier_base::data
+  {
+    unsigned options;
+    std::ostream* verbose;
+    robin_hood::unordered_set<spot::formula> ins_or_outs;
+    bool is_inputs;
+  };
+
+  realizability_simplifier_base::realizability_simplifier_base
+  (const std::vector<std::string>& ins_or_outs, bool is_inputs,
    unsigned options, std::ostream* verbose)
   {
+    data_ = new data;
+    data_->options = options;
+    data_->verbose = verbose;
+    auto& io = data_->ins_or_outs;
+    for (const std::string& ap: ins_or_outs)
+      io.insert(spot::formula::ap(ap));
+    data_->is_inputs = is_inputs;
+  }
+
+  realizability_simplifier_base::~realizability_simplifier_base()
+  {
+    delete data_;
+  }
+
+  std::pair<formula, realizability_simplifier_base::mapping_t>
+  realizability_simplifier_base::simplify(formula f)
+  {
+    mapping_t mapping;
     bool first_mapping = true;
     relabeling_map rm;
+    std::ostream* verbose = data_->verbose;
     auto add_to_mapping = [&](formula from, bool from_is_input, formula to)
     {
-      mapping_.emplace_back(from, from_is_input, to);
+      mapping.emplace_back(from, from_is_input, to);
       rm[from] = to;
       if (SPOT_LIKELY(!verbose))
         return;
@@ -297,19 +396,15 @@ namespace spot
         }
       *verbose << "  " << from << " := " << to <<'\n';
     };
-    global_equiv_output_only_ =
+    unsigned options = data_->options;
+    bool geqoo =
       (options & global_equiv_output_only) == global_equiv_output_only;
 
-    robin_hood::unordered_set<spot::formula> ap_inputs;
-    for (const std::string& ap: inputs)
-      ap_inputs.insert(spot::formula::ap(ap));
-
     formula oldf;
-    f_ = f;
     do
       {
         bool rm_has_new_terms = false;
-        oldf = f_;
+        oldf = f;
 
         if (options & polarity)
           {
@@ -318,18 +413,13 @@ namespace spot
             // syntcomp, this occurs more frequently for input
             // variables than output variable.  See issue #529 for
             // some examples.
-            std::set<spot::formula> lits = spot::collect_literals(f_);
-            for (const formula& lit: lits)
-              if (lits.find(spot::formula::Not(lit)) == lits.end())
+            for (auto& [ap, pol]: spot::collect_aps_with_polarities(f))
+              if (pol != 0b11)
                 {
-                  formula ap = lit;
-                  bool neg = false;
-                  if (lit.is(op::Not))
-                    {
-                      ap = lit[0];
-                      neg = true;
-                    }
-                  bool is_input = ap_inputs.find(ap) != ap_inputs.end();
+                  bool neg = pol & 0b01;
+                  bool is_input =
+                    (data_->ins_or_outs.find(ap) != data_->ins_or_outs.end())
+                    == data_->is_inputs;
                   formula to = (is_input == neg)
                     ? spot::formula::tt() : spot::formula::ff();
                   add_to_mapping(ap, is_input, to);
@@ -337,9 +427,9 @@ namespace spot
                 }
             if (rm_has_new_terms)
               {
-                f_ = spot::relabel_apply(f_, &rm);
+                f = spot::relabel_apply(f, &rm);
                 if (verbose)
-                  *verbose << "new formula: " << f_ << '\n';
+                  *verbose << "new formula: " << f << '\n';
                 rm_has_new_terms = false;
               }
           }
@@ -348,7 +438,7 @@ namespace spot
             // check for equivalent terms
             spot::formula_ptr_less_than_bool_first cmp;
             for (std::vector<spot::formula>& equiv:
-                   spot::collect_equivalent_literals(f_))
+                   spot::collect_equivalent_literals(f))
               {
                 // For each set of equivalent literals, we want to
                 // pick a representative.  That representative
@@ -363,7 +453,9 @@ namespace spot
                     spot::formula ap = lit;
                     if (ap.is(spot::op::Not))
                       ap = ap[0];
-                    if (ap_inputs.find(ap) != ap_inputs.end())
+                    if ((data_->ins_or_outs.find(ap)
+                         != data_->ins_or_outs.end())
+                        == data_->is_inputs)
                       {
                         if (input_seen)
                           {
@@ -372,7 +464,7 @@ namespace spot
                             // unrealizable.  Make it false for the
                             // rest of the algorithm.
                             f = spot::formula::ff();
-                            return;
+                            return make_pair(f, mapping);
                           }
                         input_seen = lit;
                         // Normally, we want the input to be the
@@ -390,7 +482,7 @@ namespace spot
                         // we only do
                         //     o2 := o1
                         // when printing games.
-                        if (!global_equiv_output_only_)
+                        if (!geqoo)
                           {
                             repr_is_input = true;
                             repr = lit;
@@ -419,14 +511,23 @@ namespace spot
               }
             if (rm_has_new_terms)
               {
-                f_ = spot::relabel_apply(f_, &rm);
+                f = spot::relabel_apply(f, &rm);
                 if (verbose)
-                  *verbose << "new formula: " << f_ << '\n';
+                  *verbose << "new formula: " << f << '\n';
                 rm_has_new_terms = false;
               }
           }
       }
-    while (oldf != f_);
+    while (oldf != f);
+    return make_pair(f, mapping);
+  }
+
+  realizability_simplifier::realizability_simplifier
+  (formula f, const std::vector<std::string>& inputs,
+   unsigned options, std::ostream* verbose)
+    : realizability_simplifier_base(inputs, true, options, verbose)
+  {
+    std::tie(f_, mapping_) = simplify(f);
   }
 
   void
@@ -480,7 +581,8 @@ namespace spot
 
   void realizability_simplifier::patch_game(twa_graph_ptr game) const
   {
-    if (SPOT_UNLIKELY(!global_equiv_output_only_))
+    if (SPOT_UNLIKELY((data_->options & global_equiv_output_only)
+                      != global_equiv_output_only))
       throw std::runtime_error("realizability_simplifier::path_game() requires "
                                "option global_equiv_output_only");
 
