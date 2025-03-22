@@ -23,7 +23,7 @@ set -e
 
 ltl2tgba 'p | (!p & G(Fq & F!q & Fa))' >in
 test '3 3' = "`autfilt in --stats='%s %a'`"
-for i in minato all; do
+for i in minato; do
     test '2 3' = \
          "`autfilt --given-fo='F(Gq|G!q)' --given-s=$i in --stats='%s %a'`"
 done
@@ -38,7 +38,7 @@ while read opt exp; do
 done <<EOF
 minato 2 2 3
 stutter 3 7 3
-all 2 2 3
+stutter-restrict 3 7 3
 EOF
 
 while read opt exp; do
@@ -47,10 +47,10 @@ while read opt exp; do
 done <<EOF
 minato 1 1 0
 stutter 3 7 3
-all 1 1 0
+stutter-restrict 3 7 3
 EOF
 
-for opt in minato all; do
+for opt in minato; do
     res=`ltl2tgba GFp |
          autfilt --given-s=$opt --given-fo='G!p' --small --stats=%s%e%x`
     test "$res" = 100
@@ -64,7 +64,7 @@ while read opt exp; do
 done <<EOF
 minato 3 4 2
 stutter 2 3 2
-all 2 3 2
+stutter-restrict 3 6 2
 EOF
 
 
@@ -75,7 +75,7 @@ while read opt exp; do
 done <<EOF
 minato 3 4 2
 stutter 2 3 2
-all 3 4 2
+stutter-restrict 3 6 2
 EOF
 
 # We could hope for a better reduction on this case
@@ -86,7 +86,7 @@ while read opt exp; do
 done <<EOF
 minato 3 4 2
 stutter 2 3 2
-all 3 4 2
+stutter-restrict 3 6 2
 EOF
 
 # Test case from Yann's 2022-03-29 email.

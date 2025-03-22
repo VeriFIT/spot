@@ -434,13 +434,13 @@ static const argp_option options[] =
       "simplify input automata assuming they are only used in a context where "
       "FORMULA holds", 0 },
     { "given-strategy", OPT_GIVEN_STRAT,
-      "minato|stutter|stutter-relax|stutter-restrict|all", 0,
+      "minato|stutter-relax|stutter-restrict", 0,
       "strategy to use to simplify input automata based on given knowledge: "
       "(minato) simplify edge labels based on knowledge [the default], "
       "(stutter,stutter-relax) build a stutter-invariant results if the"
       " added words are outside the given knowledge, "
       "(stutter-restrict) build a stutter-invariant results by removing "
-      "words outside the given knowledge, (all) minato then stutter-relax", 0 },
+      "words outside the given knowledge", 0 },
     { "given-fixpoint", OPT_GIVEN_FIXPOINT, nullptr, 0,
       "If multiple knowledges have been given with --given-formula or "
       "--given-automaton repeat their application until we reach a fixpoint.",
@@ -569,19 +569,17 @@ enum given_strategy {
   GIVEN_MINATO = 1,
   GIVEN_STUTTER_RELAX = 2,
   GIVEN_STUTTER_RESTRICT = 4,
-  GIVEN_ALL = 3,
 };
 static char const *const given_args[] =
 {
   "minato",
   "stutter", "stutter-relax", "stutter-restrict",
-  "all", nullptr
+  nullptr
 };
 static given_strategy const given_types[] =
 {
   GIVEN_MINATO,
   GIVEN_STUTTER_RELAX, GIVEN_STUTTER_RELAX, GIVEN_STUTTER_RESTRICT,
-  GIVEN_ALL,
 };
 ARGMATCH_VERIFY(given_args, given_types);
 
