@@ -1,4 +1,4 @@
-New in spot 2.12.2.dev  (not yet released)
+New in spot 2.13  (2025-03-24)
 
   Command-line tools:
 
@@ -34,23 +34,23 @@ New in spot 2.12.2.dev  (not yet released)
 
     The resulting formulas are now usable by ltlsynt without having to
     specify which atomic propositions are input or output, as this can
-    be inferred from their name.  (This suspports a --part-file option
-    as well.)
+    be inferred from their name.  Instead of using --ins/--outs, a
+    --part-file option can be used as well.
 
-  - ltlfilt learned --save-part-file[=FILENAME] option that can be
+  - ltlfilt learned a --save-part-file[=FILENAME] option that can be
     used to create partition files suitable for many synthesis tools
     (including ltlsynt).
 
   - genltl learned --lily-patterns to generate the example LTL
     synthesis specifications from Lily 1.0.2.  Those come with input
-    and output atomic proposition rewriten in the form "iNN" or "oNN",
+    and output atomic propositions rewriten in the form "iNN" or "oNN",
     so they can be fed to ltlsynt directly, as in
 
        % genltl --lily-patterns | ltlsynt -q
 
   - genltl's --pps-arbiter-standard and --pps-arbiter-strict have been
     changed to rename variables {r1,r2,...,g1,g2...} as
-    {i1,i1,...,o1,o2,...} so that these formulas can be fed directly to
+    {i1,i2,...,o1,o2,...} so that these formulas can be fed directly to
     ltlsynt.
 
   - autfilt learned --restrict-dead-end-edges, to restricts labels of
@@ -79,16 +79,16 @@ New in spot 2.12.2.dev  (not yet released)
 
   - restrict_dead_end_edges_here() can reduce non-determinism (but
     not remove it) by restricting the label L of some edge (S)-L->(D)
-    going to a state D that does not have other successor than
-    itself.  The conditions are detailled in the documentation of
+    going to a state D that does not have other successors than
+    itself.  The conditions are detailed in the documentation of
     this function.
 
   - spot::postprocessor will now call restrict_dead_end_edges_here()
     in its highest setting.  This can be fine-tuned with the "rde"
-    extra option, see the spot-x (7) man page for detail.
+    extra option; see the spot-x (7) man page for detail.
 
   - The formula class now keeps track of membership to the Δ₁, Σ₂,
-    Π₂, and Δ₂ syntactic class.  This can be tested with
+    Π₂, and Δ₂ syntactic classes.  This can be tested with
     formula::is_delta1(), formula::is_sigma2(), formula::is_pi2(),
     formula::is_delta2().  See doc/tl/tl.pdf from more discussion.
 
@@ -107,17 +107,17 @@ New in spot 2.12.2.dev  (not yet released)
     x can be accepted in B from some state in V[x].
 
     That function also has a variant spot::match_states(A, f) where f
-    is an LTL formula.  In this case it returns and array of
+    is an LTL formula.  In this case, it returns an array of
     formulas.  If f represents a superset of the language of A, then
     any word accepted by A from state x satisfies V[x].  Related to
     Issue #591.
 
-  - twa_graph::defrag_states(num) no longer require num[i]≤i; num
+  - twa_graph::defrag_states(num) no longer requires num[i]≤i; num
     can now describe a permutation of the state numbers.
 
   - spot::maximum_cardinality_search() and
     spot::maximum_cardinality_search_reorder_here() are new function
-    to compute (and apply) an ordering of state based on a maximum
+    to compute (and apply) an ordering of states based on a maximum
     cardinality search.
 
   - a new set of functions spot::update_bounds_given(),
@@ -131,7 +131,7 @@ New in spot 2.12.2.dev  (not yet released)
     status and the AIG circuit; it now does the job silently as
     requested.
 
-  - ltlsynt had a minor memory leak
+  - ltlsynt had a minor memory leak.
 
 New in spot 2.12.2  (2025-01-18)
 
