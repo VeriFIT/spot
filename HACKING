@@ -27,10 +27,10 @@ since the generated files they produce are distributed.)
   GNU Flex >= 2.6
   GNU Bison >= 3.3
   GNU Emacs (preferably >= 24 but it may work with older versions)
-  org-mode >= 9.1 (the version that comes bundled with your emacs
-    version is likely out-of-date; but distribution often have
-    a separate and more recent org-mode package, or you can
-    simply upgrade from ELPA).
+  org-mode >= 9.1 (the version that comes bundled with recent
+    emacs versions should usually be more recent than that; some
+    Linux distribution may ship a more recent org-mode package
+    separately from emacs).
   Groff (a.k.a. GNU troff) >= 1.20
   SWIG >= 3.0.2, preferably >= 4.0.1 (for its better modern C++ support)
     If you use Macports you consider installing the swig-python package
@@ -66,10 +66,10 @@ only for certain operations (like releases):
             powerful, but additional tests do not hurt)
 
 If you use Debian or a similar distribution, the Dockerfile at
-https://github.com/adl/spot-docker/blob/master/debuild/Dockerfile
+https://gitlab.lre.epita.fr/spot/buildenv/-/blob/master/deb/stable-amd64/Dockerfile
 lists all the Debian packages that should be installed to build
 Debian packages out of the GIT tree.  Additionally, the script
-https://github.com/adl/spot-docker/blob/master/debuild/install.sh
+https://gitlab.lre.epita.fr/spot/buildenv/-/blob/master/deb/stable-amd64/install.sh
 installs the third-party tools that do not have Debian packages.
 
 
