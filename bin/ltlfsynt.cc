@@ -82,23 +82,29 @@ static const argp_option options[] =
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
     { "translation", OPT_TRANS,
-      "retricted|full|compositional|on-the-fly|scc-on-the-fly", 0,
-      "Whether to translate the formula directly as a whole, or to "
-      "assemble translations from subformulas.  The restricted-direct version,"
-      " which is the default, will only build the useful part of the game"
-      " arena.", 0 },
+      "full|compositional|retricted|on-the-fly|scc-on-the-fly", 0,
+      "The type of translation to use: (full) is a direct translation to MTDFA,"
+      " (compositional) breaks the specification on Boolean operators and "
+      " builds the MTDFA by compositing minimized subautomata, (restrict) is"
+      " a direct translation but that is restricted to the only part useful "
+      "to synthesis, (on-the-fly) is the on-the-fly version of \"restrict\" "
+      "but that will start solving the game as the automaton is generated, and"
+      " (scc-on-the-fly) will additionally keep track of SCCs to help with the"
+      " game solving.  The default is scc-on-the-fly.", 0 },
     { "minimize", OPT_MINIMIZE, "yes|no", 0,
-      "Minimize the automaton (enabled by default).", 0 },
+      "Minimize the automaton (disabled by default except for the compositional"
+      " translation). Has no effect on on-the-fly translations.", 0 },
     { "composition", OPT_COMPOSITION, "size|ap", 0,
-      "How to order n-ary compositions in the compositional translation.  "
-      "By increasing size, or trying to group operands based on their APs.",
+      "If the translation is set to \"compositional\" this option specify how"
+      " to order n-ary compositions: by increasing size, or trying to group"
+      " operands based on their APs (the default).",
       0 },
     { "decompose", OPT_DECOMPOSE, "yes|no", 0,
       "whether to decompose the specification as multiple output-disjoint "
       "problems to solve independently (enabled by default)", 0 },
     { "backprop", OPT_BACKPROP, "nodes|states", 0,
       "whether backpropagation should be done at the node or state level "
-      "(states by default)", 0 },
+      "(nodes by default)", 0 },
     { "polarity", OPT_POLARITY, "yes|no|before-decompose", 0,
       "whether to remove atomic propositions that always have the same "
       "polarity in the formula to speed things up (enabled by default, "
@@ -108,7 +114,9 @@ static const argp_option options[] =
       "another one (enabled by default, both before and after decomposition)",
       0 },
     { "one-step-preprocess", OPT_ONE_STEP, "yes|no", 0,
-      "attempt to speedup solve each state locally", 0 },
+      "attempt check one-step realizability or unrealizability of each "
+      "state during on-the-fly or restricted translations (enabled by "
+      "default)", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Output options:", 20 },
     { "aiger", OPT_AIGER, "ite|isop|both[+ud][+dc]"
@@ -179,7 +187,7 @@ static translation_type translation_values[] =
     translation_compositional, translation_compositional,
   };
 ARGMATCH_VERIFY(translation_args, translation_values);
-static translation_type opt_trans = translation_direct_restricted;
+static translation_type opt_trans = translation_otf_scc;
 
 static const char* const minimize_args[] =
   {
@@ -193,8 +201,9 @@ static bool minimize_values[] =
     false, false, false, false,
   };
 ARGMATCH_VERIFY(minimize_args, minimize_values);
-static bool opt_minimize = true;
-static bool opt_one_step = false;
+static bool opt_minimize = false;
+static bool opt_minimize_set = false;
+static bool opt_one_step = true;
 
 static std::ostream* opt_verbose = nullptr;
 
@@ -207,7 +216,7 @@ static const bool backprop_values[] =
     false, true,
   };
 ARGMATCH_VERIFY(backprop_args, backprop_values);
-static bool opt_backprop = false;
+static bool opt_backprop = true;
 
 static const char* const composition_args[] =
   {
@@ -348,6 +357,7 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_MINIMIZE:
       opt_minimize = XARGMATCH("--minimize", arg,
                                minimize_args, minimize_values);
+      opt_minimize_set = true;
       break;
     case OPT_ONE_STEP:
       opt_one_step = XARGMATCH("--one-step", arg,
@@ -618,12 +628,15 @@ namespace
           case translation_otf_scc:
             {
               bool scc = opt_trans == translation_otf_scc;
+              if (!opt_backprop)
+                error(2, 0,
+                      "on-the-fly translations do not support --nodes=states");
               if (opt_verbose)
                 *opt_verbose << indent
                              << ("starting on-the-fly translation with "
                                  "node-based backpropagation, with")
                              << (scc ? "" : "out")
-                             << " SCC, with"
+                             << " SCC tracking, with"
                              << (opt_one_step ? "" : "out")
                              << " one-step preprocess\n";
               auto bp = scc ? spot::node_and_scc_backprop : spot::node_backprop;
@@ -866,6 +879,10 @@ main(int argc, char** argv)
 
       check_no_formula();
       process_io_options();
+
+      // For compositional translation, we enable minimization by default.
+      if (!opt_minimize_set && opt_trans == translation_compositional)
+        opt_minimize = true;
 
       trans_processor processor;
       if (int res = processor.run(); res == 0 || res == 1)
