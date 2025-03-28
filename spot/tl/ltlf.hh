@@ -46,4 +46,21 @@ namespace spot
   /// introduces a <code>dead</code> property on states representing
   /// the end of finite computations.
   SPOT_API formula from_ltlf(formula f, const char* alive = "alive");
+
+  /// \ingroup tl_rewriting
+  /// \brief Cheap simplification rules for LTLf formulas.
+  class SPOT_API ltlf_simplifier
+  {
+  public:
+    ltlf_simplifier();
+    ~ltlf_simplifier();
+    formula simplify(formula f, bool negated = false);
+  private:
+    formula simplify_aux(formula f, bool negated);
+    class cache;
+    cache* cache_;
+  };
+
+  SPOT_API formula ltlf_one_step_sat_rewrite(formula f);
+  SPOT_API formula ltlf_one_step_unsat_rewrite(formula f, bool negate = false);
 }

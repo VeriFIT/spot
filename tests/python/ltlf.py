@@ -46,3 +46,46 @@ for f in formulas:
     print(f"{f2}\t=>\t{f4}")
     tc.assertTrue(lcc.equal(f3, f4))
     print()
+
+
+ls = spot.ltlf_simplifier()
+
+for i, j in [('!X!X!a', 'X[!]X!a'),
+             ('X!X!a', 'XX[!]a'),
+             ('!(a U (b W (c R (d M e))))', '!a R (!b M (!c U (!d W !e)))'),
+             ('!GFGa', 'FGF!a'),
+             ('(Fa & Fb) | (Fa & Fc)', 'Fa & F(b | c)'),
+             ('(Ga & Gb & Gd) | (Ga & Gc & Gd)', 'G(a & b & d) | G(a & c & d)'),
+             ('(Xa & Fb & Gd) | (Xa & X[!]c & Gd) | Gd', 'Gd'),
+             ('(Xa | Gb) & (Xa | Fc)', 'Xa | (Gb & Fc)'),
+             ('(Xa | Fb | Gd ) & (Xa | Fc | Gd)', 'Xa | Gd | (Fb & Fc)'),
+             ('(Xa | Fb | Gd) & (Xa | Fc | Gd) & Gd', 'Gd'),
+             ('!Xa -> b', 'Xa | b'),
+             ('Xa -> Gb', 'Xa -> Gb'),
+             ('Xa -> !Gb', 'Xa -> F!b'),
+             ('!Xa -> !Gb', 'Xa | F!b'),
+             ('!(Xa -> Gb)', 'Xa & F!b'),
+             ('!(!Xa -> Gb)', 'X[!]!a & F!b'),
+             ('!(Xa -> !Gb)', 'Xa & Gb'),
+             ('!(!Xa -> !Gb)', 'X[!]!a & Gb'),
+             ('(Ga -> b) & (Gb -> c) & (Ga -> d) & Gf & Gg',
+              '(F!a | (b & d)) & (c | F!b) & G(f & g)'),
+             ('(a -> Gb) | (c -> Gd) | (Fe -> Gb) | Fg | Fh',
+              '!a | !c | Gb | Gd | F(g | h) | G!e'),
+             ('Xa <->Gb', 'Xa<->Gb'),
+             ('!Xa xor Gb', 'Xa<->Gb'),
+             ('!Xa <-> !Gb', 'Xa<->Gb'),
+             ('!Xa xor Gb', 'Xa<->Gb'),
+             ('Xa <-> !Gb', 'Xa xor Gb'),
+             ('X(a) | X(!b) | Gc | Fd | Fe', 'X(a | !b) | Gc | F(d | e)'),
+             ('X(a) & X(!b) & Gc & Gd & Fe & Ff',
+              'X(a & !b) & G(c & d) & Fe & Ff'),
+             ]:
+    f1 = spot.formula(i)
+    f2 = spot.formula(j)
+    f3 = ls.simplify(f1)
+    print(f1, "  =>  ", f3)
+    tc.assertEqual(f2, f3)
+    a = spot.ltlf_to_mtdfa(f1)
+    b = spot.ltlf_to_mtdfa(f2)
+    tc.assertTrue(spot.product_xor(a, b).is_empty())

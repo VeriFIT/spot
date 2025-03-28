@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <climits>
+#include <spot/tl/ltlf.hh>
 #include <spot/misc/bddlt.hh>
 #include <spot/misc/escape.hh>
 #include <spot/twaalgos/ltlf2dfa.hh>
@@ -460,11 +461,14 @@ namespace spot
     switch (f.kind())
       {
       case op::tt:
-        return bddtrue;
+        res = bddtrue;
+        break;
       case op::ff:
-        return bddfalse;
+        res = bddfalse;
+        break;
       case op::ap:
-        return bdd_ithvar(dict_->register_proposition(f, this));
+        res = bdd_ithvar(dict_->register_proposition(f, this));
+        break;
       case op::Not:
         // For all purely Boolean subformulas, we want to use the
         // regular BDD operators, so that the cache entries are long
@@ -740,151 +744,6 @@ namespace spot
       }
     };
 
-    formula one_step_real_rewrite(formula f)
-    {
-      if (f.is_boolean())
-        return f;
-      switch (f.kind())
-        {
-        case op::ap:
-        case op::tt:
-        case op::ff:
-          return f;
-        case op::X:
-          return formula::tt();
-        case op::strong_X:
-          return formula::ff();
-        case op::G:
-        case op::F:
-          return one_step_real_rewrite(f[0]);
-        case op::R:
-        case op::U:
-          return one_step_real_rewrite(f[1]);
-        case op::W:
-          return formula::Or({one_step_real_rewrite(f[0]),
-                              one_step_real_rewrite(f[1])});
-        case op::M:
-          return formula::And({one_step_real_rewrite(f[0]),
-                               one_step_real_rewrite(f[1])});
-        case op::And:
-        case op::Or:
-        case op::Not:
-        case op::Xor:
-        case op::Equiv:
-        case op::Implies:
-          return f.map(one_step_real_rewrite);
-        case op::eword:
-        case op::AndNLM:
-        case op::AndRat:
-        case op::Closure:
-        case op::Concat:
-        case op::EConcat:
-        case op::EConcatMarked:
-        case op::first_match:
-        case op::FStar:
-        case op::Fusion:
-        case op::NegClosure:
-        case op::NegClosureMarked:
-        case op::OrRat:
-        case op::Star:
-        case op::UConcat:
-          throw std::runtime_error
-            ("one_step_real_rewrite(): unsupported operator");
-        }
-      SPOT_UNREACHABLE();
-      return f;
-    }
-
-    formula one_step_unreal_rewrite(formula f, bool negate = false)
-    {
-      if (f.is_boolean())
-        return negate ? formula::Not(f) : f;
-      switch (op o = f.kind())
-        {
-        case op::Not:
-          return one_step_unreal_rewrite(f[0], !negate);
-        case op::ap:
-        case op::tt:
-        case op::ff:
-          if (negate)
-            return formula::Not(f);
-          else
-            return f;
-        case op::X:
-        case op::strong_X:
-          return formula::tt();
-          return formula::tt();
-        case op::F:
-          if (negate)           // G
-            return one_step_unreal_rewrite(f[0], true);
-          else
-            return formula::tt();
-        case op::Xor:
-        case op::Equiv:
-        case op::G:
-          if (negate)           // F
-            return formula::tt();
-          else
-            return one_step_unreal_rewrite(f[0]);
-        case op::R:
-        case op::M:
-          if (negate)           // U, W
-            return formula::Or({one_step_unreal_rewrite(f[0], true),
-                                one_step_unreal_rewrite(f[1], true)});
-          else
-            return one_step_unreal_rewrite(f[1]);
-        case op::U:
-        case op::W:
-          if (negate)         // R, M
-            return one_step_unreal_rewrite(f[1], true);
-          else
-            return formula::Or({one_step_unreal_rewrite(f[0]),
-                                one_step_unreal_rewrite(f[1])});
-        case op::Implies:
-          if (negate)
-            // !(a => b) == a & !b
-            {
-              formula f2 = one_step_unreal_rewrite(f[1], true);
-              return formula::And({one_step_unreal_rewrite(f[0], false), f2});
-            }
-          else // a => b == !a | b
-            {
-              formula f2 = one_step_unreal_rewrite(f[1], false);
-              return formula::Or({one_step_unreal_rewrite(f[0], true), f2});
-            }
-        case op::And:
-        case op::Or:
-          {
-            unsigned mos = f.size();
-            std::vector<formula> v;
-            for (unsigned i = 0; i < mos; ++i)
-              v.emplace_back(one_step_unreal_rewrite(f[i], negate));
-            op on = o;
-            if (negate)
-              on = o == op::Or ? op::And : op::Or;
-            return formula::multop(on, v);
-          }
-        case op::eword:
-        case op::AndNLM:
-        case op::AndRat:
-        case op::Closure:
-        case op::Concat:
-        case op::EConcat:
-        case op::EConcatMarked:
-        case op::first_match:
-        case op::FStar:
-        case op::Fusion:
-        case op::NegClosure:
-        case op::NegClosureMarked:
-        case op::OrRat:
-        case op::Star:
-        case op::UConcat:
-          throw std::runtime_error
-            ("one_step_unreal_rewrite(): unsupported operator");
-        }
-      SPOT_UNREACHABLE();
-      return f;
-    }
   }
 
   static backprop_bdd_encoder* global_backprop = nullptr;
@@ -1042,7 +901,7 @@ namespace spot
 
         if (realsimp && !label.is_boolean())
           {
-            formula g = one_step_real_rewrite(label);
+            formula g = ltlf_one_step_sat_rewrite(label);
 
             realizability_simplifier_base::mapping_t simpl_map;
             std::tie(g, simpl_map) = realsimp->simplify(g);
@@ -1072,7 +931,7 @@ namespace spot
               }
             else
               {
-                g = one_step_unreal_rewrite(label);
+                g = ltlf_one_step_unsat_rewrite(label);
                 b = ltlf_to_mtbdd(g);
                 restrict_bdd(b);
                 if (b == bddfalse)
@@ -1350,7 +1209,7 @@ namespace spot
         bool b_done = false;
         if (preprocess && !label.is_boolean())
           {
-            formula g = one_step_real_rewrite(label);
+            formula g = ltlf_one_step_sat_rewrite(label);
 
             realizability_simplifier_base::mapping_t simpl_map;
             std::tie(g, simpl_map) = realsimp.simplify(g);
@@ -1380,7 +1239,7 @@ namespace spot
               }
             else
               {
-                g = one_step_unreal_rewrite(label);
+                g = ltlf_one_step_unsat_rewrite(label);
                 std::tie(g, simpl_map) = realsimp.simplify(g);
                 b = ltlf_to_mtbdd(g);
                 restrict_bdd(b);
