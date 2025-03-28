@@ -32,6 +32,7 @@
 #include <spot/tl/formula.hh>
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/print.hh>
+#include <spot/tl/ltlf.hh>
 #include <spot/twaalgos/dot.hh>
 #include <spot/twaalgos/synthesis.hh> // for split_independent_formulas
 #include <spot/twaalgos/ltlf2dfa.hh>
@@ -55,6 +56,7 @@ enum
   OPT_POLARITY,
   OPT_REALIZABILITY,
   OPT_SEMANTICS,
+  OPT_SIMPLIFY_FORMULA,
   OPT_TLSF,
   OPT_TRANS,
   OPT_VERBOSE,
@@ -117,6 +119,9 @@ static const argp_option options[] =
       "attempt check one-step realizability or unrealizability of each "
       "state during on-the-fly or restricted translations (enabled by "
       "default)", 0 },
+    { "simplify-formula", OPT_SIMPLIFY_FORMULA, "yes|no", 0,
+      "simplify the LTLf formula with cheap rewriting rules "
+      "(enabled by default)", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Output options:", 20 },
     { "aiger", OPT_AIGER, "ite|isop|both[+ud][+dc]"
@@ -204,6 +209,7 @@ ARGMATCH_VERIFY(minimize_args, minimize_values);
 static bool opt_minimize = false;
 static bool opt_minimize_set = false;
 static bool opt_one_step = true;
+static bool opt_simplify_ltl = true;
 
 static std::ostream* opt_verbose = nullptr;
 
@@ -391,6 +397,10 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_VERBOSE:
       opt_verbose = &std::cerr;
       break;
+    case OPT_SIMPLIFY_FORMULA:
+      opt_simplify_ltl = XARGMATCH("--simplify-formula", arg,
+                                   decompose_args, decompose_values);
+      break;
     case 'q':
       automaton_format = Quiet;
       opt_show_status = false;
@@ -458,7 +468,6 @@ namespace
                                                     opt, opt_verbose));
         f = rs->simplified_formula();
       }
-
 
     std::vector<spot::formula> sub_form;
     std::vector<std::set<spot::formula>> sub_outs;
@@ -535,6 +544,8 @@ namespace
     std::vector<spot::twa_graph_ptr> mealy_machines;
     const char* indent = "";
 
+    spot::ltlf_simplifier simplify_cache;
+
     for (; sub_f != sub_form.end(); ++sub_f, ++sub_o)
       {
         if (numsubs > 1 && (opt_polarity == pol_yes || opt_gequiv == pol_yes))
@@ -554,6 +565,16 @@ namespace
             rs->merge_mapping(rsub);
             indent = "  ";
           }
+
+        if (opt_simplify_ltl)
+          if (spot::formula fsimpl = simplify_cache.simplify(*sub_f);
+              fsimpl != *sub_f)
+            {
+              if (opt_verbose)
+                *opt_verbose << indent << "formula simplified to "
+                             << fsimpl << '\n';
+              *sub_f = fsimpl;
+            }
 
         spot::stopwatch st;
         auto stop_trans = [&] (spot::mtdfa_ptr a)

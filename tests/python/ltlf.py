@@ -80,6 +80,8 @@ for i, j in [('!X!X!a', 'X[!]X!a'),
              ('X(a) | X(!b) | Gc | Fd | Fe', 'X(a | !b) | Gc | F(d | e)'),
              ('X(a) & X(!b) & Gc & Gd & Fe & Ff',
               'X(a & !b) & G(c & d) & Fe & Ff'),
+             ('X(a) & G(!b) & GFc & GFd & Fe & Ff',
+              'X(a) & G(!b & F(c & d)) & Fe & Ff'),
              ]:
     f1 = spot.formula(i)
     f2 = spot.formula(j)

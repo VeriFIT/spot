@@ -82,6 +82,7 @@ while read f; do
    res="$line"
 
    for sem in Moore Mealy; do
+     for sim in yes no; do
      for dec in yes no; do
      for tra in restr full comp otf scc; do
        bpvalues="states nodes"
@@ -98,7 +99,7 @@ while read f; do
            rez=`ltlfsynt -f "$f" --decomp=$dec --trans=$tra --min=$min \
                      --semantics=$sem --global-equiv=$geq \
                      --polarity=$pol --backprop=$bp --one-step=$os \
-                     --realizability`
+                     --realizability --simplify=$sim`
            test $? -le 1 || exit 2
            test "$rez" = "$prev" || test "$prev" = "" || exit 2
            prev=$rez
@@ -107,6 +108,7 @@ while read f; do
        done
        done
        done
+     done
      done
      done
      prev=

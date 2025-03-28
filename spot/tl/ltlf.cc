@@ -254,6 +254,28 @@ namespace spot
       }
   }
 
+  // if vec = [Xa, Fb, Fc, Gd, e], match = F, combine = &
+  // this returns [Xa, F(b & c), Gd, e]
+  static std::vector<formula>
+  group_op(std::vector<formula>&& vec, op match, op combine)
+  {
+    std::vector<formula> matched;
+    matched.reserve(vec.size());
+    for (formula f: vec)
+      if (f.kind() == match)
+        matched.push_back(f[0]);
+    if (matched.empty())
+      return vec;
+    formula f = formula::unop(match, formula::multop(combine, matched));
+    matched.clear();
+    matched.push_back(f);
+    for (formula f: vec)
+      if (f.kind() != match)
+        matched.push_back(f);
+    return matched;
+  }
+
+
   formula ltlf_simplifier::simplify_aux(formula f, bool negated)
   {
     switch (op o = f.kind())
@@ -390,7 +412,7 @@ namespace spot
           if (opos == op::And)
             {
               // (a -> b1) & (a -> b2) & rest  =  (a -> (b1 & b2)) & rest
-              // G(a) & G(b) & rest  =  G(a & b) & rest
+              // G(a) & G(b) & GF(c) & GF(d) & rest = G(a & b & F(c & d)) & rest
               std::unordered_map<formula, std::vector<formula>> map;
               std::vector<formula> inG;
               std::vector<formula> rest;
@@ -433,7 +455,10 @@ namespace spot
                   for (const auto& [a, bs]: map)
                     res.push_back(formula::Implies(a, formula::And(bs)));
                   if (!inG.empty())
-                    res.push_back(formula::G(formula::And(inG)));
+                    {
+                      inG = group_op(std::move(inG), op::F, op::And);
+                      res.push_back(formula::G(formula::And(inG)));
+                    }
                   if (!inXs.empty())
                     res.push_back(formula::strong_X(formula::And(inXs)));
                   if (!inXw.empty())
@@ -486,7 +511,10 @@ namespace spot
                 {
                   res.clear();
                   if (!inF.empty())
-                    res.push_back(formula::F(formula::Or(inF)));
+                    {
+                      inF = group_op(std::move(inF), op::G, op::Or);
+                      res.push_back(formula::F(formula::Or(inF)));
+                    }
                   if (!inXs.empty())
                     res.push_back(formula::strong_X(formula::Or(inXs)));
                   if (!inXw.empty())
