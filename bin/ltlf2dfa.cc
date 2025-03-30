@@ -30,6 +30,7 @@
 #include <spot/tl/formula.hh>
 #include <spot/tl/print.hh>
 #include <spot/twaalgos/ltlf2dfa.hh>
+#include <spot/tl/ltlf.hh>
 
 enum
 {
@@ -38,6 +39,7 @@ enum
   OPT_KEEP_NAMES,
   OPT_MTDFA_DOT,
   OPT_MTDFA_STATS,
+  OPT_SIMPLIFY_FORMULA,
   OPT_TLSF,
   OPT_TRANS,
   OPT_MINIMIZE,
@@ -67,6 +69,9 @@ static const argp_option options[] =
       "How to order n-ary compositions in the compositional translation.  "
       "By increasing size, or trying to group operands based on their APs.",
       0 },
+    { "simplify-formula", OPT_SIMPLIFY_FORMULA, "yes|no", 0,
+      "simplify the LTLf formula with cheap rewriting rules "
+      "(disabled by default)", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Output options:", 20 },
     { "hoaf", 'H', "1.1|b|i|k|l|m|s|t|v", OPTION_ARG_OPTIONAL,
@@ -134,7 +139,7 @@ static bool minimize_values[] =
   };
 ARGMATCH_VERIFY(minimize_args, minimize_values);
 static bool opt_minimize = true;
-
+static bool opt_simplify_formula = false;
 static bool opt_keep_names = false;
 
 
@@ -194,6 +199,10 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_MINIMIZE:
       opt_minimize = XARGMATCH("--minimize", arg,
                                minimize_args, minimize_values);
+      break;
+    case OPT_SIMPLIFY_FORMULA:
+      opt_simplify_formula = XARGMATCH("--simplify-formula", arg,
+                                       minimize_args, minimize_values);
       break;
     case 'd':
       automaton_format = Dot;
@@ -258,11 +267,17 @@ namespace
                         s.c_str());
         }
 
+      spot::process_timer timer;
+      timer.start();
+
       if (negate)
         f = spot::formula::Not(f);
 
-      spot::process_timer timer;
-      timer.start();
+      if (opt_simplify_formula)
+        {
+          spot::ltlf_simplifier ls;
+          f = ls.simplify(f);
+        }
 
       spot::mtdfa_ptr a;
       if (opt_trans == translation_direct)
