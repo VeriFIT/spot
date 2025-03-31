@@ -23,53 +23,42 @@ cat >formulas.ltlf <<EOF
 Gi0
 Gi0&Fo0
 Gi0&Fo0&Fi1
-Gi0&Fo0&Fi1&Fo1
-Gi0&Fo0&Fi1&Fo1&Fi2
-Gi0&Fo0&Fi1&Fo1&Fi2&Fi3
-Gi0&Fo0&Fi1&Fo1&Fi2&Fi3&Fo2
 Gi0&Fo0&Fi1&Fo1&Fi2&Fi3&Fo2&Fi4
 Gi0&Fo0&Fi1&Fo1&Fi2&Fi3&Fo2&Fi4&Fo3
 i0
 i0 U o0
 i0 U(i1 U o0)
 i0 U(i1 U(o0 U o1))
-i0 U(i1 U(i2 U(o0 U o1)))
-i0 U(i1 U(i2 U(o0 U(o1 U o2))))
 i0 U(i1 U(i2 U(i3 U(o0 U(o1 U o2)))))
 i0 U(i1 U(i2 U(i3 U(o0 U(o1 U(o2 U o3))))))
-G(i0->X[!](!o0 U i5))&G(i4->X[!](!o1 U i3))&G(i1->X[!](!o0 U i2))
-!(G(i3->Fo3)&G(i5->Fo2))&!(G(i0->Fo1)&G(i1->Fo0))&!(G(i4->Fo4)&G(i2->Fo4))
-G(i0->X[!](!o1 U i3))&G(i4->X[!](!o2 U i1))&G(i2->X[!](!o0 U o0))
-G(o1->X[!]!o1)&G(o0->X[!]!o0)&G(o2->X[!]!o2)
-!(G(i4->Fo3)&G(i2->Fo0))&!(G(i1->Fo4)&G(i0->Fo2))&!(G(i5->Fo2)&G(i3->Fo1))
-G(i2->X[!](!o0 U i0))&G(i5->X[!](!o2 U i1))&G(i3->X[!](!o1 U i4))
-G(i3->X[!](!o0 U i5))&G(i1->X[!](!o2 U i4))&G(i2->X[!](!o1 U i0))
-!(G(i1->Fo0)&G(i3->Fo4))&!(G(i2->Fo2)&G(i0->Fo3))&!(G(i3->Fo5)&G(o3->Fo1))
 (GFi1->GFo1)&(GFi2->GFo0)&(GFi0->GFo2)
-G(o2->X[!]!o2)&G(o3->X[!]!o3)&G(o1->X[!]!o1)&G(o0->X[!]!o0)
-(GFi3->GFo1)&(GFi1->GFo0)&(GFi2->GFo2)&(GFi0->GFo3)
-G(i1->X[!](o0 U i4))&G(i0->X(o3 U i3))&G(i5->X[!](o1 U i6))&G(i7->X[!](o2 U i2))
-(GFi1->GFo1)&(GFi3->GFo3)&(GFi0->GFo0)&(GFi2->GFo2)
-G(o1->X[!]!o1)&G(o0->X[!]!o0)&G(o3->X[!]!o3)&G(o2->X[!]!o2)
-G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&G(i3|!X[!]o4)&G(i4|!X[!]o0)
-G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&((GFi3|Fi4)->(GFo4|Go0))
-G(o1->X[!]!o1)&(Gi0->Fo2)&(G!i0->F!o2)&G(i1|!X[!]o3)&G(i2|!X[!]o4)&G(o->X[!]!o)
-G(o<->i)
+G(o1->X[!]!o1)&G(o0->X[!]!o0)&G(o2->X[!]!o2)
 G(i1->Fo1)&G(o1<->X!o1)&G(i2->Fo2)&G(o2<->X!o2)
+(GFi3->GFo1)&(GFi1->GFo0)&(GFi2->GFo2)&(GFi0->GFo3)
+G(o2->X[!]!o2)&G(o3->X[!]!o3)&G(o1->X[!]!o1)&G(o0->X[!]!o0)
+G(i0->X[!](!o0 U i1))&G(i4->X[!](!o1 U i3))&G(i2->X[!](!o0 U i5))
+G(i0->X[!](!o1 U i1))&G(i4->X[!](!o2 U i3))&G(i2->X[!](!o0 U o0))
+G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&((GFi3|Fi4)->(GFo4|Go0))
+G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&G(i3|!X[!]o4)&G(i4|!X[!]o0)
+!(G(i3->Fo3)&G(i5->Fo2))&!(G(i0->Fo1)&G(i1->Fo0))&!(G(i4->Fo4)&G(i2->Fo4))
+!(G(i1->Fo0)&G(i3->Fo4))&!(G(i2->Fo2)&G(i0->Fo3))&!(G(i3->Fo5)&G(o3->Fo1))
+G(o1->X[!]!o1)&(Gi0->Fo2)&(G!i0->F!o2)&G(i1|!X[!]o3)&G(i2|!X[!]o4)&G(o->X[!]!o)
+G(i1->X[!](o0 U i4))&G(i0->X(o3 U i3))&G(i5->X[!](o1 U i6))&G(i7->X[!](o2 U i2))
+G(o<->i)
 !i0 xor o0
-F((o0<->(i0<->i1))<->((i2&Fo0&Go2)W((!i2->i0)->X!o1)))
-FG((FG(G!o0 R o1)R((i0 W i1)<->G!Fi1))<->(o0 W Go2))
-G(o1&((Xo0 xor(Fo0 xor F!G!i0))<->X(!o0|o1|Go0)))
 FG(i0 W(i1<->Fo0))
-(!o0 xor((Go0 M!(Xi1&Fo1))U Xi0))<->((i2 U i0)W 0)
-(o0<->(i2->i0))->((!i2&Fi2)M(Gi2 xor(!i1 M((i1 W o1)M(i0|o1)))))
-!(X((i0 xor o1)|((o0 xor!o1)U i1))&(FXo0 R(o0 R!(i1 M 1))))
-(XX(0)M(F(Xi0 W(i0 W o0))xor(i1 U o0)))<->(!i1 M i2)
 Fo0 xor((o0<->Fi0)->Fi0)
-(i0<->o1)|((0 R((o2 M i2)U i0))R((!o2&Go0)R(Xo1 M!Xi1)))
+(F!o1 U!XFo0)R(i0<->o0)
+G(o1&((Xo0 xor(Fo0 xor F!G!i0))<->X(!o0|o1|Go0)))
+(!o0 xor((Go0 M!(Xi1&Fo1))U Xi0))<->((i2 U i0)W 0)
 !((Gi1 M(!i1 R o0))M!(o1 M 1))M(o2 xor G(i0 U i1))
 FG((X!o2 M Fi0)M Fi0)xor(Fi1<->(o0 xor(o1|o2|Xo1)))
-(F!o1 U!XFo0)R(i0<->o0)
+FG((FG(G!o0 R o1)R((i0 W i1)<->G!Fi1))<->(o0 W Go2))
+(XX(0)M(F(Xi0 W(i0 W o0))xor(i1 U o0)))<->(!i1 M i2)
+F((o0<->(i0<->i1))<->((i2&Fo0&Go2)W((!i2->i0)->X!o1)))
+(i0<->o1)|((0 R((o2 M i2)U i0))R((!o2&Go0)R(Xo1 M!Xi1)))
+!(X((i0 xor o1)|((o0 xor!o1)U i1))&(FXo0 R(o0 R!(i1 M 1))))
+(o0<->(i2->i0))->((!i2&Fi2)M(Gi2 xor(!i1 M((i1 W o1)M(i0|o1)))))
 EOF
 
 
@@ -84,11 +73,11 @@ while read f; do
    for sem in Moore Mealy; do
      for sim in yes no; do
      for dec in yes no; do
-     for tra in restr full comp otf scc; do
+     for tra in restr full comp otf scc dfs; do
        bpvalues="states nodes"
        osvalues="yes no";
        case $tra in
-           otf | scc) bpvalues=nodes;;
+           otf | scc | dfs) bpvalues=nodes;;
            restr | full | comp) osvalues=no;;
        esac
        for min in yes no; do
@@ -126,50 +115,39 @@ cat >expected <<EOF
 4 UNREALIZABLE UNREALIZABLE
 5 UNREALIZABLE UNREALIZABLE
 6 UNREALIZABLE UNREALIZABLE
-7 UNREALIZABLE UNREALIZABLE
-8 UNREALIZABLE UNREALIZABLE
-9 UNREALIZABLE UNREALIZABLE
-10 UNREALIZABLE UNREALIZABLE
+7 REALIZABLE REALIZABLE
+8 REALIZABLE REALIZABLE
+9 REALIZABLE REALIZABLE
+10 REALIZABLE REALIZABLE
 11 REALIZABLE REALIZABLE
 12 REALIZABLE REALIZABLE
 13 REALIZABLE REALIZABLE
 14 REALIZABLE REALIZABLE
 15 REALIZABLE REALIZABLE
 16 REALIZABLE REALIZABLE
-17 REALIZABLE REALIZABLE
+17 UNREALIZABLE UNREALIZABLE
 18 UNREALIZABLE UNREALIZABLE
-19 UNREALIZABLE UNREALIZABLE
-20 UNREALIZABLE UNREALIZABLE
-21 REALIZABLE REALIZABLE
+19 REALIZABLE REALIZABLE
+20 REALIZABLE REALIZABLE
+21 UNREALIZABLE UNREALIZABLE
 22 UNREALIZABLE UNREALIZABLE
-23 UNREALIZABLE UNREALIZABLE
+23 REALIZABLE REALIZABLE
 24 UNREALIZABLE UNREALIZABLE
-25 UNREALIZABLE UNREALIZABLE
-26 REALIZABLE REALIZABLE
-27 REALIZABLE REALIZABLE
-28 REALIZABLE REALIZABLE
-29 UNREALIZABLE UNREALIZABLE
-30 REALIZABLE REALIZABLE
-31 REALIZABLE REALIZABLE
-32 REALIZABLE REALIZABLE
-33 REALIZABLE REALIZABLE
-34 REALIZABLE REALIZABLE
+25 UNREALIZABLE REALIZABLE
+26 UNREALIZABLE REALIZABLE
+27 UNREALIZABLE REALIZABLE
+28 UNREALIZABLE REALIZABLE
+29 UNREALIZABLE REALIZABLE
+30 UNREALIZABLE REALIZABLE
+31 UNREALIZABLE REALIZABLE
+32 UNREALIZABLE REALIZABLE
+33 UNREALIZABLE REALIZABLE
+34 UNREALIZABLE REALIZABLE
 35 UNREALIZABLE REALIZABLE
-36 REALIZABLE REALIZABLE
+36 UNREALIZABLE REALIZABLE
 37 UNREALIZABLE REALIZABLE
 38 UNREALIZABLE REALIZABLE
 39 UNREALIZABLE REALIZABLE
-40 UNREALIZABLE REALIZABLE
-41 UNREALIZABLE REALIZABLE
-42 UNREALIZABLE REALIZABLE
-43 UNREALIZABLE REALIZABLE
-44 UNREALIZABLE REALIZABLE
-45 UNREALIZABLE REALIZABLE
-46 UNREALIZABLE REALIZABLE
-47 UNREALIZABLE REALIZABLE
-48 UNREALIZABLE REALIZABLE
-49 UNREALIZABLE REALIZABLE
-50 UNREALIZABLE REALIZABLE
 EOF
 
 diff expected results

@@ -1071,7 +1071,7 @@ namespace spot
   }
 
   mtdfa_ptr
-  ltlf_translator::ltlf_synthesis_with_scc(formula f,
+  ltlf_translator::ltlf_synthesis_with_dfs(formula f,
                                            const std::vector<std::string>*
                                            outvars,
                                            bool realizability,
@@ -1084,16 +1084,11 @@ namespace spot
     std::vector<int> new_rootnums;
     std::vector<int> old_rootnums;
     std::vector<formula> names;
-    // todo is used as a stack of pairs of the form:
-    // (MTBDD root number, list of successors root numbers)
-    std::deque<int> todo;
-    std::deque<int> live_states;
+    std::deque<int> todo;       // stack of MTBDD root numbers
     // An entry (state, size) in prev indicates that
     // when todo.size() == size, we have processed
     // all successors of state and should backtrack;
     std::deque<std::pair<int, unsigned>> prev;
-    // stack of SCC roots stored as DFS rank numbers.
-    std::deque<unsigned> scc_roots;
 
     terminal_to_state_map.clear();
 
@@ -1161,11 +1156,227 @@ namespace spot
         if (todo.size() == size) // DFS backtrack
           {
             // std::cerr << "DFS backtrack\n";
+            if (backprop.root_status_set_if_unknown(prev_state, false))
+              break;
+            prev.pop_back();
+            continue;
+          }
+        int label_term = todo.front();
+        todo.pop_front();
+        formula label = int_to_formula_[label_term];
+
+        // std::cerr << "DFS considering term " << label_term << '\n';
+
+        // already processed
+        if (terminal_to_state_map.find(label_term)
+            != terminal_to_state_map.end())
+          continue;
+
+        bdd b;
+        bool b_done = false;
+        if (preprocess && !label.is_boolean())
+          {
+            formula g = ltlf_one_step_sat_rewrite(label);
+
+            realizability_simplifier_base::mapping_t simpl_map;
+            std::tie(g, simpl_map) = realsimp.simplify(g);
+
+            b = ltlf_to_mtbdd(g);
+            if (restrict_bdd(b))
+              {
+                assert(b != bddfalse);
+                b_done = true;
+                backprop.encode_state(label_term, b, nullptr,
+                                      &new_rootnums, &old_rootnums);
+                if (!realizability)
+                  {
+                    bdd fix = bddtrue;
+                    for (auto [k, k_is_input, v]: simpl_map)
+                      {
+                        if (k_is_input)
+                          continue;
+                        int i = dict_->register_proposition(k, this);
+                        if (v.is_tt())
+                          fix &= bdd_ithvar(i);
+                        else
+                          fix &= bdd_nithvar(i);
+                      }
+                    b &= fix;
+                  }
+              }
+            else
+              {
+                g = ltlf_one_step_unsat_rewrite(label);
+                std::tie(g, simpl_map) = realsimp.simplify(g);
+                b = ltlf_to_mtbdd(g);
+                restrict_bdd(b);
+                if (b == bddfalse)
+                  {
+                    b_done = true;
+                    backprop.encode_state(label_term, b, nullptr,
+                                          &new_rootnums, &old_rootnums);
+                  }
+              }
+          }
+        if (!b_done)
+          {
+            b = ltlf_to_mtbdd(label);
+            restrict_bdd(b);
+            backprop.encode_state(label_term, b, nullptr,
+                                  &new_rootnums, &old_rootnums);
+          }
+
+        unsigned n = states.size();
+        // std::cerr << "rank is " << n << '\n';
+        formula_to_state[label] = n;
+        bdd_to_state[b] = n;
+        states.push_back(b);
+        names.push_back(label);
+        terminal_to_state_map[label_term] = n;
+
+        trival init_status = backprop.root_status(0);
+        if (SPOT_UNLIKELY(init_status.is_known()))
+          break;
+        // If the status of this state is known, we can skip the
+        // exploration of its successors.
+        if (backprop.root_status(label_term).is_known())
+          continue;
+        // Schedule all successors for processing in DFS order
+        prev.emplace_back(label_term, todo.size());
+        for (unsigned root: new_rootnums)
+          todo.push_front(root);
+        for (unsigned root: old_rootnums)
+          {
+            auto it = terminal_to_state_map.find(root);
+            if (it == terminal_to_state_map.end())
+              todo.push_back(root);
+          }
+        old_rootnums.clear();
+        new_rootnums.clear();
+      }
+    while (!todo.empty());
+    // finalize backpropagation
+    trival init_status = backprop.root_status(0);
+    if (realizability)
+      {
+        if (init_status.is_true())
+          {
+            dfa->states.push_back(bddtrue);
+            dfa->names.push_back(formula::tt());
+            return dfa;
+          }
+        else
+          {
+            dfa->states.push_back(bddfalse);
+            dfa->names.push_back(formula::ff());
+            return dfa;
+          }
+      }
+    // backprop.backprop.print_dot(std::cerr);
+    unsigned sz = states.size();
+    for (unsigned i = 0; i < sz; ++i)
+      bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
+                              &cache_, hash_key_finalstrat);
+    dfa->states = std::move(states);
+    dfa->names = std::move(names);
+    dict_->register_all_propositions_of(this, dfa);
+    return dfa;
+  }
+
+  mtdfa_ptr
+  ltlf_translator::ltlf_synthesis_with_scc(formula f,
+                                           const std::vector<std::string>*
+                                           outvars,
+                                           bool realizability,
+                                           bool preprocess)
+  {
+    mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
+    std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
+    std::unordered_map<formula, int> formula_to_state;
+    std::vector<bdd> states;
+    std::vector<int> new_rootnums;
+    std::vector<int> old_rootnums;
+    std::vector<formula> names;
+    std::deque<int> todo;       // stack of MTBDD root numbers
+    std::deque<int> live_states;
+    // An entry (state, size) in prev indicates that
+    // when todo.size() == size, we have processed
+    // all successors of state and should backtrack;
+    std::deque<std::pair<int, unsigned>> prev;
+    std::deque<unsigned> scc_roots;
+
+    terminal_to_state_map.clear();
+
+    realizability_simplifier_base
+      realsimp(*outvars, false, realizability_simplifier_base::polarity);
+
+    backprop_bdd_encoder backprop;
+    global_backprop = &backprop;
+    bdd bddoutvars = bddtrue;
+    // this is the number of variable we had the last time
+    // we called bdd_mt_quantify_prepare().
+    int varnum = 0;
+
+    auto restrict_bdd = [&](bdd& b) -> bool {
+      // Everytime a new variable is created, the quantifycation
+      // buffer is wiped out.  This can happen as a side-effect
+      // of ltlf_to_mtbdd().  We only have to call
+      // bdd_mt_quantify_prepare() when the number of variables
+      // changed.
+      if (int vn = bdd_varnum(); vn != varnum)
+        {
+          bdd_mt_quantify_prepare(bddoutvars);
+          varnum = vn;
+        }
+      return bdd_mt_apply1_synthesis(b, strategy_map_true,
+                                     &cache_, hash_key_strat);
+    };
+
+    // Keep track of atomic propositions used in he automaton.
+    // Actually the automaton might use fewer atomic propositions than
+    // what appears in the formula, but we do not pay attention to
+    // that.
+    {
+      atomic_prop_set* a = atomic_prop_collect(f);
+      dfa->aps.assign(a->begin(), a->end());
+
+      // We need to register the output variables already so we can
+      // call bdd_mt_quantify_prepare.  Let's do it in the order in
+      // which they will be discovered in the formula.
+      std::unordered_set<spot::formula> outputs;
+      for (const std::string& s: *outvars)
+        outputs.insert(spot::formula::ap(s));
+      f.traverse([&](const spot::formula& f)
+      {
+        if (f.is(spot::op::ap) && outputs.find(f) != outputs.end()
+            && a->erase(f))
+          {
+            int i = dict_->register_proposition(f, dfa);
+            bddoutvars &= bdd_ithvar(i);
+          }
+        return false;
+      });
+      dfa->set_controllable_variables(bddoutvars);
+      delete a;
+    }
+
+    prev.emplace_back(0, 0);
+    todo.emplace_back(formula_to_int(f));
+    do
+      {
+        auto [prev_state, size] = prev.back();
+        // std::cerr << "prev_state=" << prev_state
+        //           << " size=" << size
+        //           << " todo.size=" << todo.size() << '\n';
+        if (todo.size() == size) // DFS backtrack
+          {
+            // std::cerr << "DFS backtrack\n";
             prev.pop_back();
             auto it = terminal_to_state_map.find(prev_state);
             assert(it != terminal_to_state_map.end());
             SPOT_ASSUME(it != terminal_to_state_map.end());
             unsigned prev_rank = it->second;
+
             assert(!scc_roots.empty());
             if (scc_roots.back() == prev_rank) // Is this the root of the SCC?
               {
@@ -2197,6 +2408,9 @@ namespace spot
                                      preprocess);
         case node_and_scc_backprop:
           return trans.ltlf_synthesis_with_scc(f, &outvars, realizability,
+                                               preprocess);
+        case node_and_dfs_backprop:
+          return trans.ltlf_synthesis_with_dfs(f, &outvars, realizability,
                                                preprocess);
         }
     SPOT_UNREACHABLE();

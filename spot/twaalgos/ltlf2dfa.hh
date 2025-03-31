@@ -274,6 +274,7 @@ namespace spot
     node_backprop,              // on-the-fly
     state_refine,               // no backpropagation, just local refinement
     node_and_scc_backprop,      // on-the-fly
+    node_and_dfs_backprop,      // on-the-fly
   };
 
   /// \ingroup mtdfa
@@ -438,6 +439,12 @@ namespace spot
                             bool one_step_preprocess = false);
 
     mtdfa_ptr ltlf_synthesis_with_scc(formula f,
+                                      const std::vector<std::string>*
+                                      outvars = nullptr,
+                                      bool realizability = false,
+                                      bool ont_step_preprocess = false);
+
+    mtdfa_ptr ltlf_synthesis_with_dfs(formula f,
                                       const std::vector<std::string>*
                                       outvars = nullptr,
                                       bool realizability = false,

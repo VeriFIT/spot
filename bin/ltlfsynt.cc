@@ -167,6 +167,7 @@ If multiple formulas are supplied, several automata will be output.";
 
 enum translation_type {
   translation_otf,
+  translation_otf_dfs,
   translation_otf_scc,
   translation_direct_restricted,
   translation_direct_full,
@@ -176,6 +177,7 @@ enum translation_type {
 static const char* const translation_args[] =
   {
     "otf", "on-the-fly",
+    "dfs", "dfs-otf", "dfs-on-the-fly",
     "scc", "scc-otf", "scc-on-the-fly",
     "direct", "direct-restricted", "restricted-direct",
     "direct-full", "full-direct",
@@ -185,6 +187,7 @@ static const char* const translation_args[] =
 static translation_type translation_values[] =
   {
     translation_otf, translation_otf,
+    translation_otf_dfs, translation_otf_dfs, translation_otf_dfs,
     translation_otf_scc, translation_otf_scc, translation_otf_scc,
     translation_direct_restricted, translation_direct_restricted,
     translation_direct_restricted,
@@ -647,20 +650,29 @@ namespace
             break;
           case translation_otf:
           case translation_otf_scc:
+          case translation_otf_dfs:
             {
               bool scc = opt_trans == translation_otf_scc;
+              bool dfs = opt_trans == translation_otf_dfs;
               if (!opt_backprop)
                 error(2, 0,
                       "on-the-fly translations do not support --nodes=states");
               if (opt_verbose)
-                *opt_verbose << indent
-                             << ("starting on-the-fly translation with "
-                                 "node-based backpropagation, with")
-                             << (scc ? "" : "out")
-                             << " SCC tracking, with"
-                             << (opt_one_step ? "" : "out")
-                             << " one-step preprocess\n";
-              auto bp = scc ? spot::node_and_scc_backprop : spot::node_backprop;
+                {
+                  *opt_verbose << indent
+                               << ("starting on-the-fly translation with "
+                                   "node-based backpropagation,");
+                  if (scc)
+                    *opt_verbose << " with SCC tracking,";
+                  else if (dfs)
+                    *opt_verbose << " with DFS order,";
+                  *opt_verbose << " with"
+                               << (opt_one_step ? "" : "out")
+                               << " one-step preprocess\n";
+                }
+              auto bp = (scc ? spot::node_and_scc_backprop :
+                         dfs ? spot::node_and_dfs_backprop :
+                         spot::node_backprop);
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
                                                     bp, opt_one_step,
                                                     opt_realizability);
