@@ -18,26 +18,17 @@
 
 #include "common_sys.hh"
 
-#include <iostream>
-#include <fstream>
 #include <argp.h>
-#include <cstdlib>
 #include "error.h"
 #include <vector>
+#include <cstring>
+#include <cstdlib>
 
 #include "common_setup.hh"
 #include "common_aoutput.hh"
 #include "common_range.hh"
 #include "common_cout.hh"
 
-#include <cassert>
-#include <iostream>
-#include <sstream>
-#include <set>
-#include <string>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
 #include <spot/gen/automata.hh>
 
 using namespace spot;

@@ -21,9 +21,7 @@
 #include <cstdlib>
 #include <string>
 #include <iostream>
-#include <fstream>
 #include <argp.h>
-#include <cstring>
 #include "error.h"
 
 #include "common_setup.hh"
@@ -35,7 +33,6 @@
 #include "common_r.hh"
 #include "common_range.hh"
 
-#include <spot/misc/hash.hh>
 #include <spot/misc/timer.hh>
 #include <spot/tl/simplify.hh>
 #include <spot/tl/sonf.hh>
@@ -49,15 +46,11 @@
 #include <spot/tl/ltlf.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/hierarchy.hh>
-#include <spot/twaalgos/isdet.hh>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/minimize.hh>
-#include <spot/twaalgos/postproc.hh>
 #include <spot/twaalgos/product.hh>
-#include <spot/twaalgos/remfin.hh>
 #include <spot/twaalgos/strength.hh>
 #include <spot/twaalgos/stutter.hh>
-#include <spot/twaalgos/totgba.hh>
 #include <spot/twaalgos/word.hh>
 
 static const char argp_program_doc[] = "\

@@ -23,8 +23,7 @@
 #include <limits>
 #include <set>
 #include <memory>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <cstdlib>
 
 #include <argp.h>
 #include "error.h"
@@ -45,10 +44,10 @@
 #include <spot/parseaut/public.hh>
 #include <spot/tl/exclusive.hh>
 #include <spot/tl/parse.hh>
+#include <spot/twa/acc.hh>
 #include <spot/twaalgos/alternation.hh>
 #include <spot/twaalgos/are_isomorphic.hh>
 #include <spot/twaalgos/canonicalize.hh>
-#include <spot/twaalgos/cobuchi.hh>
 #include <spot/twaalgos/cleanacc.hh>
 #include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/contains.hh>
@@ -56,7 +55,6 @@
 #include <spot/twaalgos/degen.hh>
 #include <spot/twaalgos/dtwasat.hh>
 #include <spot/twaalgos/dualize.hh>
-#include <spot/twaalgos/gtec/gtec.hh>
 #include <spot/twaalgos/given.hh>
 #include <spot/twaalgos/hoa.hh>
 #include <spot/twaalgos/iscolored.hh>

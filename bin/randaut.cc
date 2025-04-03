@@ -18,18 +18,13 @@
 
 #include "common_sys.hh"
 
-#include <iostream>
-#include <fstream>
 #include <argp.h>
 #include <cstdlib>
 #include <sstream>
-#include <iterator>
 #include "error.h"
-#include "argmatch.h"
 
 #include "common_setup.hh"
 #include "common_range.hh"
-#include "common_cout.hh"
 #include "common_aoutput.hh"
 #include "common_conv.hh"
 

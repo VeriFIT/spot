@@ -19,8 +19,6 @@
 
 #include "common_sys.hh"
 
-#include <iostream>
-#include <fstream>
 #include <argp.h>
 #include <cstdlib>
 #include "error.h"
@@ -31,12 +29,7 @@
 #include "common_range.hh"
 #include "common_cout.hh"
 
-#include <cassert>
-#include <iostream>
-#include <sstream>
-#include <set>
 #include <string>
-#include <cstdlib>
 #include <cstring>
 #include <spot/tl/formula.hh>
 #include <spot/tl/relabel.hh>

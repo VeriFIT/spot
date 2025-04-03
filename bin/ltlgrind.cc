@@ -19,7 +19,6 @@
 
 #include "common_sys.hh"
 #include <argp.h>
-#include "error.h"
 
 #include "common_setup.hh"
 #include "common_finput.hh"

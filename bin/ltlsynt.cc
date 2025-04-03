@@ -16,19 +16,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#include <config.h>
-
+#include "common_sys.hh"
+#include "error.h"
 #include "argmatch.h"
 
 #include "common_aoutput.hh"
 #include "common_finput.hh"
-#include "common_hoaread.hh"
 #include "common_setup.hh"
-#include "common_sys.hh"
 #include "common_trans.hh"
 #include "common_ioap.hh"
 
-#include <spot/misc/bddlt.hh>
 #include <spot/misc/escape.hh>
 #include <spot/misc/timer.hh>
 #include <spot/priv/robin_hood.hh>
@@ -39,9 +36,7 @@
 #include <spot/twaalgos/game.hh>
 #include <spot/twaalgos/hoa.hh>
 #include <spot/twaalgos/dot.hh>
-#include <spot/twaalgos/minimize.hh>
 #include <spot/twaalgos/mealy_machine.hh>
-#include <spot/twaalgos/product.hh>
 #include <spot/twaalgos/synthesis.hh>
 #include <spot/twaalgos/translate.hh>
 

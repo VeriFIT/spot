@@ -29,7 +29,6 @@
 #include "common_cout.hh"
 #include "common_range.hh"
 
-#include <spot/tl/defaultenv.hh>
 #include <spot/tl/randomltl.hh>
 #include <spot/misc/random.hh>
 

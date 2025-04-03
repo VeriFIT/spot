@@ -23,22 +23,17 @@
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
-#include <cstdio>
 #include <argp.h>
-#include <unistd.h>
-#include <cmath>
-#include <sys/wait.h>
 #include <iomanip>
+#include <sys/wait.h>           // WIFSIGNALED, WIFEXITED, ...
 #include "error.h"
-#include "argmatch.h"
 
 #include "common_setup.hh"
 #include "common_hoaread.hh"
 #include "common_finput.hh"
 #include "common_color.hh"
 #include "common_trans.hh"
-#include "common_cout.hh"
-#include "common_aoutput.hh"
+#include "common_file.hh"
 #include "common_post.hh"
 
 #include <spot/twaalgos/hoa.hh>
@@ -47,6 +42,8 @@
 #include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/alternation.hh>
 #include <spot/twaalgos/cleanacc.hh>
+#include <spot/twaalgos/word.hh>
+#include <spot/twaalgos/stats.hh>
 #include <spot/misc/escape.hh>
 #include <spot/misc/timer.hh>
 

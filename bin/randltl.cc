@@ -19,10 +19,8 @@
 #include "common_sys.hh"
 
 #include <iostream>
-#include <fstream>
 #include <argp.h>
 #include <cstdlib>
-#include <iterator>
 #include "error.h"
 
 #include "common_setup.hh"
@@ -32,10 +30,8 @@
 #include "common_conv.hh"
 #include "common_cout.hh"
 
-#include <sstream>
 #include <spot/tl/defaultenv.hh>
 #include <spot/tl/randomltl.hh>
-#include <spot/tl/simplify.hh>
 #include <spot/misc/random.hh>
 #include <spot/misc/optionmap.hh>
 

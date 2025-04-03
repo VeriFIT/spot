@@ -19,16 +19,13 @@
 #include "common_sys.hh"
 
 #include <string>
-#include <iostream>
 
 #include <argp.h>
 #include "error.h"
 
 #include "common_setup.hh"
 #include "common_r.hh"
-#include "common_cout.hh"
 #include "common_finput.hh"
-#include "common_output.hh"
 #include "common_aoutput.hh"
 #include "common_post.hh"
 

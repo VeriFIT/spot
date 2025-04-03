@@ -17,7 +17,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "common_sys.hh"
-#include <string>
 #include <iostream>
 #include <cstdlib>
 #include <argp.h>

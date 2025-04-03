@@ -20,10 +20,8 @@
 
 #include <string>
 #include <iostream>
-#include <fstream>
 
 #include <argp.h>
-#include <unistd.h>
 #include "error.h"
 
 #include "common_setup.hh"
@@ -32,16 +30,13 @@
 #include "common_finput.hh"
 #include "common_post.hh"
 
-#include <spot/tl/parse.hh>
 #include <spot/tl/print.hh>
-#include <spot/tl/simplify.hh>
 #include <spot/twaalgos/dot.hh>
-#include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/translate.hh>
 #include <spot/twa/bddprint.hh>
 
-#include <spot/taalgos/tgba2ta.hh>
 #include <spot/taalgos/dot.hh>
+#include <spot/taalgos/tgba2ta.hh>
 #include <spot/taalgos/minimize.hh>
 #include <spot/misc/optionmap.hh>
 

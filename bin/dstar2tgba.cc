@@ -19,10 +19,8 @@
 #include "common_sys.hh"
 
 #include <string>
-#include <iostream>
 #include <memory>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <cstdlib>
 
 #include <argp.h>
 #include "error.h"
@@ -32,20 +30,11 @@
 #include "common_cout.hh"
 #include "common_aoutput.hh"
 #include "common_post.hh"
-#include "common_file.hh"
 #include "common_hoaread.hh"
 
-#include <spot/twaalgos/dot.hh>
-#include <spot/twaalgos/lbtt.hh>
-#include <spot/twaalgos/hoa.hh>
-#include <spot/twaalgos/neverclaim.hh>
-#include <spot/twaalgos/stats.hh>
-#include <spot/twaalgos/totgba.hh>
-#include <spot/twa/bddprint.hh>
 #include <spot/misc/optionmap.hh>
 #include <spot/misc/timer.hh>
 #include <spot/parseaut/public.hh>
-#include <spot/twaalgos/sccinfo.hh>
 
 static const char argp_program_doc[] = "\
 Convert automata with any acceptance condition into variants of \

@@ -21,14 +21,12 @@
 #include <string>
 #include <iostream>
 #include <sstream>
-#include <fstream>
-#include <sys/wait.h>
+#include <sys/wait.h>           // WIFSIGNALED, WIFEXITED, ...
 
 #include "error.h"
 #include "argmatch.h"
 
 #include "common_setup.hh"
-#include "common_cout.hh"
 #include "common_conv.hh"
 #include "common_finput.hh"
 #include "common_aoutput.hh"
@@ -39,11 +37,8 @@
 
 #include <spot/tl/relabel.hh>
 #include <spot/tl/print.hh>
-#include <spot/misc/bareword.hh>
 #include <spot/misc/timer.hh>
-#include <spot/twaalgos/lbtt.hh>
 #include <spot/twaalgos/relabel.hh>
-#include <spot/twaalgos/totgba.hh>
 #include <spot/parseaut/public.hh>
 
 static const char argp_program_doc[] = "\
