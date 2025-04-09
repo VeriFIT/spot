@@ -195,7 +195,7 @@ static translation_type translation_values[] =
     translation_compositional, translation_compositional,
   };
 ARGMATCH_VERIFY(translation_args, translation_values);
-static translation_type opt_trans = translation_otf_scc;
+static translation_type opt_trans = translation_otf_dfs;
 
 static const char* const minimize_args[] =
   {
