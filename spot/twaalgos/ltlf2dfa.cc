@@ -647,6 +647,13 @@ namespace spot
           return backprop.set_status(it->second, status);
       }
 
+      bool root_status_set(unsigned root_number, bool status)
+      {
+        auto it = rootnum_to_backprop_state.find(root_number);
+        assert(it != rootnum_to_backprop_state.end());
+        return backprop.set_status(it->second, status);
+      }
+
       bool encode_state(unsigned root_number, bdd mtbdd,
                         std::string* name = nullptr,
                         std::vector<int>* new_rootnums = nullptr,
@@ -1153,10 +1160,22 @@ namespace spot
         // std::cerr << "prev_state=" << prev_state
         //           << " size=" << size
         //           << " todo.size=" << todo.size() << '\n';
-        if (todo.size() == size) // DFS backtrack
+
+        // If prev_state is determined, skip the exploration of its successors
+        // and backtrack immediately
+        if (todo.size() >= size && backprop.root_status(prev_state).is_known())
           {
-            // std::cerr << "DFS backtrack\n";
-            if (backprop.root_status_set_if_unknown(prev_state, false))
+            while (todo.size() > size)
+              todo.pop_back();
+            prev.pop_back();
+            continue;
+          }
+        if (todo.size() == size) // DFS backtrack,
+          {
+            // Since all successors have been explored and that was
+            // not enough to mark the previous state as winning, mark
+            // it as losing.
+            if (backprop.root_status_set(prev_state, false))
               break;
             prev.pop_back();
             continue;
