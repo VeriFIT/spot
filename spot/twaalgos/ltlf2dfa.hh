@@ -271,10 +271,9 @@ namespace spot
 
 
   enum ltlf_synthesis_backprop {
-    node_backprop,              // on-the-fly
-    state_refine,               // no backpropagation, just local refinement
-    node_and_scc_backprop,      // on-the-fly
-    node_and_dfs_backprop,      // on-the-fly
+    state_refine,         // no backpropagation, just local refinement
+    bfs_node_backprop,    // on-the-fly
+    dfs_node_backprop,    // on-the-fly
   };
 
   /// \ingroup mtdfa
@@ -312,7 +311,8 @@ namespace spot
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,
-                              ltlf_synthesis_backprop backprop = node_backprop,
+                              ltlf_synthesis_backprop backprop
+                              = dfs_node_backprop,
                               bool one_step_preprocess = false,
                               bool realizability = false,
                               bool fuse_same_bdds = true,
@@ -437,12 +437,6 @@ namespace spot
                             bool do_backprop = false,
                             bool realizability = false,
                             bool one_step_preprocess = false);
-
-    mtdfa_ptr ltlf_synthesis_with_scc(formula f,
-                                      const std::vector<std::string>*
-                                      outvars = nullptr,
-                                      bool realizability = false,
-                                      bool ont_step_preprocess = false);
 
     mtdfa_ptr ltlf_synthesis_with_dfs(formula f,
                                       const std::vector<std::string>*

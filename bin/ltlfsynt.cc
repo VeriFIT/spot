@@ -84,15 +84,15 @@ static const argp_option options[] =
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
     { "translation", OPT_TRANS,
-      "full|compositional|retricted|on-the-fly|scc-on-the-fly", 0,
+      "full|compositional|retricted|bfs-on-the-fly|dfs-on-the-fly", 0,
       "The type of translation to use: (full) is a direct translation to MTDFA,"
       " (compositional) breaks the specification on Boolean operators and "
       " builds the MTDFA by compositing minimized subautomata, (restrict) is"
       " a direct translation but that is restricted to the only part useful "
-      "to synthesis, (on-the-fly) is the on-the-fly version of \"restrict\" "
-      "but that will start solving the game as the automaton is generated, and"
-      " (scc-on-the-fly) will additionally keep track of SCCs to help with the"
-      " game solving.  The default is scc-on-the-fly.", 0 },
+      "to synthesis, (dfs-on-the-fly) is the on-the-fly version of "
+      "\"restrict\" that follow a dfs order, solving the game as the automaton"
+      " is generated, (bfs-on-the-fly) same using bfs order.  "
+      "The default is dfs-on-the-fly.", 0 },
     { "minimize", OPT_MINIMIZE, "yes|no", 0,
       "Minimize the automaton (disabled by default except for the compositional"
       " translation). Has no effect on on-the-fly translations.", 0 },
@@ -166,9 +166,8 @@ Convert LTLf formulas to transition-based deterministic finite automata.\n\n\
 If multiple formulas are supplied, several automata will be output.";
 
 enum translation_type {
-  translation_otf,
   translation_otf_dfs,
-  translation_otf_scc,
+  translation_otf_bfs,
   translation_direct_restricted,
   translation_direct_full,
   translation_compositional,
@@ -176,9 +175,8 @@ enum translation_type {
 
 static const char* const translation_args[] =
   {
-    "otf", "on-the-fly",
     "dfs", "dfs-otf", "dfs-on-the-fly",
-    "scc", "scc-otf", "scc-on-the-fly",
+    "bfs", "bfs-otf", "bfs-on-the-fly",
     "direct", "direct-restricted", "restricted-direct",
     "direct-full", "full-direct",
     "compositional", "compose",
@@ -186,9 +184,8 @@ static const char* const translation_args[] =
   };
 static translation_type translation_values[] =
   {
-    translation_otf, translation_otf,
     translation_otf_dfs, translation_otf_dfs, translation_otf_dfs,
-    translation_otf_scc, translation_otf_scc, translation_otf_scc,
+    translation_otf_bfs, translation_otf_bfs, translation_otf_bfs,
     translation_direct_restricted, translation_direct_restricted,
     translation_direct_restricted,
     translation_direct_full, translation_direct_full,
@@ -648,31 +645,23 @@ namespace
             a->set_controllable_variables(*sub_o, true);
             stop_trans(a);
             break;
-          case translation_otf:
-          case translation_otf_scc:
+          case translation_otf_bfs:
           case translation_otf_dfs:
             {
-              bool scc = opt_trans == translation_otf_scc;
               bool dfs = opt_trans == translation_otf_dfs;
               if (!opt_backprop)
                 error(2, 0,
                       "on-the-fly translations do not support --nodes=states");
               if (opt_verbose)
-                {
-                  *opt_verbose << indent
-                               << ("starting on-the-fly translation with "
-                                   "node-based backpropagation,");
-                  if (scc)
-                    *opt_verbose << " with SCC tracking,";
-                  else if (dfs)
-                    *opt_verbose << " with DFS order,";
-                  *opt_verbose << " with"
-                               << (opt_one_step ? "" : "out")
-                               << " one-step preprocess\n";
-                }
-              auto bp = (scc ? spot::node_and_scc_backprop :
-                         dfs ? spot::node_and_dfs_backprop :
-                         spot::node_backprop);
+                *opt_verbose << indent
+                             << ("starting on-the-fly translation with "
+                                 "node-based backpropagation, with ")
+                             << (dfs ? 'D' : 'B') << "FS order, with"
+                             << (opt_one_step ? "" : "out")
+                             << " one-step preprocess\n";
+              auto bp = (dfs ?
+                         spot::dfs_node_backprop :
+                         spot::bfs_node_backprop);
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
                                                     bp, opt_one_step,
                                                     opt_realizability);

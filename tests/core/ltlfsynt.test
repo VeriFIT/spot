@@ -73,11 +73,11 @@ while read f; do
    for sem in Moore Mealy; do
      for sim in yes no; do
      for dec in yes no; do
-     for tra in restr full comp otf scc dfs; do
+     for tra in restr full comp dfs bfs; do
        bpvalues="states nodes"
        osvalues="yes no";
        case $tra in
-           otf | scc | dfs) bpvalues=nodes;;
+           bfs | dfs) bpvalues=nodes;;
            restr | full | comp) osvalues=no;;
        esac
        for min in yes no; do
