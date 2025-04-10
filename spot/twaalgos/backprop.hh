@@ -71,6 +71,11 @@ namespace spot
     // see if the status of that state can be determined already
     bool freeze_state(unsigned state);
 
+    bool is_frozen(unsigned state) const
+    {
+      return (*this)[state].frozen;
+    }
+
     trival status_of(unsigned state) const
     {
       return (*this)[state].status;

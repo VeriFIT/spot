@@ -622,6 +622,8 @@ namespace spot
       backprop_graph backprop;
       robin_hood::unordered_map<int, unsigned> rootnum_to_backprop_state;
       robin_hood::unordered_map<int, unsigned> bdd_to_backprop_state;
+      // only used if recompute_succ
+      robin_hood::unordered_set<int> bdd_seen;
 
       trival root_status(unsigned root_number)
       {
@@ -654,11 +656,38 @@ namespace spot
         return backprop.set_status(it->second, status);
       }
 
+      // This encodes an MTDFA state into the backpropgation
+      // graph (aka game arena)
+      //
+      // The state is specified by its root_number, and and MTBDD
+      // encoding the successors.  Vertices of the game arena will be
+      // created for all nodes, including terminals.  The terminal
+      // corresponding to the root is created as well.
+      //
+      // For the purpose of debuging, a name may be passed.  It will
+      // be attached to the root.
+      //
+      // As a side effect, the function will record the root numbers stored
+      // on the terminal it reaches in in new_rootnums or old_rootnums
+      // depending on whether the corresponding vertex had to be created
+      // in the game or if it was already existing.
+      //
+      // If recompute_succ is false, the encoding stops its
+      // "recursion" whenever it finds a nodes that has already been
+      // encoded into the game.  If it is true, it will continue the
+      // recursion even through nodes that have already been encoded,
+      // provided they correspond to underterminate vertices.  Doing
+      // so allows to collect all undeterminate successors even if
+      // they were already encoded.  This is necessary for our DFS
+      // construction.
+      template<bool recompute_succ = false>
       bool encode_state(unsigned root_number, bdd mtbdd,
                         std::string* name = nullptr,
                         std::vector<int>* new_rootnums = nullptr,
                         std::vector<int>* old_rootnums = nullptr)
       {
+        if constexpr (recompute_succ)
+          bdd_seen.clear();
         // hold (backprop state, low bdd, high bdd)
         std::deque<std::tuple<unsigned, int, int>> todo;
 
@@ -682,7 +711,10 @@ namespace spot
         {
           auto [it, is_new] = bdd_to_backprop_state.emplace(b, 0);
           if (!is_new)
-            return it->second;
+            {
+              if (!recompute_succ || b == 0 || b == 1)
+                return it->second;
+            }
           if (b == 0 || b == 1)
             {
               unsigned s = backprop.new_state(!b);
@@ -692,19 +724,43 @@ namespace spot
                 backprop.set_name(s, b ? "true" : "false");
               return s;
             }
+          if constexpr (recompute_succ)
+            {
+              // Make sure we see each node only once per call to
+              // encode_state.
+              if (!bdd_seen.emplace(b).second)
+                return it->second;
+            }
           if (bdd_is_terminal(b))
             {
+              if constexpr (recompute_succ)
+                if (!is_new)
+                  {
+                    int term = bdd_get_terminal(b);
+                    if (term & 1)
+                      return it->second;
+                    return rootnum_to_state(term / 2);
+                  }
               int term = bdd_get_terminal(b);
               if (term & 1)
                 {
                   unsigned n = self(1, self);
-                  // it might have been invalidated by the recursive call
+                  // "it" might have been invalidated by the recursive call
                   bdd_to_backprop_state[b] = n;
                   return n;
                 }
               return it->second = rootnum_to_state(term / 2);
             }
+          if constexpr (recompute_succ)
+            if (!is_new && backprop.status_of(it->second).is_known())
+              return it->second;
           auto [owner, low, high] = bdd_mt_quantified_low_high(b);
+          if constexpr (recompute_succ)
+            if (!is_new)
+              {
+                todo.emplace_back(it->second, low, high);
+                return it->second;
+              }
           unsigned s = backprop.new_state(owner);
           it->second = s;
           todo.emplace_back(s, low, high);
@@ -715,6 +771,8 @@ namespace spot
         unsigned root_state = rootnum_to_state(root_number);
         if (name)
           backprop.set_name(root_state, *name);
+        // std::cerr << "encoding term " << root_number
+        //           << " on vertex " << root_state << '\n';
 
         // link it to the actual BDD root, as the only child
         if (backprop.new_edge(root_state,
@@ -730,6 +788,14 @@ namespace spot
           {
             auto [state, low, high] = todo.front();
             todo.pop_front();
+            if constexpr (recompute_succ)
+              if (backprop.is_frozen(state))
+                {
+                  assert(!backprop.status_of(state).is_known());
+                  bdd_to_state(low, bdd_to_state);
+                  bdd_to_state(high, bdd_to_state);
+                  continue;
+                }
             // We could swap low and high here if we wanted.  That
             // makes sense if we know that a state for high already
             // exist and is determined.  However, deciding this is an
@@ -919,7 +985,8 @@ namespace spot
                 assert(b != bddfalse);
                 b_done = true;
                 if (do_backprop)
-                  backprop->encode_state(label_term, b, nullptr, &new_rootnums);
+                  backprop->encode_state<>(label_term, b, nullptr,
+                                           &new_rootnums);
                 if (!realizability)
                   {
                     bdd fix = bddtrue;
@@ -945,8 +1012,8 @@ namespace spot
                   {
                     b_done = true;
                     if (do_backprop)
-                      backprop->encode_state(label_term, b, nullptr,
-                                             &new_rootnums);
+                      backprop->encode_state<>(label_term, b, nullptr,
+                                               &new_rootnums);
                   }
 
               }
@@ -958,7 +1025,8 @@ namespace spot
               {
                 restrict_bdd(b);
                 if (do_backprop)
-                  backprop->encode_state(label_term, b, nullptr, &new_rootnums);
+                  backprop->encode_state(label_term, b, nullptr,
+                                         &new_rootnums);
               }
           }
 
@@ -1165,8 +1233,12 @@ namespace spot
         // and backtrack immediately
         if (todo.size() >= size && backprop.root_status(prev_state).is_known())
           {
+
             while (todo.size() > size)
-              todo.pop_back();
+              {
+                // std::cerr << "Pop " << todo.back() << '\n';
+                todo.pop_back();
+              }
             prev.pop_back();
             continue;
           }
@@ -1180,11 +1252,12 @@ namespace spot
             prev.pop_back();
             continue;
           }
-        int label_term = todo.front();
-        todo.pop_front();
+        int label_term = todo.back();
+        todo.pop_back();
         formula label = int_to_formula_[label_term];
 
-        // std::cerr << "DFS considering term " << label_term << '\n';
+        // std::cerr << "DFS considering term " << label_term << '\t'
+        //          << label << '\n';
 
         // already processed
         if (terminal_to_state_map.find(label_term)
@@ -1205,8 +1278,13 @@ namespace spot
               {
                 assert(b != bddfalse);
                 b_done = true;
-                backprop.encode_state(label_term, b, nullptr,
-                                      &new_rootnums, &old_rootnums);
+                {
+                  std::string* name = nullptr;
+                  // std::string x = str_psl(g);
+                  // name = &x;
+                  backprop.encode_state<>(label_term, b, name,
+                                          &new_rootnums, &old_rootnums);
+                }
                 if (!realizability)
                   {
                     bdd fix = bddtrue;
@@ -1232,8 +1310,11 @@ namespace spot
                 if (b == bddfalse)
                   {
                     b_done = true;
-                    backprop.encode_state(label_term, b, nullptr,
-                                          &new_rootnums, &old_rootnums);
+                    std::string* name = nullptr;
+                    // std::string x = str_psl(g);
+                    // name = &x;
+                    backprop.encode_state<>(label_term, b, name,
+                                            &new_rootnums, &old_rootnums);
                   }
               }
           }
@@ -1241,12 +1322,14 @@ namespace spot
           {
             b = ltlf_to_mtbdd(label);
             restrict_bdd(b);
-            backprop.encode_state(label_term, b, nullptr,
-                                  &new_rootnums, &old_rootnums);
+            std::string* name = nullptr;
+            // std::string x = str_psl(label);
+            // name = &x;
+            backprop.encode_state<true>(label_term, b, name,
+                                        &new_rootnums, &old_rootnums);
           }
 
         unsigned n = states.size();
-        // std::cerr << "rank is " << n << '\n';
         formula_to_state[label] = n;
         bdd_to_state[b] = n;
         states.push_back(b);
@@ -1254,6 +1337,10 @@ namespace spot
         terminal_to_state_map[label_term] = n;
 
         trival init_status = backprop.root_status(0);
+        // std::cerr << "init_status = " << init_status << '\n';
+        // std::cerr << "label_term status = "
+        //          << backprop.root_status(label_term) << '\n';
+        // backprop.backprop.print_dot(std::cerr);
         if (SPOT_UNLIKELY(init_status.is_known()))
           break;
         // If the status of this state is known, we can skip the
@@ -1263,7 +1350,7 @@ namespace spot
         // Schedule all successors for processing in DFS order
         prev.emplace_back(label_term, todo.size());
         for (unsigned root: new_rootnums)
-          todo.push_front(root);
+          todo.push_back(root);
         for (unsigned root: old_rootnums)
           {
             auto it = terminal_to_state_map.find(root);
@@ -1291,7 +1378,6 @@ namespace spot
             return dfa;
           }
       }
-    // backprop.backprop.print_dot(std::cerr);
     unsigned sz = states.size();
     for (unsigned i = 0; i < sz; ++i)
       bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
