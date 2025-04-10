@@ -179,6 +179,12 @@ namespace spot
       /// \cite geldenhuys.06.spin ,
       /// \cite gastin.01.cav .
       LTL_U_RIGHT,
+      /// Single Counter LTLf with Mealy semantics
+      /// \cite tabajara.19.ijcai
+      LTLF_TV_COUNTER_MEALY,
+      /// Double Counters LTLf with Mealy semantics
+      /// \cite tabajara.19.ijcai
+      LTLF_TV_DOUBLE_COUNTERS_MEALY,
       LTL_END
     };
 

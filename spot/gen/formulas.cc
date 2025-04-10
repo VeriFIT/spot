@@ -27,6 +27,7 @@
 #define G_(x) formula::G(x)
 #define F_(x) formula::F(x)
 #define X_(x) formula::X(x)
+#define Xs_(x) formula::strong_X(x)
 #define Not_(x) formula::Not(x)
 
 #define Implies_(x, y) formula::Implies((x), (y))
@@ -34,6 +35,7 @@
 #define And_(x, y) formula::And({(x), (y)})
 #define Or_(x, y) formula::Or({(x), (y)})
 #define U_(x, y) formula::U((x), (y))
+#define Xor_(x, y) formula::Xor((x), (y))
 
 namespace spot
 {
@@ -1345,6 +1347,101 @@ namespace spot
       return formula::Implies(res, formula::strong_X(n, formula::ap(c)));
     }
 
+    static formula
+    counter_mealy(int n)
+    {
+      // See section B.1 in
+      // https://bitbucket.org/ijcai2816/ijcai-2816/src/master/Appendix.pdf
+      if (n <= 0)
+        bad_number("tv-counter-mealy", n);
+      std::vector<formula> v;
+      std::vector<formula> z;   // zeros
+      v.reserve(3 * n + 1);
+      z.reserve(n);
+      formula inc = formula::ap("inc");
+      formula bim1;             // b[i-1]
+      formula cim1;             // c[i-1]
+      for (int i = 0; i < n; ++i)
+        {
+          std::string si = std::to_string(i);
+          formula bi = formula::ap("ob" + si);
+          formula ci = formula::ap("oc" + si);
+          formula ii = formula::ap("init" + si);
+          v.push_back(Equiv_(bi, ii)); // b[i] <-> init[i]
+          if (i == 0)
+            v.push_back(G_(Equiv_(ci, inc))); // G(c[0] <-> inc)
+          else                  // G(c[i] <-> (b[i-1]&c[i-1]))
+            v.push_back(G_(Equiv_(ci, And_(bim1, cim1))));
+          // G((X[!]b[i] -> (b[i] xor c[i])) & (X[!](!b[i]) -> (b[i] <-> c[i])))
+          v.push_back(G_(And_(Implies_(Xs_(bi), Xor_(bi, ci)),
+                              Implies_(Xs_(Not_(bi)), Equiv_(bi, ci)))));
+          z.push_back(Not_(bi));
+          bim1 = bi;
+          cim1 = ci;
+        }
+      // G(!inc->X[!]inc) -> F(!b[0] && ... && !b[n-1])
+      v.push_back(Implies_(G_(Implies_(Not_(inc), Xs_(inc))),
+                           F_(formula::And(z))));
+      return formula::And(v);
+    }
+
+    static formula
+    counters_mealy(int n)
+    {
+      // See section B.2 in
+      // https://bitbucket.org/ijcai2816/ijcai-2816/src/master/Appendix.pdf
+      if (n <= 0)
+        bad_number("tv-counter-mealy", n);
+      std::vector<formula> v;
+      std::vector<formula> z;   // equivalent counters
+      v.reserve(6 * n + 1);
+      z.reserve(n);
+      formula iinc = formula::ap("iinc");
+      formula oinc = formula::ap("oinc");
+      formula ibim1;             // ib[i-1]
+      formula obim1;             // ob[i-1]
+      formula icim1;             // ic[i-1]
+      formula ocim1;             // oc[i-1]
+      for (int i = 0; i < n; ++i)
+        {
+          std::string si = std::to_string(i);
+          formula ii = formula::ap("init" + si);
+          formula ibi = formula::ap("obe" + si);
+          formula ici = formula::ap("oce" + si);
+          formula obi = formula::ap("obs" + si);
+          formula oci = formula::ap("ocs" + si);
+          v.push_back(Equiv_(ibi, ii)); // ib[i] <-> init[i]
+          v.push_back(Not_(obi)); // !ob[i]
+          if (i == 0)
+            {
+              v.push_back(G_(Equiv_(oci, oinc))); // G(oc[0] <-> oinc)
+              v.push_back(G_(Equiv_(ici, iinc))); // G(ic[0] <-> iinc)
+            }
+          else
+            {
+              // G(oc[i] <-> (ob[i-1]&oc[i-1]))
+              // G(ic[i] <-> (ib[i-1]&ic[i-1]))
+              v.push_back(G_(Equiv_(oci, And_(obim1, ocim1))));
+              v.push_back(G_(Equiv_(ici, And_(ibim1, icim1))));
+            }
+          // G((X[!]ob[i]->(ob[i] xor oc[i]))&(X[!](!ob[i])->(ob[i]<->oc[i])))
+          // G((X[!]ib[i]->(ib[i] xor ic[i]))&(X[!](!ib[i])->(ib[i]<->ic[i])))
+          v.push_back(G_(And_(Implies_(Xs_(obi), Xor_(obi, oci)),
+                              Implies_(Xs_(Not_(obi)), Equiv_(obi, oci)))));
+          v.push_back(G_(And_(Implies_(Xs_(ibi), Xor_(ibi, ici)),
+                              Implies_(Xs_(Not_(ibi)), Equiv_(ibi, ici)))));
+          z.push_back(Equiv_(ibi, obi));
+          ibim1 = ibi;
+          obim1 = obi;
+          icim1 = ici;
+          ocim1 = oci;
+        }
+      // G(inc->!X[!]inc) -> F((ib[0]<->ob[o]) && ... && (ib[n-1]<->ob[n-1]))
+      v.push_back(Implies_(G_(Implies_(iinc, Not_(Xs_(iinc)))),
+                           F_(formula::And(z))));
+      return formula::And(v);
+    }
+
     formula ltl_pattern(ltl_pattern_id pattern, int n, int m)
     {
       if (n < 0)
@@ -1467,6 +1564,10 @@ namespace spot
           return bin_n("p", n, op::U, false);
         case LTL_U_RIGHT:
           return bin_n("p", n, op::U, true);
+        case LTLF_TV_COUNTER_MEALY:
+          return counter_mealy(n);
+        case LTLF_TV_DOUBLE_COUNTERS_MEALY:
+          return counters_mealy(n);
         case LTL_END:
           break;
         }
@@ -1529,6 +1630,8 @@ namespace spot
           "tv-uu",
           "u-left",
           "u-right",
+          "tv-counter-mealy",
+          "tv-double-counters-mealy",
         };
       // Make sure we do not forget to update the above table every
       // time a new pattern is added.
@@ -1608,6 +1711,8 @@ namespace spot
         case LTL_TV_UU:
         case LTL_U_LEFT:
         case LTL_U_RIGHT:
+        case LTLF_TV_COUNTER_MEALY:
+        case LTLF_TV_DOUBLE_COUNTERS_MEALY:
           return 0;
         case LTL_END:
           break;
@@ -1675,6 +1780,8 @@ namespace spot
         case LTL_TV_UU:
         case LTL_U_LEFT:
         case LTL_U_RIGHT:
+        case LTLF_TV_COUNTER_MEALY:
+        case LTLF_TV_DOUBLE_COUNTERS_MEALY:
           return 1;
         case LTL_END:
           break;
