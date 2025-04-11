@@ -1,15 +1,58 @@
 New in spot 2.13.0.dev  (not yet released)
 
+  Command-line tools:
+
+  - ltlf2dfa is a new tool that converts LTLf to MTDFA, i.e., DFA
+    represented with multi-terminal BDDs.   See
+    https://spot.lre.epita.fr/ltlf2dfs.html for some examples.
+
+  - ltlfsynt is a new tool that solves the reactive synthesis for LTLf
+    specification, using a reachability game interpreted oveer MTDFA.
+    See https://spot.lre.epita.fr/ltlfsynt.html
+
+    The output of --realizability has been compared to several other
+    tools on benchmarks from the synthesis competition (which all use
+    Moore semantics) in addition to some custom specifications (with
+    Moore and Mealy semantics) in our test suite.  The production of a
+    Mealy machine representing the controller has been implemented,
+    but it hasn't received a lot of testing so far, it should be
+    regarded as very experimental.
+
+  - genltl learned two new options: --tv-counter-mealy=N and
+    --tv-double-counters-mealy=N.  These are scalable LTLf
+    specifications that can be used directly with ltlfsynt.
+
+  - ltlf2tgba learned an --ltlf option.  This currently implements the
+    very slow approach of going from LTLf->LTL->DBA->DFA.  ltlf2dfa is
+    way faster.
+
+  Library:
+
   - spot::mtdfa is a new class implementing a DFA using Multi-Terminal
     BDDs.  The data structure is similar to what can be found in Mona.
     This comes with convenient rendering routines for use in Jupyter
     notebook.
 
-    spot::ltlf_to_mtdfa() is a new function that converts a LTLf formula
-    into an MTDFA.
+  - spot::ltlf_to_mtdfa() and spot::ltlf_to_mtdfa_compose() are new
+    functions that converts a LTLf formula into an MTDFA, using
+    either a direct translation, or a compositional one.
 
-    spot::minimize_mtdfa() is a minimization function for MTDFA.  See
+  - spot::minimize_mtdfa() is a minimization function for MTDFA.  See
     https://spot.lre.epita.fr/ipynb/ltlf2dfa.html for some illustrations.
+
+  - spot::product_or(), spot::product_and(), spot::product_xor(), etc.
+    have been overloaded to implement those operations on MTDFAs as well.
+
+  - spot::backprop_graph is a new class implementing what's needed to
+    run a linear backpropagation for solving reachability games.  This
+    allows solving the game on-the-fly, as it is constructed.
+    See https://spot.lre.epita.fr/ipynb/backprop.html for examples.
+
+  - spot::ltlf_to_mtdfa_for_synthesis() is a new function that
+    performs LTLf synthesis.
+
+  - spot::translator learned output_type::Finite to request
+    translation to Finite automata.
 
 New in spot 2.13  (2025-03-24)
 
