@@ -78,6 +78,10 @@ Proceedings of CAV'16.  LNCS 9780.
 tv
 D. Tabakov and M. Y. Vardi: Optimized Temporal Monitors for SystemC.
 Proceedings of RV'10.  LNCS 6418.
+.TP
+tv
+L. M. Tabajara and M. Y. Vardi: Partitioning Techniques in LTLf Synthesis.
+Proceedings of IJCAI'19.
 
 [SEE ALSO]
 .BR genaut (1),
