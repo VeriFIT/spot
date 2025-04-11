@@ -1,4 +1,4 @@
-#+OPTIONS: H:2 num:nil toc:t html-postamble:nil ^:nil
+#+OPTIONS: num:nil toc:2 html-postamble:nil ^:nil
 #+EMAIL: spot@lrde.epita.fr
 #+HTML_LINK_HOME: index.html
 #+MACRO: LASTDATE 2025-03-24

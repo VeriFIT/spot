@@ -51,7 +51,7 @@ formulas.  If we fix the order in which the atomic propositions will
 be tested, that normal form is unique.  BDDs are stored as directed
 acyclic graphs with sharing of subformulas.
 
-For further information about BDDs, read for instance [[http://configit.com/configit_wordpress/wp-content/uploads/2013/07/bdd-eap.pdf][Henrik Reif
+For further information about BDDs, read for instance [[https://web.archive.org/web/20090530154634/http://www.itu.dk:80/people/hra/bdd-eap.pdf][Henrik Reif
 Andersen's lecture notes]].
 
 In Spot, BDDs are one way to represent Boolean formulas, and in
