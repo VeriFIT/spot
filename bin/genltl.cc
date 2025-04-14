@@ -173,6 +173,9 @@ static const argp_option options[] =
       "LTLf formula for Single Counter game, with Mealy semantics", 0 },
     { "tv-double-counters-mealy", gen::LTLF_TV_DOUBLE_COUNTERS_MEALY, "RANGE",
       0, "LTLf formula for Double Counters game, with Mealy semantics", 0 },
+    { "tv-nim-mealy", gen::LTLF_TV_NIM_MEALY, "RANGE[,RANGE]",
+      0, "LTLf formula specifying a Nim game, with Mealy semantics.  "
+      "Uses N heaps of M tokens, with M defaulting to N if not supplied.", 0 },
     { "u-left", gen::LTL_U_LEFT, "RANGE", 0, "(((p1 U p2) U p3) ... U pn)", 0 },
     OPT_ALIAS(gh-u),
     { "u-right", gen::LTL_U_RIGHT, "RANGE", 0, "(p1 U (p2 U (... U pn)))", 0 },

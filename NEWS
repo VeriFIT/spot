@@ -18,9 +18,10 @@ New in spot 2.13.0.dev  (not yet released)
     but it hasn't received a lot of testing so far, it should be
     regarded as very experimental.
 
-  - genltl learned two new options: --tv-counter-mealy=N and
-    --tv-double-counters-mealy=N.  These are scalable LTLf
-    specifications that can be used directly with ltlfsynt.
+  - genltl learned three new options: --tv-counter-mealy=N,
+    --tv-double-counters-mealy=N, and --tv-nim-mealy=N,M.  These are
+    scalable LTLf specifications that can be used directly with
+    ltlfsynt.
 
   - ltlf2tgba learned an --ltlf option.  This currently implements the
     very slow approach of going from LTLf->LTL->DBA->DFA.  ltlf2dfa is

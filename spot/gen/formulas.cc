@@ -1442,6 +1442,152 @@ namespace spot
       return formula::And(v);
     }
 
+    static formula
+    nim_mealy(int n, int m)
+    {
+      // Nim game with n heaps of size m.
+      // See section B.3 in
+      // https://bitbucket.org/ijcai2816/ijcai-2816/src/master/Appendix.pdf
+
+      std::vector<formula> sel_env;
+      sel_env.reserve(n);
+      std::vector<formula> chg_env;
+      chg_env.reserve(m);
+      std::vector<formula> sel_sys;
+      sel_sys.reserve(n);
+      std::vector<formula> chg_sys;
+      chg_sys.reserve(m);
+      std::vector<formula> heap;
+      heap.reserve(n * (m + 1));
+#define Heap_(h, c) (heap[(h) * (m + 1) + (c)])
+      formula t_env = formula::ap("oti");
+      formula t_sys = formula::ap("oto");
+      formula one_chg_env = formula::ff();
+      formula one_chg_sys = formula::ff();
+      formula one_sel_env = formula::ff();
+      formula one_sel_sys = formula::ff();
+      formula nonempty = formula::ff();
+      formula empty = formula::tt();
+      for (int h = 0; h < n; ++h)
+        {
+          std::string hs = std::to_string(h);
+          formula ish = formula::ap("is" + hs);
+          sel_env.push_back(ish);
+          one_sel_env = Or_(one_sel_env, ish);
+          formula osh = formula::ap("os" + hs);
+          sel_sys.push_back(osh);
+          one_sel_sys = Or_(one_sel_sys, osh);
+          for (int c = 0; c <= m; ++c)
+            {
+              std::string cs = std::to_string(c);
+              formula hh = formula::ap("o" + hs + "h" + cs);
+              heap.push_back(hh);
+              if (c == 0)
+                {
+                  nonempty = Or_(nonempty, Not_(hh));
+                  empty = And_(empty, hh);
+                }
+              if (h == 0 && c < m)
+                {
+                  formula chge = formula::ap("ic" + cs);
+                  chg_env.push_back(chge);
+                  one_chg_env = Or_(one_chg_env, chge);
+                  formula chgs = formula::ap("oc" + cs);
+                  chg_sys.push_back(chgs);
+                  one_chg_sys = Or_(one_chg_sys, chgs);
+                }
+            }
+        }
+
+      // system starts playing
+      std::vector<formula> init = {And_(t_sys, Not_(t_env))};
+      // when its your turn you have to select a one heap
+      std::vector<formula> rules_s = {Implies_(t_sys, one_sel_sys)};
+      std::vector<formula> rules_e = {Implies_(t_env, one_sel_env)};
+      for (int h = 0; h < n; ++h)
+        {
+          // If env hasn't selected heap h for its first move, that
+          // heap has m tokens.
+          init.push_back(Implies_(Not_(sel_sys[h]), Heap_(h, m)));
+          // If heap h is selected, one change value must be true.
+          init.push_back(Implies_(sel_sys[h], one_chg_sys));
+
+          // Heaps are mutually exclusive
+          for (int h2 = h + 1; h2 < n; ++h2)
+            {
+              rules_s.push_back(Not_(And_(sel_sys[h], sel_sys[h2])));
+              rules_e.push_back(Not_(And_(sel_env[h], sel_env[h2])));
+            }
+          // changes are mutually exclusive
+          for (int c = 0; c < m; ++c)
+            for (int o = 0; o < c; ++o)
+              {
+                rules_e.push_back(Not_(And_(chg_env[o], chg_env[c])));
+                rules_s.push_back(Not_(And_(chg_sys[o], chg_sys[c])));
+              }
+          for (int c = 0; c <= m; ++c)
+            {
+              // The content of the heap restrict the possible choice on
+              // next turn.
+              std::vector<formula> opte;
+              std::vector<formula> opts;
+              opte.reserve(c);
+              opts.reserve(c);
+              for (int o = 0; o < c; ++o)
+                {
+                  opte.push_back(chg_env[o]);
+                  opts.push_back(chg_sys[o]);
+                }
+              formula opts_e = Xs_(formula::Or(opte));
+              formula opts_s = Xs_(formula::Or(opts));
+              formula hhc = And_(nonempty, Heap_(h, c));
+              rules_e.push_back(Implies_(And_(hhc, Xs_(sel_env[h])), opts_e));
+              rules_s.push_back(Implies_(And_(hhc, Xs_(sel_sys[h])), opts_s));
+            }
+        }
+      // turns alternate between system and environment
+      rules_s.push_back(Xor_(t_env, t_sys));
+      rules_s.push_back(Implies_(Xs_(t_sys), t_env));
+      rules_s.push_back(Implies_(Xs_(t_env), t_sys));
+      // each heap can have only one value at a time.
+      for (int h = 0; h < n; ++h)
+        for (int c = 0; c <= m; ++c)
+          for (int c2 = c + 1; c2 <= m; ++c2)
+            rules_s.push_back(Not_(And_(Heap_(h, c), Heap_(h, c2))));
+      // updating the heap
+      for (int h = 0; h < n; ++h)
+        {
+          formula seh = And_(t_env, sel_env[h]);
+          formula ssh = And_(t_sys, sel_sys[h]);
+          for (int c = 0; c < m; ++c)
+            {
+              rules_s.push_back(Implies_(And_(seh, chg_env[c]), Heap_(h, c)));
+              rules_s.push_back(Implies_(And_(ssh, chg_sys[c]), Heap_(h, c)));
+            }
+        }
+      for (int h = 0; h < n; ++h)
+        {
+          formula xsenh = Xs_(And_(t_env, Not_(sel_env[h])));
+          formula xssnh = Xs_(And_(t_sys, Not_(sel_sys[h])));
+          for (int c = 0; c <= m; ++c)
+            {
+              rules_s.push_back(Implies_(And_(xsenh, Heap_(h, c)),
+                                         Xs_(Heap_(h, c))));
+              rules_s.push_back(Implies_(And_(xssnh, Heap_(h, c)),
+                                         Xs_(Heap_(h, c))));
+            }
+        }
+
+
+      formula rul_e = G_(formula::And(rules_e));
+      formula rul_s = G_(formula::And(rules_s));
+      init.push_back(Implies_(rul_e, And_(rul_s,
+                                          U_(nonempty,
+                                             And_(t_env, empty)))));
+      return formula::And(init);
+    }
+
+
     formula ltl_pattern(ltl_pattern_id pattern, int n, int m)
     {
       if (n < 0)
@@ -1568,6 +1714,8 @@ namespace spot
           return counter_mealy(n);
         case LTLF_TV_DOUBLE_COUNTERS_MEALY:
           return counters_mealy(n);
+        case LTLF_TV_NIM_MEALY:
+          return nim_mealy(n, m);
         case LTL_END:
           break;
         }
@@ -1632,6 +1780,7 @@ namespace spot
           "u-right",
           "tv-counter-mealy",
           "tv-double-counters-mealy",
+          "tv-nim-mealy",
         };
       // Make sure we do not forget to update the above table every
       // time a new pattern is added.
@@ -1713,6 +1862,7 @@ namespace spot
         case LTL_U_RIGHT:
         case LTLF_TV_COUNTER_MEALY:
         case LTLF_TV_DOUBLE_COUNTERS_MEALY:
+        case LTLF_TV_NIM_MEALY:
           return 0;
         case LTL_END:
           break;
@@ -1783,6 +1933,8 @@ namespace spot
         case LTLF_TV_COUNTER_MEALY:
         case LTLF_TV_DOUBLE_COUNTERS_MEALY:
           return 1;
+        case LTLF_TV_NIM_MEALY:
+          return 2;
         case LTL_END:
           break;
         }

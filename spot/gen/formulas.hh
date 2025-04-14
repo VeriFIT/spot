@@ -185,6 +185,9 @@ namespace spot
       /// Double Counters LTLf with Mealy semantics
       /// \cite tabajara.19.ijcai
       LTLF_TV_DOUBLE_COUNTERS_MEALY,
+      /// Nim game specified in LTLf with Mealy semantics
+      /// \cite tabajara.19.ijcai
+      LTLF_TV_NIM_MEALY,
       LTL_END
     };
 
