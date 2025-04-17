@@ -10,6 +10,10 @@ traces) into Deterministic Finite Automata with transition-based
 acceptance.
 
 * Introduction to MTDFAs
+   :PROPERTIES:
+   :CUSTOM_ID: MTDFA
+   :END:
+
 
 Internally, the translation builds a DFA that is stored as an array of
 Multi-Terminal BDDs.  Such a structure is called MTDFA in Spot (for
@@ -76,7 +80,7 @@ ltlf2dfa --keep-names 'a M b' --mtdfa-dot
 
 These false and true constants should be interpreted as rejecting and
 accepting sinks.  When representing the automaton in a more
-traditional ways, we omit paths going to the rejecting sink.
+traditional way, we omit paths going to the rejecting sink.
 
 #+NAME: ltlf2dfa4
 #+BEGIN_SRC sh :exports code
@@ -94,7 +98,7 @@ ltlf2dfa --keep-names 'a M b' --dot=.A
 * Output format issues
 
 Spot currently has very limited support for DFAs, and does not know
-any format to represent these automata.  Currently we can abuse the HOA format
+any format to represent these automata.  Currently, we can abuse the HOA format
 to write those DFAs as if they were transition-based Büchi automata.
 
 #+BEGIN_SRC sh :exports both
@@ -139,7 +143,7 @@ ltlf2dfa --keep-names 'a M b' --dot
 
 * Inspecting the MTDFA
 
-Two options allow to study the MTDFA: =--mtdfa-dot= and =--mtdfa-stats=.
+Two options allow studying the MTDFA: =--mtdfa-dot= and =--mtdfa-stats=.
 
 The former has already been used above, and prints the MTDFA in DOT format.
 
@@ -199,10 +203,10 @@ The first lines are about the automaton itself:
 - =ap= is the number of atomic proposition that were involved in the
   construction of the automaton (the automaton may use fewer in practice)
 
-The next lines, starting with BuDDy, gives statistics about the BuDDy
-library's usage.  Those statistics are global, so if multiple automats
+The next lines, starting with BuDDy, give statistics about the BuDDy
+library's usage.  Those statistics are global, so if multiple automata
 are translated in a single run of =ltlf2dfa=, these statistics will
-likely be different than if automata are translated one at a time.
+likely be different if automata are translated one at a time.
 
 - =nodenum= is the total number of nodes currently allocated by the
   BuDDy library.  Each node occupies 16 bytes.  This number in
@@ -212,7 +216,7 @@ likely be different than if automata are translated one at a time.
 - =produced= is the total number of nodes ever produced (false and true
   are not counted).
 - =cachesize= is the size of each operation cache of BuDDy.  Each
-  entry in a cache is 16 byte, and BuDDy as 6 such caches.  The MTBDD
+  entry in a cache is 16 bytes, and BuDDy as 6 such caches.  The MTBDD
   operations needed to translate LTLf to DFA will allocate a couple
   additional temporary caches of that same size, but this is not
   accounted here.
@@ -222,7 +226,7 @@ likely be different than if automata are translated one at a time.
   since its initialization.
 
 With the =--mtdfs-stats=nodes= options, additional information about the
-node usage of the automaton is retrieve.  This requires a linear scan of
+node usage of the automaton is retrieved.  This requires a linear scan of
 the entire DAG.
 
 #+BEGIN_SRC sh :exports both
@@ -247,10 +251,10 @@ BuDDy gbcnum: 0
 
 - =internal nodes= is the number of white nodes in the above pictures
 - =terminal nodes= counts magenta nodes
-- =constants nodes= counts the orange nodes)
+- =constants nodes= counts the orange nodes
 - =total nodes= is the sum of the above three.
 
-With =--mtdfa-stats=paths= we additionally counts paths and edges.  This
+With =--mtdfa-stats=paths= we additionally count paths and edges.  This
 computation can be exponential in the number of atomic propositions.
 
 #+BEGIN_SRC sh :exports both
@@ -277,7 +281,7 @@ BuDDy gbcnum: 0
 
 - =paths= is the number of different paths leading from a blue node to
   a leave (excluding paths leading to the rejecting sink)
-- =edges= is the number of pairs (state,leaf) that are connected by a
+- =edges= is the number of pairs (state, leaf) that are connected by a
   paths (again, paths leading to false rejecting sink are not considered)
 
 If we want to estimate the memory consumption of a MTDFA, each node
@@ -303,7 +307,7 @@ The =--translation= option can be used to select between two translation algorit
   directly.  The resulting MTDFA can only be minimized after the
   translation.
 - With =--translation=compositional=, the formula is split according
-  the the Boolean operators that appear above temporal operators.
+  to the Boolean operators that appear above temporal operators.
   Maximal subformulas whose top-level operator is temporal are
   translated directly.  Then the resulting MTDFAs are combined
   according to the Boolean operator that are above it.  This approach
@@ -319,3 +323,9 @@ direct translation has to track those formulas anyway.  For
 minimization and compositions this requires some extra work and
 memory, but it is usually negligible compared to size of the
 automaton.
+
+#  LocalWords:  utf ltlf dfa LTLf automata html args LTL MTDFAs MTDFA
+#  LocalWords:  BDDs SRC GFc mtdfa svg txt BDD DFAs HOA Büchi acc aps
+#  LocalWords:  Buchi BuDDy nodenum freenodes cachesize hashsize ap
+#  LocalWords:  gbcnum MTBDD BuDDy's unicity mtdfs AST subformulas
+#  LocalWords:  benchmarking

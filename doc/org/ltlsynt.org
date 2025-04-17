@@ -252,6 +252,8 @@ ltlsynt --help | sed -n '/--simplify=/,/^$/p' | sed '$d'
 :                              (bisim-sat) SAT after bisim, (bwoa-sat) SAT after
 :                              bwoa.  Defaults to 'bwoa'.
 
+<<AIG>>
+
 Finally, the strategy is encoded into [[http://fmv.jku.at/aiger/][AIGER]].  The =--aiger= option can
 take an argument to specify a type of encoding to use: by default it
 is =ite= for if-then-else, because it follows the structure of BDD

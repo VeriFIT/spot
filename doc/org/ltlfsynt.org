@@ -68,7 +68,7 @@ counter, as encoded on the first line.
 When the input variable =inc= is set, the counter should be
 incremented by one on the next step.  This is encoded on the next four
 lines, by using to extra output variables to represent carries
-(=oc0= and =oc1=), and ensuring that, if a next step exist, the next
+(=oc0= and =oc1=), and ensuring that, if a next step exists, the next
 value of the counter (=X[!]ob0= and =X[!]ob1=) will be set according
 to its current value and to that of the carries.
 
@@ -135,7 +135,7 @@ State: 4
 --END--
 #+end_example
 
-We can hide the =REALIZABLE= line with =--hide=, and print  the Mealy
+We can hide the =REALIZABLE= line with =--hide=, and print the Mealy
 machine in GraphViz's format as follows:
 
 #+BEGIN_SRC sh :exports code :session ex1
@@ -163,9 +163,9 @@ satisfy the specification.  Once the specification has been satisfied,
 the controller is free to output anything.  This is why the values of
 =ob0=, =ob1=, =oc1= are not specified on the transition leaving the
 rightmost state: that state is reached either when the counter wrapped
-to zero, or when the input signal do not satisfy our assumption
+to zero, or when the input signals do not satisfy our assumption
 (=G(!inc -> X[!]inc)=), so at that point the specification has been
-satisfied and the output variable can be chosen freely.
+satisfied, and the output variable can be chosen freely.
 
 The reason we still force the value of =oc0= to be equal to that of
 =inc= on the last state is because of an optimization in =ltlfsynt=:
@@ -299,7 +299,7 @@ those starting with =o= are output.
 
 Similarly, the semantics also have to be specified using
 =--semantics=Mealy= (the default) or =--semantics=Moore=.  When
-comparing =ltlfsynt= to other tools, beware that they may have not
+comparing =ltlfsynt= to other tools, beware that they may not
 have the same semantics by default.
 
 When the specification is passed as a TLSF file with the =--tlsf=
@@ -311,13 +311,13 @@ variables, and to obtain the semantics to use.
 
 =ltlfsynt= operates in several phases as follows:
 
-  1. preprocess the specification
-  2. translate the LTLf specification into two-player game
-  3. solve the two-player game
-  4. extract a winning strategy as a Mealy machine
-  5. encode the Mealy machine in AIG
+  1. Preprocess the specification.
+  2. Translate the LTLf specification into two-player game.
+  3. Solve the two-player game.
+  4. Extract a winning strategy as a Mealy machine.
+  5. Encode the Mealy machine in AIG.
 
-Steps 2 & 3 are optionally merged together.
+Steps 2 & 3 are optionally merged together and performed on-the-fly.
 
 ** Preprocessing
 
@@ -338,9 +338,36 @@ Various optimizations are enabled by default.
   decomposition sometimes need to distribute subformulas to favor
   decompositions.  This can be disabled with =--simplify=no=.
 
+The easiest way to track what is going on with these options is to run
+=ltlfsynt= with the =--verbose= options.
+
+#+BEGIN_SRC sh :exports code :session ex1 :prelude exec 2>&1
+  ltlfsynt --semantic=Mealy -f "$f" --verbose --realizability
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+using Mealy semantics
+the following signals can be temporarily removed:
+  oc0 := inc
+new formula: (init0 <-> ob0) & (init1 <-> ob1) & G((X[!]ob1 -> (ob1 xor oc1)) & (X[!]!ob1 -> (ob1 <-> oc1))) & (G(!inc -> X[!]inc) -> F(!ob0 & !ob1)) & G((X[!]ob0 -> (inc xor ob0)) & (X[!]!ob0 -> (inc <-> ob0))) & G(oc1 <-> (inc & ob0))
+no decomposition found
+formula simplified to (init0 <-> ob0) & (init1 <-> ob1) & (G(inc | X[!]inc) -> F(!ob0 & !ob1)) & G((oc1 <-> (inc & ob0)) & ((ob1 xor oc1) | X!ob1) & ((ob1 <-> oc1) | Xob1) & ((inc xor ob0) | X!ob0) & ((inc <-> ob0) | Xob0))
+starting on-the-fly translation with node-based backpropagation, with DFS order, with one-step preprocess
+translation to MTDFA (1 roots, 6 APs) took 0.00152387 seconds
+MTDFA game was solved during translation
+REALIZABLE
+#+end_example
+
+Here we see that the =oc0= was replaced by =inc= (such replacement
+occur because of =--global-equiv= is enabled by default), that the
+formula could not be decomposed (=--decompose=yes= is the default),
+and the result of =--simplify=yes= (the default) is shown before
+starting the translation.
+
 ** Translation & Game solving
 
-By default those two steps are combined and performed on-the-fly.
+By default, those two steps are combined and performed on-the-fly.
 This gives the best results.  =ltlfilt= supports alternative
 approaches.  In all approaches, the DFA that is constructed is
 represented using multi-terminal binary decision diagrams (MTBDD).
@@ -371,14 +398,59 @@ meaningful specifications, and =compositional= is often than
 =restricted= or specifications built from random combination
 specifications.
 
-The automaton that is built can be minimized.  This is controlled with
+
+The [[file:ltlf2dfa.org::#MTDFA][MTDFA]] (that Spot's name for MTBDD-encoded DFA) resulting from
+these translations, and that will be used directly as a reachability
+game, can be displayed with =--dot=game=.  Here is the output for the
+full translation (the compositional translation would give the same
+output on this example).  See [[file:ltlf2dfa.org::#MTDFA][this page]] if you need an introduction to
+MTDFAs.  The MTDFA is interpreted as a game in which round node are
+player by the environment, diamond nodes are played by the controller,
+and the controller want to force the game to reach an accepting state.
+
+#+NAME: ltlfsyntexgame-full
+#+BEGIN_SRC sh :exports code :session ex1
+  ltlfsynt --trans=full --semantic=Mealy -f "$f" --hide --dot=game
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlfsyntexgame-full.svg :var txt=ltlfsyntexgame-full :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlfsyntexgame-full.svg]]
+
+
+For comparison, here is MTDFA output by the =restricted= translation.
+Note how all accepting states have been merged into the true BDD node,
+and the game have been simplified already.
+
+#+NAME: ltlfsyntexgame-rest
+#+BEGIN_SRC sh :exports code :session ex1
+  ltlfsynt --trans=restrict --semantic=Mealy -f "$f" --hide --dot=game
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlfsyntexgame-rest.svg :var txt=ltlfsyntexgame-rest :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlfsyntexgame-rest.svg]]
+
+In the above case, we are lucky that the result of this translation is
+already a strategy: each diamond node has exactly one child that is
+the false BDD node, so the strategy is to always take the other child.
+Generally, the result of the translation may not be a strategy; that
+will be computed in a second step.
+
+The automaton that has been built can be minimized.  This is controlled with
 the =--minimize=yes= and =--minimize=no= options.  By default,
 minimization is only turned on for =--translation=compositional=,
 because minimization is what makes the compositional translation fast.
 For other approaches, minimization is not recommended, because solving
 the unminimized automaton is faster than minimizing it.
 
-The MTBDD-based DFA is interpreted as game that can be solved in two ways:
+The MTBDD-based DFA is interpreted as a game that can be solved in two ways:
 - =--backprop=nodes=: solve the game by backpropagation at the level
   of the MTBDD nodes.  This is a linear algorithm.
 - =--backprop=states=: solve the game by backpropagation but at the
@@ -387,8 +459,8 @@ The MTBDD-based DFA is interpreted as game that can be solved in two ways:
 
 *** On-the-fly approaches
 
-The DFA can be built on-the-fly.  Thiss build the equivalent of the "restricted"
-automaton from above and solve the game as it is constructed.
+The DFA can be built on-the-fly.  This builds the equivalent of the "restricted"
+automaton from above and solves the game as it is constructed.
 
 The order in which states are explored can be controlled with
 =--translation=dfs= or =--translation=bfs=.
@@ -409,7 +481,40 @@ optimization is a huge help.  Conversely, for some specifications
 where this does not help, this is just an unnecessary overhead.  You
 may disable it with =--one-step-preprocess=no=.
 
+The option =--dot=game= still works with on-the-fly approaches, but in
+that case it can only display the strategy that results from creating
+the game and solving it on-the-fly.  If this is combined with
+=--realizability= (discussed below), the strategy returned by the
+on-the-fly approach is simplified to true or false, so there is not
+much to see.
+
 ** Realizability
 
-Use the =--realizability= to interrupt the process once the game has
+Use the =--realizability= to interrupts the process once the game has
 been solved.
+
+#+begin_note
+In addition to our test-suite, we have run =ltlfsynt --realizability=
+on [[https://github.com/SYNTCOMP/benchmarks/][benchmarks from the LTLf tracks of the Synthesis Competition]], and
+ensured that all results where consistent between various
+configurations of =ltlfsynt= and with several other LTLf realizability
+tools.
+
+In contrast, the generation of controllers in any form (HOA, AIG) has
+not yet been thoroughly tested and should be regarded as highly
+experimental.
+#+end_note
+
+** AIG encoding
+
+=ltlfsynt= shares its AIG encoder with =ltlsynt=, so see [[file:ltlsynt.org::AIG][=ltlsynt='s --aiger option]].
+
+#  LocalWords:  utf ltlfsynt realizabiity LTLf html args LTL AIG le
+#  LocalWords:  realizability varphi mathbb genltl SRC tv sed init oc
+#  LocalWords:  HOA acc GraphViz's ltlfsyntexstrat svg txt ltlsynt un
+#  LocalWords:  AIGER aiger aag ltlfsyntexaig aig TLSF tlsf ltlfilt
+#  LocalWords:  ltlfsynt's syfco preprocess Preprocessing subformulas
+#  LocalWords:  decompositions Xob backpropagation DFS MTDFA APs DFA
+#  LocalWords:  MTBDD automata reachability MTDFAs ltlfsyntexgame BDD
+#  LocalWords:  unminimized backprop dfs bfs backpropagated
+#  LocalWords:  unrealizable
