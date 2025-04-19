@@ -91,7 +91,7 @@ start with =i= and =o= respectively, so =ltlfsynt= can tell them apart
 automatically.)
 
 #+BEGIN_SRC sh :exports both :session ex1
-ltlfsynt --semantic=Mealy -f "$f" --realizability
+ltlfsynt --semantics=Mealy -f "$f" --realizability
 #+END_SRC
 #+RESULTS:
 : REALIZABLE
@@ -102,7 +102,7 @@ Without the =--realizability= switch, =ltlfsynt= will additionally
 print a Mealy machine representing the controller, in the [[file:hoa.org][HOA format]].
 
 #+BEGIN_SRC sh :exports both :session ex1
-ltlfsynt --semantic=Mealy -f "$f"
+ltlfsynt --semantics=Mealy -f "$f"
 #+END_SRC
 
 #+RESULTS:
@@ -139,12 +139,12 @@ We can hide the =REALIZABLE= line with =--hide=, and print the Mealy
 machine in GraphViz's format as follows:
 
 #+BEGIN_SRC sh :exports code :session ex1
-  ltlfsynt --semantic=Mealy -f "$f" --hide --dot=strategy
+  ltlfsynt --semantics=Mealy -f "$f" --hide --dot=strategy
 #+END_SRC
 
 #+NAME: ltlfsyntexstrat
 #+BEGIN_SRC sh :exports none :session ex1
-  ltlfsynt --semantic=Mealy -f "$f" --hide --dot=strategy:.
+  ltlfsynt --semantics=Mealy -f "$f" --hide --dot=strategy:.
 #+END_SRC
 
 #+BEGIN_SRC dot :file ltlfsyntexstrat.svg :var txt=ltlfsyntexstrat :exports results
@@ -179,7 +179,7 @@ The controller may be output as an And-Inverter-Graph in [[http://fmv.jku.at/aig
 using the =--aiger= option:
 
 #+BEGIN_SRC sh :exports both :session ex1
-  ltlfsynt --semantic=Mealy -f "$f" --aiger
+  ltlfsynt --semantics=Mealy -f "$f" --aiger
 #+END_SRC
 
 #+RESULTS:
@@ -263,7 +263,7 @@ controller:
 
 #+NAME: ltlfsyntexaig
 #+BEGIN_SRC sh :exports code :session ex1
-  ltlfsynt --semantic=Mealy -f "$f" --hide --dot=aig
+  ltlfsynt --semantics=Mealy -f "$f" --hide --dot=aig
 #+END_SRC
 
 #+BEGIN_SRC dot :file ltlfsyntexaig.svg :var txt=ltlfsyntexaig :exports results
@@ -342,7 +342,7 @@ The easiest way to track what is going on with these options is to run
 =ltlfsynt= with the =--verbose= options.
 
 #+BEGIN_SRC sh :exports code :session ex1 :prelude exec 2>&1
-  ltlfsynt --semantic=Mealy -f "$f" --verbose --realizability
+  ltlfsynt --semantics=Mealy -f "$f" --verbose --realizability
 #+END_SRC
 
 #+RESULTS:
@@ -410,7 +410,7 @@ and the controller want to force the game to reach an accepting state.
 
 #+NAME: ltlfsyntexgame-full
 #+BEGIN_SRC sh :exports code :session ex1
-  ltlfsynt --trans=full --semantic=Mealy -f "$f" --hide --dot=game
+  ltlfsynt --trans=full --semantics=Mealy -f "$f" --hide --dot=game
 #+END_SRC
 
 #+BEGIN_SRC dot :file ltlfsyntexgame-full.svg :var txt=ltlfsyntexgame-full :exports results
@@ -427,7 +427,7 @@ and the game have been simplified already.
 
 #+NAME: ltlfsyntexgame-rest
 #+BEGIN_SRC sh :exports code :session ex1
-  ltlfsynt --trans=restrict --semantic=Mealy -f "$f" --hide --dot=game
+  ltlfsynt --trans=restrict --semantics=Mealy -f "$f" --hide --dot=game
 #+END_SRC
 
 #+BEGIN_SRC dot :file ltlfsyntexgame-rest.svg :var txt=ltlfsyntexgame-rest :exports results
