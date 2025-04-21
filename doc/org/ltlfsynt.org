@@ -75,7 +75,7 @@ to its current value and to that of the carries.
 #+begin_note
 =X[!]= is Spot's notation for the /strong next/ operator of LTLf.  The
 /weak next/ is simply noted =X=.  Since we are working with finite
-words, a /strong next/ ensure that the current instant is not the last
+words, a /strong next/ ensures that the current instant is not the last
 one.  A /weak next/ is always satisfied on the last instant.
 #+end_note
 

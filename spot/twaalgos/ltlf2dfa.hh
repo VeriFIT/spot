@@ -284,7 +284,7 @@ namespace spot
   /// will be replaced by bddtrue, and some nodes will be simplified
   /// according to their controllability.
   ///
-  /// The sent of output variables should be specified with \a outvars.
+  /// The set of output variables should be specified with \a outvars.
   ///
   /// If \a backprop is set to `node_backprop`, then a backpropagation
   /// graph it constructed while the automaton for \a f is explored.
