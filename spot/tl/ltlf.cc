@@ -152,8 +152,6 @@ namespace spot
           return ltlf_one_step_unsat_rewrite(f[0], true);
         else
           return formula::tt();
-      case op::Xor:
-      case op::Equiv:
       case op::G:
         if (negate)           // F
           return formula::tt();
@@ -185,6 +183,26 @@ namespace spot
             formula f2 = ltlf_one_step_unsat_rewrite(f[1], false);
             return formula::Or({ltlf_one_step_unsat_rewrite(f[0], true), f2});
           }
+      case op::Xor:
+      case op::Equiv:
+        {
+          formula a = ltlf_one_step_unsat_rewrite(f[0]);
+          formula b = ltlf_one_step_unsat_rewrite(f[1]);
+          formula na = ltlf_one_step_unsat_rewrite(f[0], true);
+          formula nb = ltlf_one_step_unsat_rewrite(f[1], true);
+          if ((o == op::Xor) == negate) // equiv
+            {
+              formula f1 = formula::And({a, b});
+              formula f2 = formula::And({na, nb});
+              return formula::Or({f1, f2});
+            }
+          else
+            {
+              formula f1 = formula::And({a, nb});
+              formula f2 = formula::And({na, b});
+              return formula::Or({f1, f2});
+            }
+        }
       case op::And:
       case op::Or:
         {
