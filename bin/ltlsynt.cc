@@ -58,6 +58,7 @@ enum
   OPT_PRINT,
   OPT_PRINT_HOA,
   OPT_REAL,
+  OPT_SEMANTICS,
   OPT_SIMPLIFY,
   OPT_SPLITTYPE,
   OPT_TLSF,
@@ -83,6 +84,10 @@ static const argp_option options[] =
     { "from-pgame", OPT_FROM_PGAME, "FILENAME", 0,
       "Read a parity game in Extended HOA format instead of building it.",
       0 },
+    // This option is not yet supported.  Un-hide it once available.
+    { "semantics", OPT_SEMANTICS, "Moore|Mealy", OPTION_HIDDEN,
+      "Whether to work under Mealy (input-first) or Mealy "
+      "(output-first) semantics.  The default is Mealy.", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
     { "algo", OPT_ALGO, "sd|ds|ps|lar|lar.old|acd", 0,
@@ -223,6 +228,21 @@ static spot::synthesis_info::algo const algo_types[] =
   spot::synthesis_info::algo::ACD,
 };
 ARGMATCH_VERIFY(algo_args, algo_types);
+
+static const char* const semantics_args[] =
+  {
+    "mealy", "moore",
+    "Mealy", "Moore",
+    nullptr
+  };
+enum semantics_choice { semantics_default, semantics_mealy, semantics_moore };
+static const semantics_choice semantics_values[] =
+  {
+    semantics_mealy, semantics_moore,
+    semantics_mealy, semantics_moore,
+  };
+ARGMATCH_VERIFY(semantics_args, semantics_values);
+static semantics_choice opt_semantics = semantics_default;
 
 static const char* const bypass_args[] =
   {
@@ -469,6 +489,8 @@ namespace
                 const std::vector<std::string>& input_aps,
                 const std::vector<std::string>& output_aps)
   {
+    if (opt_semantics == semantics_moore)
+      error(2, 0, "Moore semantics are not supported yet");
     spot::formula f = original_f;
     if (opt_csv)              // reset benchmark data
       gi->bv = spot::synthesis_info::bench_var();
@@ -855,7 +877,26 @@ namespace
           for (const std::string& a: *all_output_aps)
             identifier_map.emplace(a, true);
         }
+      semantics_choice old_semantics = opt_semantics;
+      if (old_semantics == semantics_default)
+        {
+          static char arg5[] = "--print-target";
+          char* command[] = { arg0, arg5,
+                              const_cast<char*>(filename), nullptr };
+          std::string res = read_stdout_of_command(command);
+
+          auto not_space = [](unsigned char c){ return !std::isspace(c); };
+          res.erase(std::find_if(res.rbegin(), res.rend(), not_space).base(),
+                    res.end());
+          if (res == "Mealy")
+            opt_semantics = semantics_mealy;
+          else if (res == "Moore")
+            opt_semantics = semantics_moore;
+          else
+            error(2, 0, "%s: unknown target: `%s'", filename, res.c_str());
+        }
       int res = process_string(tlsf_string, filename);
+      opt_semantics = old_semantics;
       if (reset_aps)
         {
           all_output_aps.reset();
@@ -1103,6 +1144,10 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_REAL:
       opt_real = true;
+      break;
+    case OPT_SEMANTICS:
+      opt_semantics = XARGMATCH("--semantics", arg,
+                                semantics_args, semantics_values);
       break;
     case OPT_SIMPLIFY:
       gi->minimize_lvl = XARGMATCH("--simplify", arg,
