@@ -34,6 +34,7 @@
 #define Equiv_(x, y) formula::Equiv((x), (y))
 #define And_(x, y) formula::And({(x), (y)})
 #define Or_(x, y) formula::Or({(x), (y)})
+#define Or3_(x, y, z) formula::Or({(x), (y), (z)})
 #define U_(x, y) formula::U((x), (y))
 #define Xor_(x, y) formula::Xor((x), (y))
 
@@ -1448,6 +1449,10 @@ namespace spot
       // Nim game with n heaps of size m.
       // See section B.3 in
       // https://bitbucket.org/ijcai2816/ijcai-2816/src/master/Appendix.pdf
+      if (n <= 0)
+        bad_number("tv-nim-mealy", n);
+      if (m <= 0)
+        bad_number("tv-nim-mealy", m);
 
       std::vector<formula> sel_env;
       sel_env.reserve(n);
@@ -1587,6 +1592,159 @@ namespace spot
       return formula::And(init);
     }
 
+    static formula
+    chomp_mealy(int n, int m)
+    {
+      // Chomp game on grid of width N, height Mn heaps of size m.
+      // https://en.wikipedia.org/wiki/Chomp
+      if (n <= 0)
+        bad_number("chomp-mealy", n);
+      if (m <= 0)
+        bad_number("chomp-mealy", m);
+
+#define Pos_(x, y) (pos[(x) + (y) * n])
+      std::vector<formula> pos;
+      pos.reserve(n * m);
+      std::vector<formula> ix;
+      ix.reserve(n);
+      std::vector<formula> iy;
+      iy.reserve(m);
+      std::vector<formula> ox;
+      ox.reserve(n);
+      std::vector<formula> oy;
+      oy.reserve(m);
+      formula t_env = formula::ap("oti");
+      formula t_sys = formula::ap("oto");
+      for (int y = 0; y < m; ++y)
+        {
+          std::string ys = std::to_string(y);
+          oy.push_back(formula::ap("oy" + ys));
+          iy.push_back(formula::ap("iy" + ys));
+          for (int x = 0; x < n; ++x)
+            {
+              std::string xs = std::to_string(x);
+              formula posxy = formula::ap("o" + xs + "b" + ys);
+              pos.push_back(posxy);
+              if (y == 0)
+                {
+                  ox.push_back(formula::ap("ox" + xs));
+                  ix.push_back(formula::ap("ix" + xs));
+                }
+            }
+        }
+
+      // system starts playing
+      std::vector<formula> init = {t_sys, Not_(t_env)};
+      // G((oti xor oto) & oti->Xoto & oto->Xoti)
+      init.push_back(G_(Xor_(t_sys, t_env)));
+      init.push_back(G_(Implies_(t_sys, X_(t_env))));
+      init.push_back(G_(Implies_(t_env, X_(t_sys))));
+
+      // oIbJ is true initially IFF ox[x] and oy[y] are false
+      for (int y = 0; y < m; ++y)
+        for (int x = 0; x < n; ++x)
+          //    Pos(x,y) xor (ox[x] & oy[y])
+          init.push_back(formula::Xor(Pos_(x, y), And_(ox[x], oy[y])));
+
+      std::vector<formula> orules; // rules for output player
+      std::vector<formula> irules; // rules for input player
+      // ox[x] -> ox[x+1]
+      // oy[y] -> oy[y+1]
+      for (int x = 0; x < n - 1; ++x)
+        {
+          orules.push_back(Implies_(ox[x], ox[x+1]));
+          irules.push_back(Implies_(ix[x], ix[x+1]));
+        }
+      for (int y = 0; y < m - 1; ++y)
+        {
+          orules.push_back(Implies_(oy[y], oy[y+1]));
+          irules.push_back(Implies_(iy[y], iy[y+1]));
+        }
+
+      // at least one square must be taken at each turn
+      // as long as (0,0) is available.
+      {
+        std::vector<formula> tmp;
+        tmp.reserve(n * m);
+        for (int y = 0; y < m; ++y)
+          for (int x = 0; x < n; ++x)
+            tmp.push_back(And_(Pos_(x, y), X_(And_(ix[x], iy[y]))));
+        formula change = formula::Or(tmp);
+        irules.push_back(Implies_(And_(Pos_(0, 0), t_sys), change));
+        tmp.clear();
+        for (int y = 0; y < m; ++y)
+          for (int x = 0; x < n; ++x)
+            tmp.push_back(And_(Pos_(x, y), X_(And_(ox[x], oy[y]))));
+        change = formula::Or(tmp);
+        orules.push_back(Implies_(And_(Pos_(0, 0), t_env), change));
+      }
+
+      // when its not the environment/controller turn, nothing should
+      // be selected.  Also make sure the system selects something
+      // initially.
+      {
+        std::vector<formula> onegs;
+        onegs.reserve(n + m);
+        std::vector<formula> inegs;
+        inegs.reserve(n + m);
+        std::vector<formula> otmp;
+        otmp.reserve(std::max(n, m));
+        for (int x = 0; x < n; ++x)
+          {
+            otmp.push_back(ox[x]);
+            onegs.push_back(Not_(ox[x]));
+            inegs.push_back(Not_(ix[x]));
+          }
+        // system has to play something initially
+        init.push_back(formula::Or(otmp));
+        otmp.clear();
+        for (int y = 0; y < m; ++y)
+        {
+          otmp.push_back(oy[y]);
+          onegs.push_back(Not_(oy[y]));
+          inegs.push_back(Not_(iy[y]));
+        }
+        // system has to play something initially
+        init.push_back(formula::Or(otmp));
+
+        formula oneg = formula::And(onegs);
+        formula ineg = formula::And(inegs);
+        orules.push_back(Implies_(Not_(t_sys), oneg));
+        irules.push_back(Implies_(Not_(t_env), ineg));
+      }
+
+
+      // !Pos(x,y) -> X(!Pos(x,y))
+      // Pos(x,y) -> X[!](Pos(x,y) | (ix[x] & iy[y] | (ox[x] & oy[y])))
+      // ((ox[x] & oy[y]) | (ix[x] & iy[y])) -> !Pos(x,y)
+      {
+        for (int y = 0; y < m; ++y)
+          for (int x = 0; x < n; ++x)
+            {
+              formula npos = Not_(Pos_(x, y));
+              orules.push_back(Implies_(npos, X_(npos)));
+              formula osel = And_(ox[x], oy[y]);
+              formula isel = And_(ix[x], iy[y]);
+
+              orules.push_back(Implies_(Pos_(x, y),
+                                        Xs_(Or3_(Pos_(x, y), osel, isel))));
+              orules.push_back(Implies_(Or_(osel, isel), npos));
+            }
+      }
+
+
+      formula irules_g = G_(formula::And(irules));
+      formula orules_g = G_(formula::And(orules));
+
+      // The game ends when (0,0) is taken, and we want the
+      // environment to take it for the system to win.
+      formula last = Pos_(0, 0);
+      init.push_back(Implies_(irules_g, And_(orules_g,
+                                             U_(last,
+                                                And_(t_env, Not_(last))))));
+      return formula::And(init);
+    }
+
 
     formula ltl_pattern(ltl_pattern_id pattern, int n, int m)
     {
@@ -1710,6 +1868,8 @@ namespace spot
           return bin_n("p", n, op::U, false);
         case LTL_U_RIGHT:
           return bin_n("p", n, op::U, true);
+        case LTLF_CHOMP_MEALY:
+          return chomp_mealy(n, m);
         case LTLF_TV_COUNTER_MEALY:
           return counter_mealy(n);
         case LTLF_TV_DOUBLE_COUNTERS_MEALY:
@@ -1778,6 +1938,7 @@ namespace spot
           "tv-uu",
           "u-left",
           "u-right",
+          "chomp-mealy",
           "tv-counter-mealy",
           "tv-double-counters-mealy",
           "tv-nim-mealy",
@@ -1860,6 +2021,7 @@ namespace spot
         case LTL_TV_UU:
         case LTL_U_LEFT:
         case LTL_U_RIGHT:
+        case LTLF_CHOMP_MEALY:
         case LTLF_TV_COUNTER_MEALY:
         case LTLF_TV_DOUBLE_COUNTERS_MEALY:
         case LTLF_TV_NIM_MEALY:
@@ -1930,6 +2092,9 @@ namespace spot
         case LTL_TV_UU:
         case LTL_U_LEFT:
         case LTL_U_RIGHT:
+          return 1;
+        case LTLF_CHOMP_MEALY:
+          return 2;
         case LTLF_TV_COUNTER_MEALY:
         case LTLF_TV_DOUBLE_COUNTERS_MEALY:
           return 1;

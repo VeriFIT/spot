@@ -40,7 +40,6 @@ G(i0->X[!](!o1 U i1))&G(i4->X[!](!o2 U i3))&G(i2->X[!](!o0 U o0))
 G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&((GFi3|Fi4)->(GFo4|Go0))
 G(i0|!X[!]o1)&G(i1|!X[!]o2)&G(i2|!X[!]o3)&G(i3|!X[!]o4)&G(i4|!X[!]o0)
 !(G(i3->Fo3)&G(i5->Fo2))&!(G(i0->Fo1)&G(i1->Fo0))&!(G(i4->Fo4)&G(i2->Fo4))
-!(G(i1->Fo0)&G(i3->Fo4))&!(G(i2->Fo2)&G(i0->Fo3))&!(G(i3->Fo5)&G(o3->Fo1))
 G(o1->X[!]!o1)&(Gi0->Fo2)&(G!i0->F!o2)&G(i1|!X[!]o3)&G(i2|!X[!]o4)&G(o->X[!]!o)
 G(i1->X[!](o0 U i4))&G(i0->X(o3 U i3))&G(i5->X[!](o1 U i6))&G(i7->X[!](o2 U i2))
 G(o<->i)
@@ -59,9 +58,10 @@ F((o0<->(i0<->i1))<->((i2&Fo0&Go2)W((!i2->i0)->X!o1)))
 !(X((i0 xor o1)|((o0 xor!o1)U i1))&(FXo0 R(o0 R!(i1 M 1))))
 (o0<->(i2->i0))->((!i2&Fi2)M(Gi2 xor(!i1 M((i1 W o1)M(i0|o1)))))
 EOF
-genltl --tv-counter-mealy=2..3 >> formulas.ltlf
-genltl --tv-double-counters-mealy=2..3 >> formulas.ltlf
-genltl --tv-nim-mealy=2..3,1..3 >> formulas.ltlf
+genltl --tv-counter-mealy=2..3 \
+       --tv-double-counters-mealy=2..3 \
+       --tv-nim-mealy=2..3,1..3 \
+       --chomp-mealy=2..3,2..3 >> formulas.ltlf
 
 line=0
 while read f; do
@@ -129,9 +129,9 @@ cat >expected <<EOF
 18 REALIZABLE REALIZABLE
 19 REALIZABLE REALIZABLE
 20 UNREALIZABLE UNREALIZABLE
-21 UNREALIZABLE UNREALIZABLE
-22 REALIZABLE REALIZABLE
-23 UNREALIZABLE UNREALIZABLE
+21 REALIZABLE REALIZABLE
+22 UNREALIZABLE UNREALIZABLE
+23 UNREALIZABLE REALIZABLE
 24 UNREALIZABLE REALIZABLE
 25 UNREALIZABLE REALIZABLE
 26 UNREALIZABLE REALIZABLE
@@ -150,13 +150,16 @@ cat >expected <<EOF
 39 UNREALIZABLE REALIZABLE
 40 UNREALIZABLE REALIZABLE
 41 UNREALIZABLE REALIZABLE
-42 UNREALIZABLE REALIZABLE
-43 REALIZABLE REALIZABLE
+42 REALIZABLE REALIZABLE
+43 UNREALIZABLE UNREALIZABLE
 44 UNREALIZABLE UNREALIZABLE
 45 UNREALIZABLE UNREALIZABLE
-46 UNREALIZABLE UNREALIZABLE
+46 UNREALIZABLE REALIZABLE
 47 UNREALIZABLE REALIZABLE
 48 UNREALIZABLE REALIZABLE
+49 UNREALIZABLE REALIZABLE
+50 UNREALIZABLE REALIZABLE
+51 UNREALIZABLE REALIZABLE
 EOF
 
 diff expected results

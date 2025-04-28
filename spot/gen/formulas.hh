@@ -179,6 +179,8 @@ namespace spot
       /// \cite geldenhuys.06.spin ,
       /// \cite gastin.01.cav .
       LTL_U_RIGHT,
+      /// Chomp game specified in LTLf with Mealy semantics
+      LTLF_CHOMP_MEALY,
       /// Single Counter LTLf with Mealy semantics
       /// \cite tabajara.19.ijcai
       LTLF_TV_COUNTER_MEALY,
