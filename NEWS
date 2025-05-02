@@ -5149,8 +5149,8 @@ New in spot 1.99.1 (2015-06-23)
     - Support for Python 2 was dropped.  We now support only Python
       3.2 or later.  The Python bindings have been improved a lot, and
       include some conveniance functions for better integration with
-      IPython's rich display system.  User familiar with IPython's
-      notebook should have a look at the notebook files in
+      IPython's rich display system.  Users familiar with IPython's
+      notebooks should have a look at the notebook files in
       wrap/python/tests/*.ipynb
 
   * Major news for the command-line tools
