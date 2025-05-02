@@ -1715,7 +1715,10 @@ namespace spot
 
 
       // !Pos(x,y) -> X(!Pos(x,y))
-      // Pos(x,y) -> X[!](Pos(x,y) | (ix[x] & iy[y] | (ox[x] & oy[y])))
+      // Pos(x,y) -> X(Pos(x,y) | (ix[x] & iy[y] | (ox[x] & oy[y])))
+      // This could be a strong X, but it does not have to because
+      // continuation is ensured by the U constraint later.  Keeping
+      // the X weak makes it possible to use this as LTL too.
       // ((ox[x] & oy[y]) | (ix[x] & iy[y])) -> !Pos(x,y)
       {
         for (int y = 0; y < m; ++y)
@@ -1727,7 +1730,7 @@ namespace spot
               formula isel = And_(ix[x], iy[y]);
 
               orules.push_back(Implies_(Pos_(x, y),
-                                        Xs_(Or3_(Pos_(x, y), osel, isel))));
+                                        X_(Or3_(Pos_(x, y), osel, isel))));
               orules.push_back(Implies_(Or_(osel, isel), npos));
             }
       }

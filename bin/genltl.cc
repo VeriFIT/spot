@@ -70,7 +70,7 @@ static const argp_option options[] =
     { "ccj-beta-prime", gen::LTL_CCJ_BETA_PRIME, "RANGE", 0,
       "F(p&(Xp)&(XXp)&...(X...X(p))) & F(q&(Xq)&(XXq)&...(X...X(q)))", 0 },
     { "chomp-mealy", gen::LTLF_CHOMP_MEALY, "RANGE[,RANGE]", 0,
-      "LTLf formula for NxM Chomp game, with Mealy semantics", 0 },
+      "LTL/LTLf formula for NxM Chomp game, with Mealy semantics", 0 },
     { "dac-patterns", gen::LTL_DAC_PATTERNS, "RANGE", OPTION_ARG_OPTIONAL,
       "Dwyer et al. [FMSP'98] Spec. Patterns for LTL "
       "(range should be included in 1..55)", 0 },
