@@ -22,6 +22,7 @@
 #include <error.h>
 #include <argmatch.h>
 #include <iomanip>
+#include <sys/stat.h>
 
 #include "common_aoutput.hh"
 #include "common_finput.hh"
@@ -33,6 +34,7 @@
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/ltlf.hh>
+#include <sys/stat.h>
 #include <spot/twaalgos/dot.hh>
 #include <spot/twaalgos/synthesis.hh> // for split_independent_formulas
 #include <spot/twaalgos/ltlf2dfa.hh>
@@ -75,9 +77,10 @@ static const argp_option options[] =
       " propositions, interpreted as a regex if enclosed in slashes", 0 },
     { "part-file", OPT_PART_FILE, "FILENAME", 0,
       "read the I/O partition of atomic propositions from FILENAME", 0 },
-    { "tlsf", OPT_TLSF, "FILENAME", 0,
+    { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,
       "Read a TLSF specification from FILENAME, and call syfco to "
-      "convert it into LTL.", 0 },
+      "convert it into LTLf.  Any parameter assignment specified after a slash"
+      " is passed as '-op VAR=VAL' to syfco." , 0 },
     { "semantics", OPT_SEMANTICS, "Moore|Mealy", 0,
       "Whether to work under Mealy (input-first) or Mealy "
       "(output-first) semantics.  The default is Mealy.", 0 },
@@ -830,17 +833,66 @@ namespace
                            opt_semantics != semantics_moore);
     }
 
+
     int
     process_tlsf_file(const char* filename) override
     {
+      if (assignments)
+        {
+          free(assignments);
+          assignments = nullptr;
+        }
+      char* syfco_filename = const_cast<char*>(filename);
+
+      // The filename passed can be either a real filename, or
+      // a string link FILENAME/ASSIGNMENTS where ASSIGNMENTS are
+      // comma-separated assignments.  E.g., "../spec.tlsf/N=3,M=4".
+      //
+      // If the filename contains a slash followed by some equal sign,
+      // and does not correspond to an existing file, then we remove
+      // the part after the last slash and assume the rest is a
+      // filename before passing it to syfco.  We don't check if the
+      // new (truncated) filename exist, syfco will do it anyway.
+      struct stat buf;
+      if (const char* slash = strrchr(filename, '/');
+          slash && strchr(slash, '=') && stat(filename, &buf) != 0)
+        {
+          if (real_filename)
+            free(real_filename);
+          real_filename = strndup(filename, slash - filename);
+          assignments = strdup(slash + 1);
+          syfco_filename = real_filename;
+        }
+
+      std::vector<char*> command;
       static char arg0[] = "syfco";
+      command.push_back(arg0);
+      // split assignments on commas, and pass each VAR=VALUE
+      // as -op VAR=VALUE to syfco.
+      if (assignments)
+        {
+          static char argop[] = "-op";
+          char* assignment = strtok(assignments, ",");
+          while (assignment)
+            {
+              command.push_back(argop);
+              command.push_back(assignment);
+              assignment = strtok(nullptr, ",");
+            }
+        }
+      unsigned after_assignments = command.size();
       static char arg1[] = "-f";
+      command.push_back(arg1);
       static char arg2[] = "ltlxba-fin";
+      command.push_back(arg2);
       static char arg3[] = "-m";
+      command.push_back(arg3);
       static char arg4[] = "fully";
-      char* command[] = { arg0, arg1, arg2, arg3, arg4,
-                          const_cast<char*>(filename), nullptr };
-      std::string tlsf_string = read_stdout_of_command(command);
+      command.push_back(arg4);
+      command.push_back(syfco_filename);
+      command.push_back(nullptr);
+
+      std::string tlsf_string = read_stdout_of_command(command, opt_verbose);
 
       // The set of atomic proposition will be temporary set to those
       // given by syfco, unless they were forced from the command-line.
@@ -848,10 +900,12 @@ namespace
       if (!all_input_aps.has_value() && !all_output_aps.has_value())
         {
           reset_aps = true;
-          static char arg5[] = "--print-output-signals";
-          char* command[] = { arg0, arg5,
-                              const_cast<char*>(filename), nullptr };
-          std::string res = read_stdout_of_command(command);
+          command.resize(after_assignments);
+          static char arg[] = "--print-output-signals";
+          command.push_back(arg);
+          command.push_back(syfco_filename);
+          command.push_back(nullptr);
+          std::string res = read_stdout_of_command(command, opt_verbose);
 
           all_output_aps.emplace(std::vector<std::string>{});
           split_aps(res, *all_output_aps);
@@ -861,10 +915,12 @@ namespace
       semantics_choice old_semantics = opt_semantics;
       if (old_semantics == semantics_default)
         {
-          static char arg5[] = "--print-target";
-          char* command[] = { arg0, arg5,
-                              const_cast<char*>(filename), nullptr };
-          std::string res = read_stdout_of_command(command);
+          command.resize(1);    // syfco
+          static char arg[] = "--print-target";
+          command.push_back(arg);
+          command.push_back(syfco_filename);
+          command.push_back(nullptr);
+          std::string res = read_stdout_of_command(command, opt_verbose);
 
           auto not_space = [](unsigned char c){ return !std::isspace(c); };
           res.erase(std::find_if(res.rbegin(), res.rend(), not_space).base(),

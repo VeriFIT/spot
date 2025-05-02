@@ -154,6 +154,20 @@ OUT=$(syfco --print-output-signals FILE)
 ltlsynt --formula="$LTL" --outs="$OUT"
 #+END_SRC
 
+Additionally, using =--tlsf= will verify that the TLSF specification
+is defined using Mealy semantics, as =ltlsynt= does not yet support
+Moore semantics.
+
+Some TLSF models are defined with parameters.  Those parameters have
+default values specified within the =PARAMETERS= block of the TLSF
+specification.  You may tell =ltlsynt= to change those parameters by
+appending =/PARAM1=VAL1,PARAM2=VAL2...= to the filename.  For
+instance:
+
+#+BEGIN_SRC sh :export code
+ltlsynt --tlsf arbiter.tlsf/n=3
+#+END_SRC
+
 
 * Output options
 

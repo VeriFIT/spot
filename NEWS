@@ -28,6 +28,13 @@ New in spot 2.13.0.dev  (not yet released)
     very slow approach of going from LTLf->LTL->DBA->DFA.  ltlf2dfa is
     way faster.
 
+  - Tools that take a "--tlsf FILENAME" option (ltlsynt, ltlfsynt, and
+    ltlf2dfa currently) will now accept arguments of the form
+    FILENAME/VAR1=VAL1,VAR2=VAL2... to override parameters defined
+    in the TLSF file.  E.g.:
+
+        ltlsynt --tlsf arbiter.tlsf/n=3
+
   Library:
 
   - spot::mtdfa is a new class implementing a DFA using Multi-Terminal

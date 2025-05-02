@@ -547,6 +547,20 @@ read_stdout_of_command(char* const* args)
 #endif
 }
 
+std::string read_stdout_of_command(std::vector<char*> args,
+                                   std::ostream* verbose)
+{
+  if (verbose)
+    {
+      *verbose << "running:";
+      for (char* arg: args)
+        if (arg)
+          *verbose << ' ' << arg;
+      *verbose << '\n';
+    }
+  return read_stdout_of_command(args.data());
+}
+
 
 std::atomic<bool> timed_out{false};
 unsigned timeout_count = 0;

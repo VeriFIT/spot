@@ -179,3 +179,5 @@ int exec_with_timeout(const char* cmd);
 // with an error message if the command is not found, or if it exit
 // with a non-zero status code.
 std::string read_stdout_of_command(char* const* args);
+std::string read_stdout_of_command(std::vector<char*> args,
+                                   std::ostream* verbose = nullptr);
