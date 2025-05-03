@@ -69,9 +69,17 @@ org: $(PICTURES_EXTRA)
 # We mirror the SourceForge URL here, because we have too many issues
 # with these automated download otherwise (mainly SSL issues and down
 # time), and failing to download those breaks our automated builds.
-PLANTUML_URL = https://www.lrde.epita.fr/dload/spot/deps/plantuml.jar
+#
+# We have two local web sites, but recently they have been unreliable
+# too...  Now that Plantuml has moved to GitHub, maybe we should
+# go fetch the jar file there.
+PLANTUML_URL1 = https://www.lre.epita.fr/dload/spot/deps/plantuml.jar
+PLANTUML_URL2 = https://www.lrde.epita.fr/dload/spot/deps/plantuml.jar
 org/plantuml.jar:
-	wget $(PLANTUML_URL) -O org/plantuml.jar || curl -L $(PLANTUML_URL) -o org/plantuml.jar
+	wget $(PLANTUML_URL1) -O org/plantuml.jar || \\
+        curl -L $(PLANTUML_URL1) -o org/plantuml.jar || \\
+	wget $(PLANTUML_URL2) -O org/plantuml.jar || \\
+        curl -L $(PLANTUML_URL2) -o org/plantuml.jar
 
 org-man:
 	mkdir -p $(srcdir)/userdoc/man
