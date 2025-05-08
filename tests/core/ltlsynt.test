@@ -1367,3 +1367,6 @@ ltlsynt -f "((G((p0)<->(!(p1))))&&(((F(a))||(G(b)))<->(G(F(p0)))))" \
         --verify --aiger | tail -n 1 > out
 echo 'Circuit was verified' >expected
 diff out expected
+
+run 0 ltlsynt --global-equiv=no --print-game \
+               -f "(F(i0 & X(i1)) <-> Fo1) && (i0 <-> Go0)"

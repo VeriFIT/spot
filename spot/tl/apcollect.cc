@@ -581,10 +581,10 @@ namespace spot
 
   void realizability_simplifier::patch_game(twa_graph_ptr game) const
   {
-    if (SPOT_UNLIKELY((data_->options & global_equiv_output_only)
-                      != global_equiv_output_only))
-      throw std::runtime_error("realizability_simplifier::path_game() requires "
-                               "option global_equiv_output_only");
+    unsigned opteq = data_->options & global_equiv_output_only;
+    if (SPOT_UNLIKELY(opteq == global_equiv))
+      throw std::runtime_error("realizability_simplifier::patch_game() "
+                               "requires option global_equiv_output_only");
 
     auto& sp = spot::get_state_players(game);
     bdd add = bddtrue;

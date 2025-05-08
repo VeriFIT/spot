@@ -1,6 +1,8 @@
 New in spot 2.13.0.dev  (not yet released)
 
-  Nothing yet.
+  Bugs fixed:
+
+  - ltlsynt --print-game did not work with --global-equiv=no --polarity=yes.
 
 New in spot 2.13  (2025-03-24)
 
