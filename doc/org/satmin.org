@@ -283,10 +283,11 @@ The following options can be used to fine-tune this procedure:
 - =-x tba-det= :: attempt a powerset construction and check if
                   there exists an acceptance set such that the
                   resulting DTBA is equivalent to the input.
-- =-x sat-minimize= :: enable SAT-based minimization. It is the same as
-     =-x sat-minimize=1= (which is the default value). It performs a dichotomy
-     to find the correct automaton size.  This option implies =-x tba-det=.
-- =-x sat-minimize=[2|3]= :: enable SAT-based
+- =-x sat-minimize= :: enable SAT-based minimization. It is the same
+  as =-x sat-minimize=1= (which is the default value). It performs a
+  binary search to find the correct automaton size.  This option
+  implies =-x tba-det=.
+- =-x sat-minimize=2|3= :: enable SAT-based
      minimization. Let us consider each intermediate automaton as a =step=
      towards the minimal automaton and assume =N= as the size of the starting
      automaton. =2= and =3= have been implemented with the aim of not
