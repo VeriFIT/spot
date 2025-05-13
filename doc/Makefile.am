@@ -76,9 +76,9 @@ org: $(PICTURES_EXTRA)
 PLANTUML_URL1 = https://www.lre.epita.fr/dload/spot/deps/plantuml.jar
 PLANTUML_URL2 = https://www.lrde.epita.fr/dload/spot/deps/plantuml.jar
 org/plantuml.jar:
-	wget $(PLANTUML_URL1) -O org/plantuml.jar || \\
-        curl -L $(PLANTUML_URL1) -o org/plantuml.jar || \\
-	wget $(PLANTUML_URL2) -O org/plantuml.jar || \\
+	wget $(PLANTUML_URL1) -O org/plantuml.jar || \
+        curl -L $(PLANTUML_URL1) -o org/plantuml.jar || \
+	wget $(PLANTUML_URL2) -O org/plantuml.jar || \
         curl -L $(PLANTUML_URL2) -o org/plantuml.jar
 
 org-man:
