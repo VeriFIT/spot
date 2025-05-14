@@ -1244,11 +1244,13 @@ namespace spot
           }
         if (todo.size() == size) // DFS backtrack,
           {
-            // Since all successors have been explored and that was
-            // not enough to mark the previous state as winning, mark
-            // it as losing.
-            if (backprop.root_status_set(prev_state, false))
-              break;
+            // All successors have been explored and that was
+            // not enough to mark the prev_state as winning.
+            //
+            // It would be tempting to mark that state as losing, but
+            // in fact it is not true that we have explored all
+            // successors.  Some of those successors might actually be
+            // on the path leading to this state.
             prev.pop_back();
             continue;
           }

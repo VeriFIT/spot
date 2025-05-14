@@ -63,6 +63,16 @@ genltl --tv-counter-mealy=2..3 \
        --tv-nim-mealy=2..3,1..3 \
        --chomp-mealy=2..3,2..3 >> formulas.ltlf
 
+# Two formula based on Scutellà's counterexample.
+# They should be both realizable in any semantics.
+f1="o0&G((o1->!o0)&(o0|o1|o2|o3|o4)&(o2->(!o0&!o1))&(o3->(!o0&!o1&!o2))"
+f2="&(o4->(!o0&!o1&!o2&!o3))&(o1->Xo2)&(o3->Xo1)"
+f3="&(o2->((!o&Xo3)|(o&Xo4)))&(o0->((i&Xo3)|(!i&Xo1))))&Fo4"
+f3b="&(o2->((o&Xo3)|(!o&Xo4)))&(o0->((!i&Xo3)|(i&Xo1))))&Fo4"
+echo "$f1$f2$f3" >> formulas.ltlf
+echo "$f1$f2$f3b" >> formulas.ltlf
+
+
 line=0
 while read f; do
 
@@ -160,6 +170,8 @@ cat >expected <<EOF
 49 UNREALIZABLE REALIZABLE
 50 UNREALIZABLE REALIZABLE
 51 UNREALIZABLE REALIZABLE
+52 REALIZABLE REALIZABLE
+53 REALIZABLE REALIZABLE
 EOF
 
 diff expected results
