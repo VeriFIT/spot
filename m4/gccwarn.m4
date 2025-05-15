@@ -23,6 +23,52 @@ AC_DEFUN([CF_GXX_WARNINGS],
 #include <string>
 #include <vector>
 #include <regex>
+#include <unordered_map>
+
+class key
+{
+};
+
+bool less_than(const key* left, const key* right) noexcept;
+
+struct hash
+{
+  size_t
+  operator()(const key*) const noexcept
+  {
+    return 0;
+  }
+};
+
+struct equal
+{
+  bool
+  operator()(const key* left, const key* right) const noexcept
+  {
+    return less_than(left, right);
+  }
+};
+
+
+class foo
+{
+public:
+  foo();
+private:
+  std::unordered_map<const key*, int, hash, equal> map;
+};
+
+
+foo::foo()
+{
+  key b;
+  // GCC 15 -O -Werror -Wnull-dereference
+  // reports a spurious null-dereference here
+  // GCC bug 120288.
+  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=120288
+  map.find(&b);
+}
+
 
 // From GCC bug 106159
 // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=106159
