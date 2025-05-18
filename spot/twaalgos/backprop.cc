@@ -31,22 +31,18 @@ namespace spot
     if (SPOT_UNLIKELY(ss.frozen))
       throw std::runtime_error
         ("backprop_graph: cannot add successor to frozen state");
-    if (!ss.status.is_maybe())
+    if (SPOT_UNLIKELY(ss.determined)) // the edge is useless
       return false;
     backprop_state& ds = (*this)[dst];
-    if (ds.status.is_maybe())
+    if (!ds.determined)
       {
         // declare an edge for backward propagation
         reverse_.new_edge(dst, src);
         ss.counter += 1;
       }
-    else if (ss.owner && ds.status.is_true())
+    else if (ss.owner == ds.winner)
       {
-        return set_status(src, true);
-      }
-    else if (!ss.owner && ds.status.is_false())
-      {
-        return set_status(src, false);
+        return set_winner(src, ss.owner, dst);
       }
     // ignore other edges
     return false;
@@ -56,17 +52,23 @@ namespace spot
   {
     backprop_state& ss = (*this)[state];
     ss.frozen = true;
-    if (ss.status.is_maybe() && ss.counter == 0)
-      return set_status(state, !ss.owner);
+    if (!ss.determined && ss.counter == 0)
+      return set_winner(state, !ss.owner, 0);
     return false;
   }
 
-  bool backprop_graph::set_status(unsigned state, bool new_status)
+  bool backprop_graph::set_winner(unsigned state, bool winner,
+                                  unsigned choice_state)
   {
-    if (SPOT_UNLIKELY(!(*this)[state].status.is_maybe()))
-      throw std::runtime_error
-        ("backprop_graph: cannot change status of determined state");
-    (*this)[state].status = new_status;
+    {
+      backprop_state& ss = (*this)[state];
+      if (SPOT_UNLIKELY(ss.determined))
+        throw std::runtime_error
+          ("backprop_graph: cannot change status of determined state");
+      ss.determined = true;
+      ss.winner = winner;
+      ss.choice = choice_state;
+    }
     std::deque<unsigned> todo;
     todo.push_back(state);
     bool result = false;
@@ -75,18 +77,22 @@ namespace spot
         unsigned s = todo.front();
         todo.pop_front();
 
+#ifndef NDEBUG
         backprop_state& bs = (*this)[state];
-        assert(!bs.status.is_maybe());
-        bool bs_status = bs.status.is_true();
+        assert(bs.determined && (bs.winner == winner));
+#endif
         for (unsigned p: reverse_.out(s))
           {
             backprop_state& prev = (*this)[p];
-            if (!prev.status.is_maybe())
+            if (prev.determined)
               continue;
-            if ((prev.owner == bs_status)
-                || (--prev.counter == 0 && prev.frozen))
+            bool exist_choice = prev.owner == winner;
+            if (exist_choice || (--prev.counter == 0 && prev.frozen))
               {
-                prev.status = bs_status;
+                prev.determined = true;
+                prev.winner = winner;
+                if (exist_choice)
+                  prev.choice = s;
                 if (SPOT_UNLIKELY(p == 0))
                   {
                     if (stop_asap_)
@@ -117,9 +123,11 @@ namespace spot
         if (!bs.frozen)
           os << ",dashed";
         os << "\" fillcolor="
-           << (bs.status.is_true() ? "\"#33A02C\""
-               : bs.status.is_false() ? "\"#E31A1C\"" : "white")
-           << ", label=\"";
+           << (!bs.determined ? "white" :
+               bs.winner ? "\"#33A02C\"" : "\"#E31A1C\"");
+        if (bs.choice == target)
+          os << ", penwidth=3";
+        os << ", label=\"";
         if (auto it = names_.find(state); it != names_.end())
           escape_str(os, it->second);
         else
@@ -127,8 +135,18 @@ namespace spot
         os << "\"];\n";
       }
     for (unsigned state = 0; state < num_states; ++state)
-      for (unsigned p: reverse_.out(state))
-        os << "  " << p << " -> " << state << ";\n";
+      {
+        backprop_state ss = (*this)[state];
+        unsigned ch = ss.choice;
+        if (ss.determined && ss.winner == ss.owner && ss.choice != target)
+          os << "  " << state << " -> " << ch << " [penwidth=2]\n";
+        for (unsigned p: reverse_.out(state))
+          {
+            backprop_state sp = (*this)[p];
+            if (!sp.determined || sp.winner != sp.owner || sp.choice != state)
+              os << "  " << p << " -> " << state << ";\n";
+          }
+      }
     return os << "}\n";
   }
 

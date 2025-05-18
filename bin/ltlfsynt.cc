@@ -699,7 +699,7 @@ namespace
                                << " level\n";
                 st.start();
                 if (opt_backprop)
-                  unrealizable = !mtdfa_to_backprop(a).status_of(0).is_true();
+                  unrealizable = !mtdfa_to_backprop(a).winner(0);
                 else
                   unrealizable = !mtdfa_winning_region_lazy(a)[0];
                 double solve_time = st.stop();

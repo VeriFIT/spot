@@ -625,12 +625,19 @@ namespace spot
       // only used if recompute_succ
       robin_hood::unordered_set<int> bdd_seen;
 
-      trival root_status(unsigned root_number)
+      bool root_is_determined(unsigned root_number) const
       {
         auto it = rootnum_to_backprop_state.find(root_number);
         if (it == rootnum_to_backprop_state.end())
-          return trival::maybe();
-        return backprop.status_of(it->second);
+          return false;
+        return backprop.is_determined(it->second);
+      }
+
+      bool root_winner(unsigned root_number) const
+      {
+        auto it = rootnum_to_backprop_state.find(root_number);
+        assert(it != rootnum_to_backprop_state.end());
+        return backprop.winner(it->second);
       }
 
       // ~backprop_bdd_encoder()
@@ -639,21 +646,14 @@ namespace spot
       //             << backprop.new_state(false) << '\n';
       // }
 
-      bool root_status_set_if_unknown(unsigned root_number, bool status)
+      bool root_winner_set_if_unknown(unsigned root_number, bool winner)
       {
         auto it = rootnum_to_backprop_state.find(root_number);
         assert(it != rootnum_to_backprop_state.end());
-        if (backprop.status_of(it->second).is_known())
+        if (backprop.is_determined(it->second))
           return false;
         else
-          return backprop.set_status(it->second, status);
-      }
-
-      bool root_status_set(unsigned root_number, bool status)
-      {
-        auto it = rootnum_to_backprop_state.find(root_number);
-        assert(it != rootnum_to_backprop_state.end());
-        return backprop.set_status(it->second, status);
+          return backprop.set_winner(it->second, winner);
       }
 
       // This encodes an MTDFA state into the backpropgation
@@ -719,7 +719,7 @@ namespace spot
             {
               unsigned s = backprop.new_state(!b);
               it->second = s;
-              backprop.set_status(s, b);
+              backprop.set_winner(s, b);
               if (name)
                 backprop.set_name(s, b ? "true" : "false");
               return s;
@@ -752,7 +752,7 @@ namespace spot
               return it->second = rootnum_to_state(term / 2);
             }
           if constexpr (recompute_succ)
-            if (!is_new && backprop.status_of(it->second).is_known())
+            if (!is_new && backprop.is_determined(it->second))
               return it->second;
           auto [owner, low, high] = bdd_mt_quantified_low_high(b);
           if constexpr (recompute_succ)
@@ -791,7 +791,7 @@ namespace spot
             if constexpr (recompute_succ)
               if (backprop.is_frozen(state))
                 {
-                  assert(!backprop.status_of(state).is_known());
+                  assert(!backprop.is_determined(state));
                   bdd_to_state(low, bdd_to_state);
                   bdd_to_state(high, bdd_to_state);
                   continue;
@@ -805,7 +805,7 @@ namespace spot
               return true;
             // If the previous edge determined the source state, no
             // need to process the other branch.
-            if (backprop.status_of(state).is_known())
+            if (backprop.is_determined(state))
               continue;
             unsigned high_state = bdd_to_state(high, bdd_to_state);
             if (backprop.new_edge(state, high_state))
@@ -831,7 +831,7 @@ namespace spot
       }
     term /= 2;
     // remplace losing terminals by bddfalse
-    if (!global_backprop->root_status(term).is_true())
+    if (!global_backprop->root_winner(term))
       {
         *root_ptr = 0;
         return 0;
@@ -856,7 +856,7 @@ namespace spot
         return 1;
       }
     // remplace losing terminals by bddfalse
-    if (!global_backprop->root_status(term / 2).is_true())
+    if (!global_backprop->root_winner(term / 2))
       {
         *root_ptr = 0;
         return 0;
@@ -1046,10 +1046,9 @@ namespace spot
 
         if (do_backprop)
           {
-            trival init_status = backprop->root_status(0);
-            if (SPOT_UNLIKELY(init_status.is_known()))
+            if (SPOT_UNLIKELY(backprop->root_is_determined(0)))
               break;
-            if (backprop->root_status(label_term).is_known())
+            if (backprop->root_is_determined(label_term))
               continue;
             // We stored all successors in new_rootnums to
             // avoid calling leaves_of.
@@ -1085,10 +1084,9 @@ namespace spot
 
     if (do_backprop)            // finalize backpropagation
       {
-        trival init_status = backprop->root_status(0);
         if (realizability)
           {
-            if (init_status.is_true())
+            if (backprop->root_winner(0))
               {
                 dfa->states.push_back(bddtrue);
                 dfa->names.push_back(formula::tt());
@@ -1101,7 +1099,8 @@ namespace spot
                 return dfa;
               }
           }
-        // backprop->backprop.print_dot(std::cerr);
+        // FIXME: this needs to take indices into account
+        // to make the right choices.
         unsigned sz = states.size();
         for (unsigned i = 0; i < sz; ++i)
           bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
@@ -1231,9 +1230,8 @@ namespace spot
 
         // If prev_state is determined, skip the exploration of its successors
         // and backtrack immediately
-        if (todo.size() >= size && backprop.root_status(prev_state).is_known())
+        if (todo.size() >= size && backprop.root_is_determined(prev_state))
           {
-
             while (todo.size() > size)
               {
                 // std::cerr << "Pop " << todo.back() << '\n';
@@ -1338,16 +1336,11 @@ namespace spot
         names.push_back(label);
         terminal_to_state_map[label_term] = n;
 
-        trival init_status = backprop.root_status(0);
-        // std::cerr << "init_status = " << init_status << '\n';
-        // std::cerr << "label_term status = "
-        //          << backprop.root_status(label_term) << '\n';
-        // backprop.backprop.print_dot(std::cerr);
-        if (SPOT_UNLIKELY(init_status.is_known()))
+        if (SPOT_UNLIKELY(backprop.root_is_determined(0)))
           break;
         // If the status of this state is known, we can skip the
         // exploration of its successors.
-        if (backprop.root_status(label_term).is_known())
+        if (backprop.root_is_determined(label_term))
           continue;
         // Schedule all successors for processing in DFS order
         prev.emplace_back(label_term, todo.size());
@@ -1364,10 +1357,9 @@ namespace spot
       }
     while (!todo.empty());
     // finalize backpropagation
-    trival init_status = backprop.root_status(0);
     if (realizability)
       {
-        if (init_status.is_true())
+        if (backprop.root_winner(0))
           {
             dfa->states.push_back(bddtrue);
             dfa->names.push_back(formula::tt());
@@ -1380,6 +1372,8 @@ namespace spot
             return dfa;
           }
       }
+    // FIXME: This needs to take indices into account
+    // to make the right choices.
     unsigned sz = states.size();
     for (unsigned i = 0; i < sz; ++i)
       bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
@@ -3082,7 +3076,7 @@ namespace spot
     for (unsigned i = 0; i < ns; ++i)
       if (enc.encode_state(i, dfa->states[i]))
         break;
-    if (!enc.backprop.status_of(0).is_true())
+    if (!enc.backprop.winner(0))
       {
         res->states.push_back(bddfalse);
         res->names.push_back(formula::ff());
@@ -3093,6 +3087,8 @@ namespace spot
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
 
+    // FIXME: this needs to take indices into account
+    // to make the right choices.
     res->states = dfa->states;
     res->names = dfa->names;
     for (unsigned i = 0; i < ns; ++i)

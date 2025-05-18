@@ -27,23 +27,30 @@
 namespace spot
 {
 
-  struct SPOT_API backprop_state
+  class SPOT_API backprop_graph final
   {
-    int counter;                // number of unknown successors
-    bool owner;
-    bool frozen;
-    trival status;             // satisfiable, unstatisfiable, unknown
+    static constexpr unsigned target = (1U << (sizeof(unsigned)*8 - 4)) - 1;
 
-    backprop_state(bool owner)
-      : counter(0),
-        owner(owner),
-        frozen(false)
+      struct backprop_state
     {
-    }
-  };
+      int counter;            // number of unknown successors
+      bool owner:1;
+      bool frozen:1;
+      bool determined:1;
+      bool winner:1;            // meaningful only if determined is true
+      unsigned choice: sizeof(unsigned)*8 - 4;
 
-  struct SPOT_API backprop_graph final
-  {
+      backprop_state(bool owner)
+        : counter(0),
+          owner(owner),
+          frozen(false),
+          determined(false),
+          winner(false),
+          choice(0)
+      {
+      }
+    };
+  public:
     backprop_graph(bool stop_asap = true)
       : stop_asap_(stop_asap)
     {
@@ -59,11 +66,6 @@ namespace spot
       names_.emplace(state, s);
     }
 
-    const backprop_state& operator[](unsigned state) const
-    {
-      return reverse_.state_data(state);
-    }
-
     // return true if the status of src is now known
     bool new_edge(unsigned src, unsigned dst);
 
@@ -76,12 +78,25 @@ namespace spot
       return (*this)[state].frozen;
     }
 
-    trival status_of(unsigned state) const
+    bool is_determined(unsigned state) const
     {
-      return (*this)[state].status;
+      return (*this)[state].determined;
     }
 
-    bool set_status(unsigned state, bool status);
+    bool winner(unsigned state) const
+    {
+      return (*this)[state].winner;
+    }
+
+    unsigned choice(unsigned state) const
+    {
+      return (*this)[state].choice;
+    }
+
+    bool set_winner(unsigned state, bool winner)
+    {
+      return set_winner(state, winner, target);
+    }
 
     std::ostream& print_dot(std::ostream& os) const;
 
@@ -91,9 +106,16 @@ namespace spot
     }
 
   private:
+    bool set_winner(unsigned state, bool winner, unsigned choice_state);
+
     adjlist<backprop_state> reverse_;
     bool stop_asap_;
     std::unordered_map<unsigned, std::string> names_;
+
+    const backprop_state& operator[](unsigned state) const
+    {
+      return reverse_.state_data(state);
+    }
 
     backprop_state& operator[](unsigned state)
     {
