@@ -1681,6 +1681,165 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
 }
 
 
+// call quantify_prepare first
+int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
+                                        int (*choice)(int),
+                                        int (*opleaf)(int*, int),
+                                        bddExtCache* cache, int ophash)
+{
+   LOCAL_REC_STACKS;
+   int index;
+   int r = *ptr_r;
+
+   if (ISCONST(r))
+     return r;
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           /* I: -1 r --- */
+           /* R: --- val r */
+           r = POPINT_();
+
+           if (ISCONST(r))
+             {
+               PUSHREF_(r);     /* BDD result*/
+               PUSHREF_(r);     /* bool for realizability */
+               continue;
+             }
+           // This like is only executed in the right branch of
+           // the recursion.  If the left branch is known to be
+           // realizable and the variable is is being worked on
+           // is existential, then we can replace the result of
+           // the right branch with false right a away.
+           //
+           // This optimization is currently disabled because checking
+           // for quantvarset[LEVEL(READINT_(2)) everytime seems to
+           // make this slower.
+           // if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
+           //   {
+           //     PUSHREF_(0);
+           //     PUSHREF_(0);
+           //     continue;
+           //   }
+         work:;
+           if (ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int term = TERM(r);
+               bdd i = r;
+               int data = opleaf(&i, term);
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(i);
+               PUSHREF_(data);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, ophash), index);
+               if (entry1->arg1 == r && entry1->op == ophash)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                   PUSHREF_(entry1->arg2); /* data */
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   int high = HIGH(r);
+                   int low = LOW(r);
+
+                   if (low && high && quantvarset[LEVEL(r)])
+                     {
+                       int ch = choice(r);
+                       if (ch == 0)
+                         {
+                           low = high= bddfalse;
+                         }
+                       else if (low == ch)
+                         {
+                           high = bddfalse;
+                         }
+                       else
+                         {
+                           assert(high == ch);
+                           low = bddfalse;
+                         }
+                     }
+
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, high, -1);
+                   r = low;
+
+                   if (ISCONST(r))
+                     {
+                       PUSHREF_(r);     /* BDD result*/
+                       PUSHREF_(r);     /* boolean representing acceptance */
+                       continue;
+                     }
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: index r --- */
+           /* R: rval rres lval lres --- val res */
+           int rval = READREF_(1);
+           BDD rres = READREF_(2);
+           int lval = READREF_(3);
+           BDD lres = READREF_(4);
+           BDD r = POPINT_();
+           int val = lval;
+           if (quantvarset[LEVEL(r)])
+             {
+               val |= rval;       /* existential quantification */
+               if (val)           /* let's pick a unique winning path */
+                 {
+                   if (lval)
+                     rres = 0;
+                   else
+                     lres = 0;
+                 }
+             }
+           else
+             {
+               val &= rval;       /* universal quantification */
+               if (!val)
+                 // If any branch can lose, let's simplify
+                  if (lres == 0 || rres == 0)
+                    lres = rres = 0;
+             }
+           SYNC_REC_STACKS;
+           BDD res = bdd_makenode(LEVEL(r), lres, rres);
+           POPREF_(4);
+           PUSHREF_(res);
+           PUSHREF_(val);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->op = ophash;
+           entry->res = res;
+           entry->arg2 = val;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   int val = READREF_(1);
+   BDD res = READREF_(2);
+   POPREF_(2);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   *ptr_r = res;
+   return val;
+}
+
+
 static BDD bdd_mt_map_leaves(BDD r,
                              BDD from1, BDD to1,
                              BDD from2, BDD to2,

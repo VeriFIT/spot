@@ -408,6 +408,10 @@ BUDDY_API BDD      bdd_mt_apply1_leaves(BDD, int (*)(int, int),
 BUDDY_API int      bdd_mt_apply1_synthesis(BDD*,
                                            int (*)(int*, int),
                                            bddExtCache*, int);
+BUDDY_API int      bdd_mt_apply1_synthesis_with_choice(BDD*,
+                                                       int (*)(int),
+                                                       int (*)(int*, int),
+                                                       bddExtCache*, int);
 BUDDY_API BDD      bdd_const_to_terminal(BDD, BDD, BDD,
                                          bddExtCache*, int);
 BUDDY_API BDD      bdd_terminal_to_const(BDD, BDD, BDD,
@@ -706,6 +710,10 @@ protected:
    friend int      bdd_mt_apply1_synthesis(bdd&,
                                            int (*)(int*, int),
                                            bddExtCache*, int);
+   friend int      bdd_mt_apply1_synthesis_with_choice(bdd&,
+                                                       int (*)(int),
+                                                       int (*)(int*, int),
+                                                       bddExtCache*, int);
    friend bdd      bdd_const_to_terminal(const bdd&, const bdd&, const bdd&,
                                          bddExtCache*, int);
    friend bdd      bdd_terminal_to_const(const bdd&, const bdd&, const bdd&,
@@ -983,6 +991,19 @@ inline int bdd_mt_apply1_synthesis(bdd& r,
 {
   int root = r.root;
   int res = bdd_mt_apply1_synthesis(&root, opleaf, cache, ophash);
+  bdd r2 = root;
+  r = r2;
+  return res;
+}
+
+inline int bdd_mt_apply1_synthesis_with_choice(bdd& r,
+                                               int (*choice)(int),
+                                               int (*opleaf)(int*, int),
+                                               bddExtCache* cache, int ophash)
+{
+  int root = r.root;
+  int res = bdd_mt_apply1_synthesis_with_choice(&root, choice, opleaf,
+                                                cache, ophash);
   bdd r2 = root;
   r = r2;
   return res;
