@@ -815,11 +815,37 @@ namespace spot
           }
         return false;
       }
+
+      int get_choice(int node)
+      {
+        auto it = bdd_to_backprop_state.find(node);
+        if ((it == bdd_to_backprop_state.end())
+            || !backprop.winner(it->second))
+          return 0;
+        unsigned ch = backprop.choice(it->second);
+        int lowid = bdd_low(node);
+        auto it2 = bdd_to_backprop_state.find(lowid);
+        assert(it2 != bdd_to_backprop_state.end());
+        if (it2->second == ch)
+          return lowid;
+        int highid = bdd_high(node);
+#ifndef NDEBUG
+        auto it3 = bdd_to_backprop_state.find(highid);
+        assert(it3 != bdd_to_backprop_state.end());
+        assert(it3->second == ch);
+#endif
+        return highid;
+      }
     };
 
   }
 
   static backprop_bdd_encoder* global_backprop = nullptr;
+
+  static int strategy_choice(int bddid)
+  {
+    return global_backprop->get_choice(bddid);
+  }
 
   static int strategy_map_finalize(int* root_ptr, int term)
   {
@@ -1099,12 +1125,12 @@ namespace spot
                 return dfa;
               }
           }
-        // FIXME: this needs to take indices into account
-        // to make the right choices.
         unsigned sz = states.size();
         for (unsigned i = 0; i < sz; ++i)
-          bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
-                                  &cache_, hash_key_finalstrat);
+          bdd_mt_apply1_synthesis_with_choice(states[i],
+                                              strategy_choice,
+                                              strategy_map_finalize,
+                                              &cache_, hash_key_finalstrat);
         dfa->states = std::move(states);
         dfa->names = std::move(names);
         dict_->register_all_propositions_of(this, dfa);
@@ -1372,12 +1398,12 @@ namespace spot
             return dfa;
           }
       }
-    // FIXME: This needs to take indices into account
-    // to make the right choices.
     unsigned sz = states.size();
     for (unsigned i = 0; i < sz; ++i)
-      bdd_mt_apply1_synthesis(states[i], strategy_map_finalize,
-                              &cache_, hash_key_finalstrat);
+      bdd_mt_apply1_synthesis_with_choice(states[i],
+                                          strategy_choice,
+                                          strategy_map_finalize,
+                                          &cache_, hash_key_finalstrat);
     dfa->states = std::move(states);
     dfa->names = std::move(names);
     dict_->register_all_propositions_of(this, dfa);
@@ -3087,13 +3113,13 @@ namespace spot
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
 
-    // FIXME: this needs to take indices into account
-    // to make the right choices.
     res->states = dfa->states;
     res->names = dfa->names;
     for (unsigned i = 0; i < ns; ++i)
-      bdd_mt_apply1_synthesis(res->states[i], strategy_finalize,
-                              &cache, hash_key_finalstrat);
+      bdd_mt_apply1_synthesis_with_choice(res->states[i],
+                                          strategy_choice,
+                                          strategy_finalize,
+                                          &cache, hash_key_finalstrat);
     dict->register_all_propositions_of(dfa, res);
     res->set_controllable_variables(outputs);
 

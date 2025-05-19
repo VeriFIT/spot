@@ -87,3 +87,35 @@ F=$F'&&X[!](F(!c0))))'
 echo "$F" >ctr1.ltlf
 
 run 0 ltlfsynt -F ctr1.ltlf --part ctr1.part --real
+
+
+# Two formula based on Scutellà's counterexample.
+# They should be both realizable in any semantics.
+f1="o0&G((o1->!o0)&(o0|o1|o2|o3|o4)&(o2->(!o0&!o1))&(o3->(!o0&!o1&!o2))"
+f2="&(o4->(!o0&!o1&!o2&!o3))&(o1->Xo2)&(o3->Xo1)"
+f3="&(o2->((!o&Xo3)|(o&Xo4)))&(o0->((i&Xo3)|(!i&Xo1))))&Fo4"
+f3b="&(o2->((o&Xo3)|(!o&Xo4)))&(o0->((!i&Xo3)|(i&Xo1))))&Fo4"
+echo "$f1$f2$f3" > scutella.ltlf
+echo "$f1$f2$f3b" >> scutella.ltlf
+
+ltlfsynt --trans=dfs --hide -F scutella.ltlf > out.hoa
+ltlfsynt --trans=dfs --semantics=moore --hide -F scutella.ltlf >> out.hoa
+ltlfsynt --trans=bfs --hide -F scutella.ltlf >> out.hoa
+ltlfsynt --trans=bfs --semantics=moore --hide -F scutella.ltlf >> out.hoa
+ltlfsynt --trans=full --hide -F scutella.ltlf >> out.hoa
+ltlfsynt --trans=full --semantics=moore --hide -F scutella.ltlf >> out.hoa
+ltlfsynt --trans=full --backprop=states --hide -F scutella.ltlf >> out.hoa
+ltlfsynt --trans=full --backprop=states \
+         --semantics=moore --hide -F scutella.ltlf >> out.hoa
+autfilt out.hoa --stats=%s,%e > out.stats
+
+: >expected
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+do
+    echo 6,7 >>expected
+done
+diff out.stats expected
+
+# Out of the above 16 automata we expect 4 different ones.
+# One of each pair (formula, semantics).
+test 4 = `autfilt --uniq out.hoa -c`
