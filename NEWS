@@ -1,8 +1,12 @@
-New in spot 2.13.0.dev  (not yet released)
+New in spot 2.13.1  (2025-05-21)
 
   Bugs fixed:
 
   - ltlsynt --print-game did not work with --global-equiv=no --polarity=yes.
+
+  - Work around a couple of compilation issues with GCC 15 and later.
+
+  - Miscelaneous documentation fixes.
 
 New in spot 2.13  (2025-03-24)
 
