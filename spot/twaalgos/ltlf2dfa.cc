@@ -43,7 +43,8 @@ constexpr int hash_key_xor = 5;
 constexpr int hash_key_not = 6;
 constexpr int hash_key_rename = 7;
 constexpr int hash_key_strat = 8;
-constexpr int hash_key_finalstrat = 9;
+constexpr int hash_key_strat_bool = 9;
+constexpr int hash_key_finalstrat = 10;
 
 namespace spot
 {
@@ -158,6 +159,15 @@ namespace spot
             break;
           f = formula::And(std::move(vec));
           goto again;
+          // Rules that are not implemented but for which I have
+          // seen both sides of the equality during some translation:
+          //
+          //  α ∧ Fα ≡ α  (generalizes to α ∧ (β [UW∨] α) ≡ α).
+          //  Gα ∧ (β ∨ α) ≡ Gα
+          //  Fα ∨ (β ∧ α) ≡ Fα
+          //
+          // All of these can be seen as some type of unit-propagation.
+          // See Issue #606.
         }
       case op::Or:
         {
@@ -668,12 +678,12 @@ namespace spot
       // be attached to the root.
       //
       // As a side effect, the function will record the root numbers stored
-      // on the terminal it reaches in in new_rootnums or old_rootnums
+      // on the terminals it reaches in new_rootnums or old_rootnums
       // depending on whether the corresponding vertex had to be created
       // in the game or if it was already existing.
       //
       // If recompute_succ is false, the encoding stops its
-      // "recursion" whenever it finds a nodes that has already been
+      // "recursion" whenever it finds a node that has already been
       // encoded into the game.  If it is true, it will continue the
       // recursion even through nodes that have already been encoded,
       // provided they correspond to underterminate vertices.  Doing
@@ -898,7 +908,8 @@ namespace spot
                                  const std::vector<std::string>* outvars,
                                  bool do_backprop,
                                  bool realizability,
-                                 bool preprocess)
+                                 bool preprocess,
+                                 bool bfs)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
@@ -906,7 +917,7 @@ namespace spot
     std::vector<bdd> states;
     std::vector<int> new_rootnums; // used only if do_backprop
     std::vector<formula> names;
-    std::queue<formula> todo;
+    std::deque<formula> todo;
     terminal_to_state_map.clear();
 
     if (do_backprop && outvars == nullptr)
@@ -937,6 +948,24 @@ namespace spot
         }
       return bdd_mt_apply1_synthesis(b, strategy_map_true,
                                      &cache_, hash_key_strat);
+    };
+
+    auto restrict_bdd_bool = [&](bdd& b, bool realizability) -> bool {
+      // Everytime a new variable is created, the quantifycation
+      // buffer is wiped out.  This can happen as a side-effect
+      // of ltlf_to_mtbdd().  We only have to call
+      // bdd_mt_quantify_prepare() when the number of variables
+      // changed.
+      if (int vn = bdd_varnum(); vn != varnum)
+        {
+          bdd_mt_quantify_prepare(bddoutvars);
+          varnum = vn;
+        }
+      if (!realizability)
+        return bdd_mt_apply1_synthesis(b, nullptr,
+                                       &cache_, hash_key_strat);
+      return bdd_mt_quantify_to_bool(b, nullptr,
+                                     &cache_, hash_key_strat_bool);
     };
 
     // Keep track of atomic propositions used in he automaton.
@@ -982,11 +1011,20 @@ namespace spot
     bool has_accepting = false;
     bool has_rejecting = false;
 
-    todo.push(f);
+    todo.push_back(f);
     do
       {
-        formula label = todo.front();
-        todo.pop();
+        formula label;
+        if (bfs)
+          {
+            label = todo.front();
+            todo.pop_front();
+          }
+        else
+          {
+            label = todo.back();
+            todo.pop_back();
+          }
         int label_term = formula_to_terminal(label) / 2;
 
         // already processed
@@ -1006,15 +1044,16 @@ namespace spot
             std::tie(g, simpl_map) = realsimp->simplify(g);
 
             b = ltlf_to_mtbdd(g);
-            if (restrict_bdd(b))
+            if (restrict_bdd_bool(b, realizability))
               {
-                assert(b != bddfalse);
                 b_done = true;
-                if (do_backprop)
-                  backprop->encode_state<>(label_term, b, nullptr,
-                                           &new_rootnums);
-                if (!realizability)
+                if (realizability)
                   {
+                    b = bddtrue;
+                  }
+                else
+                  {
+                    assert(b != bddfalse);
                     bdd fix = bddtrue;
                     for (auto [k, k_is_input, v]: simpl_map)
                       {
@@ -1028,17 +1067,21 @@ namespace spot
                       }
                     b &= fix;
                   }
+                if (do_backprop)
+                  backprop->encode_state<>(label_term, b, nullptr,
+                                           &new_rootnums);
               }
             else
               {
                 g = ltlf_one_step_unsat_rewrite(label);
+                std::tie(g, simpl_map) = realsimp->simplify(g);
                 b = ltlf_to_mtbdd(g);
-                restrict_bdd(b);
-                if (b == bddfalse)
+
+                if (!restrict_bdd_bool(b, true))
                   {
                     b_done = true;
                     if (do_backprop)
-                      backprop->encode_state<>(label_term, b, nullptr,
+                      backprop->encode_state<>(label_term, bddfalse, nullptr,
                                                &new_rootnums);
                   }
 
@@ -1049,7 +1092,15 @@ namespace spot
             b = ltlf_to_mtbdd(label);
             if (outvars)
               {
-                restrict_bdd(b);
+                if (realizability && label.is_boolean())
+                  {
+                    if (restrict_bdd_bool(b, true))
+                      b = bddtrue;
+                    else
+                      b = bddfalse;
+                  }
+                else
+                  restrict_bdd(b);
                 if (do_backprop)
                   backprop->encode_state(label_term, b, nullptr,
                                          &new_rootnums);
@@ -1079,7 +1130,7 @@ namespace spot
             // We stored all successors in new_rootnums to
             // avoid calling leaves_of.
             for (unsigned root: new_rootnums)
-              todo.push(int_to_formula_[root]);
+              todo.push_back(int_to_formula_[root]);
             new_rootnums.clear();
             continue;
           }
@@ -1103,7 +1154,7 @@ namespace spot
               has_rejecting = true;
             if (terminal_to_state_map.find(term / 2)
                 == terminal_to_state_map.end())
-              todo.push(terminal_to_formula(term));
+              todo.push_back(terminal_to_formula(term));
           }
       }
     while (!todo.empty());
@@ -1217,6 +1268,25 @@ namespace spot
                                      &cache_, hash_key_strat);
     };
 
+    auto restrict_bdd_bool = [&](bdd& b, bool realizability) -> bool {
+      // Everytime a new variable is created, the quantifycation
+      // buffer is wiped out.  This can happen as a side-effect
+      // of ltlf_to_mtbdd().  We only have to call
+      // bdd_mt_quantify_prepare() when the number of variables
+      // changed.
+      if (int vn = bdd_varnum(); vn != varnum)
+        {
+          bdd_mt_quantify_prepare(bddoutvars);
+          varnum = vn;
+        }
+      if (!realizability)
+        return bdd_mt_apply1_synthesis(b, nullptr,
+                                       &cache_, hash_key_strat);
+      return bdd_mt_quantify_to_bool(b, nullptr,
+                                     &cache_, hash_key_strat_bool);
+    };
+
+
     // Keep track of atomic propositions used in he automaton.
     // Actually the automaton might use fewer atomic propositions than
     // what appears in the formula, but we do not pay attention to
@@ -1300,19 +1370,16 @@ namespace spot
             std::tie(g, simpl_map) = realsimp.simplify(g);
 
             b = ltlf_to_mtbdd(g);
-            if (restrict_bdd(b))
+            if (restrict_bdd_bool(b, realizability))
               {
-                assert(b != bddfalse);
                 b_done = true;
-                {
-                  std::string* name = nullptr;
-                  // std::string x = str_psl(g);
-                  // name = &x;
-                  backprop.encode_state<>(label_term, b, name,
-                                          &new_rootnums, &old_rootnums);
-                }
-                if (!realizability)
+                if (realizability)
                   {
+                    b = bddtrue;
+                  }
+                else
+                  {
+                    assert(b != bddfalse);
                     bdd fix = bddtrue;
                     for (auto [k, k_is_input, v]: simpl_map)
                       {
@@ -1326,20 +1393,18 @@ namespace spot
                       }
                     b &= fix;
                   }
+                backprop.encode_state<>(label_term, b, nullptr,
+                                        &new_rootnums, &old_rootnums);
               }
             else
               {
                 g = ltlf_one_step_unsat_rewrite(label);
                 std::tie(g, simpl_map) = realsimp.simplify(g);
                 b = ltlf_to_mtbdd(g);
-                restrict_bdd(b);
-                if (b == bddfalse)
+                if (!restrict_bdd_bool(b, true))
                   {
                     b_done = true;
-                    std::string* name = nullptr;
-                    // std::string x = str_psl(g);
-                    // name = &x;
-                    backprop.encode_state<>(label_term, b, name,
+                    backprop.encode_state<>(label_term, bddfalse, nullptr,
                                             &new_rootnums, &old_rootnums);
                   }
               }
@@ -1347,11 +1412,16 @@ namespace spot
         if (!b_done)
           {
             b = ltlf_to_mtbdd(label);
-            restrict_bdd(b);
-            std::string* name = nullptr;
-            // std::string x = str_psl(label);
-            // name = &x;
-            backprop.encode_state<true>(label_term, b, name,
+            if (realizability && label.is_boolean())
+              {
+                if (restrict_bdd_bool(b, true))
+                  b = bddtrue;
+                else
+                  b = bddfalse;
+              }
+            else
+              restrict_bdd(b);
+            backprop.encode_state<true>(label_term, b, nullptr,
                                         &new_rootnums, &old_rootnums);
           }
 
@@ -2270,12 +2340,16 @@ namespace spot
         case bfs_node_backprop:
           return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
                                      &outvars, true, realizability,
-                                     preprocess);
+                                     preprocess, false);
+        case dfs_node_backprop:
+          return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+                                     &outvars, true, realizability,
+                                     preprocess, true);
         case state_refine:
           return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
                                      &outvars, false, realizability,
                                      preprocess);
-        case dfs_node_backprop:
+        case dfs_strict_node_backprop:
           return trans.ltlf_synthesis_with_dfs(f, &outvars, realizability,
                                                preprocess);
         }
