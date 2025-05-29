@@ -465,11 +465,8 @@ automaton from above and solves the game as it is constructed.
 The order in which states are explored can be controlled with
 =--translation=dfs= or =--translation=bfs=.
 
-The DFS on-the-fly translation is the default.  Compared to the BFS,
-it allows an extra optimization: when a state is backtracked, we know
-that all its successors have been explored, so if it has not been
-decided that the state was winning, we can mark it as losing (and this
-information can be backpropagated).
+The BFS on-the-fly translation is the default, because it had a very
+slight advantage over DFS in a benchmark we did.
 
 An extra optimization that is enabled by default in on-the-fly
 approaches is /one-step (un)realizability/ where the formula \alpha

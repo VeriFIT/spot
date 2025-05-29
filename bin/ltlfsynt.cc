@@ -98,7 +98,7 @@ static const argp_option options[] =
       "BDD nodes, solving the game as the automaton is generated, "
       "(dfs-strict-on-the-fly) stops on visited states, (bfs-on-the-fly) "
       "same as dfs-on-the-fly but using bfs order.  "
-      "The default is dfs-on-the-fly.", 0 },
+      "The default is bfs-on-the-fly.", 0 },
     { "minimize", OPT_MINIMIZE, "yes|no", 0,
       "Minimize the automaton (disabled by default except for the compositional"
       " translation). Has no effect on on-the-fly translations.", 0 },
@@ -201,7 +201,7 @@ static translation_type translation_values[] =
     translation_compositional, translation_compositional,
   };
 ARGMATCH_VERIFY(translation_args, translation_values);
-static translation_type opt_trans = translation_otf_dfs;
+static translation_type opt_trans = translation_otf_bfs;
 
 static const char* const minimize_args[] =
   {
