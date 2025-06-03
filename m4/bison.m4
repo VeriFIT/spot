@@ -1,6 +1,6 @@
 AC_DEFUN([adl_CHECK_BISON],
 [AC_ARG_VAR([BISON], [Bison parser generator])
-AC_CHECK_PROGS([BISON], [bison])
+AM_MISSING_PROG([BISON], [bison])
 if test -n "$BISON"; then
    opt='-Wno-deprecated'
    if AM_RUN_LOG([$BISON $opt --version]); then
