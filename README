@@ -18,7 +18,7 @@ Documentation
 Some documentation can be found in the doc/ directory.
 
 - doc/userdoc/ is basically a local copy of the web-site at
-  https://spot.lrde.epita.fr/.  It contains several explanations and
+  https://spot.lre.epita.fr/.  It contains several explanations and
   illustrations of the core concepts and tools; it has installation
   instructions; and also provide several code examples.
 
@@ -37,7 +37,7 @@ also be found in doc/userdoc/.
 An important part of the documentation that is missing is the
 documentation of the Python bindings.  Currently all we have is a
 collection of examples, which are all collected at
-http://spot.lrde.epita.fr/tut.html (or doc/userdoc/tut.html in the
+http://spot.lre.epita.fr/tut.html (or doc/userdoc/tut.html in the
 source tree).  This is hardly ideal, but we do not have the resources
 to maintain such a manual for the Python binding by hand.  If you have
 an idea about how to generate a manual for the Python bindings
@@ -61,10 +61,13 @@ History
 =======
 
 This project started in 2003 at LIP6 (www.lip6.fr).  The main author
-moved to LRDE (www.lrde.epita.fr) in 2007, and all regular
-contributors are now at LRDE.  The web site was moved from
-spot.lip6.fr to spot.lrde.epita.fr in 2015, so do not be surprised if
-you find links to the old site.
+moved to LRDE (www.lrde.epita.fr) in 2007.  The web site was moved
+from spot.lip6.fr to spot.lrde.epita.fr in 2015.  In 2022 LRDE was
+merged with another laboratory, becoming LRE (www.lre.epita.fr), and
+the URLs are progressively being updated to the new name.  Currently,
+the source code still contains a mix of *.lrde.* and *.lre.* URLs: I
+you find one that does not work, try changing lrde into lre (or
+vice-versa).
 
 
 Installation
@@ -80,6 +83,11 @@ Spot expects a complete installation of Python (version 3.6 or later).
 Especially, Python's headers files should be installed.  If you don't
 have Python installed, and do NOT want to install it, you should run
 configure with the --disable-python option (see below).
+
+Note that the release tarballs include generated files that are not
+stored in Spot's git repository.  If you are installing Spot from its
+git repository, you will need many more dependencies to build these
+files.  See file HACKING for a list.
 
 
 Optional third-party dependencies
@@ -102,7 +110,7 @@ test bench), mostly fixing errors reported by recent compilers.
 However Spot now distributes its own reimplementation of LBTT, called
 ltlcross, so the use of LBTT is completely optional.  The last
 modified version of LBTT we used to distribute can now be found at
-  http://www.lrde.epita.fr/dload/spot/lbtt-1.2.1a.tar.gz
+  http://www.lre.epita.fr/dload/spot/lbtt-1.2.1a.tar.gz
 If some lbtt binary is found on your system, it will be used in the
 test suite in addition to ltlcross.
 
@@ -292,7 +300,7 @@ In that case you may need to pass some -I option to the compiler to
 add some "include" directory.  At link time, you may also need to add
 some -L option if the libraries are not in some location that is
 already searched by the linker.  The file doc/userdoc/compile.html (or
-its on-line version at https://spot.lrde.epita.fr/compile.html)
+its on-line version at https://spot.lre.epita.fr/compile.html)
 discusses this topic a bit more.
 
 
