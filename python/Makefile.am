@@ -91,7 +91,9 @@ else
 	$(SWIG) $(SWIGFLAGS) -I$(srcdir) -I$(top_srcdir) $(srcdir)/spot/impl.i
 endif
 ## work around https://github.com/swig/swig/issues/1553
-	$(PERL) -pi -e 's/^#define SWIG_Python_CallFunctor.*/#define SWIG_Python_CallFunctor(functor, obj) PyObject_CallFunctionObjArgs(functor, obj, NULL);/' $@
+	$(PERL) -pi -e 's/^#define SWIG_Python_CallFunctor.*/#define SWIG_Python_CallFunctor(functor, obj) PyObject_CallFunctionObjArgs(functor, obj, NULL);/;' \
+## work around https://github.com/swig/swig/issues/3189
+	-e 's/SwigPyIterator/SwigPyIterator_spot_impl/g;' $@ ${srcdir}/spot/impl.py
 
 spot/impl.py: spot/impl.i
 	$(MAKE) $(AM_MAKEFLAGS) spot/impl_wrap.cxx
@@ -115,6 +117,8 @@ if AMDEP
 else
 	$(SWIG) $(SWIGFLAGS) -I$(srcdir) -I$(top_srcdir) $(srcdir)/spot/ltsmin.i
 endif
+## work around https://github.com/swig/swig/issues/3189
+	$(PERL) -pi -e 's/SwigPyIterator/SwigPyIterator_spot_listmin/g;' $@ ${srcdir}/spot/ltsmin.py
 
 spot/ltsmin.py: spot/ltsmin.i
 	$(MAKE) $(AM_MAKEFLAGS) spot/ltsmin_wrap.cxx
@@ -138,6 +142,8 @@ if AMDEP
 else
 	$(SWIG) $(SWIGFLAGS) -I$(srcdir) -I$(top_srcdir) $(srcdir)/spot/gen.i
 endif
+## work around https://github.com/swig/swig/issues/3189
+	$(PERL) -pi -e 's/SwigPyIterator/SwigPyIterator_spot_gen/g;' $@ ${srcdir}/spot/gen.py
 
 spot/gen.py: spot/gen.i
 	$(MAKE) $(AM_MAKEFLAGS) spot/gen_wrap.cxx
@@ -159,6 +165,8 @@ if AMDEP
 else
 	$(SWIG) $(SWIGFLAGS) $(BUDDY_CPPFLAGS) $(srcdir)/buddy.i
 endif
+## work around https://github.com/swig/swig/issues/3189
+	$(PERL) -pi -e 's/SwigPyIterator/SwigPyIterator_buddy/g;' $@ ${srcdir}/buddy.py
 
 buddy.py: buddy.i
 	$(MAKE) $(AM_MAKEFLAGS) buddy_wrap.cxx
