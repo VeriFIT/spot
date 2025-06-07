@@ -345,7 +345,7 @@ else:
 
 # This shows that exclusive word also depend on
 # containment_select_version()
-tc.assertEqual(str(one.exclusive_word(both)), "!a & !b; cycle{a}")
+tc.assertEqual(str(one.exclusive_word(both)), "!a & !b; cycle{!a & !b}")
 spot.containment_select_version("default")
 tc.assertEqual(str(one.exclusive_word(both)), "cycle{a}")
 

@@ -28,7 +28,9 @@
 #include <spot/twa/acc.hh>
 #include <unordered_map>
 #include <unordered_set>
+#include <list>
 #include <iterator>
+#include <algorithm>
 #include <optional>
 #include <vector>
 #include <memory>
@@ -142,7 +144,7 @@ namespace std
 
 namespace spot::forq
 {
-  using state = size_t;
+  using state = unsigned;
   using edge = std::pair<state, state>;
   using const_graph = ::spot::const_twa_graph_ptr;
 
@@ -194,7 +196,7 @@ namespace spot::forq
 
   namespace util
   {
-    std::vector<state> get_final_states(const_graph const& automata);
+    std::vector<state> get_final_states(const_graph const& automaton);
     forq_context create_forq_context(const_graph const& A,
                                      const_graph const& B);
 
@@ -247,8 +249,7 @@ namespace spot::forq
     class post_variable
     {
       using state_entry_t = state_entry<quasi_type>;
-      using state_set_t = std::unordered_set<std::shared_ptr<
-                                        const state_entry_t>>;
+      using state_set_t = std::list<std::shared_ptr<const state_entry_t>>;
     public:
       bool empty() const
       {
@@ -262,7 +263,9 @@ namespace spot::forq
 
       void add(state s, std::shared_ptr<const state_entry_t> entry)
       {
-        state_vector[s].insert(std::move(entry));
+        auto& lst = state_vector[s];
+        // assert(std::find(lst.begin(), lst.end(), entry) == lst.end());
+        lst.push_back(std::move(entry));
       }
 
       bool add_if_min(state s,
@@ -278,7 +281,7 @@ namespace spot::forq
           else
             ++it;
         }
-        old_state_set.insert(entry);
+        old_state_set.push_back(entry);
         return true;
       }
 
@@ -295,7 +298,7 @@ namespace spot::forq
           else
             ++it;
         }
-        old_state_set.insert(entry);
+        old_state_set.push_back(entry);
         return true;
       }
 
@@ -364,8 +367,7 @@ namespace spot::forq
   template<TEMPLATE_QUASI_TYPE(quasi_type)> class post_base
   {
     using state_entry_t = state_entry<quasi_type>;
-    using state_set_t = std::unordered_set<std::shared_ptr<
-                                      const state_entry_t>>;
+    using state_set_t = std::list<std::shared_ptr<const state_entry_t>>;
   public:
 
     post_base(forq_context const& context) : context(context)
@@ -651,31 +653,25 @@ namespace spot::forq::util
 
   // We consider any state as final if it's the source of an edge that's
   // considered accepting
-  std::vector<state> get_final_states(const_graph const& automata)
+  std::vector<state> get_final_states(const_graph const& automaton)
   {
     std::unordered_set<state> states;
-    for (auto& edge_storage : automata->edges())
-    {
+    std::vector<state> final_states;
+    for (auto& edge_storage : automaton->edges())
       if (is_final_edge(edge_storage))
-      {
-        states.insert(edge_storage.src);
-      }
-    }
-    return std::vector<state>(states.begin(), states.end());
+        if (states.insert(edge_storage.src).second)
+          final_states.push_back(edge_storage.src);
+    return final_states;
   }
 
-  static final_edge_set get_final_edges(const_graph const& automata)
+  static final_edge_set get_final_edges(const_graph const& automaton)
   {
     final_edge_set edges;
-    for (auto& edge_storage : automata->edges())
-      {
-        if (is_final_edge(edge_storage))
-          {
-            edges.insert(final_edge{
-              symbol_set(edge_storage.cond), edge_storage.src, edge_storage.dst
-            });
-          }
-      }
+    for (auto& edge_storage : automaton->edges())
+      if (is_final_edge(edge_storage))
+        edges.insert(final_edge{
+            symbol_set(edge_storage.cond), edge_storage.src, edge_storage.dst
+          });
     return edges;
   }
 
@@ -880,13 +876,13 @@ namespace spot::forq
   post_i post_i::create(forq_context const& context,
                         state A_initial, state B_initial)
   {
-    return post_i(context, std::move(A_initial), B_initial, false);
+    return post_i(context, A_initial, B_initial, false);
   }
 
   post_i post_i::create_reversed(forq_context const& context,
                                  state A_initial, state B_initial)
   {
-    return post_i(context, std::move(A_initial), B_initial, true);
+    return post_i(context, A_initial, B_initial, true);
   }
 
   post_i::post_i(forq_context const& context, state A_initial,
