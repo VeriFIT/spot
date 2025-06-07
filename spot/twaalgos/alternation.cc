@@ -659,9 +659,14 @@ namespace spot
     bdd cond_;
     minato_isop isop_;
     const std::map<int, unsigned>& var_to_state_;
-    univ_remover_state* dst_;
+    univ_remover_state* dst_ = nullptr;
 
   public:
+    ~univ_remover_succ_iterator()
+    {
+      delete dst_;
+    }
+
     univ_remover_succ_iterator(const_twa_graph_ptr aut,
                                const univ_remover_state* state,
                                const std::vector<int>& state_to_var,
@@ -744,7 +749,7 @@ namespace spot
 
     virtual const state* dst() const override
     {
-      return dst_;
+      return dst_->clone();
     }
 
     virtual bdd cond() const override
