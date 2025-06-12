@@ -1,4 +1,4 @@
-New in spot 2.13.1.dev  (not yet released)
+New in spot 2.13.2.dev  (not yet released)
 
   Command-line tools:
 
@@ -62,6 +62,8 @@ New in spot 2.13.1.dev  (not yet released)
 
   - spot::translator learned output_type::Finite to request
     translation to Finite automata.
+
+New in spot 2.13.2  (2025-06-12)
 
   Bugs fixed:
 
