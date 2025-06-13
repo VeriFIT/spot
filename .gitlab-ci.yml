@@ -138,8 +138,7 @@ debian-gcc-snapshot:
   artifacts:
     when: always
     paths:
-      - spot-*/tests/*/*.log
-      - spot-*/*.log
+      - ./**/*.log
 
 alpine-gcc:
   stage: build
@@ -156,7 +155,7 @@ alpine-gcc:
   artifacts:
     when: always
     paths:
-      - ./spot-*/_build/sub/tests/*/*.log
+      - ./**/*.log
       - ./*.log
       - ./*.tar.gz
 
@@ -175,7 +174,7 @@ arch-clang:
   artifacts:
     when: on_failure
     paths:
-      - ./spot-*/_build/sub/tests/*/*.log
+      - ./**/*.log
       - ./*.log
 
 arch-gcc-glibcxxdebug:
@@ -201,8 +200,7 @@ arch-gcc-glibcxxdebug:
   artifacts:
     when: on_failure
     paths:
-      - build-*/spot-*/_build/sub/tests/*/*.log
-      - build-*/*.log
+      - ./**/*.log
 
 mingw-shared:
   stage: build2
@@ -228,8 +226,7 @@ mingw-shared:
   artifacts:
     when: on_failure
     paths:
-      - spot-*/tests/*/*.log
-      - spot-*/*.log
+      - ./**/*.log
 
 mingw-static:
   stage: build2
@@ -261,9 +258,7 @@ mingw-static:
   artifacts:
     when: always
     paths:
-      - spot-*/tests/*/*.log
-      - spot-*/*.log
-      - spot-*/*.tar.gz
+      - ./**/*.log
 
 debpkg-stable:
   stage: build
@@ -479,7 +474,7 @@ raspbian:
   artifacts:
     when: always
     paths:
-      - ./spot-*/_build/sub/tests/*/*.log
+      - ./**/*.log
       - ./*.log
       - ./*.tar.gz
 
@@ -506,5 +501,4 @@ centos7:
   artifacts:
     when: on_failure
     paths:
-      - build-*/spot-*/_build/sub/tests/*/*.log
-      - build-*/*.log
+      - ./**/*.log
