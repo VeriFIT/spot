@@ -2861,11 +2861,26 @@ namespace spot
   }
 
   const std::vector<bool>* global_is_winning;
+  const std::vector<trival>* global_is_winning3;
   int is_winning_terminal(int v)
   {
     int dst = v / 2;
     assert((v >= 0) && (global_is_winning->size() > (unsigned) dst));
     return (v & 1) || (*global_is_winning)[dst];
+  }
+
+  int is_winning_terminal3(int v)
+  {
+    int dst = v / 2;
+    assert((v >= 0) && (global_is_winning3->size() > (unsigned) dst));
+    if (v & 1)
+      return 3;
+    trival w = (*global_is_winning3)[dst];
+    if (w.is_true())
+      return 3;
+    if (w.is_false())
+      return 0;
+    return 2;
   }
 
   std::vector<bool>
@@ -2914,16 +2929,9 @@ namespace spot
     return winning;
   }
 
-
-  int is_winning_terminal_lazy(int v)
-  {
-    int dst = v / 2;
-    assert((v >= 0) && (global_is_winning->size() > (unsigned) dst));
-    return ((v & 1) || (*global_is_winning)[dst]);
-  }
-
-  std::vector<bool>
-  mtdfa_winning_region_lazy(mtdfa_ptr dfa)
+  template <typename T>
+  std::vector<T>
+  mtdfa_winning_region_lazy_do(mtdfa_ptr dfa)
   {
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
@@ -2933,9 +2941,14 @@ namespace spot
     adjlist<void> rev = build_reverse_of_reachable_graph(dfa);
 
     unsigned nroots = dfa->num_roots();
-    std::vector<bool> winning(nroots, false);
+    // winning is initialized to the default value of T, which is
+    // false for bool, and "maybe" for trival.
+    std::vector<T> winning(nroots);
     std::vector<int> seen(nroots, -1); // last iteration seen
-    global_is_winning = &winning;
+    if constexpr (std::is_same<T, bool>::value)
+      global_is_winning = &winning;
+    else
+      global_is_winning3 = &winning;
 
     // The upcoming calls to bdd_mt_quantify_to_bool depend on this
     // setup.
@@ -2956,41 +2969,81 @@ namespace spot
           {
             unsigned i = todo.front();
             todo.pop_front();
-            assert(!winning[i]);
 
-            if (bdd_mt_quantify_to_bool(dfa->states[i],
-                                        is_winning_terminal_lazy,
-                                        &cache, iteration))
+            if constexpr (std::is_same<T, bool>::value)
               {
-                // By modifying winning, we modify the behavior of
-                // is_winning_terminal_lazy.  That should normally
-                // call for an invalidation of the cache (or
-                // equivalently, an increment of the iteration
-                // number), but it is actually OK if the cache uses
-                // previous values, as if winning was constant during
-                // one iteration.  The new values are sure to be used
-                // on next iteration.
-                winning[i] = true;
-                // if the initial state is winning, we can stop
-                if (i == 0)
-                  goto done;
-                changed.push_back(i);
+                assert(!winning[i]);
+                if (bdd_mt_quantify_to_bool(dfa->states[i],
+                                            is_winning_terminal,
+                                            &cache, iteration))
+                  {
+                    // By modifying winning, we modify the behavior of
+                    // is_winning_terminal_lazy.  That should normally
+                    // call for an invalidation of the cache (or
+                    // equivalently, an increment of the iteration
+                    // number), but it is actually OK if the cache
+                    // uses previous values, as if winning was
+                    // constant during one iteration.  The new values
+                    // are sure to be used on next iteration.
+                    winning[i] = true;
+                    // if the initial state is winning, we can stop
+                    if (i == 0)
+                      goto done;
+                    changed.push_back(i);
+                  }
+              }
+            else // trival version
+              {
+                assert(winning[i].is_maybe());
+                if (int res = bdd_mt_quantify_to_trival(dfa->states[i],
+                                                        is_winning_terminal3,
+                                                        &cache, 0, iteration);
+                    res != 2)
+                  {
+                    winning[i] = trival(res != 0);
+                    if (i == 0)
+                      goto done;
+                    changed.push_back(i);
+                  }
               }
           }
         while (!todo.empty());
-        // Schedule non-winning predecessors for next iteration.
+        // Schedule unknown predecessors for next iteration.
         for (unsigned i: changed)
           for (unsigned p: rev.out(i))
-            if (!winning[p] && seen[p] != iteration)
+            if constexpr (std::is_same<T, bool>::value)
               {
-                seen[p] = iteration;
-                todo.push_front(p);
+                if (!winning[p] && seen[p] != iteration)
+                  {
+                    seen[p] = iteration;
+                    todo.push_front(p);
+                  }
+              }
+            else
+              {
+                if (winning[p].is_maybe() && seen[p] != iteration)
+                  {
+                    seen[p] = iteration;
+                    todo.push_front(p);
+                  }
               }
         changed.clear();
       }
   done:
     bdd_extcache_done(&cache);
     return winning;
+  }
+
+  std::vector<bool>
+  mtdfa_winning_region_lazy(mtdfa_ptr dfa)
+  {
+    return mtdfa_winning_region_lazy_do<bool>(dfa);
+  }
+
+  std::vector<trival>
+  mtdfa_winning_region_lazy3(mtdfa_ptr dfa)
+  {
+    return mtdfa_winning_region_lazy_do<trival>(dfa);
   }
 
   static std::unordered_map<int, int>* global_term_map;
@@ -3017,9 +3070,31 @@ namespace spot
     return bdd_terminal_as_int(new_term);
   }
 
-  static mtdfa_ptr
+  static int map_restrict_as_game3(int root, int term)
+  {
+    if (root == 0 || root == 1)
+      return root;
+    if (term & 1)
+      return 1;
+    int dst = term / 2;
+    if (global_is_winning && !(*global_is_winning3)[dst].is_true())
+      return 0;
+
+    int new_term = global_term_map->size() * 2;
+    auto [it, b] = global_term_map->emplace(term, new_term);
+    if (b)
+      global_todo->push(dst);
+    else
+      new_term = it->second;
+    if (term == new_term)
+      return root;
+    return bdd_terminal_as_int(new_term);
+  }
+
+  template <typename T>
+  mtdfa_ptr
   mtdfa_restrict_as_game_aux(mtdfa_ptr dfa,
-                             const std::vector<bool>* winning_states)
+                             const std::vector<T>* winning_states)
   {
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
@@ -3031,7 +3106,10 @@ namespace spot
 
     bool keep_names = dfa->names.size() == dfa->states.size();
 
-    global_is_winning = winning_states;
+    if constexpr (std::is_same<T, bool>::value)
+      global_is_winning = winning_states;
+    else
+      global_is_winning3 = winning_states;
 
     std::unordered_map<int, int> term_map;
     global_term_map = &term_map;
@@ -3045,7 +3123,9 @@ namespace spot
         int state = todo.front();
         todo.pop();
         bdd b = dfa->states[state];
-        b = bdd_mt_apply1_leaves(b, map_restrict_as_game,
+        b = bdd_mt_apply1_leaves(b,
+                                 std::is_same<T, bool>::value ?
+                                 map_restrict_as_game : map_restrict_as_game3,
                                  &cache, 0);
         res->states.push_back(b);
         if (keep_names)
@@ -3059,14 +3139,21 @@ namespace spot
   mtdfa_ptr
   mtdfa_restrict_as_game(mtdfa_ptr dfa)
   {
-    return mtdfa_restrict_as_game_aux(dfa, nullptr);
+    return mtdfa_restrict_as_game_aux<bool>(dfa, nullptr);
   }
 
   mtdfa_ptr
   mtdfa_restrict_as_game(mtdfa_ptr dfa,
                          const std::vector<bool>& winning_states)
   {
-    return mtdfa_restrict_as_game_aux(dfa, &winning_states);
+    return mtdfa_restrict_as_game_aux<bool>(dfa, &winning_states);
+  }
+
+  mtdfa_ptr
+  mtdfa_restrict_as_game(mtdfa_ptr dfa,
+                         const std::vector<trival>& winning_states)
+  {
+    return mtdfa_restrict_as_game_aux<trival>(dfa, &winning_states);
   }
 
 

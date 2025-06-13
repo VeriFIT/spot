@@ -538,6 +538,7 @@ namespace std {
   %template(vectormarkunsigned) vector<pair<spot::acc_cond::mark_t, unsigned>>;
   %template(vectorbool) vector<bool>;
   %template(vectorbdd) vector<bdd>;
+  %template(vectortrival) vector<spot::trival>;
   %template(aliasvector) vector<pair<string, bdd>>;
   %template(vectorstring) vector<string>;
   %template(vectorint) vector<int>;

@@ -110,7 +110,7 @@ static const argp_option options[] =
     { "decompose", OPT_DECOMPOSE, "yes|no", 0,
       "whether to decompose the specification as multiple output-disjoint "
       "problems to solve independently (enabled by default)", 0 },
-    { "backprop", OPT_BACKPROP, "nodes|states", 0,
+    { "backprop", OPT_BACKPROP, "nodes|states|trival-states", 0,
       "whether backpropagation should be done at the node or state level "
       "(nodes by default)", 0 },
     { "polarity", OPT_POLARITY, "yes|no|before-decompose", 0,
@@ -222,16 +222,17 @@ static bool opt_simplify_ltl = true;
 
 static std::ostream* opt_verbose = nullptr;
 
+enum backprop_style { bp_nodes, bp_states, bp_trival_states };
 static const char* const backprop_args[] =
   {
-    "states", "nodes", nullptr
+    "states", "nodes", "trival-states", nullptr
   };
-static const bool backprop_values[] =
+static const backprop_style backprop_values[] =
   {
-    false, true,
+    bp_states, bp_nodes, bp_trival_states,
   };
 ARGMATCH_VERIFY(backprop_args, backprop_values);
-static bool opt_backprop = true;
+static backprop_style opt_backprop = bp_nodes;
 
 static const char* const composition_args[] =
   {
@@ -660,9 +661,9 @@ namespace
             {
               bool dfs_strict = opt_trans == translation_otf_dfs_strict;
               bool dfs = (opt_trans == translation_otf_dfs) | dfs_strict;
-              if (!opt_backprop)
+              if (opt_backprop != bp_nodes)
                 error(2, 0,
-                      "on-the-fly translations do not support --nodes=states");
+                      "on-the-fly translations onlyl support --backprop=nodes");
               if (opt_verbose)
                 {
                   *opt_verbose << indent
@@ -705,15 +706,23 @@ namespace
             else
               {
                 if (opt_verbose)
-                  *opt_verbose << indent
-                               << "solving game by backpropagation at "
-                               << (opt_backprop ? "node" : "state")
-                               << " level\n";
+                  {
+                    *opt_verbose << indent
+                                 << "solving game by backpropagation at "
+                                 << (opt_backprop == bp_nodes ?
+                                     "node" : "state");
+                    if (opt_backprop == bp_trival_states)
+                      *opt_verbose << " level with trivalued logic\n";
+                    else
+                      *opt_verbose << " level\n";
+                  }
                 st.start();
-                if (opt_backprop)
+                if (opt_backprop == bp_nodes)
                   unrealizable = !mtdfa_to_backprop(a).winner(0);
-                else
+                else if (opt_backprop == bp_states)
                   unrealizable = !mtdfa_winning_region_lazy(a)[0];
+                else // bp_trival_states
+                  unrealizable = !mtdfa_winning_region_lazy3(a)[0].is_true();
                 double solve_time = st.stop();
                 if (opt_verbose)
                   *opt_verbose << indent << "game solved in "

@@ -84,7 +84,7 @@ while read f; do
      for sim in yes no; do
      for dec in yes no; do
      for tra in restr full comp dfs bfs dfs-strict; do
-       bpvalues="states nodes"
+       bpvalues="states nodes trival"
        osvalues="yes no";
        case $tra in
            bfs | dfs | dfs-strict) bpvalues=nodes;;

@@ -20,6 +20,7 @@
 
 #include <spot/twa/twagraph.hh>
 #include <spot/misc/bddlt.hh>
+#include <spot/misc/trival.hh>
 #include <spot/twaalgos/backprop.hh>
 
 namespace spot
@@ -504,8 +505,18 @@ namespace spot
   /// This is similar to mtdfa_winning_region, but it will only
   /// compute the winning status of states that are reachable from the
   /// initial state without crossing any accepting terminal.
+  ///
+  /// In the trival version, the returned vector indicates whether
+  /// the environment can force the game to reach false (false),
+  /// the controller can force the game to reach an accepting state (true),
+  /// or no player can force the game to reach its target (maybe).
+  ///@{
   SPOT_API std::vector<bool>
   mtdfa_winning_region_lazy(mtdfa_ptr dfa);
+
+  SPOT_API std::vector<trival>
+  mtdfa_winning_region_lazy3(mtdfa_ptr dfa);
+  ///@}
 
   #include <spot/graph/adjlist.hh>
 
@@ -522,6 +533,9 @@ namespace spot
   SPOT_API mtdfa_ptr
   mtdfa_restrict_as_game(mtdfa_ptr dfa,
                          const std::vector<bool>& winning_states);
+  SPOT_API mtdfa_ptr
+  mtdfa_restrict_as_game(mtdfa_ptr dfa,
+                         const std::vector<trival>& winning_states);
   /// @}
 
 
