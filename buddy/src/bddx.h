@@ -419,6 +419,8 @@ BUDDY_API BDD      bdd_terminal_to_const(BDD, BDD, BDD,
 BUDDY_API void     bdd_mt_quantify_prepare(BDD);
 BUDDY_API int      bdd_mt_quantify_to_bool(BDD, int (*)(int),
                                            bddExtCache*, int);
+BUDDY_API int      bdd_mt_quantify_to_trival(BDD, int (*)(int),
+                                             bddExtCache*, int, int);
 
 BUDDY_API BDD      bdd_and(BDD, BDD);
 BUDDY_API BDD      bdd_or(BDD, BDD);
@@ -721,6 +723,9 @@ protected:
    friend void     bdd_mt_quantify_prepare(const bdd&);
    friend int      bdd_mt_quantify_to_bool(const bdd&,
                                            int (*)(int), bddExtCache*, int);
+   friend int      bdd_mt_quantify_to_trival(const bdd&,
+                                             int (*)(int), bddExtCache*,
+                                             int, int);
    friend bdd      bdd_and(const bdd &, const bdd &);
    friend bdd      bdd_or(const bdd &, const bdd &);
    friend bdd      bdd_xor(const bdd &, const bdd &);
@@ -1041,6 +1046,13 @@ inline int bdd_mt_quantify_to_bool(const bdd& r,
   return bdd_mt_quantify_to_bool(r.root, op, cache, ophash);
 }
 
+inline int bdd_mt_quantify_to_trival(const bdd& r,
+                                     int (*op)(int),
+                                     bddExtCache* cache,
+                                     int ophash, int iteration)
+{
+  return bdd_mt_quantify_to_trival(r.root, op, cache, ophash, iteration);
+}
 
 inline bdd bdd_and(const bdd &l, const bdd &r)
 { return bdd_apply(l.root, r.root, bddop_and); }

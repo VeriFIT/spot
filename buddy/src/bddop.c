@@ -1942,6 +1942,13 @@ void bdd_mt_quantify_prepare(BDD r)
      quantvarset[LEVEL(n)] = 1;
 }
 
+// This assumes that bdd_mt_quantify_prepare(BDD q) has been called
+// first, and quantify all variables in r in the order they appear in.
+// Variables from r that appear in q will be qunatified existentially,
+// and other variables will be quantified universally.  The result 0
+// (meaning bddfalse) or 1 (meaning bddtrue).  Function termop is
+// called for all terminal nodes and is given the terminal value (not
+// the BDD node number); it should return 0 or 1.
 int bdd_mt_quantify_to_bool(BDD r, int (*termop)(int),
                             bddExtCache* cache, int ophash)
 {
@@ -1993,7 +2000,7 @@ int bdd_mt_quantify_to_bool(BDD r, int (*termop)(int),
          }
        else
          {
-           /* I: -1 r --- */
+           /* I: index r --- */
            /* R: rres lres --- res */
            int rres = READREF_(1);
            int lres = READREF_(2);
@@ -2007,6 +2014,106 @@ int bdd_mt_quantify_to_bool(BDD r, int (*termop)(int),
            PUSHREF_(res);
            bddExtCacheEntry* entry = cache->table + index;
            entry->arg1 = r;
+           entry->op = ophash;
+           entry->res = res;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   BDD res = READREF_(1);
+   POPREF_(1);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   return res;
+}
+
+// This assumes that bdd_mt_quantify_prepare(BDD q) has been called
+// first, and quantify all variables in r in the order they appear in.
+// Variables from r that appear in q will be qunatified existentially,
+// and other variables will be quantified universally.
+//
+// Unlike bdd_mt_quantify_to_bool, this return three possible values:
+// 0 (meaning false), 2 (meaning unknown), or 3 (meaning true).
+// Function termop is called on all terminal values, and should return
+// one of those three values.
+//
+// In additional to that ophash, and iteration are two values that are
+// combined with r to for the key in the result hashtable.  It is
+// assumed that the values returned by termop are only valid for a
+// given ophash, and additionally, the "unknown" results can only be
+// reused for the same pair of (ophash, iteration).  In other words, 0
+// (false) and 3 (true) are stable across iterations, but not 2
+// (unknown).
+int bdd_mt_quantify_to_trival(BDD r, int (*termop)(int),
+                              bddExtCache* cache,
+                              int ophash, int iteration)
+{
+   LOCAL_REC_STACKS;
+   int index;
+
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           r = POPINT_();
+         work:;
+           if (ISCONST(r))
+             RETURN(r * 3);
+
+           /* I: r --- */
+           /* R: --- r */
+           if (ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int i = termop(TERM(r));
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(i);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, ophash), index);
+               if (entry1->arg1 == r && entry1->op == ophash &&
+                   // if res == 2 (meaning "unknown") we can only use
+                   // the cached value for the current iteration.
+                   (entry1->res != 2 || entry1->arg2 == iteration))
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, HIGH(r), -1);
+                   r = LOW(r);
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: index r --- */
+           /* R: rres lres --- res */
+           int rres = READREF_(1);
+           int lres = READREF_(2);
+           BDD r = POPINT_();
+           int res = lres;
+           if (quantvarset[LEVEL(r)])
+             res |= rres;       /* existential quantification */
+           else
+             res &= rres;       /* universal quantification */
+           POPREF_(2);
+           PUSHREF_(res);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->arg2 = iteration;
            entry->op = ophash;
            entry->res = res;
          }
