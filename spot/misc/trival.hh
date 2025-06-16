@@ -39,12 +39,12 @@ namespace spot
   private:
     value_t val_;
   public:
-    constexpr trival()
+    constexpr trival() noexcept
       : val_(maybe_value)
     {
     }
 
-    constexpr trival(bool v)
+    constexpr trival(bool v) noexcept
       : val_(v ? yes_value : no_value)
     {
     }
