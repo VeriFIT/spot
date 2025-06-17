@@ -140,6 +140,8 @@ def canonicalize(s, type, ignores):
     s = re.sub(r' fill="black"', '', s)
     s = re.sub(r' stroke="transparent"', ' stroke="none"', s)
     s = re.sub(r'><title>', '>\n<title>', s)
+    # Graphiz 13.0.0 adds xml:space="preserve" to SVG labels.
+    s = re.sub(r'xml:space="preserve" ', '', s)
     # At some point Fedora changed the default font-familly from
     # Times,serif to Times-Roman.
     s = re.sub(r'"Times[^"]+"', '"Times"', s)
