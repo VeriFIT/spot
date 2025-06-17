@@ -104,8 +104,7 @@ Then each label can now be considered as a letter.
   import spot, sys
 
   # Read the input automaton from standard input, or from a supplied filename.
-  argc = len(sys.argv)
-  if argc < 2:
+  if len(sys.argv) < 2:
     filename = "-"
   elif argc == 2:
     filename = sys.argv[1]

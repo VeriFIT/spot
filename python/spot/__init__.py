@@ -19,14 +19,14 @@
 
 import sys
 
-if sys.hexversion < 0x03060000:
-    sys.exit("This module requires Python 3.6 or newer")
+if sys.hexversion < 0x03080000:
+    sys.exit("This module requires Python 3.8 or newer")
 
 import subprocess
 import os
 import signal
 import tempfile
-from contextlib import suppress as _supress
+from contextlib import nullcontext
 
 if 'SPOT_UNINSTALLED' in os.environ:
     # When Spot is installed, _impl.so will be in the same directory as
@@ -136,9 +136,7 @@ __om_init_tmp = option_map.__init__
 
 def __om_init_new(self, str=None):
     __om_init_tmp(self)
-    if str:
-        res = self.parse_options(str)
-        if res:
+    if str and (res := self.parse_options(str)):
             raise RuntimeError("failed to parse option at: '" + str + "'")
 
 
@@ -740,13 +738,13 @@ def automata(*sources, timeout=None, ignore_abort=True,
                 setsid_maybe = None
                 if not no_sid:
                     setsid_maybe = os.setsid
-                # universal_newlines for str output instead of bytes
-                # when the pipe is read from Python (which happens
-                # when timeout is set).
+                # text=True for str output instead of bytes when the
+                # pipe is read from Python (which happens when timeout
+                # is set).
                 prefn = None if no_sid else os.setsid
                 proc = subprocess.Popen(filename[:-1], shell=True,
                                         preexec_fn=prefn,
-                                        universal_newlines=True,
+                                        text=True,
                                         stdout=subprocess.PIPE)
                 if timeout is None:
                     p = automaton_stream_parser(proc.stdout.fileno(),
@@ -760,8 +758,7 @@ def automata(*sources, timeout=None, ignore_abort=True,
                         os.killpg(proc.pid, signal.SIGKILL)
                         raise
                     else:
-                        ret = proc.wait()
-                        if ret:
+                        if (ret := proc.wait()):
                             raise subprocess.CalledProcessError(ret,
                                                                 filename[:-1])
                     finally:
@@ -776,11 +773,8 @@ def automata(*sources, timeout=None, ignore_abort=True,
             # closed on exit, and the process will be properly waited for.
             # This is important when running tools that produce an infinite
             # stream of automata and that must be killed once the generator
-            # returned by spot.automata() is destroyed.  Otherwise, _supress()
-            # is just a dummy context manager that does nothing (Python 3.7
-            # introduces nullcontext() for this purpose, but at the time of
-            # writing we still have to support Python 3.6).
-            mgr = proc if proc else _supress()
+            # returned by spot.automata() is destroyed.
+            mgr = proc if proc else nullcontext()
             with mgr:
                 while a:
                     # the automaton is None when we reach the end of the file.
@@ -985,8 +979,7 @@ def _postproc_translate_options(obj, default_type, *args):
 
     for arg in args:
         arg = arg.lower()
-        fn = options.get(arg)
-        if fn:
+        if (fn := options.get(arg)):
             fn(arg)
         else:
             # arg is not an know option, but maybe it is a prefix of
@@ -1323,8 +1316,7 @@ def randltl(ap, n=-1, **kwargs):
 
 
 def simplify(f, **kwargs):
-    level = kwargs.get('level', None)
-    if level is not None:
+    if (level := kwargs.get('level', None)) is not None:
         return tl_simplifier(tl_simplifier_options(level)).simplify(f)
 
     basics = kwargs.get('basics', True)

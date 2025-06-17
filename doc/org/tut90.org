@@ -430,13 +430,11 @@ variables *anonymous* because their meaning is unknown to the
           self.dict.unregister_all_my_variables(self)
       def __str__(self):
           isop = spot.minato_isop(self.rel)
-          i = isop.next()
           res = []
-          while i != bddfalse:
+          while (i := isop.next()) != bddfalse:
             s = bdd_var(i) - self.anonbase
             d = bdd_var(bdd_high(i)) - self.anonbase - self.num_states
             res.append((s, d))
-            i = isop.next()
           return str(res)
 
   ts = trans_set(spot.translate('GF(a <-> XXa)'))

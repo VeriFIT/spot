@@ -172,12 +172,12 @@ try:
 
                    try:
                        p = subprocess.run(['divine', 'compile',
-                                             '--ltsmin', t.name],
-                                            stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE,
-                                            universal_newlines=True)
+                                           '--ltsmin', t.name],
+                                          capture_output=True,
+                                          text=True)
                        if p.stdout: print(p.stdout)
-                       if p.stderr: print(p.stderr, file=sys.stderr)
+                       if p.stderr:
+                           print(p.stderr, file=sys.stderr, flush=True)
                        p.check_returncode()
                        self.shell.user_ns[line] = load(t.name + '2C')
                    finally:

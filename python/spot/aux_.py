@@ -66,37 +66,29 @@ def _gvfix(matchobj):
 # interactive widget, we avoid some repeated calls to dot for
 # identical inputs.
 @lru_cache(maxsize=64)
-def str_to_svg(str):
+def str_to_svg(s):
     """
     Send some text to dot for conversion to SVG.
     """
     try:
-        dot = subprocess.Popen(['dot', '-Tsvg'],
-                               stdin=subprocess.PIPE,
-                               stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE)
+        p = subprocess.run(['dot', '-Tsvg'],
+                           capture_output=True, text=True,
+                           input=s.decode('utf-8') if type(s) is bytes else s)
     except FileNotFoundError:
         print("The command 'dot' seems to be missing on your system.\n"
               "Please install the GraphViz package "
               "and make sure 'dot' is in your PATH.", file=sys.stderr)
         raise
-
-    stdout, stderr = dot.communicate(str)
-    if stderr:
-        print("Calling 'dot' for the conversion to SVG produced the message:\n"
-              + stderr.decode('utf-8'), file=sys.stderr)
-    ret = dot.wait()
-    if ret:
-        raise subprocess.CalledProcessError(ret, 'dot')
-    out = stdout.decode('utf-8')
-    return svgscale_regex.sub(_gvfix, out)
+    if p.stderr: print(p.stderr, file=sys.stderr, flush=True)
+    p.check_returncode()
+    return svgscale_regex.sub(_gvfix, p.stdout)
 
 
 def ostream_to_svg(ostr):
     """
-    Encode an ostringstream as utf-8 and send it to dot for cocnversion to SVG.
+    Encode an ostringstream to SVG.
     """
-    return str_to_svg(ostr.str().encode('utf-8'))
+    return str_to_svg(ostr.str())
 
 
 def rm_f(filename):
