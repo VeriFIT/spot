@@ -94,7 +94,21 @@ AX_CHECK_COMPILE_FLAG([-Werror -fvisibility=hidden],
   [CXXFLAGS="$CXXFLAGS -fvisibility=hidden"
   AX_CHECK_COMPILE_FLAG([-fvisibility-inlines-hidden],
     [CXXFLAGS="$CXXFLAGS -fvisibility-inlines-hidden"])])
+
+
+# clang 17.0 and later have broken assumptions about the vtables
+# it generates for final classes.  See
+#  - https://github.com/llvm/llvm-project/issues/71196
+#  - https://gitlab.lre.epita.fr/spot/spot/-/issues/609
+# This is only an issue with shared libraries.
+case $enable_shared in
+ yes)
+ AX_CHECK_COMPILE_FLAG([-Werror -fno-assume-unique-vtables],
+                       [CXXFLAGS="$CXXFLAGS -fno-assume-unique-vtables"])
+ ;;
+esac
 CXXFLAGS="$CXXFLAGS -DSPOT_BUILD"
+
 
 # Turn on C++17 support
 m4_define([_AX_CXX_COMPILE_STDCXX_17_testbody],
