@@ -39,6 +39,8 @@ namespace spot
   /// The `bddfalse` and `bddtrue` nodes are kept to represent
   /// rejecting and accepting sinks; using them helps some to shortcut
   /// some BDD operations.
+  ///
+  /// \cite duret.25.ciaa
 
   /// \ingroup mtdfa
   /// \brief statistics about an mtdfa instance
@@ -109,6 +111,8 @@ namespace spot
   ///
   /// `bddfalse` and `bddtrue` terminals are used to represent
   /// rejecting and accepting sink states.
+  ///
+  /// \cite duret.25.ciaa
   struct SPOT_API mtdfa: public std::enable_shared_from_this<mtdfa>
   {
     public:
@@ -270,6 +274,8 @@ namespace spot
   ///
   /// States will be labeled using LTLf formulas, this is required by
   /// the construction.
+  ///
+  /// \cite duret.25.ciaa
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                 bool fuse_same_bdds = true,
@@ -317,6 +323,8 @@ namespace spot
   ///
   /// See ltlf_to_mtdfa for the purpose of \a fuse_same_bdds, \a
   /// simplify_terms, \a detect_empty_univ.
+  ///
+  /// \cite duret.25.ciaa
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,
@@ -556,6 +564,8 @@ namespace spot
   /// backprop_graph with a few annotations indicating which the
   /// correspondence between some states of the backprop_graph and the
   /// roots of \a dfa.
+  ///
+  /// \cite duret.25.ciaa
   SPOT_API backprop_graph
   mtdfa_to_backprop(mtdfa_ptr dfa, bool early_stop = true,
                     bool preserve_names = false);

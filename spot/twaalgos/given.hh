@@ -41,6 +41,8 @@ namespace spot
   ///
   /// Then use bounds_simplify() to simplify the bounds and get
   /// back a standard automaton.
+  ///
+  /// \cite duret.25.pn
   /// @{
   SPOT_API twa_graph_ptr
   update_bounds_given_here(twa_graph_ptr& aut,
@@ -63,6 +65,8 @@ namespace spot
   /// This uses the Minato algorithm to select a label
   /// for each transition, between the bounds computed
   /// by update_bounds_given().
+  ///
+  /// \cite duret.25.pn
   /// @{
   SPOT_API twa_graph_ptr
   bounds_simplify_here(twa_graph_ptr& aut);
@@ -85,6 +89,8 @@ namespace spot
   ///
   /// The algorithm has two variant (relax and restrict) that can be
   /// selected using the \a relax argument.
+  ///
+  /// \cite duret.25.pn
   SPOT_API
   twa_graph_ptr stutterize_given(twa_graph_ptr& aut,
                                  std::vector<const_twa_graph_ptr>& facts,

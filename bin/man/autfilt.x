@@ -107,7 +107,7 @@ Describes the \fB\-\-sat\-minimize\fR option.
 \(bu
 Alexandre Duret-Lutz, Denis Poitrenaud, Yann Thierry-Mieg:
 Simplifying LTL Model-Checking Given Prior Knowledge.
-Proceedings of PetriNet'25.  To appear.
+Proceedings of PetriNet'25.  LNCS 15714.
 
 Discusses the techniques behind the \fB\-\-given-formula\fR,
 \fB\-\-given-automaton\fR, and \fB\-\-given-strategy\fR options.
