@@ -67,14 +67,14 @@ troubleshooting installations.
 
 We build Debian packages for amd64 and i386, for both releases and the
 development versions.  Packages for releases are built for Debian
-Bullseye (a.k.a. Debian stable) while packages for development are built
+Bookworm (a.k.a. Debian stable) while packages for development are built
 for Sid (a.k.a. Debian unstable).
 
 Here is how to install the stable packages:
 
 #+BEGIN_SRC sh
-wget -q -O - https://www.lrde.epita.fr/repo/debian.gpg | apt-key add -
-echo 'deb http://www.lrde.epita.fr/repo/debian/ stable/' >> /etc/apt/sources.list
+wget -q -O - https://www.lre.epita.fr/repo/debian.gpg | apt-key add -
+echo 'deb http://www.lre.epita.fr/repo/debian/ stable/' >> /etc/apt/sources.list
 apt-get update
 apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
 #+END_SRC
@@ -82,8 +82,8 @@ apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
 Here is how to install the unstable packages:
 
 #+BEGIN_SRC sh
-wget -O /etc/apt/trusted.gpg.d/lrde.gpg https://www.lrde.epita.fr/repo/debian.gpg
-echo 'deb http://www.lrde.epita.fr/repo/debian/ unstable/' >> /etc/apt/sources.list
+wget -O /etc/apt/trusted.gpg.d/lrde.gpg https://www.lre.epita.fr/repo/debian.gpg
+echo 'deb http://www.lre.epita.fr/repo/debian/ unstable/' >> /etc/apt/sources.list
 apt-get update
 apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
 #+END_SRC
@@ -104,20 +104,37 @@ examples).  The packages containing the libraries (=libspot0=,
 =libbddx0=, =libspotltsmin0=) are automatically installed as
 dependencies of the previous packages.
 
+* Builds of other Debian based distributions
+
+[[https://download.opensuse.org/repositories/home:/adl/][This OBS directory]] contains builds of Spot for several Debian-based
+distributions, e.g., Ubuntu or Raspbian distributions.  It may be
+lagging behind the latest release of Spot by a few days, as the update
+is not entirely automatic.
+
+To use it, browse the [[https://download.opensuse.org/repositories/home:/adl/][above link]] to find your distribution, and adjust
+the following example accordingly.
+
+#+BEGIN_SRC sh
+echo 'deb [trusted=true] https://download.opensuse.org/repositories/home:/adl/xUbuntu_22.04/ ./' >> /etc/apt/sources.list
+apt-get update
+apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
+#+END_SRC
+
 * Installing the Fedora packages
    :PROPERTIES:
    :CUSTOM_ID: Fedora
    :END:
 
 We build Fedora packages for amd64, for both releases and the
-development versions.  Both builds are currently made for Fedora 28.
+development versions.  Both builds are currently made for the latest
+Fedora version at the moment of the release.
 
-Our `stable` repository contains RPM for released versions of Spot, add it with:
+Our =stable= repository contains RPM for released versions of Spot, add it with:
 #+BEGIN_SRC sh
 sudo dnf config-manager --add-repo https://www.lrde.epita.fr/repo/fedora/lrde.repo
 #+END_SRC
 
-Our `unstable` repository contains RPM for the development versions of Spot,
+Our =unstable= repository contains RPM for the development versions of Spot,
 you can opt to use that instead:
 
 #+BEGIN_SRC sh
@@ -143,7 +160,7 @@ on =libspot= that contains the shared libraries.
   A typical installation would go as follows:
 
 #+BEGIN_SRC sh
-  conda create --name myenv python=3.8 # adjust as desired
+  conda create --name myenv python=3.10 # adjust as desired
   conda activate myenv
   conda install -c conda-forge spot
 #+END_SRC
