@@ -30,12 +30,15 @@ namespace spot
   /// MTDFAs are a representation of transition-based finite
   /// deterministic automata labeled by Boolean formulas.  Each state
   /// is represented by a BDD encoding the Boolean formulas labeling
-  /// the successor transition.  The leaves of these BDDs are not the
-  /// usual `bddfalse` and `bddtrue`, but some integer-valued terminal
-  /// representing the destination state.  A terminal with integer
-  /// label $2d+b$ represent desitination state $d$ and uses
-  /// $b\in\{0,1\}$ to indicate whether the transition is accpeting
+  /// the successor transition.  The leaves of these BDDs are not only
+  /// the usual `bddfalse` and `bddtrue`, but some integer-valued
+  /// terminal representing the destination state.  A terminal with
+  /// integer label $2d+b$ represents destination state $d$ and uses
+  /// $b\in\{0,1\}$ to indicate whether the transition is accepting
   /// (i.e., the evaluation can stop after reading the last letter).
+  /// The `bddfalse` and `bddtrue` nodes are kept to represent
+  /// rejecting and accepting sinks; using them helps some to shortcut
+  /// some BDD operations.
 
   /// \ingroup mtdfa
   /// \brief statistics about an mtdfa instance
@@ -103,9 +106,11 @@ namespace spot
   /// If a transition should reach state V, the terminal stores the
   /// value 2*V if the transition is rejecting, or 2*V+1 if the
   /// transition is accepting.
+  ///
+  /// `bddfalse` and `bddtrue` terminals are used to represent
+  /// rejecting and accepting sink states.
   struct SPOT_API mtdfa: public std::enable_shared_from_this<mtdfa>
-
-    {
+  {
     public:
     /// \brief create an empty mtdfa
     ///
@@ -128,7 +133,7 @@ namespace spot
     /// This is actually the list of atomic propositions that appeared
     /// in the formulas/automata that were used to build this
     /// automaton.  The automaton itself may use fewer atomic
-    /// propositions in cases some of them canceled each other.
+    /// propositions, for instance in cases some of them canceled each other.
     ///
     /// This vector is sorted by formula ID, to make it easy to merge
     /// with another sorted vector.
@@ -137,7 +142,7 @@ namespace spot
     /// \brief the number of MTBDDs roots
     ///
     /// This is the size of the `states` array.  It does not account
-    /// for any false or true state.
+    /// for any bddfalse or bddtrue state.
     unsigned num_roots() const
     {
       return states.size();
@@ -145,7 +150,7 @@ namespace spot
 
     /// \brief The number of states in the automaton
     ///
-    /// This counts the number of roots, plus one if the `true` state
+    /// This counts the number of roots, plus one if the `bddtrue` state
     /// is reachable.  This is therefore the size that the
     /// transition-based output of `as_twa()` would have.
     unsigned num_states() const
@@ -157,12 +162,13 @@ namespace spot
     // check if one terminal is accepting.
     bool is_empty() const;
 
-    /// \brief Print the states array of MTBDD in graphviz format.
+    /// \brief Print the `states` array of MTBDD in graphviz format.
     ///
-    /// If \a index is non-negative, print only a single state.
+    /// If \a index is non-negative, print only the single state
+    /// specified by \a index.
     ///
     /// By default states will be named according to the formulas
-    /// given in the `names` array, if available.  Set \a labels is
+    /// given in the `names` array, if available.  Set \a labels to
     /// `false` (or clear `names`) if you prefer states to by
     /// numbered.
     std::ostream& print_dot(std::ostream& os,
@@ -171,8 +177,8 @@ namespace spot
 
     /// \brief Convert this automaton to a spot::twa_graph
     ///
-    /// The twa_graph is not meant to represent finite automata, so
-    /// this will actually abuse the twa_graph class by creating a
+    /// The twa_graph class is not meant to represent finite automata,
+    /// so this will actually abuse the twa_graph class by creating a
     /// deterministic Büchi automaton in which accepting transitions
     /// should be interpreted as final transitions.  If \a state_based
     /// is set, then a DBA with state-based acceptance is created
@@ -180,18 +186,18 @@ namespace spot
     ///
     /// The conversion can be costly, since it requires creating
     /// BDD-labeled transitions for each path between a root and a
-    /// leave of the state array.  However it can be useful to
-    /// explain the MTDBA semantics.
+    /// leaf of the state array.  However it can be useful to explain
+    /// the MTDBA semantics.
     ///
-    /// By default the created automaton will have its states named
-    /// using the LTLf formula for the original state if available.
-    /// Set \a labels to `false` if you do not want that.
+    /// By default, the created automaton will have its states named
+    /// using the LTLf formulas that label the original automaton if
+    /// available.  Set \a labels to `false` if you do not want that.
     twa_graph_ptr as_twa(bool state_based = false, bool labels = true) const;
 
     /// \brief compute some statistics about the automaton
     ///
-    /// By default, only fetch statistics that are available
-    /// in constant time.
+    /// If \a nodes and \a paths are false, this only fetches
+    /// statistics that are available in constant time.
     ///
     /// If \a nodes is true, this will additionally count the number
     /// of internal nodes and leaves.  It requires scanning the BDDs
@@ -215,12 +221,12 @@ namespace spot
     /// format, but this is also a prerequisite for interpreting
     /// the automaton as a game.
     ///
-    /// This function should only be called after the state have been
-    /// registered by the automaton.  If \a ignore_non_registered_ap
-    /// is set, variable listed as output but not registered by the
-    /// automaton will be dropped.  Else, an exception will be raised
-    /// for those variables.
-    /// @{
+    /// This function is expected to be after you have built the
+    /// automaton, in some way (causing atomic propositions to be
+    /// registered).  If \a ignore_non_registered_ap is set, variable
+    /// listed as output but not registered by the automaton will be
+    /// dropped.  Else, an exception will be raised for those
+    /// variables.  @{
     void set_controllable_variables(const std::vector<std::string>& vars,
                                     bool ignore_non_registered_ap = false);
     void set_controllable_variables(bdd vars);
@@ -241,13 +247,13 @@ namespace spot
   typedef std::shared_ptr<const mtdfa> const_mtdfa_ptr;
 
   /// \ingroup mtdfa
-  /// \brief Convert an LTLf formula into a MTDFA
+  /// \brief Convert an LTLf formula into an MTDFA
   ///
-  /// This converts the LTLf formula \a f into a MTDFA, one state at a
-  /// time, using a recursive computation of the successors of a
+  /// This converts the LTLf formula \a f into an MTDFA, one state at
+  /// a time, using a recursive computation of the successors of an
   /// LTLf-labeled state.
   ///
-  /// By default, the constructions includes some very cheap
+  /// By default, the construction includes some very cheap
   /// optimizations that can be disabled with the relevant flags
   /// to study their effact:
   ///
@@ -272,10 +278,10 @@ namespace spot
 
 
   enum ltlf_synthesis_backprop {
-    state_refine,         // no backpropagation, just local refinement
-    bfs_node_backprop,    // on-the-fly
-    dfs_node_backprop,    // on-the-fly, DFS that stops on visited nodes
-    dfs_strict_node_backprop, // on-the-fly, DFS that stops on visited states
+    state_refine,         ///< no backpropagation, just local refinement
+    bfs_node_backprop,    ///< on-the-fly
+    dfs_node_backprop,    ///< on-the-fly, DFS that stops on visited nodes
+    dfs_strict_node_backprop, ///< on-the-fly, DFS that stops on visited states
   };
 
   /// \ingroup mtdfa
@@ -288,15 +294,16 @@ namespace spot
   ///
   /// The set of output variables should be specified with \a outvars.
   ///
-  /// If \a backprop is set to `node_backprop`, then a backpropagation
-  /// graph it constructed while the automaton for \a f is explored.
-  /// This may help to abort the construction earlier, and it is
-  /// enough to solve the game and return a strategy.  That strategy
-  /// is returned if \a realizability is set to `false` (if a strategy
-  /// does not exist, a DFA that has a single bddfalse state is
-  /// reaturned.  When \a realizability is `true`, then the returned
-  /// MTDFA will just have a single state that is bddtrue (realizable)
-  /// or bddfalse (unrealizable).
+  /// If \a backprop is set to `bdd_node_backprop`,
+  /// `dfs_node_backprop`, or `dfs_strict_node_backprop`, then a
+  /// backpropagation graph it constructed while the automaton for \a
+  /// f is explored.  This may help to abort the construction earlier,
+  /// and it is enough to solve the game and return a strategy.  That
+  /// strategy is returned if \a realizability is set to `false` (if a
+  /// strategy does not exist, a DFA that has a single bddfalse state
+  /// is reaturned.  When \a realizability is `true`, then the
+  /// returned MTDFA will just have a single state that is bddtrue
+  /// (realizable) or bddfalse (unrealizable).
   ///
   /// When \a backprop is set to `state_refine`, each state is locally
   /// simplified according to the accepting terminals/bddtrue/bddfalse
@@ -325,14 +332,14 @@ namespace spot
   /// \brief Convert an LTLf formula into a MTDFA, with a compositional
   /// approach.
   ///
-  /// This splits using the Boolean operators at the top of the
-  /// formula.  Maximal subformula that have a temporal operator as
-  /// root are translated using ltlf_to_mtdfa(), and the resulting
-  /// automata are then minimized and then composed according to the
-  /// Boolean operators above those subformulas.
+  /// This splits the LTLf formula on the Boolean operators at the top
+  /// of the formula.  Maximal subformula that have a temporal
+  /// operator as root are translated using ltlf_to_mtdfa(), and the
+  /// resulting automata are then minimized and then composed
+  /// according to the Boolean operators above those subformulas.
   ///
-  /// This approaches makes it possible to minimize the intermediate
-  /// automata before combining them.  (See \a minimize to `false` to
+  /// This approach makes it possible to minimize the intermediate
+  /// automata before combining them.  (Set \a minimize to `false` to
   /// disable that.)
   ///
   /// When combining multiple automata with AND or OR, there is some
@@ -374,11 +381,9 @@ namespace spot
   /// that state are in the same class iff they have the MTBDD
   /// encoding.
   ///
-  /// Each iteration is linear in number of nodes of the entire MTBDD
-  /// array, and the number of iteration can at most linear in the
-  /// number of states.  That makes the algorithm quadratic in the
-  /// number of states, and at most exponential in the number of
-  /// atomic propositions.
+  /// Each iteration is linear in the number of nodes of the entire
+  /// MTBDD array, and the number of iteration is at most linear in
+  /// the number of states.
   SPOT_API mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa);
 
   /// \ingroup mtdfa
@@ -392,8 +397,9 @@ namespace spot
   /// \ingroup mtdfa
   /// \brief Combine two MTDFAs to build the exclusive sum of their languages
   ///
-  /// The results will recognize words that are their recognized by only
-  /// one of \a dfa1 or \a dfa2.
+  /// The results will recognize words that are their by only one of
+  /// \a dfa1 or \a dfa2.  If the resulting automaton has an empty language,
+  /// then the two input automata were equivalent.
   SPOT_API mtdfa_ptr product_xor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2);
 
   /// \ingroup mtdfa
@@ -487,8 +493,8 @@ namespace spot
   /// \brief Compute the winning region of the MTDFA interpreted
   /// as a game.
   ///
-  /// This assumes that controllable variable have been registered by
-  /// set_controllable_variables().
+  /// This assumes that controllable variable have been registered
+  /// with set_controllable_variables().
   ///
   /// The winning region is the set of states from which the
   /// controllable variables can force the automaton to reach an
@@ -517,9 +523,6 @@ namespace spot
   SPOT_API std::vector<trival>
   mtdfa_winning_region_lazy3(mtdfa_ptr dfa);
   ///@}
-
-  #include <spot/graph/adjlist.hh>
-
 
   /// \ingroup mtdfa
   /// \brief Build a generalized strategy from a set of winning states.

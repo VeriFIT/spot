@@ -35,6 +35,8 @@
 #include <spot/graph/adjlist.hh>
 #include <spot/twaalgos/backprop.hh>
 
+// Some of the MTBDD operations may share the same operation cache, so
+// they need an hash key to be distinguished.
 constexpr int hash_key_and = 1;
 constexpr int hash_key_or = 2;
 constexpr int hash_key_implies = 3;
@@ -48,69 +50,92 @@ constexpr int hash_key_finalstrat = 10;
 
 namespace spot
 {
-  static int size_estimate_product(int left_states,
-                                   int right_states,
-                                   int sum_aps)
+
+  ////////////////////////////////////////////////////////////////////////
+  //                        size estimates                              //
+  ////////////////////////////////////////////////////////////////////////
+
+  // The MTBDD operations we perform may use two types of operation
+  // caches.  There are operation caches that grows proportionally to
+  // the number of BDD nodes allocated so far (those cache may be
+  // reset and reallocated when the garbage collection is triggered),
+  // or we can use operation caches that are specifically allocated
+  // for one operation.  In the later case, we need a good estimate of
+  // the MTBDD that will be constructed by the operation, so create a
+  // cache of similar size.
+  //
+  // The following functions provide such estimations.
+
+  namespace
   {
-    if (right_states > left_states)
-      std::swap(left_states, right_states);
-    left_states /= 4;
-    ++left_states;
-    int prod1 = left_states * right_states;
-    if (prod1 / left_states != right_states) // overflow
+    static int size_estimate_product(int left_states,
+                                     int right_states,
+                                     int sum_aps)
+    {
+      if (right_states > left_states)
+        std::swap(left_states, right_states);
+      left_states /= 4;
+      ++left_states;
+      int prod1 = left_states * right_states;
+      if (prod1 / left_states != right_states) // overflow
         return INT_MAX / 16;
-    int prod2 = prod1 * sum_aps;
-    if ((sum_aps > 0) && ((prod2 / sum_aps != prod1) || // overflow
-                          prod2 > (INT_MAX / 16)))
-      return INT_MAX / 16;
-    if (prod2 < (1 << 14))
-      return 1 << 14;
-    return prod2;
+      int prod2 = prod1 * sum_aps;
+      if ((sum_aps > 0) && ((prod2 / sum_aps != prod1) || // overflow
+                            prod2 > (INT_MAX / 16)))
+        return INT_MAX / 16;
+      if (prod2 < (1 << 14))
+        return 1 << 14;
+      return prod2;
+    }
+
+    static int size_estimate_product(const mtdfa_ptr& left,
+                                     const mtdfa_ptr& right)
+    {
+      // Compute the number of atomic propositions in the product.
+      // The logic is similar to std::set_union except we only
+      // count the number of elements in the union.
+      auto lbegin = left->aps.begin();
+      auto lend = left->aps.end();
+      auto rbegin = right->aps.begin();
+      auto rend = right->aps.end();
+      int apsz = 0;
+      while (lbegin != lend && rbegin != rend)
+        {
+          ++apsz;
+          bool adv_left = *lbegin <= *rbegin;
+          bool adv_right = *rbegin <= *lbegin;
+          lbegin += adv_left;
+          rbegin += adv_right;
+        }
+      // Parentheses are important here, because rend should not be
+      // added to (lend - lbegin) in theory even if it's ok in
+      // practice..  (Compile the STL in debug mode will catch this.)
+      apsz += (lend - lbegin) + (rend - rbegin);
+
+      return size_estimate_product(left->num_roots(),
+                                   right->num_roots(),
+                                   apsz);
+    }
+
+    static int size_estimate_unary(const mtdfa_ptr& aut)
+    {
+      int states = aut->num_roots();
+      states /= 2;
+      ++states;
+      int num_aps = aut->aps.size();
+      int prod = states * num_aps;
+      if ((num_aps > 0) && ((prod / num_aps != states) || // overflow
+                            prod > (INT_MAX / 16)))
+        return INT_MAX / 16;
+      if (prod < (1 << 14))
+        return 1<<14;
+      return prod;
+    }
   }
 
-  static int size_estimate_product(const mtdfa_ptr& left,
-                                   const mtdfa_ptr& right)
-  {
-    // Compute the number of atomic propositions in the product.
-    // The logic is similar to std::set_union except we only
-    // count the number of elements in the union.
-    auto lbegin = left->aps.begin();
-    auto lend = left->aps.end();
-    auto rbegin = right->aps.begin();
-    auto rend = right->aps.end();
-    int apsz = 0;
-    while (lbegin != lend && rbegin != rend)
-      {
-        ++apsz;
-        bool adv_left = *lbegin <= *rbegin;
-        bool adv_right = *rbegin <= *lbegin;
-        lbegin += adv_left;
-        rbegin += adv_right;
-      }
-    // Parentheses are important here, because rend should not be
-    // added to (lend - lbegin) in theory even if it's ok in
-    // practice..  (Compile the STL in debug mode will catch this.)
-    apsz += (lend - lbegin) + (rend - rbegin);
-
-    return size_estimate_product(left->num_roots(),
-                                 right->num_roots(),
-                                 apsz);
-  }
-
-  static int size_estimate_unary(const mtdfa_ptr& aut)
-  {
-    int states = aut->num_roots();
-    states /= 2;
-    ++states;
-    int num_aps = aut->aps.size();
-    int prod = states * num_aps;
-    if ((num_aps > 0) && ((prod / num_aps != states) || // overflow
-                          prod > (INT_MAX / 16)))
-      return INT_MAX / 16;
-    if (prod < (1 << 14))
-      return 1<<14;
-    return prod;
-  }
+  ////////////////////////////////////////////////////////////////////////
+  //                       LTLf translator class                        //
+  ////////////////////////////////////////////////////////////////////////
 
   ltlf_translator::ltlf_translator(const bdd_dict_ptr& dict,
                                    bool simplify_terms)
@@ -127,8 +152,11 @@ namespace spot
     dict_->unregister_all_my_variables(this);
   }
 
+  // This implement propositional equivalence plus some very light
+  // simplifications
   formula ltlf_translator::propeq_representative(formula f)
   {
+    // We start we the simplifications
   again:
     switch (f.kind())
       {
@@ -198,11 +226,10 @@ namespace spot
       case op::Implies:
       case op::Equiv:
         break;
-        // abort immediately if the top-level operator is not Boolean
       default:
+        // abort immediately if the top-level operator is not Boolean
         return f;
       }
-
 
 
     auto formula_to_bddvar = [&] (formula f) -> int
@@ -361,57 +388,60 @@ namespace spot
     return bdd_from_int(formula_to_terminal_bdd_as_int(f, maystop));
   }
 
-  static ltlf_translator* term_combine_trans;
-  static int term_combine_and(int left, int left_term,
-                              int right, int right_term)
+  namespace
   {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
-    formula res = formula::And({lf, rf});
-    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb && rb);
-  }
-
-  static int term_combine_or(int left, int left_term,
-                             int right, int right_term)
-  {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
-    formula res = formula::Or({lf, rf});
-    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb || rb);
-  }
-
-  static int term_combine_implies(int left, int left_term,
-                                  int right, int right_term)
-  {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
-    formula res = formula::Implies(lf, rf);
-    return term_combine_trans->formula_to_terminal_bdd_as_int(res, !lb || rb);
-  }
-
-  static int term_combine_equiv(int left, int left_term,
+    static ltlf_translator* term_combine_trans;
+    static int term_combine_and(int left, int left_term,
                                 int right, int right_term)
-  {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
-    auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
-    formula res = formula::Equiv(lf, rf);
-    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb == rb);
-  }
+    {
+      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+      auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::And({lf, rf});
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb && rb);
+    }
 
-  static int term_combine_xor(int left, int left_term,
-                              int right, int right_term)
-  {
-    auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
-    auto [rf, rb] =  term_combine_trans->leaf_to_formula(right, right_term);
-    formula res = formula::Xor(lf, rf);
-    return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb != rb);
-  }
+    static int term_combine_or(int left, int left_term,
+                               int right, int right_term)
+    {
+      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+      auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::Or({lf, rf});
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb || rb);
+    }
 
-  static int term_combine_not(int left)
-  {
-    formula ll = term_combine_trans->terminal_to_formula(left);
-    formula res = formula::Not(ll);
-    return term_combine_trans->formula_to_terminal(res, !(left & 1));
+    static int term_combine_implies(int left, int left_term,
+                                    int right, int right_term)
+    {
+      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+      auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::Implies(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res, !lb || rb);
+    }
+
+    static int term_combine_equiv(int left, int left_term,
+                                  int right, int right_term)
+    {
+      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+      auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::Equiv(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb == rb);
+    }
+
+    static int term_combine_xor(int left, int left_term,
+                                int right, int right_term)
+    {
+      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+      auto [rf, rb] =  term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::Xor(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb != rb);
+    }
+
+    static int term_combine_not(int left)
+    {
+      formula ll = term_combine_trans->terminal_to_formula(left);
+      formula res = formula::Not(ll);
+      return term_combine_trans->formula_to_terminal(res, !(left & 1));
+    }
   }
 
   bdd ltlf_translator::combine_and(bdd left, bdd right)
@@ -602,31 +632,31 @@ namespace spot
     return res;
   }
 
-  static std::unordered_map<int, int> terminal_to_state_map;
-
-  static int terminal_to_state(int terminal)
-  {
-#if NDEBUG
-    int v = terminal_to_state_map[terminal / 2];
-#else
-    int v = terminal_to_state_map.at(terminal / 2);
-#endif
-    return 2 * v + (terminal & 1);
-  }
-
-  static int strategy_map_true(int* root_ptr, int term)
-  {
-    // replace accepting terminals by bddtrue
-    if (term & 1)
-      {
-        *root_ptr = 1;
-        return 1;
-      }
-    return 0;
-  }
-
   namespace
   {
+    static std::unordered_map<int, int> terminal_to_state_map;
+
+    static int terminal_to_state(int terminal)
+    {
+#if NDEBUG
+      int v = terminal_to_state_map[terminal / 2];
+#else
+      int v = terminal_to_state_map.at(terminal / 2);
+#endif
+      return 2 * v + (terminal & 1);
+    }
+
+    static int strategy_map_true(int* root_ptr, int term)
+    {
+      // replace accepting terminals by bddtrue
+      if (term & 1)
+        {
+          *root_ptr = 1;
+          return 1;
+        }
+      return 0;
+    }
+
     struct backprop_bdd_encoder
     {
       backprop_graph backprop;
@@ -793,7 +823,7 @@ namespace spot
 
         // now encode all that BDD, when they reach terminal, this
         // will create "root number" nodes for those, and those can
-        // latter be connnected to their BDD encoding once we know it.
+        // later be connnected to their BDD encoding once we know it.
         while (!todo.empty())
           {
             auto [state, low, high] = todo.front();
@@ -806,10 +836,10 @@ namespace spot
                   bdd_to_state(high, bdd_to_state);
                   continue;
                 }
-            // We could swap low and high here if we wanted.  That
+            // We could encode high before low if we wanted.  That
             // makes sense if we know that a state for high already
-            // exist and is determined.  However, deciding this is an
-            // extra hash lookup, so this should be evaluated.
+            // exists and is determined.  However, deciding this is an
+            // extra hash lookup, so this is unlikely to be worth it.
             unsigned low_state = bdd_to_state(low, bdd_to_state);
             if (backprop.new_edge(state, low_state))
               return true;
@@ -848,59 +878,61 @@ namespace spot
       }
     };
 
-  }
+    static backprop_bdd_encoder* global_backprop = nullptr;
 
-  static backprop_bdd_encoder* global_backprop = nullptr;
+    static int strategy_choice(int bddid)
+    {
+      return global_backprop->get_choice(bddid);
+    }
 
-  static int strategy_choice(int bddid)
-  {
-    return global_backprop->get_choice(bddid);
-  }
-
-  static int strategy_map_finalize(int* root_ptr, int term)
-  {
-    // replace accepting terminals by bddtrue
-    if (term & 1)
-      {
-        *root_ptr = 1;
-        return 1;
-      }
-    term /= 2;
-    // remplace losing terminals by bddfalse
-    if (!global_backprop->root_winner(term))
-      {
-        *root_ptr = 0;
-        return 0;
-      }
-    // keep winning terminals, just replace them by their state number
+    static int strategy_map_finalize(int* root_ptr, int term)
+    {
+      // replace accepting terminals by bddtrue
+      if (term & 1)
+        {
+          *root_ptr = 1;
+          return 1;
+        }
+      term /= 2;
+      // remplace losing terminals by bddfalse
+      if (!global_backprop->root_winner(term))
+        {
+          *root_ptr = 0;
+          return 0;
+        }
+      // keep winning terminals, just replace them by their state
+      // number
 #if NDEBUG
-    int v = terminal_to_state_map[term];
+      int v = terminal_to_state_map[term];
 #else
-    int v = terminal_to_state_map.at(term);
+      int v = terminal_to_state_map.at(term);
 #endif
-    if (v != term)
-      *root_ptr = bdd_terminal_as_int(2 * v);
-    return 1;
+      if (v != term)
+        *root_ptr = bdd_terminal_as_int(2 * v);
+      return 1;
+    }
+
+    static int strategy_finalize(int* root_ptr, int term)
+    {
+      // replace accepting terminals by bddtrue
+      if (term & 1)
+        {
+          *root_ptr = 1;
+          return 1;
+        }
+      // remplace losing terminals by bddfalse
+      if (!global_backprop->root_winner(term / 2))
+        {
+          *root_ptr = 0;
+          return 0;
+        }
+      // keep winning terminals as-is
+      return 1;
+    }
   }
 
-  static int strategy_finalize(int* root_ptr, int term)
-  {
-    // replace accepting terminals by bddtrue
-    if (term & 1)
-      {
-        *root_ptr = 1;
-        return 1;
-      }
-    // remplace losing terminals by bddfalse
-    if (!global_backprop->root_winner(term / 2))
-      {
-        *root_ptr = 0;
-        return 0;
-      }
-    // keep winning terminals as-is
-    return 1;
-  }
-
+  // This is the main translation function.  It has grown to do a bit
+  // too much, as it optionally performs on-the-fly game solving.
   mtdfa_ptr
   ltlf_translator::ltlf_to_mtdfa(formula f,
                                  bool fuse_same_bdds,
@@ -930,37 +962,31 @@ namespace spot
       backprop.reset(global_backprop = new backprop_bdd_encoder());
 
     bdd bddoutvars = bddtrue;      // used if outvars was passed;
-    // this is the number of variable we had the last time
+    // this is the number of variables we had the last time
     // we called bdd_mt_quantify_prepare().
     int varnum = 0;
 
-
-    auto restrict_bdd = [&](bdd& b) -> bool {
-      // Everytime a new variable is created, the quantifycation
-      // buffer is wiped out.  This can happen as a side-effect
-      // of ltlf_to_mtbdd().  We only have to call
-      // bdd_mt_quantify_prepare() when the number of variables
-      // changed.
+    auto quantify_prepare_maybe = [&] {
+      // Everytime a new BDD variable is created, the quantification
+      // buffer is wiped out.  Adding variables can happen as a
+      // side-effect of ltlf_to_mtbdd().  As a consequence, we have to
+      // call bdd_mt_quantify_prepare() when the number of BDD
+      // variables changed.
       if (int vn = bdd_varnum(); vn != varnum)
         {
           bdd_mt_quantify_prepare(bddoutvars);
           varnum = vn;
         }
+    };
+
+    auto restrict_bdd = [&](bdd& b) -> bool {
+      quantify_prepare_maybe();
       return bdd_mt_apply1_synthesis(b, strategy_map_true,
                                      &cache_, hash_key_strat);
     };
 
     auto restrict_bdd_bool = [&](bdd& b, bool realizability) -> bool {
-      // Everytime a new variable is created, the quantifycation
-      // buffer is wiped out.  This can happen as a side-effect
-      // of ltlf_to_mtbdd().  We only have to call
-      // bdd_mt_quantify_prepare() when the number of variables
-      // changed.
-      if (int vn = bdd_varnum(); vn != varnum)
-        {
-          bdd_mt_quantify_prepare(bddoutvars);
-          varnum = vn;
-        }
+      quantify_prepare_maybe();
       if (!realizability)
         return bdd_mt_apply1_synthesis(b, nullptr,
                                        &cache_, hash_key_strat);
@@ -969,9 +995,9 @@ namespace spot
     };
 
     // Keep track of atomic propositions used in he automaton.
-    // Actually the automaton might use fewer atomic propositions than
-    // what appears in the formula, but we do not pay attention to
-    // that.
+    // Actually, the automaton might use fewer atomic propositions
+    // than what appears in the formula, but we do not pay attention
+    // to that.
     {
       atomic_prop_set* a = atomic_prop_collect(f);
       dfa->aps.assign(a->begin(), a->end());
@@ -1188,18 +1214,18 @@ namespace spot
         return dfa;
       }
 
+    // If we reach this point, we are only doing translation, not game
+    // solving.
     if (detect_empty_univ)
       {
-        if (!has_accepting)
+        if (!has_accepting)     // return a false MTDFA.
           {
-            // return a false MTDFA.
             dfa->states.push_back(bddfalse);
             dfa->names.push_back(formula::ff());
             return dfa;
           }
-        if (!has_rejecting)
+        if (!has_rejecting)     // return a true MTDFA.
           {
-            // return a true MTDFA.
             dfa->states.push_back(bddtrue);
             dfa->names.push_back(formula::tt());
             return dfa;
@@ -1253,32 +1279,27 @@ namespace spot
     // we called bdd_mt_quantify_prepare().
     int varnum = 0;
 
-    auto restrict_bdd = [&](bdd& b) -> bool {
-      // Everytime a new variable is created, the quantifycation
-      // buffer is wiped out.  This can happen as a side-effect
-      // of ltlf_to_mtbdd().  We only have to call
-      // bdd_mt_quantify_prepare() when the number of variables
-      // changed.
+    auto quantify_prepare_maybe = [&] {
+      // Everytime a new BDD variable is created, the quantification
+      // buffer is wiped out.  Adding variables can happen as a
+      // side-effect of ltlf_to_mtbdd().  As a consequence, we have to
+      // call bdd_mt_quantify_prepare() when the number of BDD
+      // variables changed.
       if (int vn = bdd_varnum(); vn != varnum)
         {
           bdd_mt_quantify_prepare(bddoutvars);
           varnum = vn;
         }
+    };
+
+    auto restrict_bdd = [&](bdd& b) -> bool {
+      quantify_prepare_maybe();
       return bdd_mt_apply1_synthesis(b, strategy_map_true,
                                      &cache_, hash_key_strat);
     };
 
     auto restrict_bdd_bool = [&](bdd& b, bool realizability) -> bool {
-      // Everytime a new variable is created, the quantifycation
-      // buffer is wiped out.  This can happen as a side-effect
-      // of ltlf_to_mtbdd().  We only have to call
-      // bdd_mt_quantify_prepare() when the number of variables
-      // changed.
-      if (int vn = bdd_varnum(); vn != varnum)
-        {
-          bdd_mt_quantify_prepare(bddoutvars);
-          varnum = vn;
-        }
+      quantify_prepare_maybe();
       if (!realizability)
         return bdd_mt_apply1_synthesis(b, nullptr,
                                        &cache_, hash_key_strat);
@@ -1286,11 +1307,10 @@ namespace spot
                                      &cache_, hash_key_strat_bool);
     };
 
-
     // Keep track of atomic propositions used in he automaton.
-    // Actually the automaton might use fewer atomic propositions than
-    // what appears in the formula, but we do not pay attention to
-    // that.
+    // Actually, the automaton might use fewer atomic propositions
+    // than what appears in the formula, but we do not pay attention
+    // to that.
     {
       atomic_prop_set* a = atomic_prop_collect(f);
       dfa->aps.assign(a->begin(), a->end());
@@ -1329,14 +1349,11 @@ namespace spot
         if (todo.size() >= size && backprop.root_is_determined(prev_state))
           {
             while (todo.size() > size)
-              {
-                // std::cerr << "Pop " << todo.back() << '\n';
-                todo.pop_back();
-              }
+              todo.pop_back();
             prev.pop_back();
             continue;
           }
-        if (todo.size() == size) // DFS backtrack,
+        if (todo.size() == size) // DFS backtrack
           {
             // All successors have been explored and that was
             // not enough to mark the prev_state as winning.
@@ -1480,48 +1497,74 @@ namespace spot
     return dfa;
   }
 
+  ////////////////////////////////////////////////////////////////////////
+  //                       minimization of MTDFA                        //
+  ////////////////////////////////////////////////////////////////////////
 
-  static std::vector<int> classes;
-  static int num_states;
-  static bool accepting_false_seen;
-  static bool rejecting_true_seen;
-
-  static int rename_class(int val)
+  // callback for minimize_mtdfa
+  namespace
   {
-    assert((unsigned) val/2 < classes.size());
-    bool accepting = val & 1;
-    val = classes[val / 2];
-    if (val == num_states + accepting)
-      {
-        if (accepting)
-          accepting_false_seen = true;
-        else
-          rejecting_true_seen = true;
-      }
-    return 2 * val + accepting;
-  }
+    static std::vector<int> classes;
+    static int num_states;
+    static bool accepting_false_seen;
+    static bool rejecting_true_seen;
 
+    static int rename_class(int val)
+    {
+      assert((unsigned) val/2 < classes.size());
+      bool accepting = val & 1;
+      val = classes[val / 2];
+      if (val == num_states + accepting)
+        {
+          if (accepting)
+            accepting_false_seen = true;
+          else
+            rejecting_true_seen = true;
+        }
+      return 2 * val + accepting;
+    }
+  }
 
   mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa,
                            bddExtCache* cache,
                            int& iteration)
   {
-    //std::cerr << "minimize_mtdfa DFA has " << dfa->num_roots()
-    // << " roots, cachesize=" << cache->tablesize << '\n';
     if (iteration >= (1 << 20))
       {
+        // wipe the cache every 2^20 iterations.
         bdd_extcache_reset(cache);
         iteration = 0;
       }
 
     unsigned n = num_states = dfa->num_roots();
 
-    classes.clear();            // global
-    classes.resize(n + 2, 0);
+    // This minimization implements Moore's partition-refinement
+    // algorithm using MTBDDs.  The idea is relatively simple: each
+    // state of the MTDFA is assigned a class. Initially every state
+    // is in the same class.  The MTBDD used to represent the states
+    // are all rewritten, replacing each terminal (dst, b) by
+    // (class[dst], b).  After this rewriting, states whose MTBDD are
+    // different are put into different classes, and we start again.
+    // We iterate the process until no more classes are created.
+    //
+    // The implementation is made a bit more difficult because of the
+    // possible use of bddfalse, and bddtrue in the MTDFA.  In order
+    // other states in the automaton that should be reduced to
+    // bddfalse/bddtrue, we have to introduce fake states for
+    // bddfalse/bddtrue.
 
+    // class is a global vector assigning classes to each state
+    classes.clear();
+    classes.resize(n + 2, 0); // two extra classes for bddtrue/bddfalse
+
+    // The "signature" of each state is their encoding using
+    // the current set of classes.  The following vector remember
+    // each unique signature in the order they were discovered.
+    std::vector<bdd> signatures;
+    signatures.reserve(n);
+    // For each distinct signature, GROUPS retains the list of
+    // states that have this signature.
     std::unordered_map<bdd, std::vector<int>, bdd_hash> groups;
-    std::vector<bdd> states;
-    states.reserve(n);
     for (;;)
       {
         ++iteration;
@@ -1536,37 +1579,44 @@ namespace spot
                                     cache, iteration);
             auto& v = groups[sig];
             if (v.empty())
-              states.push_back(sig);
+              signatures.push_back(sig);
             v.push_back(i);
           }
-        // Add the true_term to its group.
+        // Now we add the "fake" states for bddtrue amd bddfalse.
+        // We do this after all other states, because we are not sure
+        // if those will correspond to real states in the automaton.
         {
           auto& v = groups[true_term];
           if (v.empty())
-            states.push_back(true_term);
+            signatures.push_back(true_term);
           v.push_back(n);
         }
-        // Add the false_term to its group.
         {
           auto& v = groups[false_term];
           if (v.empty())
-            states.push_back(false_term);
+            signatures.push_back(false_term);
           v.push_back(n + 1);
         }
 
-        int curclass = 0;
         // { // debug
         //   std::cerr << "iteration " << iteration << '\n';
-        //   std::cerr << states.size() << " states\n";
+        //   std::cerr << signatures.size() << " states\n";
         // }
+
+        // Assign each state to its class number, using the order in
+        // which signatures were discovered.  In this order, the
+        // initial state will always have class 0.
+        //
+        // An exception is if the class contains the fake true/false
+        // state.  In this case, we map the class back to n/n+1.
+        int curclass = 0;
         bool changed = false;
-        // in this order, the initial state will always have class 0.
-        for (bdd sig: states)
+        for (bdd sig: signatures)
           {
             int mapclass = curclass++;
             auto& v = groups[sig];
             unsigned vb = v.back();
-            if (vb >= n)
+            if (vb >= n)        // contains the fake true/false state
               mapclass = vb;
             for (unsigned i: v)
               if (classes[i] != mapclass)
@@ -1590,54 +1640,62 @@ namespace spot
         if (!changed)
           break;
         groups.clear();
-        states.clear();
+        signatures.clear();
       }
 
-    // The BDDs in STATES are actually our new MTBDD representation.
-    // We just have get rid of the terms we introduced to replace
-    // bddfalse, and get rid of the states equivalent to bddfalse.
+    // Unless we have states equivalent to false/true, the BDDs in
+    // SIGNATURES are actually our new MTBDD representation.
     //
-    // And we have to keep one name per class for display.
+    // If we have state equivalent to true & false, we just have get
+    // rid of the terms we introduced to replace bddtrue/bddfalse.  Be
+    // careful that bddtrue/bddfalse only replace (tt,⊤)/(ff,⊥).  We
+    // still need state of (tt,⊥) or (ff,⊤) if those appear in the
+    // automaton.
+    //
+    // In any case, if WANT_NAMES is set we also have to keep one name
+    // per class for display.
     bool want_names = dfa->names.size() == n;
     std::vector<formula> names;
-    unsigned sz = states.size();
+    // Our automaton will SZ states, minus any bddfalse/bddtrue state.
+    unsigned sz = signatures.size();
     if (want_names)
       names.reserve(sz);
-    unsigned j = 0;
+    unsigned j = 0;             // next free state number
     ++iteration;
     bdd true_term = bdd_terminal(2 * classes[n] + 1);
     bdd false_term = bdd_terminal(2 * classes[n + 1]);
     bool need_remap = false;
     for (unsigned i = 0; i < sz; ++i)
       {
-        bdd sig = states[i];
+        bdd sig = signatures[i];
         auto& v = groups[sig];
         assert(!v.empty());
         unsigned vb = v.back();
-        if (vb == n + 1)      // equivalent to false!
+        if (vb == n + 1)        // equivalent to ff!
           {
-            if (i == 0) // the source state is false
+            if (i == 0)         // the initial state is false
               {
                 assert(v.front() == 0);
                 if (want_names)
                   names.push_back(formula::ff());
-                states[0] = bddfalse;
+                signatures[0] = bddfalse;
                 ++j;
                 break;
               }
             if (!accepting_false_seen)
               continue;
+            // since (ff,⊤) exists, give ff a state number.
             classes[n + 1] = j;
             need_remap = true;
           }
-        if (vb == n)      // equivalent to true!
+        if (vb == n)            // equivalent to tt!
           {
-            if (i == 0) // the source state is true
+            if (i == 0)         // the source state is true
               {
                 assert(v.front() == 0);
                 if (want_names)
                   names.push_back(formula::tt());
-                states[0] = bddtrue;
+                signatures[0] = bddtrue;
                 ++j;
                 break;
               }
@@ -1648,32 +1706,41 @@ namespace spot
           }
         if (want_names)
           {
+            // We can pick the name of any state in v to label the
+            // class.  Here we simply pick the first one, but this
+            // can be changed if needed (e.g. pick the shortest one
+            // since it is more readable?)
             assert((unsigned) v.front() < dfa->names.size());
             names.push_back(dfa->names[v.front()]);
           }
+        // replace false_term/true_term by bddfalse/bddtrue
+        // note that this does not change the other terminals.
         sig = bdd_terminal_to_const(sig, false_term, true_term,
                                     cache, iteration);
         classes[i] = j;
         if (i != j)
           need_remap = true;
-        states[j++] = sig;
+        signatures[j++] = sig;
       }
     if (j < sz)
-      states.resize(j);
+      signatures.resize(j);
 
+    // If we skipped some class equivalent to bddtrue/bddfalse, we
+    // have to the remaining class to fill the holes.
     if (need_remap)
       {
         ++iteration;
-        for (bdd& sig: states)
+        for (bdd& sig: signatures)
           sig = bdd_mt_apply1(sig, rename_class, bddfalse, bddtrue,
                               cache, iteration);
       }
 
     mtdfa_ptr res = std::make_shared<mtdfa>(dfa->get_dict());
-    // If the automaton hasn't been reduce to true/false, assume it
-    // still use all atomic propositions.
+    // If the automaton hasn't been reduced to true/false or has some
+    // controllable variables, assume it still uses all atomic
+    // propositions.
     bdd controllable = dfa->get_controllable_variables();
-    if ((states[0] != bddfalse && states[0] != bddtrue)
+    if ((signatures[0] != bddfalse && signatures[0] != bddtrue)
         || (controllable != bddtrue))
       {
         res->get_dict()->register_all_propositions_of(dfa, res);
@@ -1681,7 +1748,7 @@ namespace spot
       }
     res->set_controllable_variables(controllable);
     std::swap(res->names, names);
-    std::swap(res->states, states);
+    std::swap(res->states, signatures);
     return res;
   }
 
@@ -1695,6 +1762,9 @@ namespace spot
     return res;
   }
 
+  //////////////////////////////////////////////////////////////////////
+  //                  Boolean operations on MTDFAs                    //
+  //////////////////////////////////////////////////////////////////////
 
   namespace
   {
@@ -1737,7 +1807,7 @@ namespace spot
       // or [~value, bdd_terminal(value*2+1)]
       // or [bdd_terminai(value*2), bdd_terminal(value*2+1)]
       //
-      // The distinction between the three case can be made with
+      // The distinction between the three cases can be made with
       // the sign bit of the array element.
       std::unordered_map<product_state, std::array<int, 2>,
                          product_state_hash> pair_to_terminal_map;
@@ -1852,20 +1922,20 @@ namespace spot
       auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
       return the_product_data.pair_to_terminal_bdd(ls, rs, lb != rb);
     }
-  }
 
-  mtdfa_ptr product_mtdfa_aux(const mtdfa_ptr& dfa1,
-                              const mtdfa_ptr& dfa2, op o,
-                              bddExtCache* cache, int hash_key)
-  {
-    if (dfa1->get_dict() != dfa2->get_dict())
-      throw std::runtime_error
-        ("product_mtdfa_and: DFAs should share their dictionaries");
+    static mtdfa_ptr
+    product_mtdfa_aux(const mtdfa_ptr& dfa1,
+                      const mtdfa_ptr& dfa2, op o,
+                      bddExtCache* cache, int hash_key)
+    {
+      if (dfa1->get_dict() != dfa2->get_dict())
+        throw std::runtime_error
+          ("product_mtdfa_and: DFAs should share their dictionaries");
 
-    int (*combine)(int, int, int, int);
-    int applyop_shortcut = -1;
-    switch (o)
-      {
+      int (*combine)(int, int, int, int);
+      int applyop_shortcut = -1;
+      switch (o)
+        {
         case op::And:
           combine = leaf_combine_and;
           applyop_shortcut = bddop_and_zero;
@@ -1888,64 +1958,94 @@ namespace spot
           break;
         default:
           throw std::runtime_error("product_mtdfa_aux: unsupported operator");
-      }
+        }
 
-    the_product_data.left = dfa1;
-    the_product_data.right = dfa2;
+      the_product_data.left = dfa1;
+      the_product_data.right = dfa2;
 
-    bdd_dict_ptr dict = dfa1->get_dict();
-    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
-    dict->register_all_propositions_of(dfa1, res);
-    dict->register_all_propositions_of(dfa2, res);
+      bdd_dict_ptr dict = dfa1->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa1, res);
+      dict->register_all_propositions_of(dfa2, res);
 
-    std::queue<product_state>& todo = the_product_data.todo;
-    // this will  todo with the initial state of the product
-    (void) the_product_data.pair_to_terminal(0, 0);
-    while (!todo.empty())
-      {
-        product_state s = todo.front();
-        todo.pop();
+      std::queue<product_state>& todo = the_product_data.todo;
+      // this will initialize TODO with the initial state of the product
+      (void) the_product_data.pair_to_terminal(0, 0);
+      while (!todo.empty())
+        {
+          product_state s = todo.front();
+          todo.pop();
 
-        auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
-        auto [right, right_f] = bdd_and_formula_from_state(s.second, dfa2);
-        bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
-                                     applyop_shortcut);
-        res->states.push_back(b);
+          auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
+          auto [right, right_f] = bdd_and_formula_from_state(s.second, dfa2);
+          bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
+                                       applyop_shortcut);
+          res->states.push_back(b);
 
-        if (left_f && right_f)
-          switch (o)
-            {
-            case op::And:
-              res->names.push_back(formula::And({left_f, right_f}));
-              break;
-            case op::Or:
-              res->names.push_back(formula::Or({left_f, right_f}));
-              break;
-            case op::Implies:
-              res->names.push_back(formula::Implies(left_f, right_f));
-              break;
-            case op::Equiv:
-              res->names.push_back(formula::Equiv(left_f, right_f));
-              break;
-            case op::Xor:
-              res->names.push_back(formula::Xor(left_f, right_f));
-              break;
-            default:
-              SPOT_UNREACHABLE();
-            }
-      }
+          if (left_f && right_f)
+            switch (o)
+              {
+              case op::And:
+                res->names.push_back(formula::And({left_f, right_f}));
+                break;
+              case op::Or:
+                res->names.push_back(formula::Or({left_f, right_f}));
+                break;
+              case op::Implies:
+                res->names.push_back(formula::Implies(left_f, right_f));
+                break;
+              case op::Equiv:
+                res->names.push_back(formula::Equiv(left_f, right_f));
+                break;
+              case op::Xor:
+                res->names.push_back(formula::Xor(left_f, right_f));
+                break;
+              default:
+                SPOT_UNREACHABLE();
+              }
+        }
 
-    // combine the sorted list of atomic propositions from dfa1 and dfa2
-    // keeping the result sorted
-    res->aps.reserve(dfa1->aps.size() + dfa2->aps.size());
-    std::set_union(dfa1->aps.begin(), dfa1->aps.end(),
-                   dfa2->aps.begin(), dfa2->aps.end(),
-                   std::back_inserter(res->aps));
+      // combine the sorted list of atomic propositions from DFA1 and DFA2
+      // keeping the result sorted
+      res->aps.reserve(dfa1->aps.size() + dfa2->aps.size());
+      std::set_union(dfa1->aps.begin(), dfa1->aps.end(),
+                     dfa2->aps.begin(), dfa2->aps.end(),
+                     std::back_inserter(res->aps));
 
-    the_product_data.left = nullptr;
-    the_product_data.right = nullptr;
-    the_product_data.pair_to_terminal_map.clear();
-    return res;
+      the_product_data.left = nullptr;
+      the_product_data.right = nullptr;
+      the_product_data.pair_to_terminal_map.clear();
+      return res;
+    }
+
+    static int
+    complement_term(int v)
+    {
+      return v ^ 1;
+    }
+
+    static mtdfa_ptr
+    complement_aux(const mtdfa_ptr& dfa, bddExtCache* cache, int hash_key)
+    {
+      unsigned n = dfa->states.size();
+      unsigned ns = dfa->names.size();
+
+      bdd_dict_ptr dict = dfa->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa, res);
+      res->names.reserve(n);
+      res->states.reserve(ns);
+      res->aps = dfa->aps;
+
+      for (unsigned i = 0; i < n; ++i)
+        res->states.push_back(bdd_mt_apply1(dfa->states[i], complement_term,
+                                            bddtrue, bddfalse, cache,
+                                            hash_key));
+
+      for (unsigned i = 0; i < ns; ++i)
+        res->names.push_back(formula::Not(dfa->names[i]));
+      return res;
+    }
   }
 
   mtdfa_ptr product(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
@@ -1990,34 +2090,6 @@ namespace spot
     bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
     mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Implies, &cache, 0);
     bdd_extcache_done(&cache);
-    return res;
-  }
-
-  int complement_term(int v)
-  {
-    return v ^ 1;
-  }
-
-  mtdfa_ptr complement_aux(const mtdfa_ptr& dfa, bddExtCache* cache,
-                           int hash_key)
-  {
-    unsigned n = dfa->states.size();
-    unsigned ns = dfa->names.size();
-
-    bdd_dict_ptr dict = dfa->get_dict();
-    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
-    dict->register_all_propositions_of(dfa, res);
-    res->names.reserve(n);
-    res->states.reserve(ns);
-    res->aps = dfa->aps;
-
-    for (unsigned i = 0; i < n; ++i)
-      res->states.push_back(bdd_mt_apply1(dfa->states[i], complement_term,
-                                          bddtrue, bddfalse, cache,
-                                          hash_key));
-
-    for (unsigned i = 0; i < ns; ++i)
-      res->names.push_back(formula::Not(dfa->names[i]));
     return res;
   }
 
@@ -2317,6 +2389,10 @@ namespace spot
     return nullptr;
   }
 
+  ////////////////////////////////////////////////////////////////////////
+  //                 various LTLf translation interafaces               //
+  ////////////////////////////////////////////////////////////////////////
+
   mtdfa_ptr ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                           bool fuse_same_bdds, bool simplify_terms,
                           bool detect_empty_univ)
@@ -2366,6 +2442,11 @@ namespace spot
                       want_minimize, order_for_aps, want_names);
     return ltlf_to_mtdfa_compose(data, f);
   }
+
+
+  ////////////////////////////////////////////////////////////////////////
+  //                         MTDFA methods                              //
+  ////////////////////////////////////////////////////////////////////////
 
   namespace
   {
@@ -2757,93 +2838,29 @@ namespace spot
     return res;
   }
 
-  // Build the reverse graph of the subautomaton reachable from the
-  // initial state of 0 without traversing any accepting terminal.
-  //
-  // For each path root->leaf in DFA where leaf is not bddfalse, and not
-  // a terminal with value 0, this create the following edges in the
-  // returned digraph:
-  //    (terminal value / 2) -> root    if terminal is even (non accepting)
-  //    0 -> root         if the leaf is bddtrue or an odd terminal value
-  static adjlist<void>
-  build_reverse_of_reachable_graph(mtdfa_ptr dfa)
+  namespace
   {
-    unsigned n = dfa->num_roots();
-    adjlist<void> reverse(n, n);
-    reverse.new_states(n);
-
-    std::queue<int> todo;
-    std::vector<bool> seen(n, false); // added to todo
-    std::vector<int> seen_local(n, -1); // seen as predecessor of src
-    todo.push(0);
-    seen[0] = true;
-    while (!todo.empty())
-      {
-        int src = todo.front();
-        todo.pop();
-        bool has_acc = false;   // already seen an accepting terminal
-        for (auto t: silent_paths_mt_of(dfa->states[src]))
-          {
-            if (t == bddfalse)
-              continue;
-            if (t == bddtrue)
-              {
-                if (!has_acc)
-                  {
-                    reverse.new_edge(0, src);
-                    has_acc = true;
-                  }
+    static bdd
+    ap_to_bdd(mtdfa_ptr dfa, const std::vector<std::string>& controllable,
+              bool ignore_non_registered_ap)
+    {
+      bdd_dict_ptr dict = dfa->get_dict();
+      // build the conjunction of all controllable variables
+      bdd controllable_bdd = bddtrue;
+      for (const std::string& s: controllable)
+        {
+          int v = dict->has_registered_proposition(formula::ap(s), dfa);
+          if (v < 0)
+            {
+              if (ignore_non_registered_ap)
                 continue;
-              }
-            int dst = bdd_get_terminal(t);
-            if (dst & 1)
-              {
-                if (!has_acc)
-                  {
-                    reverse.new_edge(0, src);
-                    has_acc = true;
-                  }
-                continue;
-              }
-            dst /= 2;
-            // we don't record predecessors from 0, as they are not
-            // needed for backward propagation.
-            if (dst == 0)
-              continue;
-            if (seen_local[dst] == src)
-              continue;
-            seen_local[dst] = src;
-            reverse.new_edge(dst, src);
-            if (!seen[dst])
-              {
-                todo.push(dst);
-                seen[dst] = true;
-              }
-          }
-      }
-    return reverse;
-  }
-
-  static bdd
-  ap_to_bdd(mtdfa_ptr dfa, const std::vector<std::string>& controllable,
-            bool ignore_non_registered_ap)
-  {
-    bdd_dict_ptr dict = dfa->get_dict();
-    // build the conjunction of all controllable variables
-    bdd controllable_bdd = bddtrue;
-    for (const std::string& s: controllable)
-      {
-        int v = dict->has_registered_proposition(formula::ap(s), dfa);
-        if (v < 0)
-          {
-            if (ignore_non_registered_ap)
-              continue;
-            throw std::runtime_error
-              ("atomic proposition " + s + " is not registered by automaton");
-          }
-        controllable_bdd &= bdd_ithvar(v);
-      }
-    return controllable_bdd;
+              throw std::runtime_error
+                ("atomic proposition " + s + " is not registered by automaton");
+            }
+          controllable_bdd &= bdd_ithvar(v);
+        }
+      return controllable_bdd;
+    }
   }
 
   void
@@ -2860,27 +2877,102 @@ namespace spot
                                          ignore_non_registered_ap));
   }
 
-  const std::vector<bool>* global_is_winning;
-  const std::vector<trival>* global_is_winning3;
-  int is_winning_terminal(int v)
-  {
-    int dst = v / 2;
-    assert((v >= 0) && (global_is_winning->size() > (unsigned) dst));
-    return (v & 1) || (*global_is_winning)[dst];
-  }
 
-  int is_winning_terminal3(int v)
+  ////////////////////////////////////////////////////////////////////////
+  //                   offline game solving algorithms                  //
+  ////////////////////////////////////////////////////////////////////////
+
+  namespace
   {
-    int dst = v / 2;
-    assert((v >= 0) && (global_is_winning3->size() > (unsigned) dst));
-    if (v & 1)
-      return 3;
-    trival w = (*global_is_winning3)[dst];
-    if (w.is_true())
-      return 3;
-    if (w.is_false())
-      return 0;
-    return 2;
+    // Build the reverse graph of the subautomaton reachable from the
+    // initial state of 0 without traversing any accepting terminal.
+    //
+    // For each path root->leaf in DFA where leaf is not bddfalse, and not
+    // a terminal with value 0, this create the following edges in the
+    // returned digraph:
+    //    (terminal value / 2) -> root    if terminal is even (non accepting)
+    //    0 -> root         if the leaf is bddtrue or an odd terminal value
+    static adjlist<void>
+    build_reverse_of_reachable_graph(mtdfa_ptr dfa)
+    {
+      unsigned n = dfa->num_roots();
+      adjlist<void> reverse(n, n);
+      reverse.new_states(n);
+
+      std::queue<int> todo;
+      std::vector<bool> seen(n, false); // added to todo
+      std::vector<int> seen_local(n, -1); // seen as predecessor of src
+      todo.push(0);
+      seen[0] = true;
+      while (!todo.empty())
+        {
+          int src = todo.front();
+          todo.pop();
+          bool has_acc = false;   // already seen an accepting terminal
+          for (auto t: silent_paths_mt_of(dfa->states[src]))
+            {
+              if (t == bddfalse)
+                continue;
+              if (t == bddtrue)
+                {
+                  if (!has_acc)
+                    {
+                      reverse.new_edge(0, src);
+                      has_acc = true;
+                    }
+                  continue;
+                }
+              int dst = bdd_get_terminal(t);
+              if (dst & 1)
+                {
+                  if (!has_acc)
+                    {
+                      reverse.new_edge(0, src);
+                      has_acc = true;
+                    }
+                  continue;
+                }
+              dst /= 2;
+              // we don't record predecessors from 0, as they are not
+              // needed for backward propagation.
+              if (dst == 0)
+                continue;
+              if (seen_local[dst] == src)
+                continue;
+              seen_local[dst] = src;
+              reverse.new_edge(dst, src);
+              if (!seen[dst])
+                {
+                  todo.push(dst);
+                  seen[dst] = true;
+                }
+            }
+        }
+      return reverse;
+    }
+
+    static const std::vector<bool>* global_is_winning;
+    static const std::vector<trival>* global_is_winning3;
+    static int is_winning_terminal(int v)
+    {
+      int dst = v / 2;
+      assert((v >= 0) && (global_is_winning->size() > (unsigned) dst));
+      return (v & 1) || (*global_is_winning)[dst];
+    }
+
+    static int is_winning_terminal3(int v)
+    {
+      int dst = v / 2;
+      assert((v >= 0) && (global_is_winning3->size() > (unsigned) dst));
+      if (v & 1)
+        return 3;
+      trival w = (*global_is_winning3)[dst];
+      if (w.is_true())
+        return 3;
+      if (w.is_false())
+        return 0;
+      return 2;
+    }
   }
 
   std::vector<bool>
@@ -2929,109 +3021,112 @@ namespace spot
     return winning;
   }
 
-  template <typename T>
-  std::vector<T>
-  mtdfa_winning_region_lazy_do(mtdfa_ptr dfa)
+  namespace
   {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+    template <typename T>
+    std::vector<T>
+    mtdfa_winning_region_lazy_do(mtdfa_ptr dfa)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
 
-    bdd controllable = dfa->get_controllable_variables();
+      bdd controllable = dfa->get_controllable_variables();
 
-    adjlist<void> rev = build_reverse_of_reachable_graph(dfa);
+      adjlist<void> rev = build_reverse_of_reachable_graph(dfa);
 
-    unsigned nroots = dfa->num_roots();
-    // winning is initialized to the default value of T, which is
-    // false for bool, and "maybe" for trival.
-    std::vector<T> winning(nroots);
-    std::vector<int> seen(nroots, -1); // last iteration seen
-    if constexpr (std::is_same<T, bool>::value)
-      global_is_winning = &winning;
-    else
-      global_is_winning3 = &winning;
+      unsigned nroots = dfa->num_roots();
+      // winning is initialized to the default value of T, which is
+      // false for bool, and "maybe" for trival.
+      std::vector<T> winning(nroots);
+      std::vector<int> seen(nroots, -1); // last iteration seen
+      if constexpr (std::is_same<T, bool>::value)
+        global_is_winning = &winning;
+      else
+        global_is_winning3 = &winning;
 
-    // The upcoming calls to bdd_mt_quantify_to_bool depend on this
-    // setup.
-    bdd_mt_quantify_prepare(controllable);
+      // The upcoming calls to bdd_mt_quantify_to_bool depend on this
+      // setup.
+      bdd_mt_quantify_prepare(controllable);
 
-    std::deque<unsigned> todo;
-    // By convention, states that can reach an accepting terminal are
-    // listed as predecessors of 0.  (Since the predecessors of 0
-    // would never be needed otherwise.)
-    for (unsigned p: rev.out(0))
-      todo.push_back(p);
+      std::deque<unsigned> todo;
+      // By convention, states that can reach an accepting terminal are
+      // listed as predecessors of 0.  (Since the predecessors of 0
+      // would never be needed otherwise.)
+      for (unsigned p: rev.out(0))
+        todo.push_back(p);
 
-    std::deque<unsigned> changed;
+      std::deque<unsigned> changed;
 
-    for (int iteration = 0; !todo.empty(); ++iteration)
-      {
-        do
-          {
-            unsigned i = todo.front();
-            todo.pop_front();
+      for (int iteration = 0; !todo.empty(); ++iteration)
+        {
+          do
+            {
+              unsigned i = todo.front();
+              todo.pop_front();
 
-            if constexpr (std::is_same<T, bool>::value)
-              {
-                assert(!winning[i]);
-                if (bdd_mt_quantify_to_bool(dfa->states[i],
-                                            is_winning_terminal,
-                                            &cache, iteration))
-                  {
-                    // By modifying winning, we modify the behavior of
-                    // is_winning_terminal_lazy.  That should normally
-                    // call for an invalidation of the cache (or
-                    // equivalently, an increment of the iteration
-                    // number), but it is actually OK if the cache
-                    // uses previous values, as if winning was
-                    // constant during one iteration.  The new values
-                    // are sure to be used on next iteration.
-                    winning[i] = true;
-                    // if the initial state is winning, we can stop
-                    if (i == 0)
-                      goto done;
-                    changed.push_back(i);
-                  }
-              }
-            else // trival version
-              {
-                assert(winning[i].is_maybe());
-                if (int res = bdd_mt_quantify_to_trival(dfa->states[i],
-                                                        is_winning_terminal3,
-                                                        &cache, 0, iteration);
-                    res != 2)
-                  {
-                    winning[i] = trival(res != 0);
-                    if (i == 0)
-                      goto done;
-                    changed.push_back(i);
-                  }
-              }
-          }
-        while (!todo.empty());
-        // Schedule unknown predecessors for next iteration.
-        for (unsigned i: changed)
-          for (unsigned p: rev.out(i))
-            if constexpr (std::is_same<T, bool>::value)
-              {
-                if (!winning[p] && seen[p] != iteration)
-                  {
-                    seen[p] = iteration;
-                    todo.push_front(p);
-                  }
-              }
-            else
-              {
-                if (winning[p].is_maybe() && seen[p] != iteration)
-                  {
-                    seen[p] = iteration;
-                    todo.push_front(p);
-                  }
-              }
-        changed.clear();
-      }
-  done:
-    bdd_extcache_done(&cache);
-    return winning;
+              if constexpr (std::is_same<T, bool>::value)
+                {
+                  assert(!winning[i]);
+                  if (bdd_mt_quantify_to_bool(dfa->states[i],
+                                              is_winning_terminal,
+                                              &cache, iteration))
+                    {
+                      // By modifying winning, we modify the behavior of
+                      // is_winning_terminal_lazy.  That should normally
+                      // call for an invalidation of the cache (or
+                      // equivalently, an increment of the iteration
+                      // number), but it is actually OK if the cache
+                      // uses previous values, as if winning was
+                      // constant during one iteration.  The new values
+                      // are sure to be used on next iteration.
+                      winning[i] = true;
+                      // if the initial state is winning, we can stop
+                      if (i == 0)
+                        goto done;
+                      changed.push_back(i);
+                    }
+                }
+              else // trival version
+                {
+                  assert(winning[i].is_maybe());
+                  if (int res = bdd_mt_quantify_to_trival(dfa->states[i],
+                                                          is_winning_terminal3,
+                                                          &cache, 0, iteration);
+                      res != 2)
+                    {
+                      winning[i] = trival(res != 0);
+                      if (i == 0)
+                        goto done;
+                      changed.push_back(i);
+                    }
+                }
+            }
+          while (!todo.empty());
+          // Schedule unknown predecessors for next iteration.
+          for (unsigned i: changed)
+            for (unsigned p: rev.out(i))
+              if constexpr (std::is_same<T, bool>::value)
+                {
+                  if (!winning[p] && seen[p] != iteration)
+                    {
+                      seen[p] = iteration;
+                      todo.push_front(p);
+                    }
+                }
+              else
+                {
+                  if (winning[p].is_maybe() && seen[p] != iteration)
+                    {
+                      seen[p] = iteration;
+                      todo.push_front(p);
+                    }
+                }
+          changed.clear();
+        }
+    done:
+      bdd_extcache_done(&cache);
+      return winning;
+    }
   }
 
   std::vector<bool>
@@ -3046,94 +3141,97 @@ namespace spot
     return mtdfa_winning_region_lazy_do<trival>(dfa);
   }
 
-  static std::unordered_map<int, int>* global_term_map;
-  static std::queue<int>* global_todo;
-
-  static int map_restrict_as_game(int root, int term)
+  namespace
   {
-    if (root == 0 || root == 1)
-      return root;
-    if (term & 1)
-      return 1;
-    int dst = term / 2;
-    if (global_is_winning && !(*global_is_winning)[dst])
-      return 0;
+    static std::unordered_map<int, int>* global_term_map;
+    static std::queue<int>* global_todo;
 
-    int new_term = global_term_map->size() * 2;
-    auto [it, b] = global_term_map->emplace(term, new_term);
-    if (b)
-      global_todo->push(dst);
-    else
-      new_term = it->second;
-    if (term == new_term)
-      return root;
-    return bdd_terminal_as_int(new_term);
-  }
+    static int map_restrict_as_game(int root, int term)
+    {
+      if (root == 0 || root == 1)
+        return root;
+      if (term & 1)
+        return 1;
+      int dst = term / 2;
+      if (global_is_winning && !(*global_is_winning)[dst])
+        return 0;
 
-  static int map_restrict_as_game3(int root, int term)
-  {
-    if (root == 0 || root == 1)
-      return root;
-    if (term & 1)
-      return 1;
-    int dst = term / 2;
-    if (global_is_winning && !(*global_is_winning3)[dst].is_true())
-      return 0;
+      int new_term = global_term_map->size() * 2;
+      auto [it, b] = global_term_map->emplace(term, new_term);
+      if (b)
+        global_todo->push(dst);
+      else
+        new_term = it->second;
+      if (term == new_term)
+        return root;
+      return bdd_terminal_as_int(new_term);
+    }
 
-    int new_term = global_term_map->size() * 2;
-    auto [it, b] = global_term_map->emplace(term, new_term);
-    if (b)
-      global_todo->push(dst);
-    else
-      new_term = it->second;
-    if (term == new_term)
-      return root;
-    return bdd_terminal_as_int(new_term);
-  }
+    static int map_restrict_as_game3(int root, int term)
+    {
+      if (root == 0 || root == 1)
+        return root;
+      if (term & 1)
+        return 1;
+      int dst = term / 2;
+      if (global_is_winning && !(*global_is_winning3)[dst].is_true())
+        return 0;
 
-  template <typename T>
-  mtdfa_ptr
-  mtdfa_restrict_as_game_aux(mtdfa_ptr dfa,
-                             const std::vector<T>* winning_states)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+      int new_term = global_term_map->size() * 2;
+      auto [it, b] = global_term_map->emplace(term, new_term);
+      if (b)
+        global_todo->push(dst);
+      else
+        new_term = it->second;
+      if (term == new_term)
+        return root;
+      return bdd_terminal_as_int(new_term);
+    }
 
-    bdd_dict_ptr dict = dfa->get_dict();
-    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
-    dict->register_all_propositions_of(dfa, res);
-    res->set_controllable_variables(dfa->get_controllable_variables());
+    template <typename T>
+    mtdfa_ptr
+    mtdfa_restrict_as_game_aux(mtdfa_ptr dfa,
+                               const std::vector<T>* winning_states)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
 
-    bool keep_names = dfa->names.size() == dfa->states.size();
+      bdd_dict_ptr dict = dfa->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa, res);
+      res->set_controllable_variables(dfa->get_controllable_variables());
 
-    if constexpr (std::is_same<T, bool>::value)
-      global_is_winning = winning_states;
-    else
-      global_is_winning3 = winning_states;
+      bool keep_names = dfa->names.size() == dfa->states.size();
 
-    std::unordered_map<int, int> term_map;
-    global_term_map = &term_map;
-    term_map.emplace(0, 0);
+      if constexpr (std::is_same<T, bool>::value)
+        global_is_winning = winning_states;
+      else
+        global_is_winning3 = winning_states;
 
-    std::queue<int> todo;
-    global_todo = &todo;
-    todo.push(0);
-    do
-      {
-        int state = todo.front();
-        todo.pop();
-        bdd b = dfa->states[state];
-        b = bdd_mt_apply1_leaves(b,
-                                 std::is_same<T, bool>::value ?
-                                 map_restrict_as_game : map_restrict_as_game3,
-                                 &cache, 0);
-        res->states.push_back(b);
-        if (keep_names)
-          res->names.push_back(dfa->names[state]);
-      }
-    while (!todo.empty());
-    bdd_extcache_done(&cache);
-    return res;
+      std::unordered_map<int, int> term_map;
+      global_term_map = &term_map;
+      term_map.emplace(0, 0);
+
+      std::queue<int> todo;
+      global_todo = &todo;
+      todo.push(0);
+      do
+        {
+          int state = todo.front();
+          todo.pop();
+          bdd b = dfa->states[state];
+          b = bdd_mt_apply1_leaves(b,
+                                   std::is_same<T, bool>::value ?
+                                   map_restrict_as_game : map_restrict_as_game3,
+                                   &cache, 0);
+          res->states.push_back(b);
+          if (keep_names)
+            res->names.push_back(dfa->names[state]);
+        }
+      while (!todo.empty());
+      bdd_extcache_done(&cache);
+      return res;
+    }
   }
 
   mtdfa_ptr
@@ -3157,135 +3255,138 @@ namespace spot
   }
 
 
-  static int strategy_term_map(int* root_ptr, int term)
+  namespace
   {
-    // replace accepting terminals by bddtrue
-    if (term & 1)
-      {
-        *root_ptr = 1;
-        return 1;
-      }
-    term /= 2;
-    return (*global_is_winning)[term];
-  }
+    static int strategy_term_map(int* root_ptr, int term)
+    {
+      // replace accepting terminals by bddtrue
+      if (term & 1)
+        {
+          *root_ptr = 1;
+          return 1;
+        }
+      term /= 2;
+      return (*global_is_winning)[term];
+    }
 
-  static mtdfa_ptr
-  mtdfa_winning_strategy_by_refinement(mtdfa_ptr dfa)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+    static mtdfa_ptr
+    mtdfa_winning_strategy_by_refinement(mtdfa_ptr dfa)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
 
-    bdd controllable = dfa->get_controllable_variables();
+      bdd controllable = dfa->get_controllable_variables();
 
-    adjlist<void> rev = build_reverse_of_reachable_graph(dfa);
+      adjlist<void> rev = build_reverse_of_reachable_graph(dfa);
 
-    bdd_dict_ptr dict = dfa->get_dict();
-    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
-    dict->register_all_propositions_of(dfa, res);
-    res->states = dfa->states;
-    res->names = dfa->names;
-    res->set_controllable_variables(dfa->get_controllable_variables());
+      bdd_dict_ptr dict = dfa->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa, res);
+      res->states = dfa->states;
+      res->names = dfa->names;
+      res->set_controllable_variables(dfa->get_controllable_variables());
 
-    unsigned nroots = res->states.size();
+      unsigned nroots = res->states.size();
 
-    std::vector<bool> winning(nroots, false);
-    global_is_winning = &winning;
+      std::vector<bool> winning(nroots, false);
+      global_is_winning = &winning;
 
-    std::vector<int> seen(nroots, -1); // last iteration seen
+      std::vector<int> seen(nroots, -1); // last iteration seen
 
-    bdd_mt_quantify_prepare(controllable);
+      bdd_mt_quantify_prepare(controllable);
 
-    std::deque<unsigned> todo;
-    // states that can reach an accepting terminal are listed as
-    // predecessors of 0 in the reverse graph.
-    for (unsigned p: rev.out(0))
-      todo.push_front(p);
-    std::deque<unsigned> changed;
+      std::deque<unsigned> todo;
+      // states that can reach an accepting terminal are listed as
+      // predecessors of 0 in the reverse graph.
+      for (unsigned p: rev.out(0))
+        todo.push_front(p);
+      std::deque<unsigned> changed;
 
-    for (int iteration = 0; !todo.empty(); ++iteration)
-      {
-        do
-          {
-            int i = todo.front();
-            todo.pop_front();
+      for (int iteration = 0; !todo.empty(); ++iteration)
+        {
+          do
+            {
+              int i = todo.front();
+              todo.pop_front();
 
-            // State i may have been aded to visit_next before knowing
-            // it was winning.
-            if (winning[i])
-              continue;
-            if (bdd_mt_apply1_synthesis(res->states[i],
-                                        strategy_term_map,
-                                        &cache, iteration))
-              {
-                // By modifying winning, we modify the behavior of
-                // is_winning_terminal.  That should normally call for
-                // an invalidation of the cache (or equivalently, an
-                // increment of the iteration number), but it is
-                // actually OK if the cache uses previous values, as
-                // if winning was constant during one iteration.  The
-                // new values are sure to be used on next iteration.
-                winning[i] = true;
-                // if the initial state is winning, we can stop
-                if (i == 0)
-                  goto done;
-                changed.push_back(i);
-              }
-          }
-        while (!todo.empty());
-        // Schedule non-winning predecessors for next iteration.
-        for (unsigned i: changed)
-          for (unsigned p: rev.out(i))
-            if (!winning[p] && seen[p] != iteration)
-              {
-                seen[p] = iteration;
-                todo.push_front(p);
-              }
-        changed.clear();
-      }
-  done:
-    for (unsigned i = 0; i < nroots; ++i)
-      if (!winning[i])
-        res->states[i] = bddfalse;
+              // State i may have been aded to visit_next before knowing
+              // it was winning.
+              if (winning[i])
+                continue;
+              if (bdd_mt_apply1_synthesis(res->states[i],
+                                          strategy_term_map,
+                                          &cache, iteration))
+                {
+                  // By modifying winning, we modify the behavior of
+                  // is_winning_terminal.  That should normally call for
+                  // an invalidation of the cache (or equivalently, an
+                  // increment of the iteration number), but it is
+                  // actually OK if the cache uses previous values, as
+                  // if winning was constant during one iteration.  The
+                  // new values are sure to be used on next iteration.
+                  winning[i] = true;
+                  // if the initial state is winning, we can stop
+                  if (i == 0)
+                    goto done;
+                  changed.push_back(i);
+                }
+            }
+          while (!todo.empty());
+          // Schedule non-winning predecessors for next iteration.
+          for (unsigned i: changed)
+            for (unsigned p: rev.out(i))
+              if (!winning[p] && seen[p] != iteration)
+                {
+                  seen[p] = iteration;
+                  todo.push_front(p);
+                }
+          changed.clear();
+        }
+    done:
+      for (unsigned i = 0; i < nroots; ++i)
+        if (!winning[i])
+          res->states[i] = bddfalse;
 
-    bdd_extcache_done(&cache);
-    return res;
-  }
+      bdd_extcache_done(&cache);
+      return res;
+    }
 
-  static mtdfa_ptr
-  mtdfa_winning_strategy_by_backprop(mtdfa_ptr dfa)
-  {
-    bdd_dict_ptr dict = dfa->get_dict();
-    mtdfa_ptr res = std::make_shared<mtdfa>(dict);
-    backprop_bdd_encoder enc;
-    unsigned ns = dfa->num_roots();
-    bdd outputs = dfa->get_controllable_variables();
-    bdd_mt_quantify_prepare(outputs);
-    for (unsigned i = 0; i < ns; ++i)
-      if (enc.encode_state(i, dfa->states[i]))
-        break;
-    if (!enc.backprop.winner(0))
-      {
-        res->states.push_back(bddfalse);
-        res->names.push_back(formula::ff());
-        return res;
-      }
-    global_backprop = &enc;
+    static mtdfa_ptr
+    mtdfa_winning_strategy_by_backprop(mtdfa_ptr dfa)
+    {
+      bdd_dict_ptr dict = dfa->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      backprop_bdd_encoder enc;
+      unsigned ns = dfa->num_roots();
+      bdd outputs = dfa->get_controllable_variables();
+      bdd_mt_quantify_prepare(outputs);
+      for (unsigned i = 0; i < ns; ++i)
+        if (enc.encode_state(i, dfa->states[i]))
+          break;
+      if (!enc.backprop.winner(0))
+        {
+          res->states.push_back(bddfalse);
+          res->names.push_back(formula::ff());
+          return res;
+        }
+      global_backprop = &enc;
 
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
 
-    res->states = dfa->states;
-    res->names = dfa->names;
-    for (unsigned i = 0; i < ns; ++i)
-      bdd_mt_apply1_synthesis_with_choice(res->states[i],
-                                          strategy_choice,
-                                          strategy_finalize,
-                                          &cache, hash_key_finalstrat);
-    dict->register_all_propositions_of(dfa, res);
-    res->set_controllable_variables(outputs);
+      res->states = dfa->states;
+      res->names = dfa->names;
+      for (unsigned i = 0; i < ns; ++i)
+        bdd_mt_apply1_synthesis_with_choice(res->states[i],
+                                            strategy_choice,
+                                            strategy_finalize,
+                                            &cache, hash_key_finalstrat);
+      dict->register_all_propositions_of(dfa, res);
+      res->set_controllable_variables(outputs);
 
-    bdd_extcache_done(&cache);
-    return res;
+      bdd_extcache_done(&cache);
+      return res;
+    }
   }
 
   mtdfa_ptr
