@@ -1,10 +1,11 @@
-New in spot 2.13.2.dev  (not yet released)
+New in spot 2.14  (2025-06-26)
 
   Build:
 
   - When Python bindings are enabled, Spot now requires Python 3.8 or
-    later.  Python 3.8 has reached end-of-life in 2024; it was used for
-    instance in Ubuntu 20.04 (which reached end-of-life in 2025).
+    later.  Python 3.8 is already quite old: it reached end-of-life in
+    2024.  Python 3.8 was used for instance in Ubuntu 20.04, where you
+    can install this version of Spot.
 
   Command-line tools:
 
@@ -24,11 +25,16 @@ New in spot 2.13.2.dev  (not yet released)
     but it hasn't received a lot of testing so far, it should be
     regarded as very experimental.
 
+    For more information about ltlf2dfa and ltlfsynt, refer to the
+    paper "Engineering an LTLf Synthesis Tool" to be presented at
+    CIAA'25.
+
   - genltl learned four new options: --tv-counter-mealy=N,
     --tv-double-counters-mealy=N, --tv-nim-mealy=N,M,
     --chomp-mealy=N,M.   These are scalable LTLf specifications
     that can be used directly with ltlfsynt.  The first three options
-    are taken from the literature; Chomp is an original familly.
+    are taken from the literature; Chomp is an original familly that
+    has been submitted as a new model to SyntComp'25.
 
   - ltlf2tgba learned an --ltlf option.  This currently implements the
     very slow approach of going from LTLf->LTL->DBA->DFA.  ltlf2dfa is
