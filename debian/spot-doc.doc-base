@@ -7,3 +7,6 @@ Section: Science/Mathematics
 Format: HTML
 Index: /usr/share/doc/spot/userdoc/index.html
 Files: /usr/share/doc/spot/userdoc/*.html
+
+Format: PDF
+Files: /usr/share/doc/spot/tl/tl.pdf
