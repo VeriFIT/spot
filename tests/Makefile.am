@@ -218,6 +218,8 @@ TESTS_misc = \
   core/trival.test
 
 TESTS_twa = \
+## Start slow tests early.
+  core/ltlfsynt.test \
   core/385.test \
   core/521.test \
   core/522.test \
@@ -350,7 +352,6 @@ TESTS_twa = \
   core/parity.test \
   core/parity2.test \
   core/pgsolver.test \
-  core/ltlfsynt.test \
   core/ltlfsynt2.test \
   core/ltlsynt.test \
   core/ltlsynt2.test \
