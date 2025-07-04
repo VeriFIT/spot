@@ -112,7 +112,7 @@ namespace spot
       return a_;
     }
 
-    // / Return the options parameterizing how the accepting run is computed.
+    ///  Return the options parameterizing how the accepting run is computed.
     const option_map&
     options() const
     {
@@ -166,7 +166,7 @@ namespace spot
     /// Return false iff accepting_run() can return 0 for non-empty automata.
     virtual bool safe() const;
 
-    /// \brief Check whether the automaton contain an accepting run.
+    /// \brief Check whether the automaton contains an accepting run.
     ///
     /// Return 0 if the automaton accepts no run.  Return an instance
     /// of emptiness_check_result otherwise.  This instance might

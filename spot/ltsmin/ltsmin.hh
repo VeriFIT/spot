@@ -54,8 +54,8 @@ namespace spot
     // well as infinite sequences, but do not need to distinguish
     // them.  In that case dead state will have a loop labeled by
     // true.  If DEAD is any atomic proposition (formula::ap("...")),
-    // this is the name a property that should be true when looping on
-    // a dead state, and false otherwise.
+    // this is the name of a property that should be true when looping
+    // on a dead state, and false otherwise.
     //
     // This function returns nullptr on error.
     //
@@ -66,14 +66,14 @@ namespace spot
     //         dead states
     // \a compress whether to compress the states.  Use 0 to disable, 1
     // to enable compression, 2 to enable a faster compression that only
-    // work if all variables are smaller than 2^28.
+    // works if all variables are smaller than 2^28.
     kripke_ptr kripke(const atomic_prop_set* to_observe,
                       bdd_dict_ptr dict,
                       formula dead = formula::tt(),
                       int compress = 0) const;
 
     // \brief The same as above but returns a kripkecube, i.e. a kripke
-    // that can be use in parallel. Moreover, it supports more elaborated
+    // that can be used in parallel. Moreover, it supports more elaborate
     // atomic propositions such as "P.a == P.c"
     ltsmin_kripkecube_ptr kripkecube(std::vector<std::string> to_observe,
                                      formula dead = formula::tt(),

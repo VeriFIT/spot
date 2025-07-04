@@ -653,7 +653,7 @@ namespace spot
 
       struct ltl_prop
       {
-        // All properties here should be expressed in such a a way
+        // All properties here should be expressed in such a way
         // that property(f && g) is just property(f)&property(g).
         // This allows us to compute all properties of a compound
         // formula in one operation.
