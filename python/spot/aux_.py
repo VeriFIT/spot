@@ -72,7 +72,7 @@ def str_to_svg(s):
     """
     try:
         p = subprocess.run(['dot', '-Tsvg'],
-                           capture_output=True, text=True,
+                           capture_output=True, text=True, encoding='utf-8',
                            input=s.decode('utf-8') if type(s) is bytes else s)
     except FileNotFoundError:
         print("The command 'dot' seems to be missing on your system.\n"
