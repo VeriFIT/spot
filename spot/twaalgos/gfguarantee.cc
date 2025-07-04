@@ -90,7 +90,7 @@ namespace spot
           // terminal state on the transitions leaving the initial
           // state.  However if some successor of the initial state is
           // also trivial, we might be able to remove it as well if we
-          // are able to replay two step from the initial state: this
+          // are able to replay two steps from the initial state: this
           // can be generalized to more depth and requires computing
           // some history for each state (i.e., a common suffix to all
           // finite words leading to this state).
