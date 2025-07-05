@@ -46,7 +46,7 @@ corresponding commands are hidden.
 - [[file:genltl.org][=genltl=]] Generate LTL formulas from scalable patterns.
 - [[file:ltl2tgba.org][=ltl2tgba=]] Translate LTL/PSL formulas into various types of automata.
 - [[file:ltl2tgta.org][=ltl2tgta=]] Translate LTL/PSL formulas into testing automata.
-- [[file:ltlf2dfa.org][=ltlf2dfa=]] Translate LTLf formulas to transltion-based DFA.
+- [[file:ltlf2dfa.org][=ltlf2dfa=]] Translate LTLf formulas to transition-based DFA.
 - [[file:ltlcross.org][=ltlcross=]] Cross-compare LTL/PSL-to-automata translators.
 - [[file:ltlgrind.org][=ltlgrind=]] List formulas similar to but simpler than a given LTL/PSL
   formula.
