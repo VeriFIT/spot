@@ -249,21 +249,21 @@ EOF
 | -:95.1-140.7 | automaton 2 |        2 |           10 |          26 |                26 |              1 |         2 |                  6 |                      1 |                 0 | AF   | ok          |         0 |  0.0211636 |         2 |            21 |           66 |                 84 |               2 |          4 |                   0 |                       0 |                  0 |
 | -:95.1-140.7 | automaton 2 |        2 |           10 |          26 |                26 |              1 |         2 |                  6 |                      1 |                 0 | L2D  | ok          |         0 |  0.0028508 |         2 |            24 |           74 |                 96 |               2 |          4 |                   0 |                       0 |                  0 |
 
-* Transformation that preserve or complement languages
+* Transformations that preserve or complement languages
 
-By default, =autcross= assumes that for a given input the automata
-produced by all tools should be equivalent.  However, it does not
-assume that those languages should be equivalent to the input (it is
-clearly not the case in our complementation test above).
+By default, =autcross= assumes that the automata produced by all tools
+for a given input should be equivalent.  However, it does not assume
+that those languages should be equivalent to the input (it is clearly
+not the case in our complementation test above).
 
 If the transformation being tested does preserve the language of an
 automaton, it is worth to pass the =--language-preserved= option to
 =autfilt=.  Doing so a bit like adding =cat %H>%O= as another tool: it
 will also ensure that the output is equivalent to the input.
 
-Similarly, if the tools being tested implement complementation
+Similarly, if the tools being tested implement some complementation
 algorithm, adding the =--language-complemented= will additionally
-compare the outputs using this own complementation algorithm.  Using
+compare the outputs using Spot's own complementation algorithm.  Using
 this option is more efficient than passing =autfilt --complement= as a
 tool, since =autcross= can save on complementation by using the input
 automaton.
