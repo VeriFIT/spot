@@ -37,6 +37,9 @@
 #include <stdlib.h>
 #include <iomanip>
 #include <new>
+#include <cassert>
+#include <deque>
+#include <unordered_map>
 #include "kernel.h"
 #include "bvecx.h"
 
@@ -780,4 +783,158 @@ std::tuple<bool, int, int> bdd_mt_quantified_low_high(int r)
   return make_tuple(is_quant, LOW(r), HIGH(r));
 }
 
-/* EOF */
+// This interprets the MTBDD of states as a graph in which
+// a terminal labeled by X has term_succ(X) as successor.
+//
+// The function compute the maximal strongly connected components of
+// that graph.  If there a N such SCCs, this returns a vector of the
+// same size as STATES, indicating the SCC number (between 0 and N-1)
+// of each states.  SCCs are topologically ordered, with state 0
+// belonging to the largest SCC; an SCC can only reach SCCs with
+// smaller indices.
+std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
+                             int (*term_succ)(int),
+                             std::unordered_map<int, int>* seen_res)
+{
+  unsigned ns = states.size();
+  std::vector<int> res(ns, INT_MIN);
+  // This uses Dijkstra's algorithm for enumerating SCC, combined
+  // with a live stack.
+  // - A DFS is used to discover new states.
+  // - Each newly discovered state is added to a LIVE stack and assigned a
+  //   unique increasing index
+  // - A stack of SCC potential roots hold such indices, with the convention
+  //   that if is stack contains [..., i, j, ...], then all live states
+  //   whose indices are between i (included) and j (excluded) belong to
+  //   the same SCC
+  // - When the DFS discovers a cycle, i.e., a live state with index
+  //   X, then all SCC roots larger than X are popped from the ROOTS
+  //   stack, but the LIVE stack is untouched.
+  // - When the DFS backtracks from a state that is the top of ROOTS, we
+  //   use the LIVE stack to enumerate all states of that SCC and
+  //   assign them a their SCC number.
+  //
+  // Additionally, the algorithm is slightly adapted to the BDD structure:
+  // internal nodes have at most two successors, and terminal nodes have
+  // exactly one successor.
+  std::deque<int> roots;               // indices of SCC roots
+  std::deque<int> live;                // bdd.id that have been
+                                       // discovered but not assigned
+                                       // to any SCC yet.
+  std::unordered_map<int, int> seen;   // index of each live state; or
+                                       // <0 if part of some SCC
+                                       // already.
+  unsigned state_index = 0;            // number to give to newly
+                                       // discovered states.
+  unsigned scc_index = 0;              // number to give to newly
+                                       // found maximal SCCs.
+  // The following DFS stack stores pairs (x, count) where
+  //  count == 3  if x is value of a terminal to process
+  //  count == 2  if x is an inner node for which no children has been
+  //              visited (we should start with low)
+  //  count == 1  if x is an inner node for which the low child has been
+  //              visited (continue with high)
+  //  count == 0  if all successors have been visited (backtrack now)
+  std::deque<std::pair<int, int>> dfs_stack;
+
+  for (unsigned i = 0; i < ns; ++i)
+    {
+      if (res[i] != INT_MIN) // already assigned to an SCC
+        continue;
+      int r = states[i].id();
+      if (!seen.emplace(r, state_index).second)
+        {
+          // this is a trivial SCC, or we would have assigned i to
+          // some SCC already.
+          res[i] = scc_index++;
+          continue;
+        }
+      live.push_back(r);
+      roots.push_back(state_index);
+      dfs_stack.emplace_back(r, ISTERM(r) ? 3 : 2);
+      ++state_index;
+
+      while (!dfs_stack.empty())
+        {
+          auto& [r, cnt] = dfs_stack.back();
+          if (cnt == 0)         // we should backtrack
+            {
+              int rootidx = roots.back();
+              if (rootidx == seen[r]) // r is an SCC root
+                {
+                  rootidx = ~rootidx;
+                  roots.pop_back();
+                  bool scc_index_assigned = false;
+                  while (!live.empty())
+                    {
+                      int t = live.back();
+                      live.pop_back();
+                      auto it = seen.find(t);
+                      int tindex = it->second;
+                      it->second = rootidx;
+                      if (ISTERM(t))
+                        {
+                          res[term_succ(TERM(t))] = scc_index;
+                          scc_index_assigned = true;
+                        }
+                      if (t == r)
+                        break;
+                    }
+                  if (scc_index_assigned)
+                    ++scc_index;
+                }
+              dfs_stack.pop_back();
+              continue;
+            }
+          int child;
+          if (cnt == 3)         // looking at a terminal
+            {
+              int v = term_succ(TERM(r));
+              assert(v < ns);
+              child = states[v].id();
+              cnt = 0;
+            }
+          else if (cnt == 2)
+            {
+              child = LOW(r);
+              cnt = 1;
+            }
+          else
+            {
+              assert(cnt == 1);
+              child = HIGH(r);
+              cnt = 0;
+            }
+          if (ISCONST(child))   // ignore constant nodes
+            continue;
+
+          auto [it, ins] = seen.emplace(child, state_index);
+          if (ins) // new state
+            {
+              // If r is pointing to a transient state, it is
+              // possible that we have previously assigned an SCC
+              // to it without ever encountering the corresponding
+              // terminal.
+              if (ISTERM(child) && res[term_succ(TERM(child))] != INT_MIN)
+                continue;
+              live.push_back(child);
+              roots.push_back(state_index);
+              ++state_index;
+              dfs_stack.emplace_back(child, ISTERM(child) ? 3 : 2);
+              continue;
+            }
+
+          int dstidx = it->second;;
+          if (dstidx < 0) // goes to another SCC
+            continue;
+          // Closes a cycle: pop relevant SCC roots.
+          while (roots.back() > dstidx)
+            roots.pop_back();
+        } // DFS
+      if (res[i] == INT_MIN) // not assigned yet because trivial
+        res[i] = scc_index++;
+    }     // loop over all states
+  if (seen_res)
+    std::swap(seen, *seen_res);
+  return res;
+}

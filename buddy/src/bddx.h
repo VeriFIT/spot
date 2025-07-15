@@ -580,6 +580,7 @@ BUDDY_API_VAR const BDD bddtrue;
 #include <memory>
 #include <type_traits>
 #include <vector>
+#include <unordered_map>
 
 /*=== User BDD class ===================================================*/
 
@@ -1397,7 +1398,7 @@ typedef void (*bddstrmhandler)(std::ostream &, int);
 
 BUDDY_API bddstrmhandler bdd_strm_hook(bddstrmhandler);
 
-/*=== Leave collection ===*/
+/*=== Leaves collection ===*/
 
 BUDDY_API std::vector<bdd> leaves_of(const bdd&);
 BUDDY_API std::vector<bdd> leaves_of(const std::vector<bdd>& b);
@@ -1406,6 +1407,11 @@ BUDDY_API int bdd_anodecountpp(const std::vector<bdd>& b,
                                int& terms, bool& has_true, bool& has_false);
 BUDDY_API bool bdd_has_true(const std::vector<bdd>& b);
 BUDDY_API bool bdd_find_leaf(const std::vector<bdd>& b, bool (*)(int));
+
+BUDDY_API std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
+                                       int (*term_succ)(int),
+                                       std::unordered_map<int, int>*
+                                       seen_res = nullptr);
 
 /*=== Minterm enumeration ====*/
 
