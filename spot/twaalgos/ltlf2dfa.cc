@@ -625,8 +625,11 @@ namespace spot
           break;
         }
       case op::F:
-        res = combine_or(ltlf_to_mtbdd(f[0]), formula_to_terminal_bdd(f));
-        break;
+        {
+          bdd term = formula_to_terminal_bdd(f);
+          res = combine_or(ltlf_to_mtbdd(f[0]), term);
+          break;
+        }
       }
     formula_to_bdd_[f] = res;
     return res;
