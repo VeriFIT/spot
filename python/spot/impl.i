@@ -38,6 +38,7 @@
 %shared_ptr(spot::kripke_graph)
 %shared_ptr(spot::bdd_dict)
 %shared_ptr(spot::mtdfa)
+%shared_ptr(spot::mtdswa)
 %shared_ptr(spot::mtdtwa)
 %shared_ptr(spot::twa)
 %shared_ptr(spot::twa_graph)
@@ -550,6 +551,7 @@ namespace std {
   %template(pairintacccode) pair<int, spot::acc_cond::acc_code>;
   %template(pairintacccond) pair<int, spot::acc_cond>;
   %template(vectorformula) vector<spot::formula>;
+  %template(vectorcolors) vector<spot::acc_cond::mark_t>;
   %template(vectorunsigned) vector<unsigned>;
   %template(vectorvectorunsigned) vector<vector<unsigned>>;
   %template(vectorpairunsigned) vector<pair<unsigned, unsigned>>;

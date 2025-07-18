@@ -351,6 +351,26 @@ class mtdtwa:
         from spot.jupyter import SVG
         return SVG(self._repr_svg_(**args))
 
+@_extend(mtdswa)
+class mtdswa:
+    def _repr_svg_(self, opts=None):
+        """Output the automaton as SVG"""
+        ostr = ostringstream()
+        self.print_dot(ostr, opts)
+        return _ostream_to_svg(ostr)
+
+    # see spot.jupyter.SVG for why we need _repr_html_ instead of _repr_svg_
+    def _repr_html_(self):
+        return self._repr_svg_()
+
+    def show(self, opts=None):
+        """Display the automaton as SVG, in the IPython/Jupyter notebook"""
+        # Load the SVG function only if we need it. This way the
+        # bindings can still be used outside of IPython if IPython is
+        # not installed.
+        from spot.jupyter import SVG
+        return SVG(self._repr_svg_(opts))
+
 @_extend(backprop_graph)
 class backprop_graph:
     def _repr_svg_(self):
@@ -1125,6 +1145,10 @@ def ltlf_to_mtdfa_compose(formula, *args, dict=_bdd_dict):
 def ltlf_to_mtdfa_for_synthesis(formula, *args, dict=_bdd_dict):
     from spot.impl import ltlf_to_mtdfa_for_synthesis as todfa
     return todfa(formula, dict, *args)
+
+def obligation_to_mtdswa(formula, *args, dict=_bdd_dict):
+    from spot.impl import obligation_to_mtdswa as otm
+    return otm(formula, dict, *args)
 
 # Wrap C++-functions into lambdas so that they get converted into
 # instance methods (i.e., self passed as first argument
