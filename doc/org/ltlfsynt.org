@@ -330,9 +330,10 @@ Various optimizations are enabled by default.
 - Group of variables that are specified as equivalent can be replaced
   by a unique variable of that group.  This can be disabled with
   =--global-equivalence=no=.
-- The specification can be decomposed into multiple output-disjoint
+- A specification can be decomposed into multiple output-disjoint
   specifications that can be solved independently.  This decomposition
-  can be disabled with =--decompose=no=.
+  can be disabled with =--decompose=no=.  (Currently this optimization
+  has been restricted to X-free specification, because of [[https://gitlab.lre.epita.fr/spot/spot/-/issues/610][issue #610]].)
 - The formula is simplified with some cheap rewriting rules.  This is
   especially important when decomposition is used, because the
   decomposition sometimes need to distribute subformulas to favor
@@ -351,10 +352,10 @@ using Mealy semantics
 the following signals can be temporarily removed:
   oc0 := inc
 new formula: (init0 <-> ob0) & (init1 <-> ob1) & G((X[!]ob1 -> (ob1 xor oc1)) & (X[!]!ob1 -> (ob1 <-> oc1))) & (G(!inc -> X[!]inc) -> F(!ob0 & !ob1)) & G((X[!]ob0 -> (inc xor ob0)) & (X[!]!ob0 -> (inc <-> ob0))) & G(oc1 <-> (inc & ob0))
-no decomposition found
+decomposition not attempted because the formula uses X
 formula simplified to (init0 <-> ob0) & (init1 <-> ob1) & (G(inc | X[!]inc) -> F(!ob0 & !ob1)) & G((oc1 <-> (inc & ob0)) & ((ob1 xor oc1) | X!ob1) & ((ob1 <-> oc1) | Xob1) & ((inc xor ob0) | X!ob0) & ((inc <-> ob0) | Xob0))
 starting on-the-fly translation with node-based backpropagation, with BFS order, with one-step preprocess
-translation to MTDFA (1 roots, 6 APs) took 0.00165947 seconds
+translation to MTDFA (1 roots, 6 APs) took 0.00115581 seconds
 MTDFA game was solved during translation
 REALIZABLE
 #+end_example

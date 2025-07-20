@@ -71,6 +71,9 @@ f3="&(o2->((!o&Xo3)|(o&Xo4)))&(o0->((i&Xo3)|(!i&Xo1))))&Fo4"
 f3b="&(o2->((o&Xo3)|(!o&Xo4)))&(o0->((!i&Xo3)|(i&Xo1))))&Fo4"
 echo "$f1$f2$f3" >> formulas.ltlf
 echo "$f1$f2$f3b" >> formulas.ltlf
+# Two formulas from issue #610:
+echo 'X[!]X[!]X(0) && X[!]X(0)' >> formulas.ltlf
+echo 'o1 & G(o1 xor X[!]o1) & o2 & G(o2 xor Xo2)' >> formulas.ltlf
 
 
 cat >expected <<EOF
@@ -127,6 +130,8 @@ UNREALIZABLE REALIZABLE
 UNREALIZABLE REALIZABLE
 REALIZABLE REALIZABLE
 REALIZABLE REALIZABLE
+UNREALIZABLE UNREALIZABLE
+UNREALIZABLE UNREALIZABLE
 EOF
 cut -f1 -d' ' <expected >expected.Moore
 cut -f2 -d' ' <expected >expected.Mealy

@@ -6,6 +6,12 @@ New in spot 2.14.0.dev  (not yet released)
     prop_state_acc() == maybe and the automaton is found to be
     compatible with a state-based output.
 
+  - ltlfsynt's decomposition optimization (which was implemented in
+    the same way as we did in ltlsynt for LTL) isn't always correct
+    for LTLf specification.  Until we know and implement a better
+    sufficient condition, this version disables decomposition except
+    for X-free specifications.  (Issue #610.)
+
 New in spot 2.14  (2025-06-26)
 
   Build:

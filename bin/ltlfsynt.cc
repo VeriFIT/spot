@@ -483,17 +483,27 @@ namespace
     std::vector<std::set<spot::formula>> sub_outs;
     if (opt_decompose_ltl)
     {
-      auto subs = split_independent_formulas(f, output_aps);
-      if (subs.first.size() > 1)
+      if (!f.is_syntactic_stutter_invariant())
         {
+          // Avoid Issue #610 until we now a better restriction.
           if (opt_verbose)
-            *opt_verbose << "there are " << subs.first.size()
-                         << " subformulas\n";
-          sub_form = subs.first;
-          sub_outs = subs.second;
+            *opt_verbose
+              << "decomposition not attempted because the formula uses X\n";
         }
-      else if (opt_verbose)
-        *opt_verbose << "no decomposition found\n";
+      else
+        {
+          auto subs = split_independent_formulas(f, output_aps);
+          if (subs.first.size() > 1)
+            {
+              if (opt_verbose)
+                *opt_verbose << "there are " << subs.first.size()
+                             << " subformulas\n";
+              sub_form = subs.first;
+              sub_outs = subs.second;
+            }
+          else if (opt_verbose)
+            *opt_verbose << "no decomposition found\n";
+        }
     }
 
     // FIXME: revisit this after split_independent_formulas() has
