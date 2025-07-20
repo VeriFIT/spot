@@ -181,6 +181,7 @@ TESTS_tl = \
   core/ltlcrossgrind.test \
   core/ltlfilt.test \
   core/exclusive-ltl.test \
+  core/ltlf2dfa.test \
   core/latex.test \
   core/lbt.test \
   core/lenient.test \

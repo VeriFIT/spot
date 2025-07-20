@@ -1,6 +1,10 @@
 New in spot 2.14.0.dev  (not yet released)
 
-  Nothing yet.
+  - print_hoa() will not use state-based output if the input has been
+    tagged as transition-based (i.e. prop_state_acc() == false).  If
+    only uses state-based output when prop_state_acc() == true, or if
+    prop_state_acc() == maybe and the automaton is found to be
+    compatible with a state-based output.
 
 New in spot 2.14  (2025-06-26)
 

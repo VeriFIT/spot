@@ -315,7 +315,7 @@ namespace spot
         unsigned ns = aut->num_states();
         bool universal = true;
         bool complete = true;
-        bool state_acc = true;
+        bool state_acc = !aut->prop_state_acc().is_false();
         bool nodeadend = true;
         bool colored = aut->num_sets() >= 1;
         for (unsigned src = 0; src < ns; ++src)
