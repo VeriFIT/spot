@@ -488,7 +488,7 @@ much to see.
 
 ** Realizability
 
-Use the =--realizability= to interrupts the process once the game has
+Use the =--realizability= to interrupt the process once the game has
 been solved.
 
 #+begin_note
