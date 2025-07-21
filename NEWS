@@ -1,4 +1,6 @@
-New in spot 2.14.0.dev  (not yet released)
+New in spot 2.14.1  (2025-07-21)
+
+  Bug fixes:
 
   - print_hoa() will not use state-based output if the input has been
     tagged as transition-based (i.e. prop_state_acc() == false).  If
@@ -11,6 +13,8 @@ New in spot 2.14.0.dev  (not yet released)
     for LTLf specification.  Until we know and implement a better
     sufficient condition, this version disables decomposition except
     for X-free specifications.  (Issue #610.)
+
+  - Various documentation fixes.
 
 New in spot 2.14  (2025-06-26)
 
