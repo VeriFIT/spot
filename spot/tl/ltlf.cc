@@ -431,7 +431,7 @@ namespace spot
             {
               // (a -> b1) & (a -> b2) & rest  =  (a -> (b1 & b2)) & rest
               // G(a) & G(b) & GF(c) & GF(d) & rest = G(a & b & F(c & d)) & rest
-              std::unordered_map<formula, std::vector<formula>> map;
+              robin_hood::unordered_map<formula, std::vector<formula>> map;
               std::vector<formula> inG;
               std::vector<formula> rest;
               std::vector<formula> inXw;
