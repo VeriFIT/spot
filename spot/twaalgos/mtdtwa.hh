@@ -92,7 +92,11 @@ namespace spot
     std::vector<formula> names;
     std::vector<acc_cond::mark_t> colors;
     acc_cond acc;
-    bdd_dict_ptr dict_;
+    /// \brief get the bdd_dict associated to this automaton
+    bdd_dict_ptr get_dict() const
+    {
+      return dict_;
+    }
 
     unsigned num_roots() const
     {
@@ -116,6 +120,9 @@ namespace spot
 
     // convert to twa
     twa_graph_ptr as_twa(bool state_based = false, bool labels = true) const;
+
+  private:
+    bdd_dict_ptr dict_;
   };
 
 
@@ -189,4 +196,7 @@ namespace spot
                                   bool fuse_same_bdds = true,
                                   bool simplify_terms = true);
 
+
+  SPOT_API
+  mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa);
 }

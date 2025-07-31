@@ -45,6 +45,21 @@ namespace spot
 {
   namespace
   {
+    static int size_estimate_unary(const mtdswa_ptr& aut)
+    {
+      int states = aut->num_roots();
+      states /= 2;
+      ++states;
+      int num_aps = aut->aps.size();
+      int prod = states * num_aps;
+      if ((num_aps > 0) && ((prod / num_aps != states) || // overflow
+                            prod > (INT_MAX / 16)))
+        return INT_MAX / 16;
+      if (prod < (1 << 14))
+        return 1<<14;
+      return prod;
+    }
+
     struct pairmu_hash
     {
       std::size_t operator()(const std::pair<acc_cond::mark_t,
@@ -794,7 +809,7 @@ namespace spot
         ("dtwa_to_mtdswa: input does not have state-based acceptance");
 
     mtdswa_ptr dfa = std::make_shared<mtdswa>(twa->get_dict());
-    dfa->dict_->register_all_variables_of(&twa, dfa);
+    dfa->get_dict()->register_all_variables_of(&twa, dfa);
     unsigned n = twa->num_states();
     unsigned init = twa->get_init_state_number();
 
@@ -1563,6 +1578,177 @@ namespace spot
   {
     simple_ltl_translator trans(dict, simplify_terms);
     return trans.ltl_to_mtdswa(f, fuse_same_bdds);
+  }
+
+  /////////////////////////////////////////////////////////////////////////
+  //                       minimization of MTDSWA                        //
+  /////////////////////////////////////////////////////////////////////////
+
+  // callback for minimize_mtdfa
+  namespace
+  {
+    static std::vector<int> classes;
+    //static int num_states;
+    //static bool accepting_false_seen;
+    //static bool rejecting_true_seen;
+
+    static int rename_class(int val)
+    {
+      assert((unsigned) val < classes.size());
+      val = classes[val];
+      //if (val >= num_states)
+      //  {
+      //    if (accepting)
+      //      accepting_false_seen = true;
+      //    else
+      //      rejecting_true_seen = true;
+      //  }
+      return val;
+    }
+  }
+
+  mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa,
+                             bddExtCache* cache,
+                             int& iteration)
+  {
+    if (iteration >= (1 << 20))
+      {
+        // wipe the cache every 2^20 iterations.
+        bdd_extcache_reset(cache);
+        iteration = 0;
+      }
+
+    unsigned n = dfa->num_roots();
+
+    // This minimization implements Moore's partition-refinement
+    // algorithm using MTBDDs.  The idea is relatively simple: each
+    // state of the MTDSWA is assigned a class. Initially every state
+    // is in a class that corresponds to its colors.  The MTBDD used
+    // to represent the states are all rewritten, replacing each
+    // terminal (dst, b) by (class[dst], b).  After this rewriting,
+    // states whose MTBDD are different are put into different
+    // classes, and we start again.  We iterate the process until no
+    // more classes are created.
+
+    // class is a global vector assigning classes to each state
+    classes.clear();
+    classes.reserve(n); // two extra classes for bddtrue/bddfalse
+
+    // loop over all states, and give them a class that match their color
+    {
+      std::unordered_map<acc_cond::mark_t, int> col2cl;
+      for (unsigned i = 0; i < n; ++i)
+        {
+          acc_cond::mark_t col = dfa->colors[i];
+          auto it = col2cl.emplace(col, col2cl.size()).first;
+          classes.push_back(it->second);
+        }
+    }
+
+    // The "signature" of each state is their encoding using
+    // the current set of classes.  The following vector remember
+    // each unique signature in the order they were discovered.
+    std::vector<bdd> signatures;
+    signatures.reserve(n);
+    // For each distinct signature, GROUPS retains the list of
+    // states that have this signature.
+    std::unordered_map<bdd, std::vector<int>, bdd_hash> groups;
+    for (;;)
+      {
+        ++iteration;
+        for (unsigned i = 0; i < n; ++i)
+          {
+            bdd sig = bdd_mt_apply1(dfa->states[i], rename_class,
+                                    bddfalse, bddtrue,
+                                    cache, iteration);
+            auto& v = groups[sig];
+            if (v.empty())
+              signatures.push_back(sig);
+            v.push_back(i);
+          }
+        // { // debug
+        //   std::cerr << "iteration " << iteration << '\n';
+        //   std::cerr << signatures.size() << " states\n";
+        // }
+
+        // Assign each state to its class number, using the order in
+        // which signatures were discovered.  In this order, the
+        // initial state will always have class 0.
+        //
+        // An exception is if the class contains the fake true/false
+        // state.  In this case, we map the class back to n/n+1.
+        int curclass = 0;
+        bool changed = false;
+        for (bdd sig: signatures)
+          {
+            int mapclass = curclass++;
+            auto& v = groups[sig];
+            for (unsigned i: v)
+              if (classes[i] != mapclass)
+                {
+                  changed = true;
+                  classes[i] = mapclass;
+                }
+            // { // debug
+            //   std::cerr << "class " << mapclass << ':';
+            //   for (unsigned i: v)
+            //     std::cerr << ' ' << i;
+            //   if (mapclass == (int) n)
+            //     std::cerr << "  (true)";
+            //   else if (mapclass == (int) n + 1)
+            //     std::cerr << "  (false)";
+            //   std::cerr << "\n      " << sig << '\n';
+            // }
+          }
+        // for (unsigned i = 0; i <= n + 1; ++i)
+        //    std::cerr << "classes[" << i << "]=" << classes[i] << '\n';
+        if (!changed)
+          break;
+        groups.clear();
+        signatures.clear();
+      }
+
+    // The BDDs in SIGNATURES are actually our new MTBDD
+    // representation.
+    //
+    // if WANT_NAMES is set we also have to keep one name per class
+    // for display.
+    bool want_names = dfa->names.size() == n;
+    std::vector<formula> names;
+    std::vector<acc_cond::mark_t> colors;
+    // Our automaton will have SZ states;
+    unsigned sz = signatures.size();
+    if (want_names)
+      names.reserve(sz);
+    for (bdd sig: signatures)
+      {
+        auto& v = groups[sig];
+        // We can pick any state in v as representative of the
+        // class.  Here we simply pick the first one, but this
+        // can be changed if needed (e.g. pick the one with
+        // the shortest name since it is more readable?)
+        unsigned repr = v.front();
+        assert(repr < dfa->names.size());
+        if (want_names)
+          names.push_back(dfa->names[repr]);
+        colors.push_back(dfa->colors[repr]);
+      }
+
+    mtdswa_ptr res = std::make_shared<mtdswa>(dfa->get_dict());
+    std::swap(res->names, names);
+    std::swap(res->states, signatures);
+    std::swap(res->colors, colors);
+    return res;
+  }
+
+  mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+    int iteration = 0;
+    mtdswa_ptr res = minimize_mtdswa(dfa, &cache, iteration);
+    bdd_extcache_done(&cache);
+    return res;
   }
 
 
