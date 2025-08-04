@@ -10,7 +10,7 @@ return "2.14.1"
 
 #+NAME: TARBALL_LINK
 #+BEGIN_SRC python :exports none :var version=SPOT_VERSION :results output :wrap org
-  print(f"[[http://www.lrde.epita.fr/dload/spot/spot-{version}.tar.gz][=spot-{version}.tar.gz=]]")
+  print(f"[[http://www.lre.epita.fr/dload/spot/spot-{version}.tar.gz][=spot-{version}.tar.gz=]]")
 #+END_SRC
 
 #+NAME: NEWS_LINK

@@ -6,7 +6,7 @@ Summary:        C++17 library for LTL, omega-automata manipulation, model checki
 License:        GPLv3
 URL:            https://spot.lre.epita.fr
 
-Source0:        http://www.lrde.epita.fr/dload/spot/%{name}-%{version}.tar.gz
+Source0:        http://www.lre.epita.fr/dload/spot/%{name}-%{version}.tar.gz
 
 BuildRequires:  make
 BuildRequires:  automake

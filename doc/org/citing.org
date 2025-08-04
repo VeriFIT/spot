@@ -132,7 +132,7 @@ be more specific about a particular aspect of Spot.
 
 - *Reactive Synthesis from LTL Specification with Spot*,
   /Thibaud Michaud/, /Maximilien Colange/.
-  In Proc. of SYNT@CAV'18.  ([[https://www.lrde.epita.fr/~max/bibtexbrowser.php?key=michaud.18.synt&bib=perso.bib][bib]] | [[https://www.lrde.epita.fr/dload/papers/michaud.18.synt.pdf][pdf]])
+  In Proc. of SYNT@CAV'18.  ([[https://www.lrde.epita.fr/~max/bibtexbrowser.php?key=michaud.18.synt&bib=perso.bib][bib]] | [[https://www.lre.epita.fr/dload/papers/michaud.18.synt.pdf][pdf]])
 
   Was the first presentation of the tool [[file:ltlsynt.org][=ltlsynt=]].  The paper
   *Dissecting ltlsynt*, mentioned earlier, is more up-to-date.

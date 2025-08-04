@@ -32,7 +32,7 @@ grep 'spot: BDD package initialized' err
 # is initialized.
 test 15 = `grep -c 'spot: BDD GC' err`
 # Minimal size for this automaton.
-# See also https://www.lrde.epita.fr/dload/spot/mochart10-fixes.pdf
+# See also https://www.lre.epita.fr/dload/spot/mochart10-fixes.pdf
 test "2240,4214" = `autfilt --stats=%s,%e out`
 
 # With the default value of tls-max-states, no GC is needed

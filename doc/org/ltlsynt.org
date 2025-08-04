@@ -443,7 +443,7 @@ The initial reduction from LTL to parity game is described in the
 following paper:
 
 - *Reactive Synthesis from LTL Specification with Spot*, /Thibaud Michaud/,
-  /Maximilien Colange/.  Presented in SYNT@CAV'18.  ([[https://www.lrde.epita.fr/dload/papers/michaud.18.synt.pdf][pdf]] | [[https://www.lrde.epita.fr/~max/bibtexbrowser.php?key=michaud.18.synt&bib=perso.bib][bib]])
+  /Maximilien Colange/.  Presented in SYNT@CAV'18.  ([[https://www.lre.epita.fr/dload/papers/michaud.18.synt.pdf][pdf]] | [[https://www.lrde.epita.fr/~max/bibtexbrowser.php?key=michaud.18.synt&bib=perso.bib][bib]])
 
 Further improvements are described in the following paper:
 
