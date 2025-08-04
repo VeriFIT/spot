@@ -125,6 +125,10 @@ def canonicalize(s, type, ignores):
     s = re.sub(r'transform="[^"]*"', 'transform=""', s)
     s = re.sub(r'id="edge[^"]*"', 'id="edge"', s)
     s = re.sub(r'text-anchor="[^"]*"', 'text-anchor=""', s)
+    # GraphVizg 2.42.4 and 2.43 do not output the clusters (of mtdswa.ipynb)
+    # in the same order.
+    s = re.sub(r'<g id="clust[0-9]*" class="cluster">.*?</g>', '<cluster/>',
+               s, flags=re.DOTALL)
     # The following patterns from graphviz 2.40 are rewritten as they used to
     # be in 2.38.
     s = re.sub(r'"#000000"', '"black"', s)
