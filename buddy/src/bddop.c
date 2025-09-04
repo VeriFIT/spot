@@ -1655,10 +1655,21 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
                else
                  {
                    val &= rval;       /* universal quantification */
-                   if (!val)
-                     // If any branch can lose, let's simplify
-                     if (lres == 0 || rres == 0)
-                       lres = rres = 0;
+                   // If any branch can lose, let's simplify
+                   if (!val && (lres == 0 || rres == 0))
+                     lres = rres = 0;
+                   // If one branch can goes to 1, replace
+                   // this node by the other child.
+                   else if (__unlikely(lres == 1))
+                     {
+                       res = rres;
+                       goto skip;
+                     }
+                   if (__unlikely(rres == 1))
+                     {
+                       res = lres;
+                       goto skip;
+                     }
                  }
                SYNC_REC_STACKS;
                res = bdd_makenode(LEVEL(r), lres, rres);
@@ -1671,6 +1682,7 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
                // simply be removed.
                res = lres;
              }
+         skip:
            POPREF_(4);
            PUSHREF_(res);
            PUSHREF_(val);
@@ -1827,10 +1839,21 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
                else
                  {
                    val &= rval;       /* universal quantification */
-                   if (!val)
                      // If any branch can lose, let's simplify
-                     if (lres == 0 || rres == 0)
-                       lres = rres = 0;
+                   if (!val && (lres == 0 || rres == 0))
+                     lres = rres = 0;
+                   // If one branch can goes to 1, replace
+                   // this node by the other child.
+                   else if (__unlikely(lres == 1))
+                     {
+                       res = rres;
+                       goto skip;
+                     }
+                   if (__unlikely(rres == 1))
+                     {
+                       res = lres;
+                       goto skip;
+                     }
                  }
                SYNC_REC_STACKS;
                res = bdd_makenode(LEVEL(r), lres, rres);
@@ -1843,6 +1866,7 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
                // simply be removed.
                res = lres;
              }
+         skip:
            POPREF_(4);
            PUSHREF_(res);
            PUSHREF_(val);
