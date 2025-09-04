@@ -120,3 +120,8 @@ diff out.stats expected
 # Out of the above 16 automata we expect 4 different ones.
 # One of each pair (formula, semantics).
 test 4 = `autfilt --uniq out.hoa -c`
+
+
+# Issue 611
+f='(i0 & Gi1) <-> (o0 & X[2!]o1)'
+test 13 -eq `ltlfsynt -f "$f" --trans=restrict --dot=game|grep '^    B'|wc -l`
