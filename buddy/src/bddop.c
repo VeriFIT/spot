@@ -1571,7 +1571,7 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
                PUSHREF_(r);     /* bool for realizability */
                continue;
              }
-           // This like is only executed in the right branch of
+           // This is only executed in the right branch of
            // the recursion.  If the left branch is known to be
            // realizable and the variable is is being worked on
            // is existential, then we can replace the result of
@@ -1638,27 +1638,39 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
            BDD lres = READREF_(4);
            BDD r = POPINT_();
            int val = lval;
-           if (quantvarset[LEVEL(r)])
+           BDD res;
+           if (__likely(lres != rres))
              {
-               val |= rval;       /* existential quantification */
-               if (val)           /* let's pick a unique winning path */
+               if (quantvarset[LEVEL(r)])
                  {
-                   if (lval)
-                     rres = 0;
-                   else
-                     lres = 0;
+                   val |= rval;       /* existential quantification */
+                   if (val)           /* let's pick a unique winning path */
+                     {
+                       if (lval)
+                         rres = 0;
+                       else
+                         lres = 0;
+                     }
                  }
+               else
+                 {
+                   val &= rval;       /* universal quantification */
+                   if (!val)
+                     // If any branch can lose, let's simplify
+                     if (lres == 0 || rres == 0)
+                       lres = rres = 0;
+                 }
+               SYNC_REC_STACKS;
+               res = bdd_makenode(LEVEL(r), lres, rres);
              }
            else
              {
-               val &= rval;       /* universal quantification */
-               if (!val)
-                 // If any branch can lose, let's simplify
-                  if (lres == 0 || rres == 0)
-                    lres = rres = 0;
+               // This unlikely case occurs when opleaf() changes one
+               // child (or both children) so that both children
+               // become equal.  In that case the current node can
+               // simply be removed.
+               res = lres;
              }
-           SYNC_REC_STACKS;
-           BDD res = bdd_makenode(LEVEL(r), lres, rres);
            POPREF_(4);
            PUSHREF_(res);
            PUSHREF_(val);
@@ -1709,7 +1721,7 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
                PUSHREF_(r);     /* bool for realizability */
                continue;
              }
-           // This like is only executed in the right branch of
+           // This is only executed in the right branch of
            // the recursion.  If the left branch is known to be
            // realizable and the variable is is being worked on
            // is existential, then we can replace the result of
@@ -1797,27 +1809,40 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
            BDD lres = READREF_(4);
            BDD r = POPINT_();
            int val = lval;
-           if (quantvarset[LEVEL(r)])
+           BDD res;
+           if (__likely(lres != rres))
              {
-               val |= rval;       /* existential quantification */
-               if (val)           /* let's pick a unique winning path */
+
+               if (quantvarset[LEVEL(r)])
                  {
-                   if (lval)
-                     rres = 0;
-                   else
-                     lres = 0;
+                   val |= rval;       /* existential quantification */
+                   if (val)           /* let's pick a unique winning path */
+                     {
+                       if (lval)
+                         rres = 0;
+                       else
+                         lres = 0;
+                     }
                  }
+               else
+                 {
+                   val &= rval;       /* universal quantification */
+                   if (!val)
+                     // If any branch can lose, let's simplify
+                     if (lres == 0 || rres == 0)
+                       lres = rres = 0;
+                 }
+               SYNC_REC_STACKS;
+               res = bdd_makenode(LEVEL(r), lres, rres);
              }
            else
              {
-               val &= rval;       /* universal quantification */
-               if (!val)
-                 // If any branch can lose, let's simplify
-                  if (lres == 0 || rres == 0)
-                    lres = rres = 0;
+               // This unlikely case occurs when opleaf() changes one
+               // child (or both children) so that both children
+               // become equal.  In that case the current node can
+               // simply be removed.
+               res = lres;
              }
-           SYNC_REC_STACKS;
-           BDD res = bdd_makenode(LEVEL(r), lres, rres);
            POPREF_(4);
            PUSHREF_(res);
            PUSHREF_(val);
