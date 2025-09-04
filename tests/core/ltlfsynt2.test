@@ -124,4 +124,4 @@ test 4 = `autfilt --uniq out.hoa -c`
 
 # Issue 611
 f='(i0 & Gi1) <-> (o0 & X[2!]o1)'
-test 13 -eq `ltlfsynt -f "$f" --trans=restrict --dot=game|grep '^    B'|wc -l`
+test 9 -eq `ltlfsynt -f "$f" --trans=restrict --dot=game|grep '^    B'|wc -l`
