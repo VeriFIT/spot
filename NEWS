@@ -35,7 +35,7 @@ New in spot 2.14.2  (2025-09-18)
     initial state without incoming edges also had no outgoing edges.
 
   - spot::mtdfa_strategy_to_mealy() now has an option to produce a
-    strategy that stutter on accepance.  This gets rid of the
+    strategy that stutter on acceptance.  This gets rid of the
     accepting sink, and this is also necessary for the correctness of
     the produced controller in some decomposition cases.  (Issue #610)
 
@@ -92,7 +92,7 @@ New in spot 2.14  (2025-06-26)
     --tv-double-counters-mealy=N, --tv-nim-mealy=N,M,
     --chomp-mealy=N,M.   These are scalable LTLf specifications
     that can be used directly with ltlfsynt.  The first three options
-    are taken from the literature; Chomp is an original familly that
+    are taken from the literature; Chomp is an original family that
     has been submitted as a new model to SyntComp'25.
 
   - ltlf2tgba learned an --ltlf option.  This currently implements the
@@ -2953,7 +2953,7 @@ New in spot 2.5 (2018-01-20)
     always state-based.
 
   - genltl learned to generate six new families of formulas, taken from
-    the SYNTCOMP competition on reactive synthesis, and from from
+    the SYNTCOMP competition on reactive synthesis, and from
     Müller & Sickert's GandALF'17 paper:
     --gf-equiv=RANGE       (GFa1 & GFa2 & ... & GFan) <-> GFz
     --gf-implies=RANGE     (GFa1 & GFa2 & ... & GFan) -> GFz
@@ -4784,7 +4784,7 @@ New in spot 1.99.7 (2016-01-15)
   Documentation:
 
   * There is a new page explaining how to compile example programs and
-    and link them with Spot.  https://spot.lrde.epita.fr/compile.html
+    link them with Spot.  https://spot.lrde.epita.fr/compile.html
 
   * Python bindings for manipulating acceptance conditions are
     demonstrated by https://spot.lrde.epita.fr/ipynb/acc_cond.html,
@@ -4881,7 +4881,7 @@ New in spot 1.99.6 (2015-12-04)
     one.
 
   * The sat minimization for DTωA now does a better job at selecting
-    reference automata when the output acceptance is the the same as
+    reference automata when the output acceptance is the same as
     the input acceptance.  This can provide nice speedups when tring
     to syntethise larged automata with different acceptance
     conditions.
@@ -5386,7 +5386,7 @@ New in spot 1.99.1 (2015-06-23)
     - For options that take an output filename (i.e., ltlcross's
       --save-bogus, --grind, --csv, --json) you can force the file
       to be opened in append mode (instead of being truncated) by
-      by prefixing the filename with ">>".  For instance
+      prefixing the filename with ">>".  For instance
       	  --save-bogus=">>bugs.ltl"
       will append to the end of the file.
 
@@ -6150,7 +6150,7 @@ New in spot 1.1.1 (2013-05-13):
     - simulation_sba(), cosimulation_sba(), and
       iterated_simulations_sba() are new functions that apply to TGBAs
       that actually represent BAs.  They preserve the imporant
-      property that if a state of the BA is is accepting, the outgoing
+      property that if a state of the BA is accepting, the outgoing
       transitions of that state are all accepting in the TGBA that
       represent the BA.  This is something that was not preserved by
       functions cosimultion() and iterated_simulations() as mentionned
@@ -6417,7 +6417,7 @@ New in spot 1.0 (2012-10-27):
     - ltl2tgba: Translate LTL/PSL formulas into Büchi automata (TGBA,
                 BA, or Monitor).  A fundamental change to the
                 interface is that you may now specify the goal of the
-                translation: do you you favor deterministic or smaller
+                translation: do you favor deterministic or smaller
                 automata?
 
     - ltl2tgta: Translate LTL/PSL formulas into Testing Automata.
@@ -6534,7 +6534,7 @@ New in spot 0.9.2 (2012-07-02):
     - It can run ltl3ba (Babiak et al., TACAS'12) where available.
     - "a loading logo" is displayed when result is not instantaneous.
   * Speed improvements:
-    - The unicity hash table of BuDDy has been separated separated
+    - The unicity hash table of BuDDy has been separated
       node table for better cache-friendliness.  The resulting speedup
       is around 5% on BDD-intensive algorithms.
     - A new BDD operation, called bdd_implies() has been added to
@@ -7122,7 +7122,7 @@ New in spot 0.0h (2003-08-18):
     - "import buddy" works (see wrap/python/tests/bddnqueen.py for an example),
     - almost all the Spot API is now available via "import spot".
   * wrap/python/cgi/ltl2tgba.py is an LTL-to-Büchi translator that
-    work as as a cgi script.
+    work as a cgi script.
   * Couvreur's FM'99 ltl-to-tgba translation.
 
 New in spot 0.0f (2003-08-01):

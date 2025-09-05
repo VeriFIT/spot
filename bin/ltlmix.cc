@@ -311,7 +311,7 @@ main(int argc, char* argv[])
         // Do not require --ins/--outs to be used, as the input
         // pattern may use atomic propositions starting with i/o
         // already.  Setting opt_io will cause the subreader to
-        // complain about unclassifible atomic propositions.
+        // complain about unclassifiable atomic propositions.
         opt_io = true;
       if (opt_io)
         process_io_options();

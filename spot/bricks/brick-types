@@ -149,7 +149,7 @@ struct LexComparable {
   if ( !foo.nothing() ) {
     int real = foo;
   } else {
-    // we haven't got anythig in foo
+    // we haven't got anything in foo
   }
 
   Maybe takes a default value, which is normally T(). That is what you
@@ -930,7 +930,7 @@ struct Either : Union< Left, Right > {
 };
 
 // a pointer-like structure which can, however store values a value or a
-// referrence to type T
+// reference to type T
 template< typename T >
 struct RefOrVal {
     static_assert( !std::is_reference< T >::value, "T must not be a reference type" );

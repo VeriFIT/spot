@@ -32,7 +32,7 @@ namespace spot
   /// \brief Checks whether the automaton is a mealy machine
   ///
   /// A mealy machine is an automaton with the named property
-  /// `"synthesis-outputs"` and and that has a "true" as acceptance
+  /// `"synthesis-outputs"` and that has a "true" as acceptance
   /// condition.
   ///
   /// \param m The automaton to be verified
@@ -59,7 +59,7 @@ namespace spot
   /// \ingroup mealy
   /// \brief Checks whether or not the automaton is a split mealy machine
   ///
-  /// A split mealy machine is a mealy machine machine that has
+  /// A split mealy machine is a mealy machine that has
   /// been converted into a game.  It should have the named property
   /// `"state-player"`, moreover the game should be alternating
   /// between the two players.  Transitions leaving states owned by

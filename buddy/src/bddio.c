@@ -442,7 +442,7 @@ DESCR   {* Saves the nodes used by {\tt r} to either a file {\tt ofile}
 	   In the last case the file will be truncated and opened for
 	   writing. *}
 ALSO    {* bdd\_load *}
-RETURN  {* Zero on succes, otherwise an error code from {\tt bdd.h}. *}
+RETURN  {* Zero on success, otherwise an error code from {\tt bdd.h}. *}
 */
 int bdd_fnsave(char *fname, BDD r)
 {
@@ -542,7 +542,7 @@ DESCR   {* Loads a BDD from a file into the BDD pointed to by {\tt r}.
 	   The nodes {\it must} be saved in a order such that any low or
 	   high node must be defined before it is mentioned. *}
 ALSO    {* bdd\_save *}
-RETURN  {* Zero on succes, otherwise an error code from {\tt bdd.h}. *}
+RETURN  {* Zero on success, otherwise an error code from {\tt bdd.h}. *}
 */
 int bdd_fnload(char *fname, BDD *root)
 {

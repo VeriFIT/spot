@@ -427,7 +427,7 @@ static const argp_option options[] =
       "States with a outgoing \"!alive\" edge are marked as accepting.", 0 },
     { "given-automaton", OPT_GIVEN_AUTOMATON, "FILENAME", 0,
       "simplify input automata assuming they are only used in the context "
-      "where the property expressed by automton FILENAME hold", 0 },
+      "where the property expressed by automaton FILENAME hold", 0 },
     { "given-formula", OPT_GIVEN_FORMULA, "FORMULA", 0,
       "simplify input automata assuming they are only used in a context where "
       "FORMULA holds", 0 },

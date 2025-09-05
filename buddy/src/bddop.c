@@ -1573,7 +1573,7 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
              }
            // This is only executed in the right branch of
            // the recursion.  If the left branch is known to be
-           // realizable and the variable is is being worked on
+           // realizable and the variable is being worked on
            // is existential, then we can replace the result of
            // the right branch with false right a away.
            //
@@ -1735,7 +1735,7 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
              }
            // This is only executed in the right branch of
            // the recursion.  If the left branch is known to be
-           // realizable and the variable is is being worked on
+           // realizable and the variable is being worked on
            // is existential, then we can replace the result of
            // the right branch with false right a away.
            //

@@ -111,7 +111,7 @@ states.  A consequence of skipping levels is that the degeneralized \
 automaton tends to have smaller cycles around the accepting states.  \
 Disabling skipping will produce automata with large cycles, and often \
 with more states.") },
-    { DOC("degen-lowinit", "Whenever the degeneralization algorihm enters \
+    { DOC("degen-lowinit", "Whenever the degeneralization algorithm enters \
 a new SCC (or starts from the initial state), it starts on some level L that \
 is compatible with all outgoing transitions.  If degen-lowinit is zero \
 (the default) and the corresponding state (in the generalized automaton) \
@@ -172,7 +172,7 @@ state-based acceptance nowadays. \
 Set to 1 to use only direct simulation.  Set to 2 to use only reverse \
 simulation.  Set to 3 to iterate both direct and reverse simulations.   \
 The default is the value of parameter \"simul\" in --high mode, and 0 \
-therwise.") },
+otherwise.") },
     { DOC("merge-states-min", "Number of states above which states are \
 merged using a cheap approximation of a bisimulation quotient before \
 attempting simulation-based reductions.  Defaults to 128.  Set to 0 to \
@@ -208,7 +208,7 @@ this value to 0 will disable the rewriting.") },
     { DOC("rde", "Disable (0), or enable (1) the 'restrict-dead-end-edges' \
 optimization.  A dead-end-edge is one that move to a state that has only \
 itself as successors.  The label of such edges can be simplified in some \
-situtation, reducing non-determinism slightly.  By default (-1), this is \
+situation, reducing non-determinism slightly.  By default (-1), this is \
 enabled only in --high mode, or if both --medium and --deterministic are \
 used.") },
     { DOC("wdba-minimize", "Set to 0 to disable WDBA-minimization, to 1 to \

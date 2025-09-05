@@ -1240,7 +1240,7 @@ namespace spot
                                "an individual "
                                "state if \"state-winner\" already exists.");
     if (winners->size() != arena->num_states())
-      throw std::runtime_error("set_state_winner(): The \"state-winnerr\" "
+      throw std::runtime_error("set_state_winner(): The \"state-winner\" "
                                "vector has a different "
                                "size compared to the automaton! "
                                "Called new_state in between?");

@@ -65,7 +65,7 @@ namespace spot
   ///
   /// Up to version 2.11.6, this function used to call
   /// cleanup_acceptance_here() to simplify the acceptance condition
-  /// after dualization.  This caused some surprizes, users expected
+  /// after dualization.  This caused some surprises, users expected
   /// the dual of a Büchi automaton to be a co-Büchi automaton, but
   /// cleanup_acceptance_here() sometimes reduced the condition to `t`
   /// when all states where accepting.  This function is not called

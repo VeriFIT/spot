@@ -960,7 +960,7 @@ namespace spot
     // Compute the marks that are common to all incoming or all
     // outgoing transitions of each state, ignoring self-loops and
     // out-of-SCC transitions.  Note that because
-    // propagate_marks_verctor() has been used, the intersection
+    // propagate_marks_vector() has been used, the intersection
     // of all incoming marks is equal to the intersection of all
     // outgoing marks unless the state has no predecessor or no
     // successor.  We take the outgoing marks because states without

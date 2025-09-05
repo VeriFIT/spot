@@ -1471,7 +1471,7 @@ namespace spot
       else
         shift = 1;
 
-      // If we cannot decrease and we already the the maximum color, we don't
+      // If we cannot decrease and we already have the maximum color, we don't
       // have to try. Constructs a mark_t to avoid to make report_too_many_sets
       // public.
       if (!can_reduce && max_color_used_ + shift >= MAX_ACCSETS)

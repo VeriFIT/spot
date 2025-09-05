@@ -1247,7 +1247,7 @@ optional for any corresponding short options.");
         free ((char *) fstr);
     }
 }
-
+
 /* Helper functions for hol_usage.  */
 
 /* If OPT is a short option without an arg, append its key to the string

@@ -176,7 +176,7 @@ T unraw( bitvec< sizeof( T ) * 8 > r )
 
 /*
  *  Fills `x` by bits up to the most si significant bit.
- *  Comlexity is O(log n), n is sizeof(x)*8
+ *  Complexity is O(log n), n is sizeof(x)*8
  */
 template< typename number >
 static inline number fill( number x ) {
@@ -304,7 +304,7 @@ private:
 
 /*
  * NB. This function will alias whatever "to" points to with an uint64_t. With
- * aggressive optimisations, this might break code that passes an address of a
+ * aggressive optimizations, this might break code that passes an address of a
  * variable of different type. When "to" points to a stack variable, take
  * precautions to avoid breaking strict aliasing rules (the violation is not
  * detected by GCC as of 4.7.3).

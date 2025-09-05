@@ -71,7 +71,7 @@ static const argp_option options[] =
     { nullptr, 0, nullptr, 0, "Input options:", 1 },
     { "outs", OPT_OUTPUT, "PROPS", 0,
       "comma-separated list of controllable (a.k.a. output) atomic"
-      " propositions, , interpreted as a regex if enclosed in slashes", 0 },
+      " propositions, interpreted as a regex if enclosed in slashes", 0 },
     { "ins", OPT_INPUT, "PROPS", 0,
       "comma-separated list of uncontrollable (a.k.a. input) atomic"
       " propositions, interpreted as a regex if enclosed in slashes", 0 },
@@ -82,15 +82,15 @@ static const argp_option options[] =
       "convert it into LTLf.  Any parameter assignment specified after a slash"
       " is passed as '-op VAR=VAL' to syfco." , 0 },
     { "semantics", OPT_SEMANTICS, "Moore|Mealy", 0,
-      "Whether to work under Mealy (input-first) or Mealy "
+      "Whether to work under Mealy (input-first) or Moore "
       "(output-first) semantics.  The default is Mealy.", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
     { "translation", OPT_TRANS,
-      "full|compositional|retricted|bfs-on-the-fly|dfs-on-the-fly|"
+      "full|compositional|restricted|bfs-on-the-fly|dfs-on-the-fly|"
       "dfs-strict-on-the-fly", 0,
       "The type of translation to use: (full) is a direct translation to MTDFA,"
-      " (compositional) breaks the specification on Boolean operators and "
+      " (compositional) breaks the specification on Boolean operators and"
       " builds the MTDFA by compositing minimized subautomata, (restrict) is"
       " a direct translation but that is restricted to the only part useful "
       "to synthesis, (dfs-on-the-fly) is the on-the-fly version of "
@@ -452,7 +452,7 @@ namespace
       // MTBDDs.  For Moore semantics, outputs should be first.
       // Pre-registering those variables will ensure that.  We want to
       // register them in the order they are found in the formula,
-      // this this ways variables that are used together are more
+      // this ways variables that are used together are more
       // likely to be close in the order.
       f.traverse([&](const spot::formula& f)
       {
@@ -673,7 +673,7 @@ namespace
               bool dfs = (opt_trans == translation_otf_dfs) | dfs_strict;
               if (opt_backprop != bp_nodes)
                 error(2, 0,
-                      "on-the-fly translations onlyl support --backprop=nodes");
+                      "on-the-fly translations only support --backprop=nodes");
               if (opt_verbose)
                 {
                   *opt_verbose << indent

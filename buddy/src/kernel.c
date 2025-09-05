@@ -119,7 +119,7 @@ static bddgbchandler  gbc_handler;     /* Garbage collection handler */
 static bdd2inthandler resize_handler;  /* Node-table-resize handler */
 
 
-   /* Strings for all error mesages */
+   /* Strings for all error messages */
 static const char *errorstrings[BDD_ERRNUM] =
 { "Out of memory", "Unknown variable", "Value out of range",
   "Unknown BDD root dereferenced", "bdd_init() called twice",
@@ -171,7 +171,7 @@ DESCR  {* This function initiates the bdd package and {\em must} be called
 	  The initial number of nodes is not critical for any bdd operation
 	  as the table will be resized whenever there are to few nodes left
 	  after a garbage collection. But it does have some impact on the
-	  efficency of the operations. *}
+	  efficiency of the operations. *}
 RETURN {* If no errors occur then 0 is returned, otherwise
 	  a negative error code. *}
 ALSO   {* bdd\_done, bdd\_resize\_hook *}
@@ -310,7 +310,7 @@ DESCR   {* This function is used to define the number of variables used in
 	   the bdd package. It may be called more than one time, but only
 	   to increase the number of variables. The argument
 	   {\tt num} is the number of variables to use. *}
-RETURN  {* Zero on succes, otherwise a negative error code. *}
+RETURN  {* Zero on success, otherwise a negative error code. *}
 ALSO    {* bdd\_ithvar, bdd\_varnum, bdd\_extvarnum *}
 */
 int bdd_setvarnum(int num)
@@ -930,7 +930,7 @@ DESCR   {* This function is used to get a bdd representing the I'th
 	   bdd\_setvarnum} starting with 0 being the first. For ease
 	   of use then the bdd returned from {\tt bdd\_ithvar} does
 	   not have to be referenced counted with a call to {\tt
-	   bdd\_addref}. The initial variable order is defined by the
+	   bdd\_addref}. The initial variable order is defined by
 	   the index {\tt var} that also defines the position in the
 	   variable order -- variables with lower indecies are before
 	   those with higher indecies. *}

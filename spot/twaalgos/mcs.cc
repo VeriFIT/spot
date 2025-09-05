@@ -42,7 +42,7 @@ namespace spot
       // set is an array of doubly-linked list built using vertex elements
       std::vector<mcs_vertex*> set;
 
-      // Initialy, all n vertices are in set[0]
+      // Initially, all n vertices are in set[0]
       mcs_data(unsigned n)
         : vertex(n), set(n, nullptr)
       {

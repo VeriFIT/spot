@@ -40,7 +40,6 @@ namespace spot
   formula relabel(formula f, relabeling_style style,
                   relabeling_map* m = nullptr);
 
-
   /// \ingroup tl_rewriting
   /// \brief Relabel Boolean subexpressions in a formula using
   /// atomic propositions.

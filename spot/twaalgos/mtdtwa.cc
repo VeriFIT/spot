@@ -67,7 +67,7 @@ namespace spot
 
     acc_cond acc = twa->acc();
 
-    // twa's state i should be named remap[i] in dfa.  The remaping is
+    // twa's state i should be named remap[i] in dfa.  The remapping is
     // needed because the dfa only accept 0 as initial state, and we
     // do not want to represent sink states.
     std::vector<unsigned> remap;

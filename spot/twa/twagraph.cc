@@ -1118,7 +1118,7 @@ namespace spot
               useful[s] = 0;
           }
         // If we have erased any universal destination, it is possible
-        // that we have have created some new dead states, so we
+        // that we have created some new dead states, so we
         // actually need to redo the whole thing again until there is
         // no more universal edge to remove.  Also we might have
         // created some unreachable states, so we will simply call

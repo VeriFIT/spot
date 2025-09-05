@@ -1392,7 +1392,7 @@ namespace spot
       acc_code force_inf(mark_t m) const;
 
       /// \brief Rewrite an acceptance condition by keeping at most
-      /// one Inf(x) on each dijunctive branch.
+      /// one Inf(x) on each disjunctive branch.
       ///
       /// For instance `(Fin(0)&Inf(1)&(Inf(2)|Fin(3))) | Inf(4)&Inf(5)`
       /// will become `(Fin(0)&Inf(1) | Inf(4)`
@@ -1508,7 +1508,7 @@ namespace spot
 
     /// \brief Build an acceptance condition
     ///
-    /// In this version, the number of sets is set the the smallest
+    /// In this version, the number of sets is set to the smallest
     /// number necessary for \a code.
     acc_cond(const acc_code& code)
       : num_(0U), all_({}), code_(code)

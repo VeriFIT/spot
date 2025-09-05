@@ -702,7 +702,7 @@ namespace spot
                 prod_parts_.push_back(it->second);
                 break;
               }
-            // if the next lines failes,
+            // if the next lines fail,
             // it is probably due to unregistered latches or ins
             // todo
 //            unsigned v = bdd2var_.at(bdd_var(b));
@@ -1063,7 +1063,7 @@ namespace spot
             if ((itl != pterm.end()) && (itr != pterm.end()))
               {
                 ++n_occur;
-                // uncount -> modifiy -> count
+                // uncount -> modify -> count
                 uncount_occ(pterm);
                 pterm.erase(itr); //Order matters
                 pterm.erase(itl);

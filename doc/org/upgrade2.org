@@ -571,7 +571,7 @@ calls to =done()=.  Furthermore the call =release_iter()= makes it
 possible for the next call to =succ_iter()= to reuse the same
 iterator.
 
-Because the the above loop is quite common we also have some syntactic
+Because the above loop is quite common we also have some syntactic
 sugar via the new =succ()= method that returns a fake container with
 =begin()= and =end()= methods so that this works:
 

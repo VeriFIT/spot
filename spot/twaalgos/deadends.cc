@@ -98,7 +98,7 @@ namespace spot
     // the dead-end state as useful.
     bool is_weak = aut->prop_weak().is_true();
 
-    // This will hold the labels of the useful self-loops of the the
+    // This will hold the labels of the useful self-loops of the
     // dead-end states.  But we don't want to initialize it until we
     // need it.
     std::vector<bdd> dead_end_useful(is_weak ? 0U : ns, bddfalse);

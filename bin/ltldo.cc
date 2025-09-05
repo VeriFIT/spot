@@ -96,7 +96,7 @@ static const argp_option more_o_format[] =
   };
 
 // This is not very elegant, but we need to add the above %-escape
-// sequences to those of aoutput_o_fromat_argp for the --help output.
+// sequences to those of aoutput_o_format_argp for the --help output.
 // So far I've failed to instruct argp to merge those two lists into a
 // single block.
 static const struct argp*

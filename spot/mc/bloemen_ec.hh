@@ -123,7 +123,7 @@ namespace spot
 
       // Setup and try to insert the new state in the shared map.
       uf_element* v = (uf_element*) p_.allocate();
-      new (v) (uf_element); // required, otherwise the mutex is unitialized
+      new (v) (uf_element); // required, otherwise the mutex is uninitialized
       v->st_kripke = kripke;
       v->st_prop = prop;
       v->acc = {};

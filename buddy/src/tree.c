@@ -51,7 +51,7 @@ static void update_seq(BddTree *t)
 {
    int n;
    int low = t->first;
-   
+
    for (n=t->first ; n<=t->last ; n++)
       if (bddvar2level[n] < bddvar2level[low])
 	 low = n;
@@ -80,7 +80,7 @@ void bddtree_del(BddTree *t)
 {
    if (t == NULL)
       return;
-   
+
    bddtree_del(t->nextlevel);
    bddtree_del(t->next);
    if (t->seq != NULL)
@@ -112,7 +112,7 @@ BddTree *bddtree_addrange_rec(BddTree *t, BddTree *prev,
       /* Check for identity */
    if (first == t->first  &&  last == t->last)
       return t;
-   
+
       /* Before this section -> insert */
    if (last < t->first)
    {
@@ -130,7 +130,7 @@ BddTree *bddtree_addrange_rec(BddTree *t, BddTree *prev,
       return tnew;
    }
 
-      /* After this this section -> go to next */
+      /* After this section -> go to next */
    if (first > t->last)
    {
       t->next = bddtree_addrange_rec(t->next, t, first, last, fixed, id);
@@ -176,12 +176,12 @@ BddTree *bddtree_addrange_rec(BddTree *t, BddTree *prev,
 	    t->prev = NULL;
 	    return tnew;
 	 }
-	 
+
 	 this = this->next;
       }
-      
+
    }
-      
+
    return NULL;
 }
 
