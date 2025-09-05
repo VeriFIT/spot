@@ -699,10 +699,10 @@ namespace spot
           return backprop.set_winner(it->second, winner);
       }
 
-      // This encodes an MTDFA state into the backpropgation
+      // This encodes an MTDFA state into the backpropagation
       // graph (aka game arena)
       //
-      // The state is specified by its root_number, and and MTBDD
+      // The state is specified by its root_number, and the MTBDD
       // encoding the successors.  Vertices of the game arena will be
       // created for all nodes, including terminals.  The terminal
       // corresponding to the root is created as well.
@@ -826,7 +826,7 @@ namespace spot
 
         // now encode all that BDD, when they reach terminal, this
         // will create "root number" nodes for those, and those can
-        // later be connnected to their BDD encoding once we know it.
+        // later be connected to their BDD encoding once we know it.
         while (!todo.empty())
           {
             auto [state, low, high] = todo.front();
@@ -1808,7 +1808,7 @@ namespace spot
       // The array can therefore hold either
       //    [bdd_terminal(value*2), ~value]
       // or [~value, bdd_terminal(value*2+1)]
-      // or [bdd_terminai(value*2), bdd_terminal(value*2+1)]
+      // or [bdd_terminal(value*2), bdd_terminal(value*2+1)]
       //
       // The distinction between the three cases can be made with
       // the sign bit of the array element.

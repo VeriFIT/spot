@@ -1,7 +1,7 @@
 The DiVinE 2 model checker
 [http://web.archive.org/web/20120723095042/http://divine.fi.muni.cz/index.html]
 used to have a specification language called DVE, for modelling
-processes synchonizing through channels
+processes synchronizing through channels
 [http://web.archive.org/web/20120723095115/http://divine.fi.muni.cz/language.html].
 
 A lot of models can be found in the BEEM database at

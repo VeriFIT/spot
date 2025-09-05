@@ -22,7 +22,7 @@ from unittest import TestCase
 tc = TestCase()
 
 # Some of the tests here assume timely destructor calls, as they occur
-# in the the reference-counted CPython implementation.  Other
+# in the reference-counted CPython implementation.  Other
 # implementation such as PyPy, should skip those tests.
 from platform import python_implementation
 is_cpython = python_implementation() == 'CPython'

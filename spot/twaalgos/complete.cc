@@ -72,7 +72,7 @@ namespace spot
                     loopmark = t.acc;
                     first = false;
                   }
-                // If this this not the first self loop and it has a
+                // If this is not the first self loop and it has a
                 // different acceptance mark, do not consider this
                 // state as a sink candidate: combining loops with
                 // different marks might be used to build an accepting

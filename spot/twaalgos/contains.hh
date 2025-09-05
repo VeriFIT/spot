@@ -77,7 +77,7 @@ namespace spot
   /// - "forq" to use contains_forq() when possible
   /// - nullptr do not modify the preference.
   ///
-  /// If the first call to containement_select_version() is done with
+  /// If the first call to containment_select_version() is done with
   /// nullptr as an argument, then the value of the
   /// SPOT_CONTAINMENT_CHECK environment variable is used instead.
   ///

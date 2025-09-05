@@ -197,7 +197,7 @@ static const argp_option options[] =
       "use STRING as property for marking deadlock "
       "states (by default selfloopize is activated with STRING='true')", 0 },
     { "swarming", 'w', nullptr, 0,
-      "run the technique of of Holzmann et al. (IEEE'11) with the emptiness-"
+      "run the technique of Holzmann et al. (IEEE'11) with the emptiness-"
       "check of Renault et al. (LPAR'13). Returns 1 if a counterexample "
       "is found.", 0 },
     { "timer", 't', nullptr, 0,

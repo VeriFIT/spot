@@ -47,7 +47,7 @@
 /* IMPORTANT:
  * The semantics of the "level" field in the BddNode struct changes during
  * variable reordering in order to make a fast variable swap possible when
- * two variables are independent. Instead of refering to the level of the node
+ * two variables are independent. Instead of referring to the level of the node
  * it refers to the *variable* !!!
  */
 

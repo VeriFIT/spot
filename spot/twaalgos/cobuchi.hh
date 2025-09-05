@@ -73,7 +73,7 @@ namespace spot
 
   /// \brief Converts an aut. with acceptance in DNF to a nondet. co-Büchi aut.
   ///
-  /// This function converts the Rabin-like automaton into a Strett-like
+  /// This function converts the Rabin-like automaton into a Streett-like
   /// automaton and then calls nsa_to_nca() on it. It is described in section
   /// 3.2 of \cite boker.2011.fossacs .
   ///

@@ -49,7 +49,7 @@ namespace spot
     /// shape that is tested.  When that happens, num_branches() is set
     /// to 0.
     ABORT_WRONG_SHAPE = 4,
-    /// Fuse identical substree.  This cannot be used with
+    /// Fuse identical subtrees.  This cannot be used with
     /// zielonka_tree_transform().  However it saves memory if the
     /// only use of the zielonka_tree to check the shape.
     MERGE_SUBTREES = 8,
@@ -311,7 +311,7 @@ namespace spot
     /// This is mostly used for interactive display.
     std::vector<unsigned> edges_of_node(unsigned n) const;
 
-    /// \brief Return the number of nodes in the the ACD forest.
+    /// \brief Return the number of nodes in the ACD forest.
     unsigned node_count() const
     {
       return nodes_.size();

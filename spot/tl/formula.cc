@@ -764,7 +764,7 @@ namespace spot
     if (SPOT_UNLIKELY(min >= unbounded()))
       report_repetition_overflow(min);
     // We are testing strict ">", because unbounded() is a legitimate
-    // input for max.  We just cannot tell if it was really intented
+    // input for max.  We just cannot tell if it was really indented
     // as "unbounded".
     if (SPOT_UNLIKELY(max > unbounded()))
       report_repetition_overflow(max);
@@ -1939,7 +1939,7 @@ namespace spot
     if (SPOT_UNLIKELY(min >= unbounded()))
       report_repetition_overflow(min);
     // We are testing strict ">", because unbounded() is a legitimate
-    // input for max.  We just cannot tell if it was really intented
+    // input for max.  We just cannot tell if it was really indented
     // as "unbounded".
     if (SPOT_UNLIKELY(max > unbounded()))
       report_repetition_overflow(max);

@@ -41,7 +41,7 @@
 
   struct minmax_t { unsigned min, max; };
 
-  // pnode (parsing node) is simular to fnode (formula node) except
+  // pnode (parsing node) is similar to fnode (formula node) except
   // that n-ary operators will delay their construction until all
   // children are known; this is a hack to speedup the parsing,
   // because n-ary operator usually do a lot of work on construction
@@ -64,7 +64,7 @@
     std::variant<const spot::fnode*, nary> data;
     // Record whether this pnode has been transformed into a fnode( or
     // moved to another pnode).  If that occurred, the ownership of
-    // any fnode we store has been transfered to the constructed fnode
+    // any fnode we store has been transferred to the constructed fnode
     // (or to the other pnode), and our destructor has nothing to do.
     // This is the usual case while parsing a formula without error.
     // However during error recovering, the parser may have to discard

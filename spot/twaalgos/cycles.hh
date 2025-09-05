@@ -135,7 +135,7 @@ namespace spot
     /// The default implementation, not very useful, will print the
     /// states in the cycle on std::cout.
     ///
-    /// This method method should return false iff no more cycles need
+    /// This method should return false iff no more cycles need
     /// should be enumerated by run().
     virtual bool cycle_found(unsigned start);
 

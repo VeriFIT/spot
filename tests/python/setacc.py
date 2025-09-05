@@ -69,7 +69,7 @@ ve = (spot.rs_pair([0], []), spot.rs_pair([], [1]), spot.rs_pair([], [2]))
 tc.assertEqual(v, ve)
 tc.assertEqual(acc.name(), "generalized-Rabin 1 2")
 
-# At the time of writting, acc_cond does not yet recognize
+# At the time of writing, acc_cond does not yet recognize
 # "generalized-Streett", as there is no definition for that in the HOA format,
 # and defining it as follows (dual for gen.Rabin) would prevent Streett from
 # being a generalized-Streett.  See issue #249.

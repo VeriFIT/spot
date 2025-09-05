@@ -540,7 +540,7 @@ namespace spot
                 && atomic_props >= (unsigned) relabel_overlap_))
           {
             // Make a very quick simplification path before for
-            // Boolean subformulas, only only syntactic rules.  This
+            // Boolean subformulas, using only syntactic rules.  This
             // is to help getting formulas of the form
             //   FGp1 & FGp2 & ... & FGp32
             // into the shape

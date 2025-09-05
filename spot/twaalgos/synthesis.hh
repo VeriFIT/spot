@@ -52,7 +52,7 @@ namespace spot
     // process.
     struct bench_var
     {
-      // Number of sub-spefications resulting from the decomposition.
+      // Number of sub-specifications resulting from the decomposition.
       // Updated by ltlsynt.
       unsigned sub_specs = 0;
       // Total time needed for the synthesis.  Computed by ltlsynt.
@@ -62,7 +62,7 @@ namespace spot
       // the "algo" parameter.
       double sum_trans_time = 0.0;
       // Time needed to split the automata into separate
-      // environment/controler steps.  Summed over all subspecs.
+      // environment/controller steps.  Summed over all subspecs.
       // Splitting may occur before or after paritization depending on
       // the "algo" parameter.
       double sum_split_time = 0.0;

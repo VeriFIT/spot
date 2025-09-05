@@ -169,7 +169,7 @@ namespace spot
       ///
       /// This decrement the reference counter (unless the counter is
       /// saturated), and actually deallocate the fnode when the
-      /// counder reaches 0 (unless the fnode denotes a constant).
+      /// counter reaches 0 (unless the fnode denotes a constant).
       void destroy() const
       {
         if (SPOT_LIKELY(refs_))
@@ -1692,7 +1692,7 @@ namespace spot
     /// op::And, op::AndRat, op::AndNLM, op::Or, or op::OrRat.
     ///
     /// On a formula such as And({a,b,c,d,F(e),G(f)}), this returns
-    /// And({a,b,c,d}).  If \a width is not nullptr, it is set the the
+    /// And({a,b,c,d}).  If \a width is not nullptr, it is set to the
     /// number of Boolean children gathered.  Note that the children
     /// of an n-ary operator are always sorted when the node is
     /// constructed, and such that Boolean children appear at the
@@ -1758,7 +1758,7 @@ namespace spot
     ///
     /// Is class is also called Σ₁.
     SPOT_DEF_PROP(is_syntactic_guarantee);
-    /// \brief Whether a PSL/LTL formula is in the Δ₁ syntactic frament
+    /// \brief Whether a PSL/LTL formula is in the Δ₁ syntactic fragment
     ///
     /// A formula is in Δ₁ if it is a boolean combination of syntactic
     /// safety and syntactic guarantee properties.
@@ -1782,7 +1782,7 @@ namespace spot
     /// This class is a proper syntactic superset of Π₂, but has the
     /// same expressive power.
     SPOT_DEF_PROP(is_syntactic_persistence);
-    /// \brief Whether a PSL/LTL formula is in the Δ₂ syntactic frament
+    /// \brief Whether a PSL/LTL formula is in the Δ₂ syntactic fragment
     ///
     /// A formula is in Δ₂ if it is a boolean combination of Σ₂ and Π₂
     /// properties.

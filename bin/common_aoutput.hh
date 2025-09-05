@@ -212,7 +212,7 @@ public:
         // Input location for errors and statistics.
         const char* filename = nullptr,
         int loc = -1,
-        // serial numbner
+        // serial number
         unsigned index = 0,
         // Time and input automaton for statistics
         const spot::const_parsed_aut_ptr& haut = nullptr,

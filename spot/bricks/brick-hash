@@ -98,7 +98,7 @@ namespace jenkins {
 // Modifications for brick-hash.h:
 // - merged into one file
 // - pairs are used instead of output parameters
-// - some functions were marked explicitly for inlining with gcc attribete
+// - some functions were marked explicitly for inlining with gcc attribute
 //   as they are considered too long otherwise
 
 class SpookyHash

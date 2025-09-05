@@ -55,7 +55,7 @@ is_output(const std::string& ap,
 
 
 // Separate the set of the atomic propositions appearing in f, into
-// two vectors: input APs and output APs, becased on regex_in,
+// two vectors: input APs and output APs, based on regex_in,
 // regex_out, and identifier_map.
 std::pair<std::vector<std::string>, std::vector<std::string>>
 filter_list_of_aps(spot::formula f, const char* filename, int linenum);

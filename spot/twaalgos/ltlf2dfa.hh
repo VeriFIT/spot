@@ -259,7 +259,7 @@ namespace spot
   ///
   /// By default, the construction includes some very cheap
   /// optimizations that can be disabled with the relevant flags
-  /// to study their effact:
+  /// to study their effect:
   ///
   /// - States that have exactly the same MTBDD representation are
   ///   merged (\a fuse_same_bdds)
@@ -306,8 +306,8 @@ namespace spot
   /// f is explored.  This may help to abort the construction earlier,
   /// and it is enough to solve the game and return a strategy.  That
   /// strategy is returned if \a realizability is set to `false` (if a
-  /// strategy does not exist, a DFA that has a single bddfalse state
-  /// is reaturned.  When \a realizability is `true`, then the
+  /// strategy does not exist, a DFA that has a single dbdfalse state
+  /// is returned.  When \a realizability is `true`, then the
   /// returned MTDFA will just have a single state that is bddtrue
   /// (realizable) or bddfalse (unrealizable).
   ///

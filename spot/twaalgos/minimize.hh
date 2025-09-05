@@ -96,7 +96,7 @@ namespace spot
   /// was, \a aut_neg_f is built from the negation of \a f.  Then we
   /// check that <code>product(aut,!minimize(aut_f))</code> and <code>
   /// product(aut_neg_f,minimize(aut))</code> are both empty.  If they
-  /// are, the the minimization was sound.  (See the paper for full
+  /// are, the minimization was sound.  (See the paper for full
   /// details.)
   ///
   /// If \a reject_bigger is set, this function will return the input

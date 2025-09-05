@@ -626,7 +626,7 @@ namespace spot
         std::string dest = string_dst(dst, color_num);
         if (univ == 0)
           os_ << "  " << dest
-            // graphiz 13.0.0 does not suppor label=<> anymore
+            // graphviz 13.0.0 does not support label=<> anymore
               << " [label=\"\",shape=point,width=0.05,height=0.05]\n";
         if (print_edges)
           {

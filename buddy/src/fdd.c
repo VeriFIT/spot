@@ -104,7 +104,7 @@ DESCR   {* Extends the set of finite domain blocks with the {\tt num}
            domains in
            {\tt dom}. Each entry in {\tt dom} defines the size of a new
 	   finite domain which later on can be used for finite state machine
-	   traversal and other operations on finte domains. Each domain
+	   traversal and other operations on finite domains. Each domain
 	   allocates $\log_2(|dom[i]|)$ BDD variables to be used later.
 	   The ordering is interleaved for the domains defined in each
 	   call to {\tt bdd\_extdomain}. This means that assuming domain
@@ -339,7 +339,7 @@ DESCR   {* Returns an integer array containing the BDD variables used to
 	   is the number of variables used to define the finite domain block.
 	   The array will have the Least Significant Bit at pos 0. The
 	   array must {\em not} be deallocated. *}
-RETURN  {* Integer array contaning the variable numbers or NULL if
+RETURN  {* Integer array containing the variable numbers or NULL if
            {\tt v} is an unknown block. *}
 ALSO    {* fdd\_varnum *}
 */
@@ -551,7 +551,7 @@ PROTO   {* BDD fdd_domain(int var) *}
 DESCR   {* Returns what corresponds to a disjunction of all possible
            values of the variable  {\tt var}.
 	   This is more efficient than doing
-	   {\tt fdd\_ithvar(var,0) OR fdd\_ithvar(var,1) ...} explicitely
+	   {\tt fdd\_ithvar(var,0) OR fdd\_ithvar(var,1) ...} explicitly
 	   for all values in the domain of {\tt var}. *}
 RETURN  {* The encoding of the domain*}
 */
@@ -823,7 +823,7 @@ NAME    {* fdd\_scanset *}
 SECTION {* fdd *}
 SHORT   {* scans a variable set *}
 PROTO   {* int fdd_scanset(BDD r, int **varset, int *varnum) *}
-DESCR   {* Scans the BDD {\tt r} to find all occurences of FDD variables
+DESCR   {* Scans the BDD {\tt r} to find all occurrences of FDD variables
            and then stores these in {\tt varset}. {\tt varset} will be set
 	   to point to an array of size {\tt varnum} which will contain
 	   the indices of the found FDD variables. It is the users

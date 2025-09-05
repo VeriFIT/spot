@@ -86,7 +86,7 @@ configure with the --disable-python option (see below).
 Note that the release tarballs include generated files that are not
 stored in Spot's git repository.  If you are installing Spot from its
 git repository, you will need many more dependencies to build these
-files.  For a list of such depdencies, see file HACKING in the top
+files.  For a list of such dependencies, see file HACKING in the top
 directory.
 
 
@@ -250,7 +250,7 @@ some new directory.  If you installed Spot as root into a classical
 system prefix such as /usr or /usr/local/ it may be the case that you
 simply have to refresh the cache.  In GNU/Linux this is done by
 running "ldconfig -v".  If you installed Spot into a non-standard
-directory, you may have to add $prefix/lib some some environment
+directory, you may have to add $prefix/lib to some environment
 variable: that variable is called LD_LIBRARY_PATH in GNU/Linux, and
 its DYLD_LIBRARY_PATH in Darwin.
 

@@ -88,7 +88,7 @@ static const argp_option options[] =
       0 },
     // This option is not yet supported.  Un-hide it once available.
     { "semantics", OPT_SEMANTICS, "Moore|Mealy", OPTION_HIDDEN,
-      "Whether to work under Mealy (input-first) or Mealy "
+      "Whether to work under Mealy (input-first) or Moore "
       "(output-first) semantics.  The default is Mealy.", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
@@ -158,7 +158,7 @@ static const argp_option options[] =
     { "csv-without-formula", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "csv-with-formula", OPT_CSV_WITH_FORMULA, "[>>]FILENAME",
       OPTION_ARG_OPTIONAL,
-      "like --csv, but with an additional 'fomula' column", 0 },
+      "like --csv, but with an additional 'formula' column", 0 },
     { "hide-status", OPT_HIDE, nullptr, 0,
       "hide the REALIZABLE or UNREALIZABLE line (The exit status "
       "is enough of an indication.)", 0 },
