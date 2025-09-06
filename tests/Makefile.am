@@ -454,6 +454,7 @@ TESTS_python = \
   python/mergedge.py \
   python/minato.py \
   python/misc-ec.py \
+  python/mtdfa.py \
   python/optionmap.py \
   python/origstate.py \
   python/otfcrash.py \

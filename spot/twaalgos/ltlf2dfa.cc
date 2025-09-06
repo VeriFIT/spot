@@ -2753,7 +2753,11 @@ namespace spot
       throw std::runtime_error("twadfa_to_mtdfa: input is not deterministic");
     bdd_dict_ptr dict = twa->get_dict();
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict);
-    dict->register_all_propositions_of(&twa, dfa);
+    dict->register_all_propositions_of(twa, dfa);
+    dfa->aps = twa->ap();
+    // dfs->aps is expected to be sorted by formula ID, but twa->ap() was not.
+    std::sort(dfa->aps.begin(), dfa->aps.end());
+
     unsigned n = twa->num_states();
     unsigned init = twa->get_init_state_number();
 
