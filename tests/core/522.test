@@ -74,3 +74,74 @@ State: 5 {1} [t] 6 [t] 7 State: 6 [t] 6 [t] 7 State: 7 [t] 6 [t] 7
 EOF
 autfilt 552loop2.hoa > out.hoa
 test "9 0 24 0" = "`autfilt --stats='%[a]s %[u]s %[a]e %[u]e' out.hoa`"
+
+
+# This test case was sent to the mailing list on Wed, 2025-09-03 by
+# Raven Beutner.
+cat >522empty.hoa <<EOF
+HOA: v1
+States: 3
+Start: 1
+Start: 2
+AP: 0
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0 {0}
+[(t)] 0
+State: 1
+[(t)] 0
+State: 2
+--END--
+EOF
+autfilt -v --is-empty 522empty.hoa > out.hoa
+cat >expected.hoa <<EOF
+HOA: v1
+States: 3
+Start: 1
+AP: 0
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+properties: trans-labels explicit-labels state-acc deterministic
+--BODY--
+State: 0 {0}
+[t] 0
+State: 1
+[t] 0
+State: 2
+--END--
+EOF
+diff expected.hoa out.hoa
+
+cat >522empty-v2.hoa <<EOF
+HOA: v1
+States: 3
+Start: 1
+Start: 2
+AP: 0
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0 {0}
+[(t)] 0
+State: 1
+State: 2
+--END--
+EOF
+autfilt --is-empty 522empty-v2.hoa > out.hoa
+cat >expected-v2.hoa <<EOF
+HOA: v1
+States: 3
+Start: 1
+AP: 0
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+properties: trans-labels explicit-labels state-acc deterministic
+--BODY--
+State: 0 {0}
+[t] 0
+State: 1
+State: 2
+--END--
+EOF
+diff expected-v2.hoa out.hoa

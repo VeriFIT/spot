@@ -10,6 +10,11 @@ New in spot 2.14.1.dev  (not yet released)
   - twadfa_to_mtdfa(aut) was not properly registering the atomic
     proposition of aut into the resulting MTDFA.
 
+  - The part of the HOA parser responsible for dealing with multiple
+    initial states (a feature of the HOA format that Spot does not
+    support internally) had a bug if the last state of the set of
+    initial state without incoming edges also had no outgoing edges.
+
 New in spot 2.14.1  (2025-07-21)
 
   Bug fixes:

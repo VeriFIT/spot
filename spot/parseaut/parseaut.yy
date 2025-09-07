@@ -2677,7 +2677,12 @@ static void fix_initial_state(result_& r)
             unsigned p = pp.front();
             if (!has_incoming[p])
               {
-                init = p;
+                // We want to pick a state that has successors, unless
+                // none of them have.  We do so by keeping first
+                // candidate, and then updating it every time we see
+                // another candidate that has outgoing edges.
+                if (!found || aut->get_graph().state_storage(p).succ)
+                  init = p;
                 found = true;
               }
           }
@@ -2717,9 +2722,15 @@ static void fix_initial_state(result_& r)
                 continue;
               if (!has_incoming[p])
                 {
-                  // If p has no incoming edge, we can simply take
-                  // out its outgoing edges and "re-source" them on init.
+                  // If p has no incoming edge, we can simply take out
+                  // its outgoing edges and "re-source" them on init.
                   // This will avoid creating new edges.
+                  //
+                  // Note that the selected init state should have
+                  // some successors, unless none of the initial state
+                  // have successors.  If none of them have
+                  // successors, then succ and next_succ are all equal
+                  // to 0, so the following code does nothing.
                   for (auto& t: aut->out(p))
                     t.src = init;
                   auto& gr = aut->get_graph();
