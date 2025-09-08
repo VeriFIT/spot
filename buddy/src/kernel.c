@@ -859,7 +859,7 @@ ALSO    {* bdd\_err\_hook *}
 const char *bdd_errstring(int e)
 {
    e = abs(e);
-   if (e<1 || e>=BDD_ERRNUM)
+   if (e<1 || e>BDD_ERRNUM)
       return NULL;
    return errorstrings[e-1];
 }

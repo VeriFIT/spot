@@ -1044,8 +1044,8 @@ static BDD apply_rec(BDD l, BDD r)
 #ifdef CACHESTATS
            bddcachestats.opMiss++;
 #endif
-           /* I: -1 l r --- (-1 ll rl) -1 lr rr index l r */
-           /* The element in parenthesis are not pushed, as they would
+           /* I: -1 l r --- (-1 ll rl) -1 lr rr index level l r */
+           /* The elements in parenthesis are not pushed, as they would
               be popped right away.  We jump to "work" instead.*/
            int lvl_l = LEVEL(l);
            int lvl_r = LEVEL(r);
@@ -1216,8 +1216,8 @@ BDD bdd_mt_apply2(BDD l, BDD r, int (*termop)(int, int),
            bddcachestats.opMiss++;
 #endif
 
-           /* I: -1 l r --- (-1 ll rl) -1 lr rr index l r */
-           /* The element in parenthesis are not pushed, as they would
+           /* I: -1 l r --- (-1 ll rl) -1 lr rr index level l r */
+           /* The elements in parenthesis are not pushed, as they would
               be popped right away.  We jump to "work" instead.*/
            int lvl_l = LEVEL(l);
            int lvl_r = LEVEL(r);
@@ -1323,8 +1323,8 @@ BDD bdd_mt_apply2_leaves(BDD l, BDD r, int (*termop)(int, int,
            bddcachestats.opMiss++;
 #endif
 
-           /* I: -1 l r --- (-1 ll rl) -1 lr rr index l r */
-           /* The element in parenthesis are not pushed, as they would
+           /* I: -1 l r --- (-1 ll rl) -1 lr rr index level l r */
+           /* The elements in parenthesis are not pushed, as they would
               be popped right away.  We jump to "work" instead.*/
            if ((ISCONST(l) || ISTERM(l)) && (ISCONST(r) || ISTERM(r)))
              {

@@ -569,7 +569,7 @@ BUDDY_API_VAR const BDD bddtrue;
 #define BDD_INVMERGE (-23) /* Merging clashing rewriting rules */
 #define BDD_TERMINAL (-24) /* terminals are not supported */
 
-#define BDD_ERRNUM 25
+#define BDD_ERRNUM 24
 
 /*************************************************************************
    If this file is included from a C++ compiler then the following
