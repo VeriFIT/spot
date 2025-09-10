@@ -465,7 +465,7 @@ raspbian:
   except:
     - /wip/
   tags:
-    - armv7
+    - arm
   script:
     - autoreconf -vfi
     - ./configure
