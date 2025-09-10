@@ -396,7 +396,7 @@ namespace spot
         delete si;
       // If the initial state has been filtered out, we have to create
       // a new one (not doing so may cause empty automata, which in turn
-      // cause all sort of issue with algorithms assuming an automaton
+      // cause all sorts of issues with algorithms assuming an automaton
       // has one initial state).
       auto init = inout[aut->get_init_state_number()];
       filtered->set_init_state(init < out_n ? init : filtered->new_state());
@@ -426,6 +426,36 @@ namespace spot
               unsigned new_s = inout[p.first];
               if (new_s != -1U)
                 new_hs->emplace(new_s, p.second);
+            }
+        }
+      if (auto* orig =
+          aut->get_named_prop<std::vector<unsigned>>("original-states"))
+        {
+          unsigned size = orig->size();
+          if (size > in_n)
+            size = in_n;
+          auto* new_orig = new std::vector<unsigned>(out_n);
+          filtered->set_named_prop("original-states", new_orig);
+          for (unsigned s = 0; s < size; ++s)
+            {
+              unsigned new_s = inout[s];
+              if (new_s != -1U)
+                (*new_orig)[new_s] = (*orig)[s];
+            }
+        }
+      if (auto* levels =
+          aut->get_named_prop<std::vector<unsigned>>("degen-levels"))
+        {
+          unsigned size = levels->size();
+          if (size > in_n)
+            size = in_n;
+          auto* new_levels = new std::vector<unsigned>(out_n);
+          filtered->set_named_prop("degen-levels", new_levels);
+          for (unsigned s = 0; s < size; ++s)
+            {
+              unsigned new_s = inout[s];
+              if (new_s != -1U)
+                (*new_levels)[new_s] = (*levels)[s];
             }
         }
       return filtered;

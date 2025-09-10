@@ -66,6 +66,11 @@ namespace spot
   /// and has the SBA property (i.e., transitions leaving accepting
   /// states are all marked as accepting) may destroy this property.
   /// Use scc_filter_states() instead.
+  ///
+  /// If the properties "state-names", "highlight-states",
+  /// "original-states", or "degen-levels" are present in the input
+  /// automaton, they will be preserved (and adjusted) in the output
+  /// automaton.
   SPOT_API twa_graph_ptr
   scc_filter(const const_twa_graph_ptr& aut, bool remove_all_useless = false,
              scc_info* given_si = nullptr, bool keep_one_color = false);

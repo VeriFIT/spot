@@ -59,8 +59,11 @@ State: 2 {0}
 [1] 2
 --END--""")
 
+aut3 = spot.scc_filter(aut2)
+
 aut2.copy_state_names_from(aut)
-tc.assertEqual(aut2.to_str(), """HOA: v1
+
+exp = """HOA: v1
 States: 3
 Start: 0
 AP: 2 "a" "b"
@@ -78,7 +81,29 @@ State: 1 "0#0"
 [1] 2
 State: 2 "1#1" {0}
 [1] 2
+--END--"""
+tc.assertEqual(aut2.to_str(), exp)
+tc.assertEqual(aut3.to_str(), """HOA: v1
+States: 3
+Start: 0
+AP: 2 "a" "b"
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+properties: trans-labels explicit-labels state-acc
+--BODY--
+State: 0 {0}
+[0] 0
+[!0] 1
+[1] 2
+State: 1
+[0] 0
+[!0] 1
+[1] 2
+State: 2 {0}
+[1] 2
 --END--""")
+aut3.copy_state_names_from(aut)
+tc.assertEqual(aut3.to_str(), exp)
 
 aut2.set_init_state(2)
 aut2.purge_unreachable_states()
