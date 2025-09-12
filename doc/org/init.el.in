@@ -1,4 +1,4 @@
-(setq load-path (append '("@abs_top_srcdir@/elisp/") ; for hoa-mode.el
+(setq load-path (append '("@abs_top_srcdir@/elisp/"); hoa-mode.el, tlsf-mode.el
 			load-path))
 
 (setq debug-on-error t)
@@ -52,6 +52,7 @@
 
 (require 'ox-publish)
 (require 'hoa-mode)
+(require 'tlsf-mode)
 
 ; See https://github.com/emacs-ess/ESS/issues/1052
 (setq ess-gen-proc-buffer-name-function 'ess-gen-proc-buffer-name:directory)
@@ -179,7 +180,7 @@ up.html points to index.html, then the result is:
 	:auto-preamble t)
        ("spot-static"
 	:base-directory "@abs_top_srcdir@/doc/org/"
-	:base-extension "css\\|js\\|png\\|svg\\|jpg\\|gif\\|pdf\\|py"
+	:base-extension "css\\|js\\|png\\|svg\\|jpg\\|gif\\|pdf\\|py\\|tlsf"
 	:publishing-directory "@abs_top_srcdir@/doc/userdoc/"
 	:recursive t
 	:publishing-function org-publish-attachment)

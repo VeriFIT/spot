@@ -7,6 +7,14 @@ New in spot 2.14.1.dev  (not yet released)
     small improvements resulting in smaller strategies being
     generated.  (Issue #611.)
 
+  Documentation:
+
+  - https://www.lre.epita.fr/tlsf.html is a new page discussing how
+    the --tlsf option of ltlsynt/ltlfsynt/ltlf2dfa uses syfco to
+    transform TLSF into LTL/LTLf.
+
+  Bug fixes:
+
   - twadfa_to_mtdfa(aut) was not properly registering the atomic
     proposition of aut into the resulting MTDFA.
 

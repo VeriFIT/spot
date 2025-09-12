@@ -95,6 +95,7 @@ ORG_FILES = \
   org/autfilt.org \
   org/csv.org \
   org/citing.org \
+  org/chomp.tlsf \
   org/compile.org \
   org/concepts.org \
   org/dstar2tgba.org \
@@ -120,6 +121,7 @@ ORG_FILES = \
   org/oaut.org \
   org/randaut.org \
   org/randltl.org \
+  org/tlsf.org \
   org/tools.org \
   org/tut.org \
   org/tut01.org \

@@ -305,7 +305,8 @@ have the same semantics by default.
 When the specification is passed as a TLSF file with the =--tlsf=
 option, the [[https://github.com/reactive-systems/syfco][=syfco=]] tool is automatically invoked to transform the
 specification into LTLf, to retrieve the lists of input/output
-variables, and to obtain the semantics to use.
+variables, and to obtain the semantics to use.  See [[file:tlsf.org][the TLSF page]] for
+more details.
 
 * Fine-tuning
 
