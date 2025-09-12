@@ -1,0 +1,322 @@
+# -*- coding: utf-8 -*-
+#+TITLE: TLSF support
+#+DESCRIPTION: TLSF support in Spot's command-line tools
+#+INCLUDE: setup.org
+#+HTML_LINK_UP: tools.html
+#+PROPERTY: header-args:sh :results verbatim :exports both
+
+* Introduction to TLSF
+
+The [[https://arxiv.org/abs/2303.03839][Temporal Logic Synthesis Format]] (or TLSF) is used to express
+synthesis problem in [[http://syntcomp.org/][SYNTCOMP]], the Reactive Synthesis competition.
+
+Although the format is based on LTL it has a much more richer syntax,
+supporting array of variables (called buses) n-ary operators,
+parameters, helper functions, as well as the specification of the
+expected semantics and the partition of input and output variables.
+Version 1.2 of this format also adds support for finite-trace
+semantics.
+
+There is a tool, called [[https://github.com/reactive-systems/syfco][=syfco=]], which can translate a TLSF
+specification to an LTLf or LTL formula in various syntaxes.
+
+Some of Spot's command-line tools ([[file:ltlsynt.org][=ltlsynt=]], [[file:ltlfsynt.org][=ltlfsynt=]], [[file:ltlf2dfa.org][=ltlf2dfa=]])
+have support for the TLSF format, but they all rely on [[https://github.com/reactive-systems/syfco][=syfco=]] to
+translate TLSF to LTL or LTLf.  You should install [[https://github.com/reactive-systems/syfco][=syfco=]] somewhere
+on your =$PATH= for this to work.
+
+* Example TLSF specification
+
+Here is an example TLSF file, [[file:chomp.tlsf][=chomp.tlsf=]], reprinted below.
+
+#+BEGIN_SRC sh :exports results :wrap SRC tlsf
+cat chomp.tlsf
+#+END_SRC
+
+#+RESULTS:
+#+begin_SRC tlsf
+INFO {
+  TITLE:       "Chomp Game"
+  DESCRIPTION: "Parameteric Chomp Game over a NxM grid"
+  SEMANTICS:   Mealy,Finite
+  TARGET:      Mealy
+}
+
+GLOBAL {
+  PARAMETERS {
+    N = 3;
+    M = 3;
+  }
+  DEFINITIONS {
+    Pos(grid, i, j) = grid[i + j * N];
+    PickOne(sel) = ||[0 <= k < (SIZEOF sel)] sel[k];
+    // if sel[i] is true, sel[i+1] should be too.
+    AboveToo(sel) = &&[0 <= i < ((SIZEOF sel) - 1)] (sel[i] -> sel[i+1]);
+    // if it's the other's turn, all values of sel should be false
+    OtherTurn(other, sel) = other -> (&&[0 <= k < (SIZEOF sel)](!sel[k]));
+    // if it's the other's turn and square (0,0) still exists, our
+    // choices for sx and sy on next turn depend on what square is
+    // available in the grid.
+    NextChoices(grid, other, sx, sy) =
+      (Pos(grid, 0, 0) && other) ->
+        (||[0 <= x < N] ||[0 <= y < M] (Pos(grid, x, y) && X(sx[x] && sy[y])));
+    // Rules that both players should obey
+    PlayerRules(grid, other, sx, sy) =
+       AboveToo(sx) &&
+       AboveToo(sy) &&
+       OtherTurn(other, sx) &&
+       OtherTurn(other, sy) &&
+       NextChoices(grid, other, sx, sy);
+  }
+}
+
+MAIN {
+  INPUTS {
+    // When it's the input player's turn, they
+    // use ix[I] iy[J] to select square (I,J).
+    ix[N];
+    iy[M];
+  }
+  OUTPUTS {
+    // When it's the input player's turn, they
+    // use ix[I] iy[J] to select square (I,J).
+    ox[N];
+    oy[M];
+    // whether a square is available
+    os[N*M];
+    // turn
+    oti; // input turn
+    oto; // output turn
+  }
+  PRESET {
+    // The output player is the first player.
+    !oti && oto;
+    // The output player has to choose a square.
+    PickOne(ox);
+    PickOne(oy);
+    // The squares that are taken initially depend on the first choice.
+    &&[0 <= i < N] &&[0 <= j < M] (Pos(os, i, j) <-> !(ox[i] && oy[j]));
+
+    // Turns alternate between players.
+    // (Writing G(oto <-> X oti) would be ok in LTL, but not LTLf.)
+    G(oti <-> !oto);
+    G(oto -> X oti);
+    G(oti -> X oto);
+  }
+  REQUIRE {
+    PlayerRules(os, oto, ix, iy);
+  }
+  ASSERT {
+    PlayerRules(os, oti, ox, oy);
+    // If (i,j) is selected by either player, that (i,j) should become false.
+    &&[0 <= i < N] &&[0 <= j < M]
+      (((ox[i] && oy[j]) || (ix[i] && iy[j])) -> !Pos(os,i,j));
+    // if (i,j) is not availlable now, it's not available on next turn.
+    &&[0 <= i < N] &&[0 <= j < M] ((!Pos(os,i,j)) -> X !(Pos(os,i,j)));
+    // if (i,j) is availlable now, it might not be on next turn.
+    &&[0 <= i < N] &&[0 <= j < M]
+      (Pos(os,i,j) -> X(Pos(os,i,j) || (ox[i] && oy[j]) || (ix[i] && iy[j])));
+  }
+  GUARANTEE {
+    // The game finishes once square (0, 0) has been taken, and since
+    // this square is poisonous, we want the input player to take it.
+    Pos(os,0,0) U (!Pos(os,0,0) && oti);
+  }
+}
+#+end_SRC
+
+This describes a specification for [[https://en.wikipedia.org/wiki/Chomp][the "chomp" two-players game]].  One
+player (called /input/) is played by the environment, the other player
+(/output/) is played by the controller.  The game is run over a
+chocolate bar of N*M squares.  The output player plays first, and
+alternate turns with the other input player.  At their turn, the
+players select an available chocolate square at coordinate $(i,j)$,
+and eat all other chocolate squares $\{(x,y)\mid x\ge i \land y\ge
+j\}$.  The players who takes the last square at position $(0,0)$
+loses.
+
+The above specification asks if there exists a winning strategy for
+the output player.  Such a strategy is know to exists for any
+$(N,M)\ne(1,1)$.
+
+This can be verified with [[file:ltlfsynt.org][=ltlfsynt=]] quite easily:
+
+#+BEGIN_SRC sh
+  ltlfsynt --tlsf chomp.tlsf --realizability
+#+END_SRC
+#+RESULTS:
+: REALIZABLE
+
+Removing the =--realizability= flag would output the strategy, but
+because that specification uses 23 atomic propositions, the resulting
+strategy is not very readable.
+
+* How is syfco used
+
+Running the previous command with the =--verbose= option will show that
+=ltlfsynt= actually perform three calls to [[https://github.com/reactive-systems/syfco][=syfco=]].
+
+#+BEGIN_SRC sh
+  ltlfsynt --tlsf chomp.tlsf --realizability --verbose 2>&1 | grep syfco
+#+END_SRC
+#+RESULTS:
+: running: syfco -f ltlxba-fin -m fully chomp.tlsf
+: running: syfco --print-output-signals chomp.tlsf
+: running: syfco --print-target chomp.tlsf
+
+The first command converts the TLSF specification into LTLf. =-f
+ltlxba-fin= requests a syntax of LTLf that is compatible with Spot,
+and =-m fully= requests fully parenthesized formulas to avoid
+ambiguities in operator priorities.  Running that first command on
+this example already produces a pretty large formula:
+
+#+BEGIN_SRC sh
+  syfco -f ltlxba-fin -m fully chomp.tlsf | fmt -80
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+(((((((((((((((((! (oti)) && (oto)) && (((ox_0) || (ox_1)) || (ox_2))) &&
+(((oy_0) || (oy_1)) || (oy_2))) && ((os_0) <-> (! ((ox_0) && (oy_0))))) &&
+((os_3) <-> (! ((ox_0) && (oy_1))))) && ((os_6) <-> (! ((ox_0) && (oy_2))))) &&
+((os_1) <-> (! ((ox_1) && (oy_0))))) && ((os_4) <-> (! ((ox_1) && (oy_1))))) &&
+((os_7) <-> (! ((ox_1) && (oy_2))))) && ((os_2) <-> (! ((ox_2) && (oy_0))))) &&
+((os_5) <-> (! ((ox_2) && (oy_1))))) && ((os_8) <-> (! ((ox_2) && (oy_2)))))
+&& (G ((oti) <-> (! (oto))))) && (G ((oto) -> (X (oti))))) && (G ((oti) -> (X
+(oto))))) && ((G ((((((((ix_0) -> (ix_1)) && ((ix_1) -> (ix_2))) && ((iy_0) ->
+(iy_1))) && ((iy_1) -> (iy_2))) && ((oto) -> (((! (ix_0)) && (! (ix_1))) &&
+(! (ix_2))))) && ((oto) -> (((! (iy_0)) && (! (iy_1))) && (! (iy_2))))) &&
+(((os_0) && (oto)) -> ((((((os_0) && (X ((ix_0) && (iy_0)))) || ((os_3) && (X
+((ix_0) && (iy_1))))) || ((os_6) && (X ((ix_0) && (iy_2))))) || ((((os_1) &&
+(X ((ix_1) && (iy_0)))) || ((os_4) && (X ((ix_1) && (iy_1))))) || ((os_7) &&
+(X ((ix_1) && (iy_2)))))) || ((((os_2) && (X ((ix_2) && (iy_0)))) || ((os_5)
+&& (X ((ix_2) && (iy_1))))) || ((os_8) && (X ((ix_2) && (iy_2))))))))) -> ((G
+(((((((((((((((((((((((((((((((((((ox_0) -> (ox_1)) && ((ox_1) -> (ox_2)))
+&& ((oy_0) -> (oy_1))) && ((oy_1) -> (oy_2))) && ((oti) -> (((! (ox_0))
+&& (! (ox_1))) && (! (ox_2))))) && ((oti) -> (((! (oy_0)) && (! (oy_1)))
+&& (! (oy_2))))) && (((os_0) && (oti)) -> ((((((os_0) && (X ((ox_0) &&
+(oy_0)))) || ((os_3) && (X ((ox_0) && (oy_1))))) || ((os_6) && (X ((ox_0) &&
+(oy_2))))) || ((((os_1) && (X ((ox_1) && (oy_0)))) || ((os_4) && (X ((ox_1)
+&& (oy_1))))) || ((os_7) && (X ((ox_1) && (oy_2)))))) || ((((os_2) && (X
+((ox_2) && (oy_0)))) || ((os_5) && (X ((ox_2) && (oy_1))))) || ((os_8) &&
+(X ((ox_2) && (oy_2)))))))) && ((((ox_0) && (oy_0)) || ((ix_0) && (iy_0))) ->
+(! (os_0)))) && ((((ox_0) && (oy_1)) || ((ix_0) && (iy_1))) -> (! (os_3)))) &&
+((((ox_0) && (oy_2)) || ((ix_0) && (iy_2))) -> (! (os_6)))) && ((((ox_1) &&
+(oy_0)) || ((ix_1) && (iy_0))) -> (! (os_1)))) && ((((ox_1) && (oy_1)) ||
+((ix_1) && (iy_1))) -> (! (os_4)))) && ((((ox_1) && (oy_2)) || ((ix_1) &&
+(iy_2))) -> (! (os_7)))) && ((((ox_2) && (oy_0)) || ((ix_2) && (iy_0))) ->
+(! (os_2)))) && ((((ox_2) && (oy_1)) || ((ix_2) && (iy_1))) -> (! (os_5)))) &&
+((((ox_2) && (oy_2)) || ((ix_2) && (iy_2))) -> (! (os_8)))) && ((! (os_0))
+-> (X (! (os_0))))) && ((! (os_3)) -> (X (! (os_3))))) && ((! (os_6)) ->
+(X (! (os_6))))) && ((! (os_1)) -> (X (! (os_1))))) && ((! (os_4)) ->
+(X (! (os_4))))) && ((! (os_7)) -> (X (! (os_7))))) && ((! (os_2)) ->
+(X (! (os_2))))) && ((! (os_5)) -> (X (! (os_5))))) && ((! (os_8)) -> (X
+(! (os_8))))) && ((os_0) -> (X (((os_0) || ((ox_0) && (oy_0))) || ((ix_0) &&
+(iy_0)))))) && ((os_3) -> (X (((os_3) || ((ox_0) && (oy_1))) || ((ix_0) &&
+(iy_1)))))) && ((os_6) -> (X (((os_6) || ((ox_0) && (oy_2))) || ((ix_0) &&
+(iy_2)))))) && ((os_1) -> (X (((os_1) || ((ox_1) && (oy_0))) || ((ix_1) &&
+(iy_0)))))) && ((os_4) -> (X (((os_4) || ((ox_1) && (oy_1))) || ((ix_1) &&
+(iy_1)))))) && ((os_7) -> (X (((os_7) || ((ox_1) && (oy_2))) || ((ix_1) &&
+(iy_2)))))) && ((os_2) -> (X (((os_2) || ((ox_2) && (oy_0))) || ((ix_2) &&
+(iy_0)))))) && ((os_5) -> (X (((os_5) || ((ox_2) && (oy_1))) || ((ix_2) &&
+(iy_1)))))) && ((os_8) -> (X (((os_8) || ((ox_2) && (oy_2))) || ((ix_2) &&
+(iy_2))))))) && ((os_0) U ((! (os_0)) && (oti))))))
+#+end_example
+
+The second command simply extracts the list of output propositions.
+In this case the authors of the TLSF file used the convention that
+every output proposition starts with =o=, but that is not mandatory.
+
+#+BEGIN_SRC sh
+  syfco --print-output-signals chomp.tlsf
+#+END_SRC
+#+RESULTS:
+: oto, oti, os_0, os_1, os_2, os_3, os_4, os_5, os_6, os_7, os_8, oy_0, oy_1, oy_2, ox_0, ox_1, ox_2
+
+There is now query for the list of input propositions: any proposition
+that appear in the formula but that is not an output proposition is
+assumed to be an input proposition.
+
+Finally the last call to [[https://github.com/reactive-systems/syfco][=syfco=]] is used to retrieve the semantics
+that should be used to check for realizability.  In this case this
+declared as Mealy: the output player can see the choices of the input
+player at the current turn before making his decision.
+
+#+BEGIN_SRC sh
+syfco --print-target chomp.tlsf
+#+END_SRC
+
+#+RESULTS:
+: Mealy
+
+
+Note that you can use =--semantics=, =--ins=, or =--outs= to override
+the partition of propositions or the semantics.  In this case, =ltlfsynt=
+will not make unnecesary calls [[https://github.com/reactive-systems/syfco][=syfco=]].
+
+#+BEGIN_SRC sh
+  ltlfsynt --tlsf chomp.tlsf --semantics=Moore --outs='/^o/' --realizability \
+    --verbose 2>&1 | grep 'syfco\|REAL'
+#+END_SRC
+
+#+RESULTS:
+: running: syfco -f ltlxba-fin -m fully chomp.tlsf
+: UNREALIZABLE
+
+* When =--tlsf= is not enough
+
+If you do not have [[https://github.com/reactive-systems/syfco][=syfco=]] installed in your =$PATH=, or want to
+replace [[https://github.com/reactive-systems/syfco][=syfco=]], or want to TLSF with a tool that does not support the
+=--tlsf= option, you can still call that tool explicitly and pass the
+LTL/LTLf formulas directly.
+
+Beware that doing something like this only works up to a certain size
+of specifications:
+
+#+BEGIN_SRC sh :export code
+LTL=$(syfco -f ltlxba-fin -m fully chomp.tlsf)  # <- bad idea!
+OUT=$(syfco --print-output-signals chomp.tlsf)
+SEM=$(syfco --print-target chomp.tlsf)
+ltlfsynt --formula="$LTL" --outs="$OUT" --semantics="$SEM" --realizability
+#+END_SRC
+#+RESULTS:
+: REALIZABLE
+
+At some point the converted LTL/LTLf formula becomes to big to be
+passed on the command line.  It is better to pass the formula using a
+temporary file or via using a pipe as in the following (=-F -= will
+read the formula from standard input).
+
+#+BEGIN_SRC sh :export code
+OUT=$(syfco --print-output-signals chomp.tlsf)
+SEM=$(syfco --print-target chomp.tlsf)
+syfco -f ltlxba-fin -m fully chomp.tlsf |
+  ltlfsynt -F - --outs="$OUT" --semantics="$SEM" --realizability
+#+END_SRC
+#+RESULTS:
+: REALIZABLE
+
+(When option =--tlsf= is used, everything that [[https://github.com/reactive-systems/syfco][=syfco=]] outputs is
+received through a pipe.)
+
+* Overwriting TLSF parameters
+
+Some TLSF models, like =chomp.tlsf=, are defined with parameters.
+Those parameters have default values specified within the =PARAMETERS=
+block of the TLSF specification.  You may overwrite the value of those
+parameters by appending =/PARAM1=VAL1,PARAM2=VAL2...= to the filename
+that is passed to =--tlsf=.
+
+We can use that to verify that M=1,N=1 is not realizable since the
+first player is forced to take the only square.
+
+#+BEGIN_SRC sh :export code
+ltlfsynt --tlsf chomp.tlsf/N=1,M=1 --realizability --verbose 2>&1 |
+  grep 'syfco\|REAL'
+#+END_SRC
+
+#+RESULTS:
+: running: syfco -op N=1 -op M=1 -f ltlxba-fin -m fully chomp.tlsf
+: running: syfco -op N=1 -op M=1 --print-output-signals chomp.tlsf
+: running: syfco --print-target chomp.tlsf
+: UNREALIZABLE

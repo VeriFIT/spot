@@ -145,14 +145,8 @@ ltlsynt --tlsf FILE
 #+END_SRC
 
 The above =--tlsf= option will call =syfco= (which must be on your
-=$PATH=) to perform the conversion and extract output signals, as if
-you had used:
-
-#+BEGIN_SRC sh :export code
-LTL=$(syfco -f ltlxba -m fully FILE)
-OUT=$(syfco --print-output-signals FILE)
-ltlsynt --formula="$LTL" --outs="$OUT"
-#+END_SRC
+=$PATH=) to perform the conversion and extract output signals.  See
+[[file:tlsf.org][the TLSF page]] for more details.
 
 Additionally, using =--tlsf= will verify that the TLSF specification
 is defined using Mealy semantics, as =ltlsynt= does not yet support
@@ -168,6 +162,7 @@ instance:
 ltlsynt --tlsf arbiter.tlsf/n=3
 #+END_SRC
 
+Again, please read [[file:tlsf.org][the TLSF page]] for more details.
 
 * Output options
 

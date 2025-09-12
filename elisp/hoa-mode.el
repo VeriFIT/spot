@@ -1,10 +1,10 @@
 ;;; hoa-mode.el --- Major mode for the HOA format -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015, 2017, 2019, 2022  Alexandre Duret-Lutz
+;; Copyright (C) 2015, 2017, 2019-2020  Alexandre Duret-Lutz
 
 ;; Author: Alexandre Duret-Lutz <adl@lrde.epita.fr>
 ;; Maintainer: Alexandre Duret-Lutz <adl@lrde.epita.fr>
-;; URL: https://gitlab.lre.epita.fr/spot/emacs-modes
+;; URL: https://gitlab.lrde.epita.fr/spot/emacs-modes
 ;; Keywords: major-mode, automata, convenience
 ;; Created: 2015-11-13
 
@@ -131,6 +131,10 @@
     st)
   "Syntax table for `hoa-mode'.")
 
+(defun hoa-at-start-of-automaton ()
+  "Is the point at the start of an automaton?"
+  (looking-at "HOA:"))
+
 (defun hoa-start-of-automaton ()
   "Move to the start of the automaton at point."
   (interactive)
@@ -152,6 +156,37 @@
   (set-mark (point))
   (hoa-start-of-automaton))
 
+(defun hoa-display-buffer-active ()
+  "Check whether an HOA automaton is actually displayed.
+
+Returns the window of the display buffer, or nil."
+  (get-buffer-window hoa-display-buffer))
+
+(defun hoa-display-buffer-refresh ()
+  "Update any displayed automaton with the automaton at point."
+  (if (hoa-display-buffer-active)
+      (hoa-display-automaton-at-point)))
+
+(defun hoa-next-automaton ()
+  "Move to the next automaton, and optionally update display.
+
+This works as `hoa-end-of-automaton', but if an automaton is displayed,
+the display is updated with the new automaton."
+  (interactive)
+  (hoa-end-of-automaton)
+  (hoa-display-buffer-refresh))
+
+(defun hoa-previous-automaton ()
+  "Move to the previous automaton, and optionally update display.
+
+This works as `hoa-start-of-automaton', but if an automaton is displayed,
+the display is updated with the new automaton."
+  (interactive)
+  (unless (hoa-at-start-of-automaton)
+    (hoa-start-of-automaton))
+  (hoa-start-of-automaton)
+  (hoa-display-buffer-refresh))
+
 (defcustom hoa-display-error-buffer "*hoa-dot-error*"
   "The name of the buffer to display errors from `hoa-display-command'."
   :group 'hoa-mode
@@ -171,11 +206,12 @@ standard output.
 
 The default value uses the tools autfilt (part of the Spot
 package, see URL `https://spot.lrde.epita.fr/') and dot (part of
-the GraphViz package, see URL `http://www.graphviz.org/')."
+the GraphViz package, see URL `http://www.graphviz.org/').
+It also assumes that the Lato font is installed."
   :group 'hoa-mode
   :type 'string)
 
-(defun hoa-display-automaton-at-point (arg)
+(defun hoa-display-automaton-at-point (&optional arg)
   "Display the automaton-at-point.
 
 This uses the command in `hoa-display-command' to convert HOA
@@ -202,15 +238,25 @@ be edited before it is executed."
 	   (call-process-region b e shell-file-name nil (list dotbuf errfile)
 				nil shell-command-switch hoa-display-command)))
       (when (equal 0 exit-status)
-	(let ((hoa-img (create-image (with-current-buffer dotbuf
-				       (buffer-string))
-				     'png t)))
-	  (with-current-buffer (get-buffer-create hoa-display-buffer)
-	    (setq buffer-read-only nil)
-	    (erase-buffer)
-	    (insert-image hoa-img)
-	    (setq buffer-read-only t)
-	    (display-buffer (current-buffer)))))
+        (let ((img-string (with-current-buffer dotbuf (buffer-string)))
+              (img-type (if (image-type-available-p 'imagemagick)
+                             'imagemagick
+                          'png)))
+          ;; Display the buffer before we load the image, so that we
+          ;; can specify a max size.  These max-width/max-height are
+          ;; ignored if 'imagemagick is not installed.
+          (with-current-buffer (get-buffer-create hoa-display-buffer)
+            (display-buffer (current-buffer))
+            (setq buffer-read-only nil)
+            (erase-buffer)
+            (pcase-let ((`(,ax ,ay ,bx ,by)
+                         (window-body-pixel-edges (hoa-display-buffer-active))))
+              (let ((win-width (- bx ax))
+                    (win-height (- by ay)))
+                (insert-image (create-image img-string img-type t
+                                            :max-width win-width
+                                            :max-height win-height))))
+	    (setq buffer-read-only t)))))
       (when (file-exists-p errfile)
 	(when (< 0 (nth 7 (file-attributes errfile)))
 	  (with-current-buffer (get-buffer-create hoa-display-error-buffer)
@@ -219,12 +265,14 @@ be edited before it is executed."
 	    (format-insert-file errfile nil)
 	    (display-buffer (current-buffer))))
 	(delete-file errfile))
-      (kill-buffer dotbuf))))
+      (kill-buffer dotbuf)))
 
 (defvar hoa-mode-map
   (let ((map (make-keymap)))
     (define-key map "\M-e" 'hoa-end-of-automaton)
     (define-key map "\M-a" 'hoa-start-of-automaton)
+    (define-key map (kbd "<M-up>") 'hoa-previous-automaton)
+    (define-key map (kbd "<M-down>") 'hoa-next-automaton)
     (define-key map "\C-\M-h" 'hoa-mark-automaton-at-point)
     (define-key map "\C-c\C-c" 'hoa-display-automaton-at-point)
     map)

@@ -16,11 +16,15 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-EXTRA_DIST = hoa-mode.el
+EXTRA_DIST = hoa-mode.el tlsf-mode.el
 
 GIT = https://gitlab.lre.epita.fr/spot/emacs-modes/raw/master/
+GH = https://raw.githubusercontent.com
+TLSF = $(GH)/reactive-systems/syfco/refs/heads/master/misc/tlsf-mode.el
 
 .PHONY: update-el
 update-el:
+	chmod u+w $(srcdir)/hoa-mode.el $(srcdir)/tlsf-mode.el
 	wget $(GIT)/hoa-mode.el -O $(srcdir)/hoa-mode.el || curl $(GIT)/hoa-mode.el -o $(srcdir)/hoa-mode.el
-	chmod a-w $(srcdir)/hoa-mode.el
+	wget $(TLSF) -O $(srcdir)/tlsf-mode.el || curl $(TLSF) -o $(srcdir)/tlsf-mode.el
+	chmod a-w $(srcdir)/hoa-mode.el $(srcdir)/tlsf-mode.el

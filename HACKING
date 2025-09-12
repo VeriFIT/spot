@@ -60,7 +60,8 @@ only for certain operations (like releases):
   ltl2dstar likewise
   ltl3dra   likewise
   spin      likewise
-  dot2tex   used for an example in the documentation and in one test
+  syfco     likewise
+  dot2tex   likewise
   glucose >= 3.0  likewise
   lbtt >= 1.2.1a  used in the test suite (ltlcross is now more
             powerful, but additional tests do not hurt)
