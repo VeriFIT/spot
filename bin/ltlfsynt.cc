@@ -485,7 +485,7 @@ namespace
     {
       if (!f.is_syntactic_stutter_invariant())
         {
-          // Avoid Issue #610 until we now a better restriction.
+          // Avoid Issue #610 until we know a better restriction.
           if (opt_verbose)
             *opt_verbose
               << "decomposition not attempted because the formula uses X\n";
@@ -498,8 +498,8 @@ namespace
               if (opt_verbose)
                 *opt_verbose << "there are " << subs.first.size()
                              << " subformulas\n";
-              sub_form = subs.first;
-              sub_outs = subs.second;
+              sub_form = std::move(subs.first);
+              sub_outs = std::move(subs.second);
             }
           else if (opt_verbose)
             *opt_verbose << "no decomposition found\n";
