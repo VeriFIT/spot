@@ -595,6 +595,14 @@ namespace spot
   /// By default the created automaton will have its states named
   /// using the LTLf formula for the original state if available.
   /// Set \a labels to `false` if you do not want that.
+  ///
+  /// Once the specification has been fulfilled, the controller is
+  /// free to do anything.  If \a loop is false, the Mealy machine
+  /// will jump to an accepting state to reflect that.  If \a loop is
+  /// true, the mealy machine will simply stutter (i.e., jump back to
+  /// the previous state).  Both options produce valid strategy.  The
+  /// former one is slightly larger but more readable.
   SPOT_API twa_graph_ptr
-  mtdfa_strategy_to_mealy(mtdfa_ptr strategy, bool labels = true);
+  mtdfa_strategy_to_mealy(mtdfa_ptr strategy, bool labels = true,
+                          bool loop = false);
 }

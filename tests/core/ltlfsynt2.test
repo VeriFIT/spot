@@ -29,20 +29,20 @@ R='ltlfsynt --trans=rest'
 f='G(i1->Fo1)&G(o1<->X!o1)&G(i2->Fo2)&G(o2<->X!o2)'
 test 14 = `$C -f "$f" --decomp=no --dot=game | grep ' -> ' | wc -l`
 #test 20 = `$C -f "$f" --decomp=yes --dot=game | grep ' -> ' | wc -l`
-test 3 = `$C -f "$f" --decomp=no --dot=strat | grep ' -> ' | wc -l`
-test 3 = `$C -f "$f" --decomp=yes --dot=strat | grep ' -> ' | wc -l`
+test 2 = `$C -f "$f" --decomp=no --dot=strat | grep ' -> ' | wc -l`
+test 2 = `$C -f "$f" --decomp=yes --dot=strat | grep ' -> ' | wc -l`
 test 6 = `$R -f "$f" --decomp=no --dot=game | grep ' -> ' | wc -l`
 #test 8 = `$R -f "$f" --decomp=yes --dot=game | grep ' -> ' | wc -l`
 
 # See issue #601 for the effect of decomposition on this AIGER
-test 3 = `$C -f "$f" --decomp=no --dot=aig | grep ' -> ' | wc -l`
+test 2 = `$C -f "$f" --decomp=no --dot=aig | grep ' -> ' | wc -l`
 #test 4 = `$C -f "$f" --decomp=yes --dot=aig | grep ' -> ' | wc -l`
 
 run 0 ltlfsynt -f "$f" -H >out
 cat >expected <<EOF
 REALIZABLE
 HOA: v1
-States: 2
+States: 1
 Start: 0
 AP: 4 "i1" "i2" "o1" "o2"
 acc-name: all
@@ -51,21 +51,18 @@ properties: trans-labels explicit-labels state-acc deterministic
 controllable-AP: 2 3
 --BODY--
 State: 0
-[2&3] 1
-State: 1
-[t] 1
+[2&3] 0
 --END--
 EOF
 diff out expected
 
 run 0 ltlfsynt -f "$f" --aiger --hide-status >out
 cat >expected <<EOF
-aag 3 2 1 2 0
+aag 2 2 0 2 0
 2
 4
-6 1
-7
-7
+1
+1
 i0 i2
 i1 i1
 o0 o1
@@ -113,7 +110,7 @@ autfilt out.hoa --stats=%s,%e > out.stats
 : >expected
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
 do
-    echo 6,7 >>expected
+    echo 5,6 >>expected
 done
 diff out.stats expected
 
@@ -122,6 +119,29 @@ diff out.stats expected
 test 4 = `autfilt --uniq out.hoa -c`
 
 
-# Issue 611
+# Issue #611
 f='(i0 & Gi1) <-> (o0 & X[2!]o1)'
 test 9 -eq `ltlfsynt -f "$f" --trans=restrict --dot=game|grep '^    B'|wc -l`
+
+# Issue #610
+ltlfsynt -f '(Fo1&GF!o1) & (!o2&Fo2&GF!o2)' > out.txt
+cat >expected.txt <<EOF
+REALIZABLE
+HOA: v1
+States: 3
+Start: 0
+AP: 2 "o2" "o1"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic
+controllable-AP: 0 1
+--BODY--
+State: 0
+[!0&1] 1
+State: 1
+[0&!1] 2
+State: 2
+[!0&!1] 2
+--END--
+EOF
+diff expected.txt out.txt
