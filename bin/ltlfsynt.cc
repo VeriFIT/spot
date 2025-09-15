@@ -781,7 +781,10 @@ namespace
                 return 1;
               }
             st.start();
-            spot::twa_graph_ptr m = spot::mtdfa_strategy_to_mealy(a);
+            // Use a looping mealy machine: this is necessary
+            // when decomposition is used (see issue #610).
+            spot::twa_graph_ptr m =
+              spot::mtdfa_strategy_to_mealy(a, false, true);
             double time = st.stop();
             if (opt_verbose)
               *opt_verbose << indent << "Mealy machine ("

@@ -3406,7 +3406,8 @@ namespace spot
 
   twa_graph_ptr
   mtdfa_strategy_to_mealy(mtdfa_ptr strategy,
-                          bool labels)
+                          bool labels,
+                          bool loop)
   {
     bdd_dict_ptr dict = strategy->get_dict();
     twa_graph_ptr res = make_twa_graph(dict);
@@ -3477,7 +3478,7 @@ namespace spot
                 if ((term & 1) == 0)
                   dst = term / 2;
               }
-            unsigned dst_idx = map_state(dst);
+            unsigned dst_idx = (loop && dst < 0) ? i : map_state(dst);
             bdd output_label = bdd_existcomp(b, outputs);
             if (previous_dst == dst_idx
                 && previous_output_label == output_label)
