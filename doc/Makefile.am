@@ -143,6 +143,7 @@ ORG_FILES = \
   org/tut50.org \
   org/tut51.org \
   org/tut52.org \
+  org/tut60.org \
   org/tut90.org \
   org/upgrade2.org \
   org/satmin.org \

@@ -16,6 +16,10 @@ New in spot 2.14.1.dev  (not yet released)
     the --tlsf option of ltlsynt/ltlfsynt/ltlf2dfa uses syfco to
     transform TLSF into LTL/LTLf.
 
+  - https://www.lre.epita.fr/tut60.html shows two examples of
+    integration with ppLTLTT to handle some pure-past LTL
+    sub-formulas.
+
   Bug fixes:
 
   - twadfa_to_mtdfa(aut) was not properly registering the atomic
