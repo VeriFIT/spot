@@ -1,0 +1,526 @@
+# -*- coding: utf-8 -*-
+#+TITLE: Using ppLTLTT to work with pure-past LTL subformulas
+#+DESCRIPTION: Interfacing with ppLTLTT for LTL and LTLf
+#+INCLUDE: setup.org
+#+HTML_LINK_UP: tut.html
+#+PROPERTY: header-args:sh :results verbatim :exports both
+#+PROPERTY: header-args:python :results output :exports both
+
+Spot has no support for past operators at the moment.  However, if you
+really need to work with past operators, the tool [[https://github.com/DoppeD/ppLTLTT][=ppLTLTT=]] comes in
+handy.  It takes a pure-past LTL formula, and produces a temporal
+tester, i.e., a DFA with transition-based acceptance represented by an
+atomic proposition.
+
+#+BEGIN_SRC sh
+ppLTLTT -f 'a S b' -m 'end$'
+#+END_SRC
+
+#+NAME: tut60a
+#+BEGIN_SRC sh :exports none
+ppLTLTT -f 'a S b' -m 'end$' | autfilt --dot=A.
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut60a.svg :var txt=tut60a :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut60a.svg]]
+
+Another interpretation is that this is a deterministic monitor for
+=G("end$" <-> (a S b))=.
+
+As shown in [[https://gupea.ub.gu.se/bitstream/handle/2077/79408/329670.pdf][the =ppLTLTT= tool paper, published at ATVA'23]], such a
+temporal tester can be combined with existing tools to add some
+support for pure-past subformulas.  Below, we show some integration
+examples for LTL and LTLf.
+
+* Translating LTL with ppLTL subformulas
+
+#+begin_note
+This use-case is already covered by the tool =pltl2tgba= that is
+distributed with =ppLTLPP=.  In other words, the code below shows
+how to re-implement =pltl2tgba=.
+#+end_note
+
+If you have an LTL formula =f(...,g(...),...)= where =g(...)= is a
+pure-past LTL formula, then you can rewrite the former formula as
+=∃newg, f(...,newg,...) & G(newg <-> g(...))=.  This makes it possible
+to translate =G(newg <-> g(...))= using =ppLTLPP=, and translate
+=f(....,newg,...)= using [[file:ltl2tgba.org][=ltl2tgba=]].
+
+For instance, consider the formula =G((request S trigger)->(request U
+grant))=, which states that every request that has been active
+continuously since a trigger in the past must remain active until it
+is granted.
+
+We can rewrite this formula as =∃phi, G(phi -> (request U grant)) & G(phi <-> (request S trigger))=.
+
+** Shell
+
+Here is a sequence of command-line calls that produce a Büchi
+automaton for the above formula.
+
+#+NAME: tut60b
+#+BEGIN_SRC sh :exports code
+ltl2tgba -f 'G(phi -> (request U grant))' > future.hoa
+ppLTLTT -f 'request S trigger' -m phi > past.hoa
+autfilt --merge-trans --product future.hoa past.hoa |
+autfilt -B --remove-ap=phi --dot
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut60b.svg :var txt=tut60b :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut60b.svg]]
+
+#+BEGIN_SRC sh :results silent :exports results
+rm -f future.hoa past.hoa
+#+END_SRC
+
+** Python
+
+Since Spot has no support for past operators, the code below generalizes
+the syntax a bit by using braces to denote the subformulas that should
+be passed to =ppLTLTT=.
+
+#+NAME: tut60c
+#+BEGIN_SRC python :exports code
+import spot
+import re
+
+def extract_braces(s: str):
+    """Transform "{H a} R {b S c}" into
+       ('"$v1$" R "$v2$"', {'$v1$': 'H a', '$v2$': 'b S c'})"""
+    mapping = {}
+    def replacer(match, counter=[1]):
+        key = f"$v{counter[0]}$"
+        mapping[key] = match.group(1)
+        counter[0] += 1
+        return '"' + key + '"'
+    s = re.sub(r"{([^}]+)}", replacer, s)
+    return s, mapping
+
+def translate(formula: str):
+    s, m = extract_braces(formula)
+    aut = spot.translate(s)
+    for k, v in m.items():
+        past = spot.automaton(f"ppLTLTT -f '{v}' -m '{k}'|")
+        past.merge_edges()
+        aut = spot.product(aut, past)
+        rem = spot.remove_ap()
+        rem.add_ap(k)
+        aut = rem.strip(aut)
+    aut = aut.postprocess('Buchi', 'SBacc')
+    aut.set_name(formula)
+    return aut
+
+example = translate("G({request S trigger}->(request U grant))")
+print(example.to_str('dot', ".n"))
+#+END_SRC
+
+
+#+BEGIN_SRC dot :file tut60c.svg :var txt=tut60c :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut60c.svg]]
+
+** C++
+
+The C++ version of this code is similar.  The main issue is to call
+=ppLTLTT= and read its output.  The Python code for =spot.automaton=,
+that supports a trailing pipe, does not exist in C++: we have to
+implement that by ourselves.
+
+Here is a function that calls =ppLTLTT= and parses its [[file:hoa.org][HOA]] output as a
+=twa_graph_ptr=.
+
+#+NAME: run_ppLTLTT
+#+BEGIN_SRC C++ :exports code
+#include <spot/parseaut/public.hh>
+#include <iostream>
+#include <vector>
+#include <string>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <errno.h>
+#include <spawn.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+void fatal(int errnum, const char* fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  fprintf(stderr, "error: ");
+  vfprintf(stderr, fmt, args);
+  va_end(args);
+  if (errnum)
+    fprintf(stderr, ": %s\n", strerror(errnum));
+  else
+    fputc('\n', stderr);
+  exit(2);
+}
+
+spot::twa_graph_ptr
+run_ppLTLTT(const std::string& formula,
+            const std::string& ap,
+            spot::bdd_dict_ptr dict)
+{
+  int cout_pipe[2];
+  if (int err = pipe(cout_pipe))
+    fatal(err, "pipe() failed");
+
+  posix_spawn_file_actions_t actions;
+  if (int err = posix_spawn_file_actions_init(&actions))
+    fatal(err, "posix_spawn_file_actions_init() failed");
+
+  posix_spawn_file_actions_addclose(&actions, STDIN_FILENO);
+  posix_spawn_file_actions_addclose(&actions, cout_pipe[0]);
+  posix_spawn_file_actions_adddup2(&actions, cout_pipe[1], STDOUT_FILENO);
+  posix_spawn_file_actions_addclose(&actions, cout_pipe[1]);
+
+  std::vector<char*> argv;
+  argv.push_back(const_cast<char*>("ppLTLTT"));
+  argv.push_back(const_cast<char*>("-f"));
+  argv.push_back(const_cast<char*>(formula.c_str()));
+  argv.push_back(const_cast<char*>("-m"));
+  argv.push_back(const_cast<char*>(ap.c_str()));
+  argv.push_back(nullptr);
+
+  pid_t pid;
+  if (int err = posix_spawnp(&pid, argv[0], &actions,
+                             nullptr, argv.data(), environ))
+    fatal(err, "failed to run '%s'", argv[0]);
+
+  if (int err = posix_spawn_file_actions_destroy(&actions))
+    fatal(err, "posix_spawn_file_actions_destroy() failed");
+
+  if (close(cout_pipe[1]) < 0)
+    fatal(errno, "closing write-side of pipe failed");
+
+  spot::automaton_stream_parser parser(cout_pipe[0], "ppLTLTT's output");
+  spot::parsed_aut_ptr paut = parser.parse(dict);
+
+  if (close(cout_pipe[0]) < 0)
+    fatal(errno, "closing read-side of pipe failed");
+
+  int exit_code = 0;
+  if (waitpid(pid, &exit_code, 0) == -1)
+    fatal(errno, "waitpid() failed");
+
+  if (exit_code)
+    fatal(0, "ppLTLTT -f '%s' -m '%s': exited with status %d",
+          formula.c_str(), ap.c_str(), exit_code);
+
+  if (paut->format_errors(std::cerr))
+    exit(2);
+
+  return paut->aut;
+}
+#+END_SRC
+
+#+RESULTS: run_ppLTLTT
+
+With this out of the way, we can focus on our actual objective.
+
+#+NAME: tut60d
+#+BEGIN_SRC C++ :exports code :results verbatim :noweb strip-export
+#include <spot/tl/parse.hh>
+#include <spot/twaalgos/dot.hh>
+#include <spot/twaalgos/product.hh>
+#include <spot/twaalgos/remprop.hh>
+#include <spot/twaalgos/translate.hh>
+#include <utility>
+<<run_ppLTLTT>>
+spot::twa_graph_ptr
+translate(const std::string& s, spot::bdd_dict_ptr dict)
+{
+  // Scan s to replace braced subformulas by fresh propositions.
+  std::string out;
+  std::vector<std::pair<std::string, std::string>> m; // [(prop,subf)...]
+  out.reserve(s.size());
+
+  size_t pos = 0;
+  int counter = 1;
+  size_t ss = s.size();
+  while (pos < ss)
+    {
+      size_t open = s.find('{', pos);
+      if (open == std::string::npos) // No {, copy the rest.
+        {
+          out += s.substr(pos);
+          break;
+        }
+
+      out += s.substr(pos, open - pos);
+
+      size_t close = s.find('}', open + 1);
+      if (close != std::string::npos && close > open + 1)
+        {
+          // Found a valid content inside braces
+          std::string subf = s.substr(open + 1, close - (open + 1));
+          std::string prop = "$v" + std::to_string(counter++) + "$";
+          m.emplace_back(prop, subf);
+          out += '"';
+          out += prop;
+          out += '"';
+          pos = close + 1; // move past the closing brace
+        }
+      else // No close }, or empty brace pair.
+        {
+          out += '{';
+          pos = open + 1;
+        }
+    }
+
+  // parse and translate the main formula
+  spot::parsed_formula pf = spot::parse_infix_psl(out);
+  if (pf.format_errors(std::cerr))
+    exit(2);
+  spot::translator trans(dict);
+  spot::twa_graph_ptr aut = trans.run(pf.f);
+
+  // call ppLTLTT for all subformulas, and combine them
+
+  for (const auto& [prop, subf] : m)
+    {
+      spot::twa_graph_ptr past = run_ppLTLTT(subf, prop, dict);
+      past->merge_edges();
+
+      aut = spot::product(aut, past);
+
+      spot::remove_ap rem;
+      rem.add_ap(prop.c_str());
+      aut = rem.strip(aut);
+    }
+
+  // Simplify the resulting automaton and turn it into a BA
+  spot::postprocessor post;
+  post.set_type(spot::postprocessor::Buchi);
+  post.set_pref(spot::postprocessor::SBAcc);
+  aut = post.run(aut);
+
+  aut->set_named_prop("automaton-name", new std::string(s));
+  return aut;
+}
+
+int main()
+{
+  spot::bdd_dict_ptr dict = spot::make_bdd_dict();
+  spot::twa_graph_ptr aut =
+    translate("G({request S trigger}->(request U grant))", dict);
+  spot::print_dot(std::cout, aut, ".n");
+}
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut60d.svg :var txt=tut60d :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut60d.svg]]
+
+
+* Translating a pair (LTLf, ppLTL)
+
+We now consider a similar setup, this time working over finite traces.
+Take the problem of translating a specification of the form
+$\alpha\land \mathsf{G}\mathsf{F}\beta$ where $\alpha$ is an LTLf
+formula, and $\beta$ is a ppLTL formula that should be matched from
+the end of the finite trace.
+
+Spot can translate LTLf formulas into MTDFA, i.e., DFA represented by
+multi-terminal BDDs.  See [[file:ltlf2dfa.org][=ltlf2dfa=]] for some details.  Translating
+LTLf using MTDFA is more efficient than using explicit
+automata. Therefore, for this demonstration, let's assume we want to
+build an MTDFA for $\alpha\land \mathsf{G}\mathsf{F}\beta$.
+
+Unfortunately, we do not have a nice exchange format for MTDFA, so we
+cannot do operations conveniently on the command-line.  We shall
+implement our translation directly in Python and C++.
+
+In this case, we translate $\alpha$ and $\beta$ separately, but we
+interpret the =end$= variable of the automaton produced by =ppLTLTT=
+as an indication of accepting transitions.
+
+** Python
+
+Here is how to compute an MTDFA for =(a U b) & GF(c S d)=.  Note again
+that we do not parse this formula, since Spot does not understand past
+operators.  Instead we pass =a U b= and =c S d= separately, and we let
+=ppLTLTT= parse the pure-past LTL formula.
+
+#+NAME: tut60e
+#+BEGIN_SRC python :exports code
+import sys
+import spot
+import subprocess
+from buddy import bdd_implies, bdd_exist, bdd_ithvar
+
+# Call ppLTLTT to translate a ppLTL formula into an explicit temporal
+# tester, convert the result to mtdfa.
+def ppltl_to_mtdfa(formula: str):
+    end_var = "end$"
+    result = subprocess.run(['ppLTLTT', '-f', formula, '-m', end_var],
+                            capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(f"ppLTLTT failed: {result.stderr}")
+
+    aut = spot.automaton(result.stdout)
+    # Turn transition with positive end$ assignments into
+    # accepting transitions.  We declare the automaton as Büchi
+    # just so that we can tag some transition as accepting,
+    # but the function twadfa_to_mtdfa() called at the end knows
+    # that is meant to be interpreted as a DFA.
+    end_num = aut.register_ap(end_var)
+    end_bdd = bdd_ithvar(end_num)
+    accmark = aut.set_buchi();
+    for e in aut.edges():
+        if bdd_implies(e.cond, end_bdd):
+            e.acc = accmark
+        e.cond = bdd_exist(e.cond, end_bdd)
+    aut.unregister_ap(end_num)
+    # The automaton was marked as incomplete because of the end_var,
+    # but it should now be complete.
+    aut.prop_complete(True)
+    # Make sure we keep transition-based acceptance if we print that
+    # automaton, because we are storing a finite automaton in a class
+    # for ω-automata.
+    aut.prop_state_acc(False)
+    return spot.twadfa_to_mtdfa(aut)
+
+def translate(α, β):
+  ppltl_mtdfa = ppltl_to_mtdfa(β)
+  ltlf_mtdfa = spot.ltlf_to_mtdfa(α)
+  return spot.product(ltlf_mtdfa, ppltl_mtdfa)
+
+aut = translate("a U b", "c S d")
+
+# Print the product as an MTDFA:
+aut.print_dot(spot.get_cout())
+
+# Or convert back to twa for printing as HOA:
+# print(aut.as_twa().to_str('hoa'))
+#+END_SRC
+
+
+#+BEGIN_SRC dot :file tut60e.svg :var txt=tut60e :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut60e.svg]]
+
+** C++
+
+The following reuses [[run_ppLTLTT][the code for =run_ppLTLTT= presented above]].
+
+#+NAME: ppltl_to_mtdfa
+#+BEGIN_SRC C++ :exports code :results verbatim :noweb strip-export
+#include <spot/tl/parse.hh>
+#include <spot/twaalgos/ltlf2dfa.hh>
+<<run_ppLTLTT>>
+spot::mtdfa_ptr
+ppltl_to_mtdfa(std::string s, spot::bdd_dict_ptr dict)
+{
+  std::string end_var = "end$";
+  spot::twa_graph_ptr aut = run_ppLTLTT(s, end_var, dict);
+
+  // Turn "end$" transitions into accepting transitions.
+  // We declare the automaton as Büchi just so that we can tag some
+  // transition as accepting, but the function twadfa_to_mtdfa()
+  // called at the end knows that is meant to be interpreted as a DFA.
+  unsigned end_num = aut->register_ap(end_var);
+  bdd end_bdd = bdd_ithvar(end_num);
+  spot::acc_cond::mark_t accmark = aut->set_buchi();
+  for (auto& e: aut->edges())
+    {
+      if (bdd_implies(e.cond, end_bdd))
+        e.acc = accmark;
+      e.cond = bdd_exist(e.cond, end_bdd);
+    }
+  aut->unregister_ap(end_num);
+  // The automaton was marked as incomplete because of the end_var,
+  // but it should now be complete.
+  aut->prop_complete(true);
+  // Make sure we keep transition-based acceptance if we print that
+  // automaton, because we are storing a finite automaton in a class
+  // for ω-automata.
+  aut->prop_state_acc(false);
+  return spot::twadfa_to_mtdfa(aut);
+}
+
+spot::mtdfa_ptr
+translate(const std::string& alpha,
+          const std::string& beta,
+          spot::bdd_dict_ptr dict)
+{
+  // parse and translate the main formula
+  spot::parsed_formula pf = spot::parse_infix_psl(alpha);
+  if (pf.format_errors(std::cerr))
+    exit(2);
+
+  spot::mtdfa_ptr ppltl_mtdfa = ppltl_to_mtdfa(beta, dict);
+  spot::mtdfa_ptr ltlf_mtdfa = spot::ltlf_to_mtdfa(pf.f, dict);
+  return spot::product(ltlf_mtdfa, ppltl_mtdfa);
+}
+#+END_SRC
+
+#+NAME: tut60f
+#+BEGIN_SRC C++ :exports code :results verbatim :noweb strip-export
+<<ppltl_to_mtdfa>>
+int main()
+{
+  spot::bdd_dict_ptr dict = spot::make_bdd_dict();
+  spot::mtdfa_ptr aut = translate("a U b", "c S d", dict);
+  aut->print_dot(std::cout);
+}
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut60f.svg :var txt=tut60f :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut60f.svg]]
+
+If you prefer to get a =twa_graph_ptr=, just use =as_twa()=:
+
+#+NAME: tut60g
+#+BEGIN_SRC C++ :exports code :results verbatim :noweb strip-export
+#include <spot/twaalgos/dot.hh>
+<<ppltl_to_mtdfa>>
+int main()
+{
+  spot::bdd_dict_ptr dict = spot::make_bdd_dict();
+  spot::twa_graph_ptr aut = translate("a U b", "(c & !d) S d", dict)->as_twa(true);
+  spot::print_dot(std::cout, aut, ".A");
+}
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut60g.svg :var txt=tut60g :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut60g.svg]]
+
+
+#  LocalWords:  utf ppLTLTT LTL LTLf html args DFA SRC autfilt svg ap
+#  LocalWords:  txt ATVA subformulas ppLTL pltl tgba ppLTLPP newg ltl
+#  LocalWords:  Büchi hoa str replacer aut postprocess Buchi SBacc ss
+#  LocalWords:  iostream cstdio unistd sys const cout posix init argv
+#  LocalWords:  addclose STDIN FILENO adddup STDOUT nullptr pid errno
+#  LocalWords:  spawnp environ ppLTLTT's paut waitpid noweb subf pos
+#  LocalWords:  substr emplace mathsf MTDFA BDDs ltlf dfa automata GF
+#  LocalWords:  subprocess bdd ithvar mtdfa ppltl returncode stderr
+#  LocalWords:  RuntimeError twadfa num accmark buchi cond acc twa
+#  LocalWords:  unregister
