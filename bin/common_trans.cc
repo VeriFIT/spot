@@ -504,7 +504,7 @@ read_stdout_of_command(char* const* args)
   if (bytes_read < 0)
     error(2, bytes_read, "failed to read from pipe");
 
-  if (cout_pipe[0] < 0)
+  if (close(cout_pipe[0]) < 0)
     error(2, errno, "closing read-side of pipe failed");
 
   int exit_code = 0;
