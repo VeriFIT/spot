@@ -32,6 +32,7 @@
 #include <spawn.h>
 #endif
 #include <regex>
+#include <memory>
 
 #include "error.h"
 
@@ -490,29 +491,44 @@ read_stdout_of_command(char* const* args)
   if (close(cout_pipe[1]) < 0)
     error(2, errno, "closing write-side of pipe failed");
 
+  // the buffer used to read the pipe will be allocated once, and
+  // reused between all calls to read_stdout_of_command.
+  constexpr size_t BUFFER_SIZE = 16384;
+  static std::unique_ptr<char[]> buffer;
+  if (!buffer)
+    buffer = std::make_unique<char[]>(BUFFER_SIZE);
+
   std::string results;
   ssize_t bytes_read;
+  char* buf = buffer.get();
   for (;;)
     {
-      static char buffer[512];
-      bytes_read = read(cout_pipe[0], buffer, sizeof(buffer));
+      bytes_read = read(cout_pipe[0], buf, BUFFER_SIZE);
       if (bytes_read > 0)
-        results.insert(results.end(), buffer, buffer + bytes_read);
+        results.append(buf, bytes_read);
+      else if (bytes_read == 0)
+        break;                  // EOF
+      else if (errno == EINTR)
+        continue;               // try again
       else
-        break;
+        error(2, errno, "failed to read from pipe");
     }
-  if (bytes_read < 0)
-    error(2, bytes_read, "failed to read from pipe");
 
   if (close(cout_pipe[0]) < 0)
     error(2, errno, "closing read-side of pipe failed");
 
   int exit_code = 0;
-  if (waitpid(pid, &exit_code, 0) == -1)
-    error(2, errno, "waitpid() failed");
+  while (waitpid(pid, &exit_code, 0) == -1)
+    {
+      if (errno == EINTR)
+        continue;
+      error(2, errno, "waitpid() failed");
+    }
 
-  if (exit_code)
-    error(2, 0, "'%s' exited with status %d", args[0], exit_code);
+  if (WIFEXITED(exit_code) && WEXITSTATUS(exit_code) != 0)
+    error(2, 0, "'%s' exited with status %d", args[0], WEXITSTATUS(exit_code));
+  else if (WIFSIGNALED(exit_code))
+    error(2, 0, "'%s' killed by signal %d", args[0], WTERMSIG(exit_code));
 
   return results;
 #else
@@ -948,12 +964,14 @@ exec_with_timeout(const char* cmd)
   // Upon SIGALRM, the child will receive up to 3
   // signals: SIGTERM, SIGTERM, SIGKILL.
   alarm_on = 3;
-  int w = waitpid(child_pid, &status, 0);
+  int w;
+  while ((w = waitpid(child_pid, &status, 0)) == -1)
+    {
+      if (errno == EINTR)
+        continue;               // try again
+      error(2, errno, "waitpid() failed");
+    }
   alarm_on = 0;
-
-  if (w == -1)
-    error(2, errno, "error during wait()");
-
   alarm(0);
   return status;
 }
