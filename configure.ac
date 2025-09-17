@@ -37,7 +37,7 @@ gl_EARLY
 AM_PROG_CC_C_O
 AC_PROG_CXX
 
-AM_PROG_LEX
+AM_PROG_LEX([noyywrap])
 adl_CHECK_BISON
 
 # Decrease verbosity when passing argument V=0
