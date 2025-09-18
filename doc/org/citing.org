@@ -104,8 +104,8 @@ be more specific about a particular aspect of Spot.
 - *Engineering an LTLf Synthesis Tool*
   /Alexandre Duret-Lutz/, /Shufang Zhu/, /Nir Piterman/,
   /Giuseppe De Giacomo/, and /Moshe Y. Vardi/.
-  In Proc. of CIAA'25.  Sep. 2025.  To appear.
-  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.25.ciaa][bib]])
+  In Proc. of CIAA'25.  LNCS 15981, pp. 129--147.  Sep. 2025.
+  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.25.ciaa][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.25.ciaa.pdf][pdf]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.25.ciaa.slides.pdf][slides]])
 
   Discusses some of the implementation behind [[file:ltlf2dfa.org][=ltlf2dfa=]] and
   [[file:ltlfsynt.org][=ltlfsynt=]].
