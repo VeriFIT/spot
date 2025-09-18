@@ -1,4 +1,11 @@
-New in spot 2.14.1.dev  (not yet released)
+New in spot 2.14.2.dev  (not yet released)
+
+  Library:
+
+  - scc_filter() will now preserve and update any "original-states"
+    or "degen-levels" property present in the original automaton.
+
+New in spot 2.14.2  (2025-09-18)
 
   Library:
 
@@ -6,9 +13,6 @@ New in spot 2.14.1.dev  (not yet released)
     bdd_mt_apply1_synthesis_with_choice() used by ltlfsynt, got some
     small improvements resulting in smaller strategies being
     generated.  (Issue #611.)
-
-  - scc_filter() will now preserve and update any "original-states"
-    or "degen-levels" property present in the original automaton.
 
   Documentation:
 
