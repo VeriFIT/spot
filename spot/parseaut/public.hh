@@ -112,8 +112,8 @@ namespace spot
   /// may be called in a loop to parse each automaton in the stream.
   ///
   /// Several input formats are supported, and automatically
-  /// recognized: HOA, LBTT, DSTAR, or neverclaim.  We recommend
-  /// using the HOA format, because it is the most general.
+  /// recognized: HOA, LBTT, DSTAR, neverclaim, or PGsolver.  We
+  /// recommend using the HOA format, because it is the most general.
   ///
   /// The specification of the HOA format can be found at
   ///    http://adl.github.io/hoaf/
@@ -130,6 +130,11 @@ namespace spot
   /// `synthesis-output` property of Spot.  It also maps
   /// `spot.highlight.edges:`, `spot.highlight.states:`, and
   /// `spot.state-player:` to the associated automata properties.
+  ///
+  /// Parsing PGsolver will label all transitions with bddtrue, and
+  /// will adjust the acceptance condition to Spot's convention of
+  /// solving the game from the point of view of player 1 (i.e.,
+  /// player 1 is the one trying to satisfy the acceptance condition).
   class SPOT_API automaton_stream_parser final
   {
     spot::location last_loc;
