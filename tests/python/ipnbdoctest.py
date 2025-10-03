@@ -12,7 +12,6 @@ with those stored in the notebook.
 
 from __future__ import print_function
 
-import os
 import sys
 import time
 import base64
@@ -21,7 +20,6 @@ import pprint
 import random
 from difflib import unified_diff as diff
 
-from collections import defaultdict
 try:
     from queue import Empty
 except ImportError:

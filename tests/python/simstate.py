@@ -17,7 +17,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import spot
-from sys import exit
 from unittest import TestCase
 tc = TestCase()
 
