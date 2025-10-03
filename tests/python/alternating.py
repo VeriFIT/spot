@@ -22,6 +22,11 @@ import buddy
 from unittest import TestCase
 tc = TestCase()
 
+
+def report_missing_exception():
+    raise RuntimeError("missing exception")
+
+
 aut = spot.make_twa_graph(spot._bdd_dict)
 
 p1 = buddy.bdd_ithvar(aut.register_ap("p1"))
@@ -209,3 +214,11 @@ aut.edge_storage(3).cond = buddy.bddfalse
 aut.purge_dead_states()
 tc.assertEqual(aut.num_states(), 1)
 tc.assertEqual(aut.num_edges(), 0)
+
+aut.set_co_buchi()
+try:
+    spot.remove_univ_otf(aut)
+except RuntimeError as e:
+    tc.assertIn('remove_univ_otf: Büchi acceptance is expected', str(e))
+else:
+    report_missing_exception()

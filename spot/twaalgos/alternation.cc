@@ -829,7 +829,8 @@ namespace spot
 
   twa_univ_remover_ptr remove_univ_otf(const const_twa_graph_ptr& aut)
   {
-    assert(aut->acc().is_buchi());
+    if (!aut->acc().is_buchi())
+      throw std::runtime_error("remove_univ_otf: Büchi acceptance is expected");
     auto res = std::make_shared<twa_univ_remover>(aut);
     res->copy_ap_of(aut);
     res->copy_acceptance_of(aut);

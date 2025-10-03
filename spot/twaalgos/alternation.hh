@@ -91,7 +91,7 @@ namespace spot
   }
   /// @}
 
-  /// \brief Remove universal edges from an automaton.
+  /// \brief Remove universal edges from a weak alternating automaton.
   ///
   /// This procedure is restricted to weak alternating automata as
   /// input, and produces TGBAs as output.  (Generalized Büchi
@@ -153,22 +153,12 @@ namespace spot
 
   typedef std::shared_ptr<twa_univ_remover> twa_univ_remover_ptr;
 
-  /// \brief Remove universal edges on the fly from an automaton.
+  /// \brief Remove universal edges on the fly from an alternating
+  /// Büchi automaton.
   ///
-  /// This function uses the Myiano & Hayashi (TCS 1984) breakpoint
-  /// algorithm to construct a non-deterministic Büchi automaton from an
-  /// alternating Büchi automaton on the fly.
-  ///
-  ///  \verbatim
-  ///  @Article{ miyano.84.tcs,
-  ///    title = "Alternating finite automata on ω-words",
-  ///    journal = "Theoretical Computer Science",
-  ///    volume = "32",
-  ///    number = "3",
-  ///    pages = "321 - 330",
-  ///    year = "1984",
-  ///    author = "Satoru Miyano and Takeshi Hayashi",
-  ///  }
+  /// This function uses Myiano & Hayashi's \cite{miyano.84.tcs}
+  /// breakpoint algorithm to construct a non-deterministic Büchi
+  /// automaton from an alternating Büchi automaton on the fly.
   SPOT_API
   twa_univ_remover_ptr remove_univ_otf(const const_twa_graph_ptr& aut);
 }
