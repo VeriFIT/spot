@@ -67,33 +67,27 @@ troubleshooting installations.
 
 We build Debian packages for amd64 and i386, for both releases and the
 development versions.  Packages for releases are built for Debian
-Bookworm (a.k.a. Debian stable) while packages for development are built
+Trixie (a.k.a. Debian stable) while packages for development are built
 for Sid (a.k.a. Debian unstable).
 
-Here is how to install the stable packages:
+Here is how to install the stable packages (as root):
 
 #+BEGIN_SRC sh
-wget -q -O - https://www.lre.epita.fr/repo/debian.gpg | apt-key add -
-echo 'deb http://www.lre.epita.fr/repo/debian/ stable/' >> /etc/apt/sources.list
+wget -q -O /etc/apt/keyrings/lre-epita.gpg https://www.lre.epita.fr/repo/debian.gpg
+echo "deb [signed-by=/etc/apt/keyrings/lre-epita.gpg] http://www.lre.epita.fr/repo/debian/ stable/" \
+  > /etc/apt/sources.list.d/lre-epita.list
 apt-get update
 apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
 #+END_SRC
 
-Here is how to install the unstable packages:
-
-#+BEGIN_SRC sh
-wget -O /etc/apt/trusted.gpg.d/lrde.gpg https://www.lre.epita.fr/repo/debian.gpg
-echo 'deb http://www.lre.epita.fr/repo/debian/ unstable/' >> /etc/apt/sources.list
-apt-get update
-apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
-#+END_SRC
+To install the unstable packages, simply replace =stable/= by =unstable/=.
 
 Note that our Debian repository is signed since that is the new Debian
 policy, and both of the above command blocks start with a download of
 our [[https://www.lrde.epita.fr/repo/debian.gpg][GPG key]].  Its fingerprint is =209B 7362 CFD6 FECF B41D 717F 03D9
-9E74 44F2 A84A=, if you want to verify it.  If you have an old copy of
-the GPG key that expired, please download it again: the current
-version should be valid until 2032.
+9E74 44F2 A84A=, if you want to verify it (run =gpg --show-keys
+/etc/apt/keyrings/lre-epita.gpg=).  This key should be valid
+until 2032.
 
 The package =spot= contains the [[file:tools.org][command-line tools]]. =libspot-dev=
 contains the header files if you plan to use Spot in a C++17
@@ -106,18 +100,21 @@ dependencies of the previous packages.
 
 * Builds of other Debian based distributions
 
-[[https://download.opensuse.org/repositories/home:/adl/][This OBS directory]] contains builds of Spot for several Debian-based
-distributions, e.g., Ubuntu or Raspbian distributions.  It may be
-lagging behind the latest release of Spot by a few days, as the update
-is not entirely automatic.
+[[https://download.opensuse.org/repositories/home:/adl/][This OBS directory]] contains builds of the latest release of Spot for
+several Debian-based distributions, e.g., Ubuntu or Raspbian
+distributions.  It may be lagging behind the latest release of Spot by
+a few days, as the update is not entirely automatic.
 
 To use it, browse the [[https://download.opensuse.org/repositories/home:/adl/][above link]] to find your distribution, and adjust
 the following example accordingly.
 
 #+BEGIN_SRC sh
-echo 'deb [trusted=true] https://download.opensuse.org/repositories/home:/adl/xUbuntu_22.04/ ./' >> /etc/apt/sources.list
-apt-get update
-apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
+  wget -q -O - 'https://build.opensuse.org/projects/home:adl/signing_keys/download?kind=gpg' |
+      gpg --dearmor -o /etc/apt/keyrings/home-adl-obs.gpg
+  echo 'deb [signed-by=/etc/apt/keyrings/home-adl-obs.gpg] https://download.opensuse.org/repositories/home:/adl/xUbuntu_25.04/ ./' \
+       > /etc/apt/sources.list.d/home-adl-obs.list
+  apt-get update
+  apt-get install spot libspot-dev spot-doc python3-spot # Or a subset of those
 #+END_SRC
 
 * Installing the Fedora packages
