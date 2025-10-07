@@ -46,7 +46,7 @@
 
 #define INIT_BUF_SIZE 200
 #define PRINTF_SIZE_GUESS 150
-
+
 /* Return an argp_fmtstream that outputs to STREAM, and which prefixes lines
    written on it with LMARGIN spaces and limits them to RMARGIN columns
    total.  If WMARGIN >= 0, words that extend past RMARGIN are wrapped by
@@ -113,7 +113,7 @@ __argp_fmtstream_free (argp_fmtstream_t fs)
 weak_alias (__argp_fmtstream_free, argp_fmtstream_free)
 #endif
 #endif
-
+
 
 static void
 write_block (argp_fmtstream_t fs, char *buf, int len)
@@ -262,7 +262,7 @@ __argp_fmtstream_update (argp_fmtstream_t fs)
   /* Remember that we've flushed everything.  */
   fs->p = fs->buf;
 }
-
+
 /* Ensure that FS has space for AMOUNT more bytes in its buffer, either by
    growing the buffer, or by flushing it.  True is returned iff we succeed. */
 int
@@ -294,7 +294,7 @@ __argp_fmtstream_ensure (struct argp_fmtstream *fs, size_t amount)
 
   return 1;
 }
-
+
 ssize_t
 __argp_fmtstream_printf (struct argp_fmtstream *fs, const char *fmt, ...)
 {

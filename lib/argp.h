@@ -64,7 +64,7 @@
 typedef int error_t;
 # define __error_t_defined
 #endif
-
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -149,7 +149,7 @@ struct argp_option
 /* Valid only in conjunction with OPTION_DOC. This option disables translation
    of option name. */
 #define OPTION_NO_TRANS         0x20
-
+
 struct argp;                    /* fwd declare this type */
 struct argp_state;              /* " */
 struct argp_child;              /* " */
@@ -289,7 +289,7 @@ struct argp
    suppressed.  */
 #define ARGP_KEY_HELP_DUP_ARGS_NOTE 0x2000005
 #define ARGP_KEY_HELP_ARGS_DOC  0x2000006 /* Argument doc string.  */
-
+
 /* When an argp has a non-zero CHILDREN field, it should point to a vector of
    argp_child structures, each of which describes a subsidiary argp.  */
 struct argp_child
@@ -314,7 +314,7 @@ struct argp_child
      (merging the child's grouping levels with the parents).  */
   int group;
 };
-
+
 /* Parsing state.  This is provided to parsing functions called by argp,
    which may examine and, as noted, modify fields.  */
 struct argp_state
@@ -362,7 +362,7 @@ struct argp_state
 
   void *pstate;                 /* Private, for use by argp.  */
 };
-
+
 /* Flags for argp_parse (note that the defaults are those that are
    convenient for program command line parsing): */
 
@@ -422,7 +422,7 @@ extern error_t __argp_parse (const struct argp *__restrict __argp,
                              int /*argc*/, char **__restrict /*argv*/,
                              unsigned __flags, int *__restrict __arg_index,
                              void *__restrict __input);
-
+
 /* Global variables.  */
 
 /* GNULIB makes sure both program_invocation_name and
@@ -465,7 +465,7 @@ extern const char *argp_program_bug_address;
    If not defined or set by the user program, this defaults to EX_USAGE from
    <sysexits.h>.  */
 extern error_t argp_err_exit_status;
-
+
 /* Flags for argp_help.  */
 #define ARGP_HELP_USAGE         0x01 /* a Usage: message. */
 #define ARGP_HELP_SHORT_USAGE   0x02 /*  " but don't actually print options. */
@@ -503,7 +503,7 @@ extern void argp_help (const struct argp *__restrict __argp,
 extern void __argp_help (const struct argp *__restrict __argp,
                          FILE *__restrict __stream, unsigned __flags,
                          char *__name);
-
+
 /* The following routines are intended to be called from within an argp
    parsing routine (thus taking an argp_state structure as the first
    argument).  They may or may not print an error message and exit, depending
@@ -573,7 +573,7 @@ extern void *_argp_input (const struct argp *__restrict __argp,
 extern void *__argp_input (const struct argp *__restrict __argp,
                            const struct argp_state *__restrict __state)
      __THROW;
-
+
 #if !_LIBC || defined __USE_EXTERN_INLINES
 
 # if !_LIBC

@@ -55,7 +55,7 @@
 #ifndef SIZE_MAX
 # define SIZE_MAX ((size_t) -1)
 #endif
-
+
 /* User-selectable (using an environment variable) formatting parameters.
 
    These may be specified in an environment variable called 'ARGP_HELP_FMT',
@@ -251,7 +251,7 @@ fill_in_uparams (const struct argp_state *state)
       validate_uparams (state, &new_params);
     }
 }
-
+
 /* Returns true if OPT hasn't been marked invisible.  Visibility only affects
    whether OPT is displayed or used in sorting, not option shadowing.  */
 #define ovisible(opt) (! ((opt)->flags & OPTION_HIDDEN))
@@ -270,7 +270,7 @@ fill_in_uparams (const struct argp_state *state)
 
 /* Returns true if OPT has a short option.  */
 #define oshort(opt) __option_is_short (opt)
-
+
 /*
    The help format for a particular option is like:
 
@@ -334,7 +334,7 @@ fill_in_uparams (const struct argp_state *state)
    unless you tell it not to with ARGP_NO_HELP.
 
 */
-
+
 /* Returns true if CH occurs between BEG and END.  */
 static int
 find_char (char ch, char *beg, char *end)
@@ -346,7 +346,7 @@ find_char (char ch, char *beg, char *end)
       beg++;
   return 0;
 }
-
+
 struct hol_cluster;             /* fwd decl */
 
 struct hol_entry
@@ -425,7 +425,7 @@ struct hol
   /* Clusters of entries in this hol.  */
   struct hol_cluster *clusters;
 };
-
+
 /* Create a struct hol from the options in ARGP.  CLUSTER is the
    hol_cluster in which these entries occur, or 0, if at the root.  */
 static struct hol *
@@ -497,7 +497,7 @@ make_hol (const struct argp *argp, struct hol_cluster *cluster)
 
   return hol;
 }
-
+
 /* Add a new cluster to HOL, with the given GROUP and HEADER (taken from the
    associated argp child list entry), INDEX, and PARENT, and return a pointer
    to it.  ARGP is the argp that this cluster results from.  */
@@ -521,7 +521,7 @@ hol_add_cluster (struct hol *hol, int group, const char *header, int index,
     }
   return cl;
 }
-
+
 /* Free HOL and any resources it uses.  */
 static void
 hol_free (struct hol *hol)
@@ -543,7 +543,7 @@ hol_free (struct hol *hol)
 
   free (hol);
 }
-
+
 static int
 hol_entry_short_iterate (const struct hol_entry *entry,
                          int (*func)(const struct argp_option *opt,
@@ -594,7 +594,7 @@ hol_entry_long_iterate (const struct hol_entry *entry,
 
   return val;
 }
-
+
 /* Iterator that returns true for the first short option.  */
 static int
 until_short (const struct argp_option *opt, const struct argp_option *real,
@@ -647,7 +647,7 @@ hol_find_entry (struct hol *hol, const char *name)
 
   return 0;
 }
-
+
 /* If an entry with the long option NAME occurs in HOL, set its special
    sort position to GROUP.  */
 static void
@@ -657,7 +657,7 @@ hol_set_group (struct hol *hol, const char *name, int group)
   if (entry)
     entry->group = group;
 }
-
+
 /* Order by group:  0, 1, 2, ..., n, -m, ..., -2, -1.
    EQ is what to return if GROUP1 and GROUP2 are the same.  */
 static int
@@ -710,7 +710,7 @@ hol_cluster_is_child (const struct hol_cluster *cl1,
     cl1 = cl1->parent;
   return cl1 == cl2;
 }
-
+
 /* Given the name of an OPTION_DOC option, modifies NAME to start at the tail
    that should be used for comparisons, and returns true iff it should be
    treated as a non-option.  */
@@ -829,7 +829,7 @@ hol_sort (struct hol *hol)
              hol_entry_qcmp);
     }
 }
-
+
 /* Append MORE to HOL, destroying MORE in the process.  Options in HOL shadow
    any in MORE with the same name.  */
 static void
@@ -923,7 +923,7 @@ hol_append (struct hol *hol, struct hol *more)
 
   hol_free (more);
 }
-
+
 /* Inserts enough spaces to make sure STREAM is at column COL.  */
 static void
 indent_to (argp_fmtstream_t stream, unsigned col)
@@ -965,7 +965,7 @@ arg (const struct argp_option *real, const char *req_fmt, const char *opt_fmt,
                                  dgettext (domain, real->arg));
     }
 }
-
+
 /* Helper functions for hol_entry_help.  */
 
 /* State used during the execution of hol_help.  */
@@ -1085,7 +1085,7 @@ comma (unsigned col, struct pentry_state *pest)
 
   indent_to (pest->stream, col);
 }
-
+
 /* Print help for ENTRY to STREAM.  */
 static void
 hol_entry_help (struct hol_entry *entry, const struct argp_state *state,
@@ -1216,7 +1216,7 @@ cleanup:
   __argp_fmtstream_set_lmargin (stream, old_lm);
   __argp_fmtstream_set_wmargin (stream, old_wm);
 }
-
+
 /* Output a long help message about the options in HOL to STREAM.  */
 static void
 hol_help (struct hol *hol, const struct argp_state *state,
@@ -1326,7 +1326,7 @@ usage_long_opt (const struct argp_option *opt,
 
   return 0;
 }
-
+
 /* Print a short usage description for the arguments in HOL to STREAM.  */
 static void
 hol_usage (struct hol *hol, argp_fmtstream_t stream)
@@ -1365,7 +1365,7 @@ hol_usage (struct hol *hol, argp_fmtstream_t stream)
                                 entry->argp->argp_domain, stream);
     }
 }
-
+
 /* Make a HOL containing all levels of options in ARGP.  CLUSTER is the
    cluster in which ARGP's entries should be clustered, or 0.  */
 static struct hol *
@@ -1388,7 +1388,7 @@ argp_hol (const struct argp *argp, struct hol_cluster *cluster)
       }
   return hol;
 }
-
+
 /* Calculate how many different levels with alternative args strings exist in
    ARGP.  */
 static size_t
@@ -1468,7 +1468,7 @@ argp_args_usage (const struct argp *argp, const struct argp_state *state,
 
   return !advance;
 }
-
+
 /* Print the documentation for ARGP to STREAM; if POST is false, then
    everything preceding a '\v' character in the documentation strings (or
    the whole string, for those with none) is printed, otherwise, everything
@@ -1561,7 +1561,7 @@ argp_doc (const struct argp *argp, const struct argp_state *state,
 
   return anything;
 }
-
+
 /* Output a usage message for ARGP to STREAM.  If called from
    argp_state_help, STATE is the relevant parsing state.  FLAGS are from the
    set ARGP_HELP_*.  NAME is what to use wherever a 'program name' is
@@ -1706,7 +1706,7 @@ Try '%s --help' or '%s --usage' for more information.\n"),
 
   __argp_fmtstream_free (fs);
 }
-
+
 /* Output a usage message for ARGP to STREAM.  FLAGS are from the set
    ARGP_HELP_*.  NAME is what to use wherever a 'program name' is needed. */
 void __argp_help (const struct argp *argp, FILE *stream,
@@ -1762,7 +1762,7 @@ __argp_state_help (const struct argp_state *state, FILE *stream, unsigned flags)
 #ifdef weak_alias
 weak_alias (__argp_state_help, argp_state_help)
 #endif
-
+
 /* If appropriate, print the printf string FMT and following args, preceded
    by the program name and ':', to stderr, and followed by a "Try ... --help"
    message, then exit (1).  */
@@ -1817,7 +1817,7 @@ __argp_error (const struct argp_state *state, const char *fmt, ...)
 #ifdef weak_alias
 weak_alias (__argp_error, argp_error)
 #endif
-
+
 /* Similar to the standard gnu error-reporting function error(), but will
    respect the ARGP_NO_EXIT and ARGP_NO_ERRS flags in STATE, and will print
    to STATE->err_stream.  This is useful for argument parsing code that is

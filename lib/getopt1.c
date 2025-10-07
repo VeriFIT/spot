@@ -16,7 +16,7 @@
    You should have received a copy of the GNU General Public
    License along with the GNU C Library; if not, see
    <https://www.gnu.org/licenses/>.  */
-
+
 #ifndef _LIBC
 # include <config.h>
 #endif
@@ -64,7 +64,7 @@ _getopt_long_only_r (int argc, char **argv, const char *options,
 			     1, d, 0);
 }
 
-
+
 #ifdef TEST
 
 #include <stdio.h>

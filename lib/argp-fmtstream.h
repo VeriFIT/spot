@@ -87,7 +87,7 @@ typedef FILE *argp_fmtstream_t;
 #else /* !ARGP_FMTSTREAM_USE_LINEWRAP */
 /* Guess we have to define our own version.  */
 
-
+
 struct argp_fmtstream
 {
   FILE *stream;                 /* The stream we're outputting to.  */
@@ -143,7 +143,7 @@ extern size_t __argp_fmtstream_write (argp_fmtstream_t __fs,
 extern size_t argp_fmtstream_write (argp_fmtstream_t __fs,
                                     const char *__str, size_t __len);
 #endif
-
+
 /* Access macros for various bits of state.  */
 #define argp_fmtstream_lmargin(__fs) ((__fs)->lmargin)
 #define argp_fmtstream_rmargin(__fs) ((__fs)->rmargin)
@@ -181,7 +181,7 @@ extern void _argp_fmtstream_update (argp_fmtstream_t __fs);
 extern void __argp_fmtstream_update (argp_fmtstream_t __fs);
 extern int _argp_fmtstream_ensure (argp_fmtstream_t __fs, size_t __amount);
 extern int __argp_fmtstream_ensure (argp_fmtstream_t __fs, size_t __amount);
-
+
 #if !_LIBC || defined __OPTIMIZE__
 /* Inline versions of above routines.  */
 
