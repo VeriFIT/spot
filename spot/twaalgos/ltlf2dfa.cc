@@ -134,6 +134,604 @@ namespace spot
   }
 
   ////////////////////////////////////////////////////////////////////////
+  //                       minimization of MTDFA                        //
+  ////////////////////////////////////////////////////////////////////////
+
+  // callback for minimize_mtdfa
+  namespace
+  {
+    static std::vector<int> classes;
+    static int num_states;
+    static bool accepting_false_seen;
+    static bool rejecting_true_seen;
+
+    static int rename_class(int val)
+    {
+      assert((unsigned) val/2 < classes.size());
+      bool accepting = val & 1;
+      val = classes[val / 2];
+      if (val == num_states + accepting)
+        {
+          if (accepting)
+            accepting_false_seen = true;
+          else
+            rejecting_true_seen = true;
+        }
+      return 2 * val + accepting;
+    }
+  }
+
+  mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa,
+                           bddExtCache* cache,
+                           int& iteration)
+  {
+    if (iteration >= (1 << 20))
+      {
+        // wipe the cache every 2^20 iterations.
+        bdd_extcache_reset(cache);
+        iteration = 0;
+      }
+
+    unsigned n = num_states = dfa->num_roots();
+
+    // This minimization implements Moore's partition-refinement
+    // algorithm using MTBDDs.  The idea is relatively simple: each
+    // state of the MTDFA is assigned a class. Initially every state
+    // is in the same class.  The MTBDD used to represent the states
+    // are all rewritten, replacing each terminal (dst, b) by
+    // (class[dst], b).  After this rewriting, states whose MTBDD are
+    // different are put into different classes, and we start again.
+    // We iterate the process until no more classes are created.
+    //
+    // The implementation is made a bit more difficult because of the
+    // possible use of bddfalse, and bddtrue in the MTDFA.  In order
+    // other states in the automaton that should be reduced to
+    // bddfalse/bddtrue, we have to introduce fake states for
+    // bddfalse/bddtrue.
+
+    // class is a global vector assigning classes to each state
+    classes.clear();
+    classes.resize(n + 2, 0); // two extra classes for bddtrue/bddfalse
+
+    // The "signature" of each state is their encoding using
+    // the current set of classes.  The following vector remember
+    // each unique signature in the order they were discovered.
+    std::vector<bdd> signatures;
+    signatures.reserve(n);
+    // For each distinct signature, GROUPS retains the list of
+    // states that have this signature.
+    std::unordered_map<bdd, std::vector<int>, bdd_hash> groups;
+    for (;;)
+      {
+        ++iteration;
+        bdd true_term = bdd_terminal(2 * classes[n] + 1);
+        bdd false_term = bdd_terminal(2 * classes[n + 1]);
+        accepting_false_seen = false;
+        rejecting_true_seen = false;
+        for (unsigned i = 0; i < n; ++i)
+          {
+            bdd sig = bdd_mt_apply1(dfa->states[i], rename_class,
+                                    false_term, true_term,
+                                    cache, iteration);
+            auto& v = groups[sig];
+            if (v.empty())
+              signatures.push_back(sig);
+            v.push_back(i);
+          }
+        // Now we add the "fake" states for bddtrue amd bddfalse.
+        // We do this after all other states, because we are not sure
+        // if those will correspond to real states in the automaton.
+        {
+          auto& v = groups[true_term];
+          if (v.empty())
+            signatures.push_back(true_term);
+          v.push_back(n);
+        }
+        {
+          auto& v = groups[false_term];
+          if (v.empty())
+            signatures.push_back(false_term);
+          v.push_back(n + 1);
+        }
+
+        // { // debug
+        //   std::cerr << "iteration " << iteration << '\n';
+        //   std::cerr << signatures.size() << " states\n";
+        // }
+
+        // Assign each state to its class number, using the order in
+        // which signatures were discovered.  In this order, the
+        // initial state will always have class 0.
+        //
+        // An exception is if the class contains the fake true/false
+        // state.  In this case, we map the class back to n/n+1.
+        int curclass = 0;
+        bool changed = false;
+        for (bdd sig: signatures)
+          {
+            int mapclass = curclass++;
+            auto& v = groups[sig];
+            unsigned vb = v.back();
+            if (vb >= n)        // contains the fake true/false state
+              mapclass = vb;
+            for (unsigned i: v)
+              if (classes[i] != mapclass)
+                {
+                  changed = true;
+                  classes[i] = mapclass;
+                }
+            // { // debug
+            //   std::cerr << "class " << mapclass << ':';
+            //   for (unsigned i: v)
+            //     std::cerr << ' ' << i;
+            //   if (mapclass == (int) n)
+            //     std::cerr << "  (true)";
+            //   else if (mapclass == (int) n + 1)
+            //     std::cerr << "  (false)";
+            //   std::cerr << "\n      " << sig << '\n';
+            // }
+          }
+        // for (unsigned i = 0; i <= n + 1; ++i)
+        //    std::cerr << "classes[" << i << "]=" << classes[i] << '\n';
+        if (!changed)
+          break;
+        groups.clear();
+        signatures.clear();
+      }
+
+    // Unless we have states equivalent to false/true, the BDDs in
+    // SIGNATURES are actually our new MTBDD representation.
+    //
+    // If we have state equivalent to true & false, we just have get
+    // rid of the terms we introduced to replace bddtrue/bddfalse.  Be
+    // careful that bddtrue/bddfalse only replace (tt,⊤)/(ff,⊥).  We
+    // still need state of (tt,⊥) or (ff,⊤) if those appear in the
+    // automaton.
+    //
+    // In any case, if WANT_NAMES is set we also have to keep one name
+    // per class for display.
+    bool want_names = dfa->names.size() == n;
+    std::vector<formula> names;
+    // Our automaton will SZ states, minus any bddfalse/bddtrue state.
+    unsigned sz = signatures.size();
+    if (want_names)
+      names.reserve(sz);
+    unsigned j = 0;             // next free state number
+    ++iteration;
+    bdd true_term = bdd_terminal(2 * classes[n] + 1);
+    bdd false_term = bdd_terminal(2 * classes[n + 1]);
+    bool need_remap = false;
+    for (unsigned i = 0; i < sz; ++i)
+      {
+        bdd sig = signatures[i];
+        auto& v = groups[sig];
+        assert(!v.empty());
+        unsigned vb = v.back();
+        if (vb == n + 1)        // equivalent to ff!
+          {
+            if (i == 0)         // the initial state is false
+              {
+                assert(v.front() == 0);
+                if (want_names)
+                  names.push_back(formula::ff());
+                signatures[0] = bddfalse;
+                ++j;
+                break;
+              }
+            if (!accepting_false_seen)
+              continue;
+            // since (ff,⊤) exists, give ff a state number.
+            classes[n + 1] = j;
+            need_remap = true;
+          }
+        if (vb == n)            // equivalent to tt!
+          {
+            if (i == 0)         // the source state is true
+              {
+                assert(v.front() == 0);
+                if (want_names)
+                  names.push_back(formula::tt());
+                signatures[0] = bddtrue;
+                ++j;
+                break;
+              }
+            if (!rejecting_true_seen)
+              continue;
+            classes[n] = j;
+            need_remap = true;
+          }
+        if (want_names)
+          {
+            // We can pick the name of any state in v to label the
+            // class.  Here we simply pick the first one, but this
+            // can be changed if needed (e.g. pick the shortest one
+            // since it is more readable?)
+            assert((unsigned) v.front() < dfa->names.size());
+            names.push_back(dfa->names[v.front()]);
+          }
+        // replace false_term/true_term by bddfalse/bddtrue
+        // note that this does not change the other terminals.
+        sig = bdd_terminal_to_const(sig, false_term, true_term,
+                                    cache, iteration);
+        classes[i] = j;
+        if (i != j)
+          need_remap = true;
+        signatures[j++] = sig;
+      }
+    if (j < sz)
+      signatures.resize(j);
+
+    // If we skipped some class equivalent to bddtrue/bddfalse, we
+    // have to the remaining class to fill the holes.
+    if (need_remap)
+      {
+        ++iteration;
+        for (bdd& sig: signatures)
+          sig = bdd_mt_apply1(sig, rename_class, bddfalse, bddtrue,
+                              cache, iteration);
+      }
+
+    mtdfa_ptr res = std::make_shared<mtdfa>(dfa->get_dict());
+    // If the automaton hasn't been reduced to true/false or has some
+    // controllable variables, assume it still uses all atomic
+    // propositions.
+    bdd controllable = dfa->get_controllable_variables();
+    if ((signatures[0] != bddfalse && signatures[0] != bddtrue)
+        || (controllable != bddtrue))
+      {
+        res->get_dict()->register_all_propositions_of(dfa, res);
+        res->aps = dfa->aps;
+      }
+    res->set_controllable_variables(controllable);
+    std::swap(res->names, names);
+    std::swap(res->states, signatures);
+    return res;
+  }
+
+  mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+    int iteration = 0;
+    mtdfa_ptr res = minimize_mtdfa(dfa, &cache, iteration);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  //////////////////////////////////////////////////////////////////////
+  //                  Boolean operations on MTDFAs                    //
+  //////////////////////////////////////////////////////////////////////
+
+  namespace
+  {
+    typedef std::pair<unsigned, unsigned> product_state;
+
+    struct product_state_hash
+    {
+      size_t
+      operator()(product_state s) const noexcept
+      {
+        return wang32_hash(s.first ^ wang32_hash(s.second));
+      }
+    };
+
+    inline std::pair<bdd, formula>
+    bdd_and_formula_from_state(unsigned s, const mtdfa_ptr& dfa)
+    {
+      if (s == -2U)
+        return {bddfalse, formula::ff()};
+      if (s == -1U)
+        return {bddtrue, formula::tt()};
+      if (s >= dfa->names.size())
+        return {dfa->states[s], nullptr};
+      return {dfa->states[s], dfa->names[s]};
+    }
+
+    struct product_data
+    {
+      // Cache the BDD node representing the terminals associated to a
+      // pair of states.  We may have up to two terminals par state,
+      // to distinguish between accepting states (2*value+1) or
+      // rejecting state (2*value).  However, while we know we need at
+      // least one of terminal, we may not always need the second one.
+      // So in the interest of reducing the calls to BuDDy, we store
+      // the 1-complement of value until in the other field until we
+      // find we actually need that terminal.
+      //
+      // The array can therefore hold either
+      //    [bdd_terminal(value*2), ~value]
+      // or [~value, bdd_terminal(value*2+1)]
+      // or [bdd_terminal(value*2), bdd_terminal(value*2+1)]
+      //
+      // The distinction between the three cases can be made with
+      // the sign bit of the array element.
+      std::unordered_map<product_state, std::array<int, 2>,
+                         product_state_hash> pair_to_terminal_map;
+      std::queue<product_state> todo;
+
+      std::pair<unsigned, bool> leaf_to_state(int b, int v) const
+      {
+        if (b == 0)
+          return {-2U, false};
+        if (b == 1)
+          return {-1U, true};
+        return {v / 2, v & 1};
+      }
+
+      int pair_to_terminal(unsigned left,
+                           unsigned right,
+                           bool may_stop = false)
+      {
+        if (auto it = pair_to_terminal_map.find({left, right});
+            it != pair_to_terminal_map.end())
+          {
+            int& id = it->second[may_stop];
+            if (id < 0)
+              id = bdd_terminal_as_int(2 * ~id + may_stop);
+            return id;
+          }
+
+        unsigned v = pair_to_terminal_map.size();
+        std::array<int, 2> entry;
+        int id = bdd_terminal_as_int(2 * v + may_stop);
+        entry[may_stop] = id;
+        entry[!may_stop] = ~v;
+
+        product_state ps{left, right};
+        pair_to_terminal_map.emplace(ps, entry);
+        todo.emplace(ps);
+
+        return id;
+      }
+
+      int pair_to_terminal_bdd(unsigned left,
+                               unsigned right,
+                               bool may_stop = false)
+      {
+        if (SPOT_UNLIKELY(left == -2U && right == -2U && !may_stop))
+          return 0;
+        else if (SPOT_UNLIKELY(left == -1U && right == -1U && may_stop))
+          return 1;
+        else
+          return pair_to_terminal(left, right, may_stop);
+      }
+    } the_product_data;
+
+    static int leaf_combine_and(int left, int left_term,
+                                int right, int right_term)
+    {
+      if (left == 0 || right == 0)
+        return 0;
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb & rb);
+    }
+
+    static int leaf_combine_or(int left, int left_term,
+                               int right, int right_term)
+    {
+      if (left == 1 || right == 1)
+        return 1;
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb | rb);
+    }
+
+    static int leaf_combine_implies(int left, int left_term,
+                                    int right, int right_term)
+    {
+      if (left == 0 || right == 1)
+        return 1;
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, !lb | rb);
+    }
+
+    static int leaf_combine_equiv(int left, int left_term,
+                                  int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 || left == 1))
+        {
+          if (left == right)
+            return 1;
+          if ((left ^ right) == 1)
+            return 0;
+        }
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb == rb);
+    }
+
+    static int leaf_combine_xor(int left, int left_term,
+                                int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 || left == 1))
+        {
+          if (left == right)
+            return 0;
+          if ((left ^ right) == 1)
+            return 1;
+        }
+      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
+      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs, lb != rb);
+    }
+
+    static mtdfa_ptr
+    product_mtdfa_aux(const mtdfa_ptr& dfa1,
+                      const mtdfa_ptr& dfa2, op o,
+                      bddExtCache* cache, int hash_key)
+    {
+      if (dfa1->get_dict() != dfa2->get_dict())
+        throw std::runtime_error
+          ("product_mtdfa_and: DFAs should share their dictionaries");
+
+      int (*combine)(int, int, int, int);
+      int applyop_shortcut = -1;
+      switch (o)
+        {
+        case op::And:
+          combine = leaf_combine_and;
+          applyop_shortcut = bddop_and_zero;
+          break;
+        case op::Or:
+          combine = leaf_combine_or;
+          applyop_shortcut = bddop_or_one;
+          break;
+        case op::Implies:
+          combine = leaf_combine_implies;
+          applyop_shortcut = bddop_imp_one;
+          break;
+        case op::Equiv:
+          combine = leaf_combine_equiv;
+          applyop_shortcut = -1;
+          break;
+        case op::Xor:
+          combine = leaf_combine_xor;
+          applyop_shortcut = -1;
+          break;
+        default:
+          throw std::runtime_error("product_mtdfa_aux: unsupported operator");
+        }
+
+      bdd_dict_ptr dict = dfa1->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa1, res);
+      dict->register_all_propositions_of(dfa2, res);
+
+      std::queue<product_state>& todo = the_product_data.todo;
+      // this will initialize TODO with the initial state of the product
+      (void) the_product_data.pair_to_terminal(0, 0);
+      while (!todo.empty())
+        {
+          product_state s = todo.front();
+          todo.pop();
+
+          auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
+          auto [right, right_f] = bdd_and_formula_from_state(s.second, dfa2);
+          bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
+                                       applyop_shortcut);
+          res->states.push_back(b);
+
+          if (left_f && right_f)
+            switch (o)
+              {
+              case op::And:
+                res->names.push_back(formula::And(left_f, right_f));
+                break;
+              case op::Or:
+                res->names.push_back(formula::Or(left_f, right_f));
+                break;
+              case op::Implies:
+                res->names.push_back(formula::Implies(left_f, right_f));
+                break;
+              case op::Equiv:
+                res->names.push_back(formula::Equiv(left_f, right_f));
+                break;
+              case op::Xor:
+                res->names.push_back(formula::Xor(left_f, right_f));
+                break;
+              default:
+                SPOT_UNREACHABLE();
+              }
+        }
+
+      // combine the sorted list of atomic propositions from DFA1 and DFA2
+      // keeping the result sorted
+      res->aps.reserve(dfa1->aps.size() + dfa2->aps.size());
+      std::set_union(dfa1->aps.begin(), dfa1->aps.end(),
+                     dfa2->aps.begin(), dfa2->aps.end(),
+                     std::back_inserter(res->aps));
+
+      the_product_data.pair_to_terminal_map.clear();
+      return res;
+    }
+
+    static int
+    complement_term(int v)
+    {
+      return v ^ 1;
+    }
+
+    static mtdfa_ptr
+    complement_aux(const mtdfa_ptr& dfa, bddExtCache* cache, int hash_key)
+    {
+      unsigned n = dfa->states.size();
+      unsigned ns = dfa->names.size();
+
+      bdd_dict_ptr dict = dfa->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa, res);
+      res->names.reserve(n);
+      res->states.reserve(ns);
+      res->aps = dfa->aps;
+
+      for (unsigned i = 0; i < n; ++i)
+        res->states.push_back(bdd_mt_apply1(dfa->states[i], complement_term,
+                                            bddtrue, bddfalse, cache,
+                                            hash_key));
+
+      for (unsigned i = 0; i < ns; ++i)
+        res->names.push_back(formula::Not(dfa->names[i]));
+      return res;
+    }
+  }
+
+  mtdfa_ptr product(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
+    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::And, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr product_or(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
+    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Or, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr product_xnor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
+    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Equiv, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr product_xor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
+    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Xor, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr product_implies(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
+    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Implies, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr complement(const mtdfa_ptr& dfa)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, 0, true);
+    mtdfa_ptr res = complement_aux(dfa, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  ////////////////////////////////////////////////////////////////////////
   //                       LTLf translator class                        //
   ////////////////////////////////////////////////////////////////////////
 
@@ -667,6 +1265,10 @@ namespace spot
     formula_to_bdd_[f] = res;
     return res;
   }
+
+  //////////////////////////////////////////////////////////////////////
+  //                Translation from LTLf to MTDFA                    //
+  //////////////////////////////////////////////////////////////////////
 
   namespace
   {
@@ -1549,604 +2151,9 @@ namespace spot
     return dfa;
   }
 
-  ////////////////////////////////////////////////////////////////////////
-  //                       minimization of MTDFA                        //
-  ////////////////////////////////////////////////////////////////////////
-
-  // callback for minimize_mtdfa
-  namespace
-  {
-    static std::vector<int> classes;
-    static int num_states;
-    static bool accepting_false_seen;
-    static bool rejecting_true_seen;
-
-    static int rename_class(int val)
-    {
-      assert((unsigned) val/2 < classes.size());
-      bool accepting = val & 1;
-      val = classes[val / 2];
-      if (val == num_states + accepting)
-        {
-          if (accepting)
-            accepting_false_seen = true;
-          else
-            rejecting_true_seen = true;
-        }
-      return 2 * val + accepting;
-    }
-  }
-
-  mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa,
-                           bddExtCache* cache,
-                           int& iteration)
-  {
-    if (iteration >= (1 << 20))
-      {
-        // wipe the cache every 2^20 iterations.
-        bdd_extcache_reset(cache);
-        iteration = 0;
-      }
-
-    unsigned n = num_states = dfa->num_roots();
-
-    // This minimization implements Moore's partition-refinement
-    // algorithm using MTBDDs.  The idea is relatively simple: each
-    // state of the MTDFA is assigned a class. Initially every state
-    // is in the same class.  The MTBDD used to represent the states
-    // are all rewritten, replacing each terminal (dst, b) by
-    // (class[dst], b).  After this rewriting, states whose MTBDD are
-    // different are put into different classes, and we start again.
-    // We iterate the process until no more classes are created.
-    //
-    // The implementation is made a bit more difficult because of the
-    // possible use of bddfalse, and bddtrue in the MTDFA.  In order
-    // other states in the automaton that should be reduced to
-    // bddfalse/bddtrue, we have to introduce fake states for
-    // bddfalse/bddtrue.
-
-    // class is a global vector assigning classes to each state
-    classes.clear();
-    classes.resize(n + 2, 0); // two extra classes for bddtrue/bddfalse
-
-    // The "signature" of each state is their encoding using
-    // the current set of classes.  The following vector remember
-    // each unique signature in the order they were discovered.
-    std::vector<bdd> signatures;
-    signatures.reserve(n);
-    // For each distinct signature, GROUPS retains the list of
-    // states that have this signature.
-    std::unordered_map<bdd, std::vector<int>, bdd_hash> groups;
-    for (;;)
-      {
-        ++iteration;
-        bdd true_term = bdd_terminal(2 * classes[n] + 1);
-        bdd false_term = bdd_terminal(2 * classes[n + 1]);
-        accepting_false_seen = false;
-        rejecting_true_seen = false;
-        for (unsigned i = 0; i < n; ++i)
-          {
-            bdd sig = bdd_mt_apply1(dfa->states[i], rename_class,
-                                    false_term, true_term,
-                                    cache, iteration);
-            auto& v = groups[sig];
-            if (v.empty())
-              signatures.push_back(sig);
-            v.push_back(i);
-          }
-        // Now we add the "fake" states for bddtrue amd bddfalse.
-        // We do this after all other states, because we are not sure
-        // if those will correspond to real states in the automaton.
-        {
-          auto& v = groups[true_term];
-          if (v.empty())
-            signatures.push_back(true_term);
-          v.push_back(n);
-        }
-        {
-          auto& v = groups[false_term];
-          if (v.empty())
-            signatures.push_back(false_term);
-          v.push_back(n + 1);
-        }
-
-        // { // debug
-        //   std::cerr << "iteration " << iteration << '\n';
-        //   std::cerr << signatures.size() << " states\n";
-        // }
-
-        // Assign each state to its class number, using the order in
-        // which signatures were discovered.  In this order, the
-        // initial state will always have class 0.
-        //
-        // An exception is if the class contains the fake true/false
-        // state.  In this case, we map the class back to n/n+1.
-        int curclass = 0;
-        bool changed = false;
-        for (bdd sig: signatures)
-          {
-            int mapclass = curclass++;
-            auto& v = groups[sig];
-            unsigned vb = v.back();
-            if (vb >= n)        // contains the fake true/false state
-              mapclass = vb;
-            for (unsigned i: v)
-              if (classes[i] != mapclass)
-                {
-                  changed = true;
-                  classes[i] = mapclass;
-                }
-            // { // debug
-            //   std::cerr << "class " << mapclass << ':';
-            //   for (unsigned i: v)
-            //     std::cerr << ' ' << i;
-            //   if (mapclass == (int) n)
-            //     std::cerr << "  (true)";
-            //   else if (mapclass == (int) n + 1)
-            //     std::cerr << "  (false)";
-            //   std::cerr << "\n      " << sig << '\n';
-            // }
-          }
-        // for (unsigned i = 0; i <= n + 1; ++i)
-        //    std::cerr << "classes[" << i << "]=" << classes[i] << '\n';
-        if (!changed)
-          break;
-        groups.clear();
-        signatures.clear();
-      }
-
-    // Unless we have states equivalent to false/true, the BDDs in
-    // SIGNATURES are actually our new MTBDD representation.
-    //
-    // If we have state equivalent to true & false, we just have get
-    // rid of the terms we introduced to replace bddtrue/bddfalse.  Be
-    // careful that bddtrue/bddfalse only replace (tt,⊤)/(ff,⊥).  We
-    // still need state of (tt,⊥) or (ff,⊤) if those appear in the
-    // automaton.
-    //
-    // In any case, if WANT_NAMES is set we also have to keep one name
-    // per class for display.
-    bool want_names = dfa->names.size() == n;
-    std::vector<formula> names;
-    // Our automaton will SZ states, minus any bddfalse/bddtrue state.
-    unsigned sz = signatures.size();
-    if (want_names)
-      names.reserve(sz);
-    unsigned j = 0;             // next free state number
-    ++iteration;
-    bdd true_term = bdd_terminal(2 * classes[n] + 1);
-    bdd false_term = bdd_terminal(2 * classes[n + 1]);
-    bool need_remap = false;
-    for (unsigned i = 0; i < sz; ++i)
-      {
-        bdd sig = signatures[i];
-        auto& v = groups[sig];
-        assert(!v.empty());
-        unsigned vb = v.back();
-        if (vb == n + 1)        // equivalent to ff!
-          {
-            if (i == 0)         // the initial state is false
-              {
-                assert(v.front() == 0);
-                if (want_names)
-                  names.push_back(formula::ff());
-                signatures[0] = bddfalse;
-                ++j;
-                break;
-              }
-            if (!accepting_false_seen)
-              continue;
-            // since (ff,⊤) exists, give ff a state number.
-            classes[n + 1] = j;
-            need_remap = true;
-          }
-        if (vb == n)            // equivalent to tt!
-          {
-            if (i == 0)         // the source state is true
-              {
-                assert(v.front() == 0);
-                if (want_names)
-                  names.push_back(formula::tt());
-                signatures[0] = bddtrue;
-                ++j;
-                break;
-              }
-            if (!rejecting_true_seen)
-              continue;
-            classes[n] = j;
-            need_remap = true;
-          }
-        if (want_names)
-          {
-            // We can pick the name of any state in v to label the
-            // class.  Here we simply pick the first one, but this
-            // can be changed if needed (e.g. pick the shortest one
-            // since it is more readable?)
-            assert((unsigned) v.front() < dfa->names.size());
-            names.push_back(dfa->names[v.front()]);
-          }
-        // replace false_term/true_term by bddfalse/bddtrue
-        // note that this does not change the other terminals.
-        sig = bdd_terminal_to_const(sig, false_term, true_term,
-                                    cache, iteration);
-        classes[i] = j;
-        if (i != j)
-          need_remap = true;
-        signatures[j++] = sig;
-      }
-    if (j < sz)
-      signatures.resize(j);
-
-    // If we skipped some class equivalent to bddtrue/bddfalse, we
-    // have to the remaining class to fill the holes.
-    if (need_remap)
-      {
-        ++iteration;
-        for (bdd& sig: signatures)
-          sig = bdd_mt_apply1(sig, rename_class, bddfalse, bddtrue,
-                              cache, iteration);
-      }
-
-    mtdfa_ptr res = std::make_shared<mtdfa>(dfa->get_dict());
-    // If the automaton hasn't been reduced to true/false or has some
-    // controllable variables, assume it still uses all atomic
-    // propositions.
-    bdd controllable = dfa->get_controllable_variables();
-    if ((signatures[0] != bddfalse && signatures[0] != bddtrue)
-        || (controllable != bddtrue))
-      {
-        res->get_dict()->register_all_propositions_of(dfa, res);
-        res->aps = dfa->aps;
-      }
-    res->set_controllable_variables(controllable);
-    std::swap(res->names, names);
-    std::swap(res->states, signatures);
-    return res;
-  }
-
-  mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
-    int iteration = 0;
-    mtdfa_ptr res = minimize_mtdfa(dfa, &cache, iteration);
-    bdd_extcache_done(&cache);
-    return res;
-  }
-
   //////////////////////////////////////////////////////////////////////
-  //                  Boolean operations on MTDFAs                    //
+  //          Compositional Translation from LTLf to MTDFA            //
   //////////////////////////////////////////////////////////////////////
-
-  namespace
-  {
-    typedef std::pair<unsigned, unsigned> product_state;
-
-    struct product_state_hash
-    {
-      size_t
-      operator()(product_state s) const noexcept
-      {
-        return wang32_hash(s.first ^ wang32_hash(s.second));
-      }
-    };
-
-    inline std::pair<bdd, formula>
-    bdd_and_formula_from_state(unsigned s, const mtdfa_ptr& dfa)
-    {
-      if (s == -2U)
-        return {bddfalse, formula::ff()};
-      if (s == -1U)
-        return {bddtrue, formula::tt()};
-      if (s >= dfa->names.size())
-        return {dfa->states[s], nullptr};
-      return {dfa->states[s], dfa->names[s]};
-    }
-
-    struct product_data
-    {
-      // Cache the BDD node representing the terminals associated to a
-      // pair of states.  We may have up to two terminals par state,
-      // to distinguish between accepting states (2*value+1) or
-      // rejecting state (2*value).  However, while we know we need at
-      // least one of terminal, we may not always need the second one.
-      // So in the interest of reducing the calls to BuDDy, we store
-      // the 1-complement of value until in the other field until we
-      // find we actually need that terminal.
-      //
-      // The array can therefore hold either
-      //    [bdd_terminal(value*2), ~value]
-      // or [~value, bdd_terminal(value*2+1)]
-      // or [bdd_terminal(value*2), bdd_terminal(value*2+1)]
-      //
-      // The distinction between the three cases can be made with
-      // the sign bit of the array element.
-      std::unordered_map<product_state, std::array<int, 2>,
-                         product_state_hash> pair_to_terminal_map;
-      std::queue<product_state> todo;
-
-      std::pair<unsigned, bool> leaf_to_state(int b, int v) const
-      {
-        if (b == 0)
-          return {-2U, false};
-        if (b == 1)
-          return {-1U, true};
-        return {v / 2, v & 1};
-      }
-
-      int pair_to_terminal(unsigned left,
-                           unsigned right,
-                           bool may_stop = false)
-      {
-        if (auto it = pair_to_terminal_map.find({left, right});
-            it != pair_to_terminal_map.end())
-          {
-            int& id = it->second[may_stop];
-            if (id < 0)
-              id = bdd_terminal_as_int(2 * ~id + may_stop);
-            return id;
-          }
-
-        unsigned v = pair_to_terminal_map.size();
-        std::array<int, 2> entry;
-        int id = bdd_terminal_as_int(2 * v + may_stop);
-        entry[may_stop] = id;
-        entry[!may_stop] = ~v;
-
-        product_state ps{left, right};
-        pair_to_terminal_map.emplace(ps, entry);
-        todo.emplace(ps);
-
-        return id;
-      }
-
-      int pair_to_terminal_bdd(unsigned left,
-                               unsigned right,
-                               bool may_stop = false)
-      {
-        if (SPOT_UNLIKELY(left == -2U && right == -2U && !may_stop))
-          return 0;
-        else if (SPOT_UNLIKELY(left == -1U && right == -1U && may_stop))
-          return 1;
-        else
-          return pair_to_terminal(left, right, may_stop);
-      }
-    } the_product_data;
-
-    static int leaf_combine_and(int left, int left_term,
-                                int right, int right_term)
-    {
-      if (left == 0 || right == 0)
-        return 0;
-      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
-      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb & rb);
-    }
-
-    static int leaf_combine_or(int left, int left_term,
-                               int right, int right_term)
-    {
-      if (left == 1 || right == 1)
-        return 1;
-      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
-      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb | rb);
-    }
-
-    static int leaf_combine_implies(int left, int left_term,
-                                    int right, int right_term)
-    {
-      if (left == 0 || right == 1)
-        return 1;
-      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
-      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
-      return the_product_data.pair_to_terminal_bdd(ls, rs, !lb | rb);
-    }
-
-    static int leaf_combine_equiv(int left, int left_term,
-                                  int right, int right_term)
-    {
-      if (SPOT_UNLIKELY(left == 0 || left == 1))
-        {
-          if (left == right)
-            return 1;
-          if ((left ^ right) == 1)
-            return 0;
-        }
-      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
-      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb == rb);
-    }
-
-    static int leaf_combine_xor(int left, int left_term,
-                                int right, int right_term)
-    {
-      if (SPOT_UNLIKELY(left == 0 || left == 1))
-        {
-          if (left == right)
-            return 0;
-          if ((left ^ right) == 1)
-            return 1;
-        }
-      auto [ls, lb] = the_product_data.leaf_to_state(left, left_term);
-      auto [rs, rb] = the_product_data.leaf_to_state(right, right_term);
-      return the_product_data.pair_to_terminal_bdd(ls, rs, lb != rb);
-    }
-
-    static mtdfa_ptr
-    product_mtdfa_aux(const mtdfa_ptr& dfa1,
-                      const mtdfa_ptr& dfa2, op o,
-                      bddExtCache* cache, int hash_key)
-    {
-      if (dfa1->get_dict() != dfa2->get_dict())
-        throw std::runtime_error
-          ("product_mtdfa_and: DFAs should share their dictionaries");
-
-      int (*combine)(int, int, int, int);
-      int applyop_shortcut = -1;
-      switch (o)
-        {
-        case op::And:
-          combine = leaf_combine_and;
-          applyop_shortcut = bddop_and_zero;
-          break;
-        case op::Or:
-          combine = leaf_combine_or;
-          applyop_shortcut = bddop_or_one;
-          break;
-        case op::Implies:
-          combine = leaf_combine_implies;
-          applyop_shortcut = bddop_imp_one;
-          break;
-        case op::Equiv:
-          combine = leaf_combine_equiv;
-          applyop_shortcut = -1;
-          break;
-        case op::Xor:
-          combine = leaf_combine_xor;
-          applyop_shortcut = -1;
-          break;
-        default:
-          throw std::runtime_error("product_mtdfa_aux: unsupported operator");
-        }
-
-      bdd_dict_ptr dict = dfa1->get_dict();
-      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
-      dict->register_all_propositions_of(dfa1, res);
-      dict->register_all_propositions_of(dfa2, res);
-
-      std::queue<product_state>& todo = the_product_data.todo;
-      // this will initialize TODO with the initial state of the product
-      (void) the_product_data.pair_to_terminal(0, 0);
-      while (!todo.empty())
-        {
-          product_state s = todo.front();
-          todo.pop();
-
-          auto [left, left_f] = bdd_and_formula_from_state(s.first, dfa1);
-          auto [right, right_f] = bdd_and_formula_from_state(s.second, dfa2);
-          bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
-                                       applyop_shortcut);
-          res->states.push_back(b);
-
-          if (left_f && right_f)
-            switch (o)
-              {
-              case op::And:
-                res->names.push_back(formula::And(left_f, right_f));
-                break;
-              case op::Or:
-                res->names.push_back(formula::Or(left_f, right_f));
-                break;
-              case op::Implies:
-                res->names.push_back(formula::Implies(left_f, right_f));
-                break;
-              case op::Equiv:
-                res->names.push_back(formula::Equiv(left_f, right_f));
-                break;
-              case op::Xor:
-                res->names.push_back(formula::Xor(left_f, right_f));
-                break;
-              default:
-                SPOT_UNREACHABLE();
-              }
-        }
-
-      // combine the sorted list of atomic propositions from DFA1 and DFA2
-      // keeping the result sorted
-      res->aps.reserve(dfa1->aps.size() + dfa2->aps.size());
-      std::set_union(dfa1->aps.begin(), dfa1->aps.end(),
-                     dfa2->aps.begin(), dfa2->aps.end(),
-                     std::back_inserter(res->aps));
-
-      the_product_data.pair_to_terminal_map.clear();
-      return res;
-    }
-
-    static int
-    complement_term(int v)
-    {
-      return v ^ 1;
-    }
-
-    static mtdfa_ptr
-    complement_aux(const mtdfa_ptr& dfa, bddExtCache* cache, int hash_key)
-    {
-      unsigned n = dfa->states.size();
-      unsigned ns = dfa->names.size();
-
-      bdd_dict_ptr dict = dfa->get_dict();
-      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
-      dict->register_all_propositions_of(dfa, res);
-      res->names.reserve(n);
-      res->states.reserve(ns);
-      res->aps = dfa->aps;
-
-      for (unsigned i = 0; i < n; ++i)
-        res->states.push_back(bdd_mt_apply1(dfa->states[i], complement_term,
-                                            bddtrue, bddfalse, cache,
-                                            hash_key));
-
-      for (unsigned i = 0; i < ns; ++i)
-        res->names.push_back(formula::Not(dfa->names[i]));
-      return res;
-    }
-  }
-
-  mtdfa_ptr product(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
-    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::And, &cache, 0);
-    bdd_extcache_done(&cache);
-    return res;
-  }
-
-  mtdfa_ptr product_or(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
-    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Or, &cache, 0);
-    bdd_extcache_done(&cache);
-    return res;
-  }
-
-  mtdfa_ptr product_xnor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
-    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Equiv, &cache, 0);
-    bdd_extcache_done(&cache);
-    return res;
-  }
-
-  mtdfa_ptr product_xor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
-    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Xor, &cache, 0);
-    bdd_extcache_done(&cache);
-    return res;
-  }
-
-  mtdfa_ptr product_implies(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, size_estimate_product(dfa1, dfa2), true);
-    mtdfa_ptr res = product_mtdfa_aux(dfa1, dfa2, op::Implies, &cache, 0);
-    bdd_extcache_done(&cache);
-    return res;
-  }
-
-  mtdfa_ptr complement(const mtdfa_ptr& dfa)
-  {
-    bddExtCache cache;
-    bdd_extcache_init(&cache, 0, true);
-    mtdfa_ptr res = complement_aux(dfa, &cache, 0);
-    bdd_extcache_done(&cache);
-    return res;
-  }
-
 
   struct compose_data
   {
