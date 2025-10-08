@@ -1830,8 +1830,6 @@ namespace spot
       // the sign bit of the array element.
       std::unordered_map<product_state, std::array<int, 2>,
                          product_state_hash> pair_to_terminal_map;
-      mtdfa_ptr left;
-      mtdfa_ptr right;
       std::queue<product_state> todo;
 
       std::pair<unsigned, bool> leaf_to_state(int b, int v) const
@@ -1979,9 +1977,6 @@ namespace spot
           throw std::runtime_error("product_mtdfa_aux: unsupported operator");
         }
 
-      the_product_data.left = dfa1;
-      the_product_data.right = dfa2;
-
       bdd_dict_ptr dict = dfa1->get_dict();
       mtdfa_ptr res = std::make_shared<mtdfa>(dict);
       dict->register_all_propositions_of(dfa1, res);
@@ -2031,8 +2026,6 @@ namespace spot
                      dfa2->aps.begin(), dfa2->aps.end(),
                      std::back_inserter(res->aps));
 
-      the_product_data.left = nullptr;
-      the_product_data.right = nullptr;
       the_product_data.pair_to_terminal_map.clear();
       return res;
     }
