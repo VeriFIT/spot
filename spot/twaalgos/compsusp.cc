@@ -90,7 +90,7 @@ namespace spot
                       // res || susp -> (res && G![susp]) || G[susp])
                       auto r = formula::multop(o, res);
                       auto gn = formula::G(formula::Not(g[0]));
-                      return formula::Or({formula::And({r, gn}), g});
+                      return formula::Or(formula::And(r, gn), g);
                     }
                 }
               return formula::multop(o, res);

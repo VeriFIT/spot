@@ -272,7 +272,7 @@ namespace spot
       else
         l = rrand(0, n/2 - 1)*2 + 1;
       formula right = rl->generate(n - l);
-      return formula::multop(Op, {rl->generate(l), right});
+      return formula::multop(Op, rl->generate(l), right);
     }
 
   } // anonymous
@@ -661,7 +661,7 @@ namespace spot
           {
             atomic_prop_set s = aprops_;
             remove_some_props(s);
-            f = formula::And({f, GF_n()});
+            f = formula::And(f, GF_n());
           }
 
         if (opt_simpl_level_)
@@ -695,15 +695,11 @@ namespace spot
   randltlgenerator::GF_n()
   {
     formula res = nullptr;
+    std::vector<formula> gfs;
+    gfs.reserve(aprops_.size());
     for (auto v: aprops_)
-      {
-        formula f = formula::G(formula::F(v));
-        if (res)
-          res = formula::And({f, res});
-        else
-          res = f;
-      }
-    return res;
+      gfs.push_back(formula::G(formula::F(v)));
+    return formula::And(std::move(gfs));
   }
 
   void

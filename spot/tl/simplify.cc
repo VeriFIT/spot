@@ -446,9 +446,9 @@ namespace spot
             return formula::Equiv(recurse_f1_false, recurse_f2_false);
           auto recurse_f1_true = rec(f1, true);
           auto recurse_f2_true = rec(f2, true);
-          auto left = formula::And({recurse_f1_false, recurse_f2_false});
-          auto right = formula::And({recurse_f1_true, recurse_f2_true});
-          return formula::Or({left, right});
+          auto left = formula::And(recurse_f1_false, recurse_f2_false);
+          auto right = formula::And(recurse_f1_true, recurse_f2_true);
+          return formula::Or(left, right);
         }
       else
         {
@@ -459,9 +459,9 @@ namespace spot
             return formula::Xor(recurse_f1_false, recurse_f2_false);
           auto recurse_f1_true = rec(f1, true);
           auto recurse_f2_true = rec(f2, true);
-          auto left = formula::And({recurse_f1_false, recurse_f2_true});
-          auto right = formula::And({recurse_f1_true, recurse_f2_false});
-          return formula::Or({left, right});
+          auto left = formula::And(recurse_f1_false, recurse_f2_true);
+          auto right = formula::And(recurse_f1_true, recurse_f2_false);
+          return formula::Or(left, right);
         }
     }
 
@@ -549,12 +549,12 @@ namespace spot
                 // !(a => b) == a & !b
                 {
                   auto f2 = rec(f[1], true);
-                  result = formula::And({rec(f[0], false), f2});
+                  result = formula::And(rec(f[0], false), f2);
                 }
               else // a => b == !a | b
                 {
                   auto f2 = rec(f[1], false);
-                  result = formula::Or({rec(f[0], true), f2});
+                  result = formula::Or(rec(f[0], true), f2);
                 }
               break;
             case op::Xor:
@@ -965,7 +965,7 @@ namespace spot
           }
         while (n--)
           tail = // b&X(tail) or !b|X(tail)
-            formula::multop(mop, {c, formula::X(tail)});
+            formula::multop(mop, c, formula::X(tail));
         return tail;
       }
 
@@ -1105,7 +1105,7 @@ namespace spot
                         {
                           formula ev = unop_multop(op::G, op::Or,
                                                    std::move(eventual));
-                          res = formula::Or({res, ev});
+                          res = formula::Or(res, ev);
                         }
                       if (res != f)
                         return recurse(res);
@@ -1122,7 +1122,7 @@ namespace spot
                                                     std::move(*s2.res_other));
                       formula gf = unop_multop(op::G, op::And,
                                                std::move(*s2.res_Event));
-                      formula res = formula::And({fg, gf});
+                      formula res = formula::And(fg, gf);
                       if (res != f)
                         return recurse(res);
                     }
@@ -1242,7 +1242,7 @@ namespace spot
                                          toadd.begin(), toadd.end());
                       formula fu = unop_multop(op::F, op::Or,
                                                std::move(*s.res_Univ));
-                      res = formula::Or({res, fu});
+                      res = formula::Or(res, fu);
                     }
                   if (res != f)
                     return recurse(res);
@@ -1308,7 +1308,7 @@ namespace spot
                         {
                           formula un = unop_multop(op::F, op::And,
                                                    std::move(univ));
-                          res = formula::And({res, un});
+                          res = formula::And(res, un);
                         }
                       if (res != f)
                         return recurse(res);
@@ -1325,7 +1325,7 @@ namespace spot
                                                     std::move(*s2.res_other));
                       formula fg = unop_multop(op::F, op::Or,
                                                std::move(*s2.res_Univ));
-                      formula res = formula::Or({gf, fg});
+                      formula res = formula::Or(gf, fg);
                       if (res != f)
                         return recurse(res);
                     }
@@ -1392,7 +1392,7 @@ namespace spot
                           formula ge =
                             unop_multop(op::G, op::And,
                                         std::move(*s.res_Event));
-                          res = formula::And({res, ge});
+                          res = formula::And(res, ge);
                         }
                       if (res != f)
                         return recurse(res);
@@ -1548,9 +1548,9 @@ namespace spot
                             {
                               tail = formula::X(tail);
                               if (doneg)
-                                tail = formula::Or({formula::Not(e), tail});
+                                tail = formula::Or(formula::Not(e), tail);
                               else
-                                tail = formula::And({e, tail});
+                                tail = formula::And(e, tail);
                             }
                         }
                       return recurse(tail);
@@ -1749,10 +1749,10 @@ namespace spot
                           if (smax != formula::unbounded())
                             smax -= smin;
                           formula s2 = formula::Star(s[0], 1, smax);
-                          formula in = formula::Fusion({s2, h.all_but(0)});
+                          formula in = formula::Fusion(s2, h.all_but(0));
                           in = formula::first_match(in);
                           formula s3 = formula::Star(s[0], smin, smin);
-                          return recurse(formula::Concat({s3, in}));
+                          return recurse(formula::Concat(s3, in));
                         }
                     }
                   // 3. first_match(first_match(f):g) =
@@ -1761,9 +1761,9 @@ namespace spot
                     {
                       formula rest = h.all_but(0);
                       if (rest.accepts_eword())
-                        rest = formula::Fusion({formula::tt(), rest});
+                        rest = formula::Fusion(formula::tt(), rest);
                       rest = formula::first_match(rest);
-                      return recurse(formula::Fusion({h[0], rest}));
+                      return recurse(formula::Fusion(h[0], rest));
                     }
                   // 4. first_match(f:g[*i..j]) = first_match(f:g[*max(1,i)])
                   // 5. first_match(f:g[:*i..j]) = first_match(f:g[:*i])
@@ -1778,7 +1778,7 @@ namespace spot
                             ++smin;
                           formula s2 =
                             formula::bunop(tail.kind(), tail[0], smin, smin);
-                          formula in = formula::Fusion({h.all_but(last), s2});
+                          formula in = formula::Fusion(h.all_but(last), s2);
                           return recurse(formula::first_match(in));
                         }
                     }
@@ -1905,7 +1905,7 @@ namespace spot
                       formula x = // X(b W !s)
                         formula::X(w);
                       formula d = // b & X(b W !s)
-                        formula::multop(op_and, {b, x});
+                        formula::multop(op_and, b, x);
                       // {r}[]->(b & X(b W !s))
                       return recurse(formula::binop(bindop, r, d));
                     }
@@ -2036,9 +2036,9 @@ namespace spot
             /* If a is a pure eventuality formula then a M b = a & b.
                If a is a pure universality formula a W b = a | b. */
             if (a.is_eventual() && bo.is(op::M))
-              return recurse(formula::And({a, b}));
+              return recurse(formula::And(a, b));
             if (a.is_universal() && bo.is(op::W))
-              return recurse(formula::Or({a, b}));
+              return recurse(formula::Or(a, b));
 
             // (q R Xf) = X(q R f)
             // (q U Xf) = X(q U f)
@@ -2056,9 +2056,9 @@ namespace spot
             if (!opt_.reduce_size_strictly)
               {
                 if (bo.is(op::W) && a.is_eventual() && b.is_eventual())
-                  return recurse(formula::Or({formula::G(a), b}));
+                  return recurse(formula::Or(formula::G(a), b));
                 if (bo.is(op::M) && a.is_universal() && b.is_universal())
-                  return recurse(formula::And({formula::F(a), b}));
+                  return recurse(formula::And(formula::F(a), b));
               }
 
             // In the following rewritings we assume that
@@ -2207,7 +2207,7 @@ namespace spot
                   return recurse(formula::U(a[1], b));
                 // if c => b, then (a U c) U b = (a U c) | b
                 if (a.is(op::U) && c_->implication(a[1], b))
-                  return recurse(formula::Or({a, b}));
+                  return recurse(formula::Or(a, b));
                 // if g => h, then (f|g) U h = f U h
                 if (a.is(op::Or))
                   {
@@ -2267,7 +2267,7 @@ namespace spot
                       return recurse(formula::R(a[1], b));
                     if (c_->implication(a[1], b))
                       {
-                        formula ac = formula::And({a[0], a[1]});
+                        formula ac = formula::And(a[0], a[1]);
                         return recurse(formula::R(ac, b));
                       }
                   }
@@ -2331,7 +2331,7 @@ namespace spot
                 // if c => b, then (a W c) W b = (a W c) | b
                 // if c => b, then (a U c) W b = (a U c) | b
                 if (a.is(op::U, op::W) && c_->implication(a[1], b))
-                  return recurse(formula::Or({a, b}));
+                  return recurse(formula::Or(a, b));
                 // if g => h, then (f|g) W h = f M h
                 if (a.is(op::Or))
                   {
@@ -2369,7 +2369,7 @@ namespace spot
                 // if c => b, then (a M c) M b = (a & c) M b
                 if (a.is(op::M) && c_->implication(a[1], b))
                   return
-                    recurse(formula::M(formula::And({a[0], a[1]}),
+                    recurse(formula::M(formula::And(a[0], a[1]),
                                        b));
                 // if h => g, then (f&g) M h = f M h
                 if (a.is(op::And))
@@ -2450,7 +2450,7 @@ namespace spot
                     formula x = formula::X(formula::binop(o == op::U ?
                                                           op::M : op::R,
                                                           b, a[0]));
-                    return recurse(formula::Or({b, x}));
+                    return recurse(formula::Or(b, x));
                   }
               }
             else if (bo.is(op::M, op::R))
@@ -2486,7 +2486,7 @@ namespace spot
                     formula x =
                       formula::X(formula::binop(o == op::M ? op::U : op::W,
                                                 b, a[0]));
-                    return recurse(formula::And({b, x}));
+                    return recurse(formula::And(b, x));
                   }
               }
           }
@@ -2820,7 +2820,7 @@ namespace spot
                       op o = op::W;
                       if (i->is(op::U) || old.is(op::U))
                         o = op::U;
-                      formula fst_arg = formula::And({old[0], (*i)[0]});
+                      formula fst_arg = formula::And(old[0], (*i)[0]);
                       *j->second = formula::binop(o, fst_arg, b);
                       assert(j->second->is(o));
                       *i = nullptr;
@@ -2844,7 +2844,7 @@ namespace spot
                       op o = op::R;
                       if (i->is(op::M) || old.is(op::M))
                         o = op::M;
-                      formula snd_arg = formula::And({old[1], (*i)[1]});
+                      formula snd_arg = formula::And(old[1], (*i)[1]);
                       *j->second = formula::binop(o, a, snd_arg);
                       assert(j->second->is(o));
                       *i = nullptr;
@@ -3083,13 +3083,13 @@ namespace spot
                     {
                       formula h = formula::And(std::move(head1));
                       formula t = formula::AndRat(std::move(tail1));
-                      s.res_other->emplace_back(formula::Concat({h, t}));
+                      s.res_other->emplace_back(formula::Concat(h, t));
                     }
                   if (!head2.empty())
                     {
                       formula h = formula::And(std::move(head2));
                       formula t = formula::AndRat(std::move(tail2));
-                      s.res_other->emplace_back(formula::Fusion({h, t}));
+                      s.res_other->emplace_back(formula::Fusion(h, t));
                     }
 
                   // {r1;b1}&&{r2;b2} = {r1&&r2};{b1∧b2}
@@ -3126,13 +3126,13 @@ namespace spot
                     {
                       formula h = formula::AndRat(std::move(head3));
                       formula t = formula::And(std::move(tail3));
-                      s.res_other->emplace_back(formula::Concat({h, t}));
+                      s.res_other->emplace_back(formula::Concat(h, t));
                     }
                   if (!head4.empty())
                     {
                       formula h = formula::AndRat(std::move(head4));
                       formula t = formula::And(std::move(tail4));
-                      s.res_other->emplace_back(formula::Fusion({h, t}));
+                      s.res_other->emplace_back(formula::Fusion(h, t));
                     }
 
                   auto r = formula::AndRat(std::move(*s.res_other));
@@ -3452,7 +3452,7 @@ namespace spot
                       op o = op::U;
                       if (i->is(op::W) || old.is(op::W))
                         o = op::W;
-                      formula snd_arg = formula::Or({old[1], (*i)[1]});
+                      formula snd_arg = formula::Or(old[1], (*i)[1]);
                       *j->second = formula::binop(o, a, snd_arg);
                       assert(j->second->is(o));
                       *i = nullptr;
@@ -3476,7 +3476,7 @@ namespace spot
                       op o = op::M;
                       if (i->is(op::R) || old.is(op::R))
                         o = op::R;
-                      formula fst_arg = formula::Or({old[0], (*i)[0]});
+                      formula fst_arg = formula::Or(old[0], (*i)[0]);
                       *j->second = formula::binop(o, fst_arg, b);
                       assert(j->second->is(o));
                       *i = nullptr;
@@ -3624,13 +3624,13 @@ namespace spot
                           // explicitly requested.
                           if (!opt_.reduce_size_strictly)
                             return recurse(formula::OrRat
-                                           ({b, formula::Fusion({b, rest})}));
+                                           (b, formula::Fusion(b, rest)));
                           else
                             return mo;
                         }
                       else
                         {
-                          return recurse(formula::Fusion({b, rest}));
+                          return recurse(formula::Fusion(b, rest));
                         }
                     }
                   // No Boolean as argument of &&.
@@ -3675,13 +3675,13 @@ namespace spot
                     {
                       formula h = formula::And(std::move(head1));
                       formula t = formula::AndNLM(std::move(tail1));
-                      s.res_other->emplace_back(formula::Concat({h, t}));
+                      s.res_other->emplace_back(formula::Concat(h, t));
                     }
                   if (!head2.empty())
                     {
                       formula h = formula::And(std::move(head2));
                       formula t = formula::AndNLM(std::move(tail2));
-                      s.res_other->emplace_back(formula::Fusion({h, t}));
+                      s.res_other->emplace_back(formula::Fusion(h, t));
                     }
 
                   formula r = formula::AndNLM(std::move(*s.res_other));

@@ -24,10 +24,10 @@
 #include <spot/tl/mutation.hh>
 #include <spot/tl/length.hh>
 
-#define And_(x, y) formula::And({(x), (y)})
-#define AndRat_(x, y) formula::AndRat({(x), (y)})
+#define And_(x, y) formula::And((x), (y))
+#define AndRat_(x, y) formula::AndRat((x), (y))
 #define AndNLM_(x) formula::AndNLM(x)
-#define Concat_(x, y) formula::Concat({(x), (y)})
+#define Concat_(x, y) formula::Concat((x), (y))
 #define Not_(x) formula::Not(x)
 
 namespace spot
@@ -214,21 +214,21 @@ namespace spot
                       if (mutation_counter_-- == 0)
                         return formula::Implies(second, first);
                       if (mutation_counter_-- == 0)
-                        return formula::And({first, second});
+                        return And_(first, second);
                       if (mutation_counter_-- == 0)
                         {
                           // Negate the two argument sequentially (in this
                           // case right before left, otherwise different
                           // compilers will make different choices.
                           auto right = formula::Not(second);
-                          return formula::And({formula::Not(first), right});
+                          return And_(formula::Not(first), right);
                         }
                       break;
                     case op::Xor:
                       if (mutation_counter_-- == 0)
-                        return formula::And({first, formula::Not(second)});
+                        return And_(first, formula::Not(second));
                       if (mutation_counter_-- == 0)
-                        return formula::And({formula::Not(first), second});
+                        return And_(formula::Not(first), second);
                       break;
                     default:
                       break;

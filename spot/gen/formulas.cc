@@ -32,8 +32,9 @@
 
 #define Implies_(x, y) formula::Implies((x), (y))
 #define Equiv_(x, y) formula::Equiv((x), (y))
-#define And_(x, y) formula::And({(x), (y)})
-#define Or_(x, y) formula::Or({(x), (y)})
+#define And_(x, y) formula::And((x), (y))
+#define And3_(x, y, z) formula::And({(x), (y), (z)})
+#define Or_(x, y) formula::Or((x), (y))
 #define Or3_(x, y, z) formula::Or({(x), (y), (z)})
 #define U_(x, y) formula::U((x), (y))
 #define Xor_(x, y) formula::Xor((x), (y))
@@ -162,7 +163,7 @@ namespace spot
         for (; n > 0; --n)
           {
             if (result)
-              result = formula::multop(oper, {p, X_(result)});
+              result = formula::multop(oper, p, X_(result));
             else
               result = p;
           }
@@ -190,7 +191,7 @@ namespace spot
             if (result)
               {
                 p = X_(p);
-                result = formula::multop(oper, {result, p});
+                result = formula::multop(oper, result, p);
               }
             else
               {
@@ -225,7 +226,7 @@ namespace spot
             formula f = G_(F_(formula::ap(p.str())));
 
             if (result)
-              result = formula::multop(o, {f, result});
+              result = formula::multop(o, f, result);
             else
               result = f;
           }
@@ -251,7 +252,7 @@ namespace spot
             formula f = F_(G_(formula::ap(p.str())));
 
             if (result)
-              result = formula::multop(o, {f, result});
+              result = formula::multop(o, f, result);
             else
               result = f;
           }
@@ -408,7 +409,7 @@ namespace spot
             formula f = formula::unop(o, formula::ap(p.str()));
 
             if (result)
-              result = formula::multop(cop, {f, result});
+              result = formula::multop(cop, f, result);
             else
               result = f;
           }
@@ -481,23 +482,26 @@ namespace spot
         // and other bits stay the same.
         formula Xnm1_b = X_n(b, n - 1);
         formula Xn_b = X_(Xnm1_b);
+        formula nm = Not_(m);
         res[2] = G_(Implies_(And_(m, neg_b),
                              AndX_(Xnm1_b,
-                                   U_(And_(Not_(m), Equiv_(b, Xn_b)), m))));
+                                   U_(And_(nm, Equiv_(b, Xn_b)), m))));
 
         // From the least significant bit to the first 0, all the bits
         // are flipped on the next value.  Remaining bits are identical.
         formula Xnm1_negb = X_n(neg_b, n - 1);
         formula Xn_negb = X_(Xnm1_negb);
+        formula and1 = And3_(b, neg_m, Xn_negb);
         res[3] =
           G_(Implies_(And_(m, b),
                       AndX_(Xnm1_negb,
-                            U_(And_(And_(b, neg_m), Xn_negb),
-                               Or_(m, And_(And_(neg_m, neg_b),
-                                           AndX_(Xnm1_b,
-                                                 U_(And_(neg_m,
-                                                         Equiv_(b, Xn_b)),
-                                                    m))))))));
+                            U_(and1,
+                               Or_(m, And3_(neg_m,
+                                            neg_b,
+                                            AndX_(Xnm1_b,
+                                                  U_(And_(neg_m,
+                                                          Equiv_(b, Xn_b)),
+                                                     m))))))));
         return formula::And(std::move(res));
       }
 
@@ -556,35 +560,43 @@ namespace spot
         formula Xn_negb = X_n(neg_b, n);
 
         // If m is 1 and b is 0 then c is 0 and n steps later b is 1.
-        res[2] = G_(Implies_(And_(m, neg_b), And_(neg_c, Xn_b)));
+        formula mnb = And_(m, neg_b);
+        res[2] = G_(Implies_(mnb, And_(neg_c, Xn_b)));
 
         // If m is 1 and b is 1 then c is 1 and n steps later b is 0.
-        res[3] = G_(Implies_(And_(m, b), And_(c, Xn_negb)));
+        formula mb = And_(m, b);
+        res[3] = G_(Implies_(mb, And_(c, Xn_negb)));
 
         if (!linear)
           {
             // If there's no carry, then all of the bits stay the same
             // n steps later.
-            res[4] = G_(Implies_(And_(neg_c, X_(neg_m)),
-                                 And_(X_(Not_(c)), Equiv_(X_(b), X_(Xn_b)))));
+            formula t4 = X_(Xn_b);
+            formula t3 = X_(b);
+            formula t2 = X_(Not_(c));
+            formula t1 = And_(neg_c, X_(neg_m));
+            res[4] = G_(Implies_(t1, And_(t2, Equiv_(t3, t4))));
 
             // If there's a carry, then add one: flip the bits of b and
             // adjust the carry.
-            res[5] = G_(Implies_(c, And_(Implies_(X_(neg_b),
-                                                  And_(X_(neg_c), X_(Xn_b))),
-                                         Implies_(X_(b),
+            formula t6 = And_(X_(neg_c), t4);
+            formula t5 = Implies_(X_(neg_b), t6);
+            res[5] = G_(Implies_(c, And_(t5,
+                                         Implies_(t3,
                                                   And_(X_(c), X_(Xn_negb))))));
           }
         else
           {
             // If there's no carry, then all of the bits stay the same
             // n steps later.
-            res[4] = G_(Implies_(And_(neg_c, X_(neg_m)),
-                                 X_(And_(Not_(c), Equiv_(b, Xn_b)))));
+            formula t8 = Equiv_(b, Xn_b);
+            formula t7 = X_(And_(Not_(c), t8));
+            res[4] = G_(Implies_(And_(neg_c, X_(neg_m)), t7));
             // If there's a carry, then add one: flip the bits of b and
             // adjust the carry.
+            formula t9 = Implies_(b, And_(c, Xn_negb));
             res[5] = G_(Implies_(c, X_(And_(Implies_(neg_b, And_(neg_c, Xn_b)),
-                                            Implies_(b, And_(c, Xn_negb))))));
+                                            t9))));
           }
         return formula::And(std::move(res));
       }
@@ -592,25 +604,29 @@ namespace spot
       static formula
       tv_f1(std::string p, std::string q, int n)
       {
-        return G_(Implies_(formula::ap(p), phi_prime_n(q, n, op::Or)));
+        formula phi = phi_prime_n(q, n, op::Or);
+        return G_(Implies_(formula::ap(p), phi));
       }
 
       static formula
       tv_f2(std::string p, std::string q, int n)
       {
-        return G_(Implies_(formula::ap(p), phi_n(q, n, op::Or)));
+        formula phi = phi_n(q, n, op::Or);
+        return G_(Implies_(formula::ap(p), phi));
       }
 
       static formula
       tv_g1(std::string p, std::string q, int n)
       {
-        return G_(Implies_(formula::ap(p), phi_prime_n(q, n)));
+        formula phi = phi_prime_n(q, n);
+        return G_(Implies_(formula::ap(p), phi));
       }
 
       static formula
       tv_g2(std::string p, std::string q, int n)
       {
-        return G_(Implies_(formula::ap(p), phi_n(q, n)));
+        formula phi = phi_n(q, n);
+        return G_(Implies_(formula::ap(p), phi));
       }
 
       static formula
@@ -972,10 +988,12 @@ namespace spot
           xn = X_(And_(Or_(fa, fb), xn));
         formula f1 = U_(Not_(fd), And_(fd, xn));
 
-        formula f_and = nullptr;
+        formula f_and = formula::tt();
         for (int i = 1; i <= n; i++)
-          f_and = And_(f_and, Or_(X_n_kv_exp(fa, i, fd),
-                                  X_n_kv_exp(fb, i, fd)));
+          {
+            formula o = X_n_kv_exp(fa, i, fd);
+            f_and = And_(f_and, Or_(o, X_n_kv_exp(fb, i, fd)));
+          }
 
         formula f2 = F_(And_(fc, And_(f_and, X_n(fc, n + 1))));
 
@@ -1095,10 +1113,7 @@ namespace spot
       static formula
       kr2_exp_1(formula* fa, formula* fb, formula fc, formula fd)
       {
-        (void) fd;
-        return And_(fc,
-                    X_(Or_(fa[0],
-                           Or_(fb[0], fd))));
+        return And_(fc, X_(Or_(fa[0], Or_(fb[0], fd))));
       }
 
       static formula
@@ -1162,7 +1177,8 @@ namespace spot
             f3and = And_(f3and, Implies_(fa[i - 1], Not_(fb[i - 1])));
           }
 
-        formula f1 = G_(Implies_(Or_(fc, fd), Not_(f1or)));
+        formula f0 = Not_(f1or);
+        formula f1 = G_(Implies_(Or_(fc, fd), f0));
         formula f2 = G_(Implies_(fc, Not_(fd)));
         formula f3 = G_(f3and);
 
@@ -1216,7 +1232,8 @@ namespace spot
       static formula
       sejk_j(std::string a, std::string b, int n)
       {
-        return formula::Implies(GF_n(a, n), GF_n(b, n));
+        formula f = GF_n(b, n);
+        return formula::Implies(GF_n(a, n), f);
       }
 
       static formula
@@ -1226,9 +1243,8 @@ namespace spot
         for (int i = 1; i <= n; ++i)
           {
             formula ai = formula::ap(a + std::to_string(i));
-            formula bi = formula::ap(b + std::to_string(i));
-            result = formula::And({result,
-                                   formula::Or({G_(F_(ai)), F_(G_(bi))})});
+            formula FGbi = F_(G_(formula::ap(b + std::to_string(i))));
+            result = And_(result, Or_(G_(F_(ai)), FGbi));
           }
         return result;
       }
@@ -1292,7 +1308,7 @@ namespace spot
         for (unsigned i = 0; i < n; ++i)
           {
             for (unsigned j = 0; j < i; ++j)
-              res.push_back(formula::Not(formula::And({g[i], g[j]})));
+              res.push_back(formula::Not(And_(g[i], g[j])));
             formula left = formula::Equiv(r[i], g[i]);
             formula right = formula::Equiv(g[i], formula::X(g[i]));
             res.push_back(formula::Implies(left, right));
@@ -1302,7 +1318,7 @@ namespace spot
         res.clear();
         for (unsigned i = 0; i < n; ++i)
           {
-            formula f = formula::Not(formula::And({r[i], g[i]}));
+            formula f = formula::Not(And_(r[i], g[i]));
             res.push_back(formula::G(formula::F(f)));
           }
         phi_e = formula::And(res);
@@ -1319,17 +1335,17 @@ namespace spot
 
       if (!strict_)
         {
-          formula left = formula::And({formula::G(psi_e), phi_e});
+          formula left = And_(formula::G(psi_e), phi_e);
           formula imp =
-            formula::Implies(left, formula::And({formula::G(psi_s), phi_s}));
-          return formula::Implies(theta_e, formula::And({theta_s, imp}));
+            formula::Implies(left, And_(formula::G(psi_s), phi_s));
+          return formula::Implies(theta_e, And_(theta_s, imp));
         }
       else
         {
           formula e = formula::W(psi_s, formula::Not(psi_e));
           formula imp =
-            formula::Implies(formula::And({formula::G(psi_e), phi_e}), phi_s);
-          return formula::Implies(theta_e, formula::And({theta_s, e, imp}));
+            formula::Implies(And_(formula::G(psi_e), phi_e), phi_s);
+          return formula::Implies(theta_e, And3_(theta_s, e, imp));
         }
     }
 
@@ -1342,8 +1358,8 @@ namespace spot
       formula res = fb;
       for (int i = 1; i <= n; ++i)
         {
-          formula tmp = formula::And({formula::strong_X(i, fa), res});
-          res = formula::Or({formula::strong_X(i, fb), tmp});
+          formula tmp = And_(formula::strong_X(i, fa), res);
+          res = Or_(formula::strong_X(i, fb), tmp);
         }
       return formula::Implies(res, formula::strong_X(n, formula::ap(c)));
     }
@@ -1776,11 +1792,20 @@ namespace spot
         case LTL_AND_GF:
           return GF_n("p", n, true);
         case LTL_CCJ_ALPHA:
-          return formula::And({E_n("p", n), E_n("q", n)});
+          {
+            formula p = E_n("p", n);
+            return And_(p, E_n("q", n));
+          }
         case LTL_CCJ_BETA:
-          return formula::And({N_n("p", n), N_n("q", n)});
+          {
+            formula p = N_n("p", n);
+            return And_(p, N_n("q", n));
+          }
         case LTL_CCJ_BETA_PRIME:
-          return formula::And({N_prime_n("p", n), N_prime_n("q", n)});
+          {
+            formula p = N_prime_n("p", n);
+            return And_(p, N_prime_n("q", n));
+          }
         case LTL_DAC_PATTERNS:
           return dac_pattern(n);
         case LTL_EH_PATTERNS:

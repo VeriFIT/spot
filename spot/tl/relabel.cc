@@ -566,7 +566,7 @@ namespace spot
                   return rename(f);
                 formula cp1group = rename(formula::multop(f.kind(), cp[1]));
                 formula cp0group = visit(formula::multop(f.kind(), cp[0]));
-                return formula::multop(f.kind(), {cp1group, cp0group});
+                return formula::multop(f.kind(), cp1group, cp0group);
               }
           }
 
@@ -589,7 +589,7 @@ namespace spot
             {
               formula left = visit(pair.first);
               formula right = visit(pair.second);
-              return formula::multop(f.kind(), { left, right });
+              return formula::multop(f.kind(), left, right);
             }
         /// If we have a formula like (a & b & Xc), consider
         /// it as ((a & b) & Xc) in the graph to isolate the

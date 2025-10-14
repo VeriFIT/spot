@@ -2613,7 +2613,7 @@ namespace // anonymous for subsformula
               todo.pop();
               done[current_index] = true;
               auto current_form = forms[current_index];
-              current_res = formula::And({current_res, current_form});
+              current_res = formula::And(current_res, current_form);
               auto [ins_f, outs_f] = form2props.aps_of(current_form);
               std::set<formula> ins_f_dec, outs_f_dec;
               std::set_intersection(ins_f.begin(), ins_f.end(),
@@ -2666,7 +2666,7 @@ namespace // anonymous for subsformula
                         std::vector<bool> &done_left,
                         std::vector<bool> &done_right)
     {
-      left_res = formula::And({left_res, f});
+      left_res = formula::And(left_res, f);
       auto [ins_f, outs_f] = form2props.aps_of(f);
       std::set<formula> f_ins_dec, f_outs_dec;
       std::set_intersection(ins_f.begin(), ins_f.end(), ins_dec.begin(),
@@ -2686,7 +2686,7 @@ namespace // anonymous for subsformula
           || are_intersecting(f2_outs, f_outs_dec))
         {
           todo.push(i);
-          right_res = formula::And({right_res, f2});
+          right_res = formula::And(right_res, f2);
           done_right[i] = true;
         }
       }
@@ -2711,7 +2711,7 @@ namespace // anonymous for subsformula
         // If an assumption hasn't any decRelProp, it is considered as
         // a free assumption.
         if (!are_intersecting(left_aps, decRelProps_ins))
-          free_assumptions = formula::And({free_assumptions, ass});
+          free_assumptions = formula::And(free_assumptions, ass);
         else
           {
             auto left = formula::tt(), right = formula::tt();
@@ -2727,7 +2727,7 @@ namespace // anonymous for subsformula
 
     if (!free_assumptions.is_tt())
       for (auto &sp : specs)
-        sp.first = formula::And({sp.first, free_assumptions});
+        sp.first = formula::And(sp.first, free_assumptions);
     std::vector<formula> elems;
     for (auto &[ass, gua] : specs)
       {
@@ -2782,7 +2782,8 @@ namespace // anonymous for subsformula
       // ¬(φ→ψ) ≡ φ ∧ ¬ψ
       else if (child.is(op::Implies))
         {
-          return formula::And({rec(child[0]), rec(formula::Not(child[1]))});
+          formula c0 = rec(child[0]);
+          return formula::And(c0, rec(formula::Not(child[1])));
         }
       // ¬(φ ∨ ψ) ≡ ¬φ ∧ ¬ψ
       else if (child.is(op::Or))

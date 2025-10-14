@@ -192,6 +192,7 @@ namespace spot
       /// \see formula::binop
       static const fnode* binop(op o, const fnode* f, const fnode* g);
       /// \see formula::multop
+      static const fnode* multop(op o, const fnode* f, const fnode* g);
       static const fnode* multop(op o, std::vector<const fnode*> l);
       /// \see formula::bunop
       static const fnode* bunop(op o, const fnode* f,
@@ -585,6 +586,7 @@ namespace spot
       [[noreturn]] static void report_max_invalid_arg();
 
       static const fnode* unique(fnode*);
+      static const fnode* multop_sorted(op o, std::vector<const fnode*>&& l);
 
       // Destruction may only happen via destroy().
       ~fnode() = default;
@@ -1091,9 +1093,9 @@ namespace spot
     {
       return formula(fnode::binop(o, f.to_node_(), g.to_node_()));
     }
+#endif //SWIG
     ///@}
 
-#endif //SWIG
 
 #ifdef SWIG
 #define SPOT_DEF_BINOP(Name)                                         \
@@ -1175,6 +1177,24 @@ namespace spot
     ///
     /// \pre \a o should be one of op::Or, op::OrRat, op::And,
     /// op::AndRat, op::AndNLM, op::Concat, op::Fusion.
+    ///
+    /// This comes into two flavors: n-ary (where the arguments
+    /// are passed via a vector), or binary (the two arguments
+    /// can be passed separately.
+    ///
+    /// When building complex formulas, be careful that Spot assigns a
+    /// serial number to each new subformula it constructs, and that
+    /// this number is later used to maintain a normal form of
+    /// formulas by ordering children of commutative operators.
+    /// Unfortunately, C++ does not guarantee the order in which
+    /// function arguments are evaluated.  So if you write
+    /// `formula::multop(op::And, formula::G(x), formula::F(y))`.
+    /// it is unspecified whether `formula::G(x)` or `formula::F(y)`
+    /// will be created first, so it may cause your code to behave
+    /// differently on different platform.  Better use multiple
+    /// instructions to name the intermediate subformulas, and
+    /// ensure the same construction order everywhere.
+    ///
     /// @{
     static formula multop(op o, const std::vector<formula>& l)
     {
@@ -1197,24 +1217,56 @@ namespace spot
       return formula(fnode::multop(o, std::move(tmp)));
     }
 #endif // !SWIG
+
+    static formula multop(op o, const formula& f, const formula& g)
+    {
+      return formula(fnode::multop(o, f.ptr_->clone(), g.ptr_->clone()));
+    }
+
+#ifndef SWIG
+    static formula multop(op o, const formula& f, formula&& g)
+    {
+      return formula(fnode::multop(o, f.ptr_->clone(), g.to_node_()));
+    }
+
+    static formula multop(op o, formula&& f, const formula& g)
+    {
+      return formula(fnode::multop(o, f.to_node_(), g.ptr_->clone()));
+    }
+
+    static formula multop(op o, formula&& f, formula&& g)
+    {
+      return formula(fnode::multop(o, f.to_node_(), g.to_node_()));
+    }
+#endif // !SWIG
     /// @}
 
 #ifdef SWIG
-#define SPOT_DEF_MULTOP(Name)                                \
-    static formula Name(const std::vector<formula>& l)       \
-    {                                                        \
-      return multop(op::Name, l);                            \
+#define SPOT_DEF_MULTOP(Name)                                           \
+    static formula Name(const std::vector<formula>& l)                  \
+    {                                                                   \
+      return multop(op::Name, l);                                       \
+    }                                                                   \
+                                                                        \
+    static formula Name(const formula& left, const formula& right)      \
+    {                                                                   \
+      return multop(op::Name, left, right);                             \
     }
 #else // !SWIG
-#define SPOT_DEF_MULTOP(Name)                                \
-    static formula Name(const std::vector<formula>& l)       \
-    {                                                        \
-      return multop(op::Name, l);                            \
-    }                                                        \
-    \
-    static formula Name(std::vector<formula>&& l)            \
-    {                                                        \
-      return multop(op::Name, std::move(l));                 \
+#define SPOT_DEF_MULTOP(Name)                                           \
+    static formula Name(const std::vector<formula>& l)                  \
+    {                                                                   \
+      return multop(op::Name, l);                                       \
+    }                                                                   \
+                                                                        \
+    static formula Name(std::vector<formula>&& l)                       \
+    {                                                                   \
+      return multop(op::Name, std::move(l));                            \
+    }                                                                   \
+                                                                        \
+    static formula Name(const formula& left, const formula& right)      \
+    {                                                                   \
+      return multop(op::Name, left, right);                             \
     }
 #endif // !SWIG
     /// \brief Construct an Or formula.
@@ -1813,63 +1865,89 @@ namespace spot
     ///
     /// Any additional argument is passed to trans.
     template<typename Trans, typename... Args>
-      formula map(Trans trans, Args&&... args)
-      {
-        switch (op o = kind())
+    formula map(Trans trans, Args&&... args)
+    {
+      switch (op o = kind())
         {
-          case op::ff:
-          case op::tt:
-          case op::eword:
-          case op::ap:
-            return *this;
-          case op::Not:
-          case op::X:
+        case op::ff:
+        case op::tt:
+        case op::eword:
+        case op::ap:
+          return *this;
+        case op::Not:
+        case op::X:
 #if SPOT_HAS_STRONG_X
-          case op::strong_X:
+        case op::strong_X:
 #endif
-          case op::F:
-          case op::G:
-          case op::Closure:
-          case op::NegClosure:
-          case op::NegClosureMarked:
-          case op::first_match:
-            return unop(o, trans((*this)[0], std::forward<Args>(args)...));
-          case op::Xor:
-          case op::Implies:
-          case op::Equiv:
-          case op::U:
-          case op::R:
-          case op::W:
-          case op::M:
-          case op::EConcat:
-          case op::EConcatMarked:
-          case op::UConcat:
-            {
-              formula tmp = trans((*this)[0], std::forward<Args>(args)...);
-              return binop(o, tmp,
-                           trans((*this)[1], std::forward<Args>(args)...));
-            }
-          case op::Or:
-          case op::OrRat:
-          case op::And:
-          case op::AndRat:
-          case op::AndNLM:
-          case op::Concat:
-          case op::Fusion:
-            {
-              std::vector<formula> tmp;
-              tmp.reserve(size());
-              for (auto f: *this)
-                tmp.emplace_back(trans(f, std::forward<Args>(args)...));
+        case op::F:
+        case op::G:
+        case op::Closure:
+        case op::NegClosure:
+        case op::NegClosureMarked:
+        case op::first_match:
+          {
+            formula arg = (*this)[0];
+            formula new_arg = trans(arg, std::forward<Args>(args)...);
+            if (arg == new_arg)
+              return *this;
+            else
+              return unop(o, new_arg);
+          }
+        case op::Xor:
+        case op::Implies:
+        case op::Equiv:
+        case op::U:
+        case op::R:
+        case op::W:
+        case op::M:
+        case op::EConcat:
+        case op::EConcatMarked:
+        case op::UConcat:
+          {
+            formula left = (*this)[0];
+            formula right = (*this)[1];
+            formula new_left = trans(left, std::forward<Args>(args)...);
+            formula new_right = trans(right, std::forward<Args>(args)...);
+            if (left == new_left && right == new_right)
+              return *this;
+            else
+              return binop(o, new_left, new_right);
+          }
+        case op::Or:
+        case op::OrRat:
+        case op::And:
+        case op::AndRat:
+        case op::AndNLM:
+        case op::Concat:
+        case op::Fusion:
+          {
+            std::vector<formula> tmp;
+            bool changed = false;
+            tmp.reserve(size());
+            for (auto f: *this)
+              {
+                formula g = trans(f, std::forward<Args>(args)...);
+                tmp.emplace_back(g);
+                changed |= g != f;
+              }
+            if (!changed)
+              return *this;
+            else
               return multop(o, std::move(tmp));
-            }
-          case op::Star:
-          case op::FStar:
-            return bunop(o, trans((*this)[0], std::forward<Args>(args)...),
-                         min(), max());
+          }
+        case op::Star:
+        case op::FStar:
+          {
+            formula arg = (*this)[0];
+            formula new_arg = trans(arg, std::forward<Args>(args)...);
+            if (arg == new_arg)
+              return *this;
+            else
+              return bunop(o, new_arg, min(), max());
+          }
         }
-        SPOT_UNREACHABLE();
-      }
+      SPOT_UNREACHABLE();
+    }
 
     /// \brief Apply \a func to each subformula.
     ///
@@ -1880,13 +1958,13 @@ namespace spot
     /// Any additional argument is passed to \a func when it is
     /// invoked.
     template<typename Func, typename... Args>
-      void traverse(Func func, Args&&... args)
-      {
-        if (func(*this, std::forward<Args>(args)...))
-          return;
-        for (auto f: *this)
-          f.traverse(func, std::forward<Args>(args)...);
-      }
+    void traverse(Func func, Args&&... args)
+    {
+      if (func(*this, std::forward<Args>(args)...))
+        return;
+      for (auto f: *this)
+        f.traverse(func, std::forward<Args>(args)...);
+    }
 
   private:
 #ifndef SWIG

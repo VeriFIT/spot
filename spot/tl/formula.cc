@@ -264,45 +264,10 @@ namespace spot
     SPOT_UNREACHABLE();
   }
 
-  const fnode*
-  fnode::multop(op o, vec v)
-  {
-    // Inline children of same kind.
-    //
-    // When we construct a formula such as Multop(Op,X,Multop(Op,Y,Z))
-    // we will want to inline it as Multop(Op,X,Y,Z).
-    //
-    // At the same time, it's possible that vec contains some null
-    // pointers we should remove.  We can do it in the same loop.
-    //
-    // It is simpler to construct a separate vector to do that, but that's
-    // only needed if we have nested multops or null pointers.
-    if (std::find_if(v.begin(), v.end(),
-                     [o](const fnode* f) { return f == nullptr || f->is(o); })
-        != v.end())
-      {
-        vec inlined;
-        for (const fnode* f: v)
-          {
-            if (f == nullptr)
-              continue;
-            if (f->is(o))
-              {
-                unsigned ps = f->size();
-                for (unsigned n = 0; n < ps; ++n)
-                  inlined.emplace_back(f->nth(n)->clone());
-                f->destroy();
-              }
-            else
-              {
-                inlined.emplace_back(f);
-              }
-          }
-        v.swap(inlined);
-      }
-    if (o != op::Concat && o != op::Fusion)
-      std::sort(v.begin(), v.end(), formula_ptr_less_than_bool_first());
 
+  const fnode*
+  fnode::multop_sorted(op o, vec&& v)
+  {
     unsigned orig_size = v.size();
 
     const fnode* neutral;       // neutral element
@@ -415,7 +380,6 @@ namespace spot
                 }
             }
         }
-
         break;
       case op::Fusion:
         neutral = tt();
@@ -756,6 +720,177 @@ namespace spot
     auto mem = ::operator new(sizeof(fnode)
                               + (v.size() - 1)*sizeof(*children));
     return unique(new(mem) fnode(o, v.begin(), v.end()));
+  }
+
+  const fnode*
+  fnode::multop(op o, const fnode* left, const fnode* right)
+  {
+    bool liso = left->is(o);
+    bool riso = right->is(o);
+
+    if (o == op::Concat || o == op::Fusion)
+      {
+        // Concat and Fusion are not commutative, so we must keep
+        // the order of left and right.
+        vec v;
+        v.reserve((liso ? left->size() : 1) + (riso ? right->size() : 1));
+        if (liso)
+          {
+            for (auto* c: *left)
+              v.emplace_back(c->clone());
+            left->destroy();
+          }
+        else
+          {
+            v.emplace_back(left);
+          }
+        if (riso)
+          {
+            for (auto* c: *right)
+              v.emplace_back(c->clone());
+            right->destroy();
+          }
+        else
+          {
+            v.emplace_back(right);
+          }
+        return multop_sorted(o, std::move(v));
+      }
+
+    formula_ptr_less_than_bool_first cmp;
+    if (liso || riso)
+      {
+        if (!liso)              // insert left into the sorted right
+          {
+            auto pos =
+              std::lower_bound(right->begin(), right->end(), left, cmp);
+            if (pos != right->end() && *pos == left) // already there
+              {
+                left->destroy();
+                return right;
+              }
+            vec v;
+            v.reserve(right->size() + 1);
+            for (auto it = right->begin(); it != pos; ++it)
+              v.emplace_back((*it)->clone());
+            v.emplace_back(left);
+            for (auto end = right->end(); pos != end; ++pos)
+              v.emplace_back((*pos)->clone());
+            right->destroy();
+            return multop_sorted(o, std::move(v));
+          }
+        if (!riso)              // insert right into the sorted left
+          {
+            auto pos =
+              std::lower_bound(left->begin(), left->end(), right, cmp);
+            if (pos != left->end() && *pos == right) // already there
+              {
+                right->destroy();
+                return left;
+              }
+            vec v;
+            v.reserve(left->size() + 1);
+            for (auto it = left->begin(); it != pos; ++it)
+              v.emplace_back((*it)->clone());
+            v.emplace_back(right);
+            for (auto end = left->end(); pos != end; ++pos)
+              v.emplace_back((*pos)->clone());
+            left->destroy();
+            return multop_sorted(o, std::move(v));
+          }
+
+        // merge two sorted vectors, while cloning elements
+        vec v;
+        v.reserve(left->size() + right->size());
+        auto lit = left->begin();
+        auto rit = right->begin();
+        auto lend = left->end();
+        auto rend = right->end();
+        while (lit != lend && rit != rend)
+          {
+            // duplicate elements can be removed
+            if (SPOT_UNLIKELY(*lit == *rit))
+              {
+                v.emplace_back((*lit)->clone());
+                ++lit;
+                ++rit;
+              }
+            else if (cmp(*lit, *rit))
+              {
+                v.emplace_back((*lit++)->clone());
+              }
+            else
+              {
+                v.emplace_back((*rit++)->clone());
+              }
+          }
+        while (lit != lend)
+          v.emplace_back((*lit++)->clone());
+        while (rit != rend)
+          v.emplace_back((*rit++)->clone());
+        left->destroy();
+        right->destroy();
+        return multop_sorted(o, std::move(v));
+      }
+    // neither left nor right is a Multop(o,...)
+    if (cmp(right, left))
+      std::swap(right, left);
+    vec v{left, right};
+    return multop_sorted(o, std::move(v));
+  }
+
+  const fnode*
+  fnode::multop(op o, vec v)
+  {
+    // Inline children of same kind.
+    //
+    // When we construct a formula such as Multop(Op,X,Multop(Op,Y,Z))
+    // we will want to inline it as Multop(Op,X,Y,Z).
+    //
+    // At the same time, it's possible that vec contains some null
+    // pointers we should remove.  We can do it in the same loop.
+    //
+    // It is simpler to construct a separate vector to do that, but that's
+    // only needed if we have nested multops or null pointers.
+    if (std::find_if(v.begin(), v.end(),
+                     [o](const fnode* f) { return f == nullptr || f->is(o); })
+        != v.end())
+      {
+        vec inlined;
+        for (const fnode* f: v)
+          {
+            if (f == nullptr)
+              continue;
+            if (f->is(o))
+              {
+                for (auto* g: *f)
+                  inlined.emplace_back(g->clone());
+                f->destroy();
+              }
+            else
+              {
+                inlined.emplace_back(f);
+              }
+          }
+        v.swap(inlined);
+      }
+
+    if (o != op::Concat && o != op::Fusion)
+      {
+        unsigned s = v.size();
+        if (s > 2)
+          {
+            std::sort(v.begin(), v.end(), formula_ptr_less_than_bool_first());
+          }
+        else if (s == 2)
+          {
+            formula_ptr_less_than_bool_first cmp;
+            if (cmp(v[1], v[0]))
+              std::swap(v[1], v[0]);
+          }
+      }
+
+    return multop_sorted(o, std::move(v));
   }
 
   const fnode*
@@ -1188,7 +1323,7 @@ namespace spot
             return second;
           }
         if (first->is_boolean())
-          return multop(op::And, {first, second});
+          return multop(op::And, first, second);
         break;
       case op::UConcat:
         //   - 0 []-> Exp = 1
@@ -1211,7 +1346,7 @@ namespace spot
             return second;
           }
         if (first->is_boolean())
-          return multop(op::Or, {unop(op::Not, first), second});
+          return multop(op::Or, unop(op::Not, first), second);
         break;
       default:
         SPOT_UNREACHABLE();
@@ -1948,7 +2083,7 @@ namespace spot
       for (unsigned i = min; i < max; ++i)
         {
           const fnode* a = f->clone();
-          res = fnode::multop(bo, {a, fnode::unop(uo, res)});
+          res = fnode::multop(bo, a, fnode::unop(uo, res));
         }
     else
       res = fnode::unop(bo == op::Or ? op::F : op::G, res);

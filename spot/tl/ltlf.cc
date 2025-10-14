@@ -34,28 +34,43 @@ namespace spot
           o = op::X;
           SPOT_FALLTHROUGH;
         case op::F:
-          return formula::unop(o, formula::And({alive, t(f[0])}));
+          return formula::unop(o, formula::And(alive, t(f[0])));
         case op::X:             // weak
         case op::G:
-          return formula::unop(o, formula::Or({formula::Not(alive), t(f[0])}));
-          // Note that the t() function given in the proof of Theorem 1 of
-          // the IJCAI'13 paper by De Giacomo & Vardi has a typo.
-          //  t(a U b) should be equal to t(a) U t(b & alive).
-          // This typo is fixed in the Memocode'14 paper by Dutta & Vardi.
-          //
-          // (However beware that the translation given in the
-          // Memocode'14 paper forgets to ensure that alive holds
-          // initially, as required in the IJCAI'13 paper.)
+          {
+            formula dead = formula::Not(alive);
+            return formula::unop(o, formula::Or(dead, t(f[0])));
+            // Note that the t() function given in the proof of Theorem 1 of
+            // the IJCAI'13 paper by De Giacomo & Vardi has a typo.
+            //  t(a U b) should be equal to t(a) U t(b & alive).
+            // This typo is fixed in the Memocode'14 paper by Dutta & Vardi.
+            //
+            // (However beware that the translation given in the
+            // Memocode'14 paper forgets to ensure that alive holds
+            // initially, as required in the IJCAI'13 paper.)
+          }
         case op::U:
-          return formula::U(t(f[0]), formula::And({alive, t(f[1])}));
+          {
+            formula t0 = t(f[0]);
+            return formula::U(t0, formula::And(alive, t(f[1])));
+          }
         case op::R:
-          return formula::R(t(f[0]),
-                            formula::Or({formula::Not(alive), t(f[1])}));
+          {
+            formula t0 = t(f[0]);
+            formula dead = formula::Not(alive);
+            return formula::R(t0, formula::Or(dead, t(f[1])));
+          }
         case op::M:
-          return formula::M(formula::And({alive, t(f[0])}), t(f[1]));
+          {
+            formula t0 = formula::And(alive, t(f[0]));
+            return formula::M(t0, t(f[1]));
+          }
         case op::W:
-          return formula::W(formula::Or({formula::Not(alive), t(f[0])}),
-                            t(f[1]));
+          {
+            formula dead = formula::Not(alive);
+            formula t0 = formula::Or(dead, t(f[0]));
+            return formula::W(t0, t(f[1]));
+          }
         default:
           return f.map(t);
         }
@@ -95,11 +110,15 @@ namespace spot
       case op::U:
         return ltlf_one_step_sat_rewrite(f[1]);
       case op::W:
-        return formula::Or({ltlf_one_step_sat_rewrite(f[0]),
-            ltlf_one_step_sat_rewrite(f[1])});
+        {
+          formula f0 = ltlf_one_step_sat_rewrite(f[0]);
+          return formula::Or(f0, ltlf_one_step_sat_rewrite(f[1]));
+        }
       case op::M:
-        return formula::And({ltlf_one_step_sat_rewrite(f[0]),
-            ltlf_one_step_sat_rewrite(f[1])});
+        {
+          formula f0 = ltlf_one_step_sat_rewrite(f[0]);
+          return formula::And(f0, ltlf_one_step_sat_rewrite(f[1]));
+        }
       case op::And:
       case op::Or:
       case op::Not:
@@ -140,10 +159,7 @@ namespace spot
       case op::ap:
       case op::tt:
       case op::ff:
-        if (negate)
-          return formula::Not(f);
-        else
-          return f;
+        return negate ? formula::Not(f) : f;
       case op::X:
       case op::strong_X:
         return formula::tt();
@@ -160,28 +176,36 @@ namespace spot
       case op::R:
       case op::M:
         if (negate)           // U, W
-          return formula::Or({ltlf_one_step_unsat_rewrite(f[0], true),
-              ltlf_one_step_unsat_rewrite(f[1], true)});
+          {
+            formula f0 = ltlf_one_step_unsat_rewrite(f[0], true);
+            return formula::Or(f0, ltlf_one_step_unsat_rewrite(f[1], true));
+          }
         else
-          return ltlf_one_step_unsat_rewrite(f[1]);
+          {
+            return ltlf_one_step_unsat_rewrite(f[1]);
+          }
       case op::U:
       case op::W:
         if (negate)         // R, M
-          return ltlf_one_step_unsat_rewrite(f[1], true);
+          {
+            return ltlf_one_step_unsat_rewrite(f[1], true);
+          }
         else
-          return formula::Or({ltlf_one_step_unsat_rewrite(f[0]),
-              ltlf_one_step_unsat_rewrite(f[1])});
+          {
+            formula f0 = ltlf_one_step_unsat_rewrite(f[0]);
+            return formula::Or(f0, ltlf_one_step_unsat_rewrite(f[1]));
+          }
       case op::Implies:
         if (negate)
           // !(a => b) == a & !b
           {
             formula f2 = ltlf_one_step_unsat_rewrite(f[1], true);
-            return formula::And({ltlf_one_step_unsat_rewrite(f[0], false), f2});
+            return formula::And(ltlf_one_step_unsat_rewrite(f[0], false), f2);
           }
         else // a => b == !a | b
           {
             formula f2 = ltlf_one_step_unsat_rewrite(f[1], false);
-            return formula::Or({ltlf_one_step_unsat_rewrite(f[0], true), f2});
+            return formula::Or(ltlf_one_step_unsat_rewrite(f[0], true), f2);
           }
       case op::Xor:
       case op::Equiv:
@@ -192,15 +216,15 @@ namespace spot
           formula nb = ltlf_one_step_unsat_rewrite(f[1], true);
           if ((o == op::Xor) == negate) // equiv
             {
-              formula f1 = formula::And({a, b});
-              formula f2 = formula::And({na, nb});
-              return formula::Or({f1, f2});
+              formula f1 = formula::And(a, b);
+              formula f2 = formula::And(na, nb);
+              return formula::Or(f1, f2);
             }
           else
             {
-              formula f1 = formula::And({a, nb});
-              formula f2 = formula::And({na, b});
-              return formula::Or({f1, f2});
+              formula f1 = formula::And(a, nb);
+              formula f2 = formula::And(na, b);
+              return formula::Or(f1, f2);
             }
         }
       case op::And:
@@ -208,8 +232,15 @@ namespace spot
         {
           unsigned mos = f.size();
           std::vector<formula> v;
+          formula abs =
+            ((o == op::Or) == negate) ? formula::ff() : formula::tt();
           for (unsigned i = 0; i < mos; ++i)
-            v.emplace_back(ltlf_one_step_unsat_rewrite(f[i], negate));
+            {
+              formula g = ltlf_one_step_unsat_rewrite(f[i], negate);
+              if (g == abs)     // abort early on absorbent element
+                return abs;
+              v.emplace_back(g);
+            }
           op on = o;
           if (negate)
             on = o == op::Or ? op::And : op::Or;
@@ -392,21 +423,21 @@ namespace spot
           {
             formula left = simplify(f[0], false);
             formula right = simplify(f[1], true);
-            return formula::And({left, right});
+            return formula::And(left, right);
           }
         // !a -> b  =  s(a) | s(b)
         if (f[0].is(op::Not))
           {
             formula left = simplify(f[0][0], false);
             formula right = simplify(f[1], false);
-            return formula::Or({left, right});
+            return formula::Or(left, right);
           }
         // bool1 -> bool2  =  s(!bool1) | s(bool2)
         if (f[0].is_boolean() || f[1].is_boolean())
           {
             formula left = simplify(f[0], true);
             formula right = simplify(f[1], false);
-            return formula::Or({left, right});
+            return formula::Or(left, right);
           }
         // a -> b  =  s(a) -> s(b)
         {
@@ -611,8 +642,8 @@ namespace spot
 
           formula simp = simplify(formula::multop(opos, simplified_clauses));
           formula rest = simplify(formula::multop(opos, unmodified_clauses));
-          formula simp2 = formula::multop(oneg, {largest_sub, simp});
-          return formula::multop(opos, {simp2, rest});
+          formula simp2 = formula::multop(oneg, largest_sub, simp);
+          return formula::multop(opos, simp2, rest);
         }
       }
     SPOT_UNREACHABLE();

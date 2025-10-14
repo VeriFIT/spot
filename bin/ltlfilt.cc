@@ -497,15 +497,21 @@ parse_opt(int key, char* arg, struct argp_state*)
     case OPT_IMPLIED_BY:
       {
         spot::formula i = parse_formula_arg(arg);
-        // a→c∧b→c ≡ (a∨b)→c
-        opt->implied_by = spot::formula::Or({opt->implied_by, i});
+        if (opt->implied_by)
+          // a→c ∧ b→c ≡ (a∨b)→c
+          opt->implied_by = spot::formula::Or(opt->implied_by, i);
+        else
+          opt->implied_by = i;
         break;
       }
     case OPT_IMPLY:
       {
-        // a→b∧a→c ≡ a→(b∧c)
         spot::formula i = parse_formula_arg(arg);
-        opt->imply = spot::formula::And({opt->imply, i});
+        if (opt->imply)
+          // a→b ∧ a→c ≡ a→(b∧c)
+          opt->imply = spot::formula::And(opt->imply, i);
+        else
+          opt->imply = i;
         break;
       }
     case OPT_INS:

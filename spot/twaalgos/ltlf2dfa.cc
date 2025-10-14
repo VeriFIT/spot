@@ -396,7 +396,7 @@ namespace spot
     {
       auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
       auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
-      formula res = formula::And({lf, rf});
+      formula res = formula::And(lf, rf);
       return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb && rb);
     }
 
@@ -405,7 +405,7 @@ namespace spot
     {
       auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
       auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
-      formula res = formula::Or({lf, rf});
+      formula res = formula::Or(lf, rf);
       return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb || rb);
     }
 
@@ -1989,10 +1989,10 @@ namespace spot
             switch (o)
               {
               case op::And:
-                res->names.push_back(formula::And({left_f, right_f}));
+                res->names.push_back(formula::And(left_f, right_f));
                 break;
               case op::Or:
-                res->names.push_back(formula::Or({left_f, right_f}));
+                res->names.push_back(formula::Or(left_f, right_f));
                 break;
               case op::Implies:
                 res->names.push_back(formula::Implies(left_f, right_f));

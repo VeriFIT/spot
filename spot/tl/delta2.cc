@@ -83,7 +83,7 @@ namespace spot
             {
               formula left = formula::U(f0, f1);
               formula right = formula::G(f0);
-              return rewrite_strong_under_weak(formula::Or({left, right}));
+              return rewrite_strong_under_weak(formula::Or(left, right));
             }
           // x[φ₀Uφ₁] W φ₂ =
           //    (GFφ₁ & (x[φ₀Wφ₁] W φ₂)) | x[φ₀Uφ₁] U (φ₂|G(x[false]))
@@ -139,10 +139,10 @@ namespace spot
             return node.map(self, self);
           };
           formula ww = rewrite_strong_under_weak(formula::W(g, f1));
-          prefix = formula::And({prefix, ww});
+          prefix = formula::And(prefix, ww);
           formula gx_false = formula::G(match_to_false(f0, match_to_false));
-          formula u_right = formula::U(f0, formula::Or({f1, gx_false}));
-          return formula::Or({prefix, rewrite_strong_under_weak(u_right)});
+          formula u_right = formula::U(f0, formula::Or(f1, gx_false));
+          return formula::Or(prefix, rewrite_strong_under_weak(u_right));
         }
       if (f.is(op::R))
         {
@@ -154,7 +154,7 @@ namespace spot
             {
               formula left = formula::M(f0, f1);
               formula right = formula::G(f1);
-              return rewrite_strong_under_weak(formula::Or({left, right}));
+              return rewrite_strong_under_weak(formula::Or(left, right));
             }
           // φ₀ R x[φ₁Uφ₂]  =
           //    (GFφ₂ & (φ₀ R x[φ₁Wφ₂])) | ((φ₀|G(x[false])) M x[φ₁Uφ₂])
@@ -215,10 +215,10 @@ namespace spot
             return node.map(self, self);
           };
           formula rw = rewrite_strong_under_weak(formula::R(f0, g));
-          prefix = formula::And({prefix, rw});
+          prefix = formula::And(prefix, rw);
           formula gx_false = formula::G(match_to_false(f1, match_to_false));
-          formula m_right = formula::M(formula::Or({f0, gx_false}), f1);
-          return formula::Or({prefix, rewrite_strong_under_weak(m_right)});
+          formula m_right = formula::M(formula::Or(f0, gx_false), f1);
+          return formula::Or(prefix, rewrite_strong_under_weak(m_right));
         }
       return f.map(rewrite_strong_under_weak);
     }
@@ -267,7 +267,7 @@ namespace spot
       match = fish_inner_suspendable(match);
       c_true = fish_inner_suspendable(c_true);
       c_false = fish_inner_suspendable(c_false);
-      return formula::Or({formula::And({match, c_true}), c_false});
+      return formula::Or(formula::And(match, c_true), c_false);
     }
 
     static formula
@@ -327,9 +327,8 @@ namespace spot
               return node;
             return node.map(self, self);
           };
-          suffix = formula::And({suffix,
-              f.map(match_to_true, match_to_true)});
-          res = formula::Or({formula::G(formula::F(res)), suffix});
+          suffix = formula::And(suffix, f.map(match_to_true, match_to_true));
+          res = formula::Or(formula::G(formula::F(res)), suffix);
           return normalize_inside_suspendable(res);
         }
       else if (formula inner = is_FG(f))
@@ -375,7 +374,7 @@ namespace spot
           formula res = find_u(inner, find_u);
           if (!match)
             return f;
-          res = formula::And({formula::F(formula::G(res)), prefix});
+          res = formula::And(formula::F(formula::G(res)), prefix);
           // append FG(x[false])
           assert(!match.is_syntactic_safety());
           auto match_to_false = [&](formula node, auto&& self) {
@@ -385,7 +384,7 @@ namespace spot
               return node;
             return node.map(self, self);
           };
-          res = formula::Or({res, f.map(match_to_false, match_to_false)});
+          res = formula::Or(res, f.map(match_to_false, match_to_false));
           return normalize_inside_suspendable(res);
         }
       return f.map(normalize_inside_suspendable);

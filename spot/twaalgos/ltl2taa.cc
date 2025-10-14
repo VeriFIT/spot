@@ -203,7 +203,7 @@ namespace spot
                   if (!refined_ || !contained)
                     {
                       std::copy(i2->Q.begin(), i2->Q.end(), ii(u, u.end()));
-                      f = formula::And({f, i2->condition});
+                      f = formula::And(f, i2->condition);
                     }
                   t = res_->create_transition(init_, u);
                   res_->add_condition(t, f);
@@ -361,7 +361,7 @@ namespace spot
               continue;
             const succ_state& ss(vs[i].succ_[pos[i] - 1]);
             std::copy(ss.Q.begin(), ss.Q.end(), ii(u, u.end()));
-            f = formula::And({ss.condition, f});
+            f = formula::And(ss.condition, f);
             for (unsigned i = 0; i < ss.acc.size(); ++i)
             {
               formula g = ss.acc[i];

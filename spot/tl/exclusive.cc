@@ -111,7 +111,7 @@ namespace spot
     formula
     nand(formula lhs, formula rhs)
     {
-      return formula::Not(formula::And({lhs, rhs}));
+      return formula::Not(formula::And(lhs, rhs));
     }
   }
 
@@ -138,7 +138,7 @@ namespace spot
       };
 
     delete s;
-    return formula::And({f, formula::G(formula::And(v))});
+    return formula::And(f, formula::G(formula::And(v)));
   }
 
   twa_graph_ptr exclusive_ap::constrain(const_twa_graph_ptr aut,

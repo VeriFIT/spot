@@ -301,7 +301,7 @@ namespace spot
             else if (f.is(op::M))
               {
                 // P(a M b) = P(a & b)
-                formula g = formula::And({f[0], f[1]});
+                formula g = formula::And(f[0], f[1]);
                 int num = dict->register_acceptance_variable(g, this);
                 a_set &= bdd_ithvar(num);
 
@@ -571,7 +571,7 @@ namespace spot
               }
             else
               {
-                formula dest2 = formula::Concat({dest, to_concat_});
+                formula dest2 = formula::Concat(dest, to_concat_);
                 if (!dest2.is_ff())
                   out |=
                     label & bdd_ithvar(dict_.register_next_variable(dest2));
@@ -634,7 +634,7 @@ namespace spot
               // to f.  This is correct even in the case of FStar, as f
               // cannot accept [*0].
               if (to_concat_)
-                f = formula::Concat({f, to_concat_});
+                f = formula::Concat(f, to_concat_);
 
               if (o == op::Star)
                 {
@@ -677,7 +677,7 @@ namespace spot
                             }
                           else
                             {
-                              formula dest2 = formula::Concat({dest, f});
+                              formula dest2 = formula::Concat(dest, f);
                               if (!dest2.is_ff())
                                 res |= label & bdd_ithvar
                                   (dict_.register_next_variable(dest2));
@@ -722,7 +722,7 @@ namespace spot
                       // can have successors.  Fusion the tail.
                       if (!dest.is(op::ff, op::eword))
                         {
-                          formula dest2 = formula::Fusion({dest, f});
+                          formula dest2 = formula::Fusion(dest, f);
                           if (!dest2.is_ff())
                             res |= label &
                               bdd_ithvar(dict_.register_next_variable(dest2));
@@ -770,11 +770,11 @@ namespace spot
                   formula f = formula::OrRat(std::move(final));
                   formula n = formula::AndNLM(std::move(non_final));
                   formula t = formula::one_star();
-                  formula ft = formula::Concat({f, t});
-                  formula nt = formula::Concat({n, t});
-                  formula ftn = formula::AndRat({ft, n});
-                  formula fnt = formula::AndRat({f, nt});
-                  return recurse_and_concat(formula::OrRat({ftn, fnt}));
+                  formula ft = formula::Concat(f, t);
+                  formula nt = formula::Concat(n, t);
+                  formula ftn = formula::AndRat(ft, n);
+                  formula fnt = formula::AndRat(f, nt);
+                  return recurse_and_concat(formula::OrRat(ftn, fnt));
                 }
               // No final formula.
               // Translate N_1 & N_2 & ... & N_n into
@@ -790,7 +790,7 @@ namespace spot
                     {
                       formula g = f[m];
                       if (n != m)
-                        g = formula::Concat({g, star});
+                        g = formula::Concat(g, star);
                       conj.emplace_back(g);
                     }
                   disj.emplace_back(formula::AndRat(std::move(conj)));
@@ -869,9 +869,9 @@ namespace spot
                   // anything to concatenate.
                   if (!dest.is(op::ff, op::eword))
                     {
-                      formula dest2 = formula::Fusion({dest, tail});
+                      formula dest2 = formula::Fusion(dest, tail);
                       if (to_concat_)
-                        dest2 = formula::Concat({dest2, to_concat_});
+                        dest2 = formula::Concat(dest2, to_concat_);
                       if (!dest2.is_ff())
                         res |= label
                           & bdd_ithvar(dict_.register_next_variable(dest2));
@@ -897,7 +897,7 @@ namespace spot
                     dict_.bdd_to_sere(bdd_restrict(res_ndet, label));
                   dest = formula::first_match(dest);
                   if (to_concat_)
-                    dest = formula::Concat({dest, to_concat_});
+                    dest = formula::Concat(dest, to_concat_);
                   if (!dest.is_ff())
                     res_det |= label
                       & bdd_ithvar(dict_.register_next_variable(dest));
@@ -2121,7 +2121,7 @@ namespace spot
                 transition t = *in;
                 while (++in != dests.end()
                        && t.cond == in->cond && t.prom == in->prom)
-                  t.dest = formula::Or({t.dest, in->dest});
+                  t.dest = formula::Or(t.dest, in->dest);
                 *out++ = t;
               }
             while (in != dests.end());

@@ -44,7 +44,7 @@ namespace spot
         {
           --n;
           assert(input[n].is(op::F));
-          res = formula::F(formula::And({input[n][0], res}));
+          res = formula::F(formula::And(input[n][0], res));
         }
       while (n);
       return res;

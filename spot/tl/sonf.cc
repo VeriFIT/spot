@@ -135,7 +135,7 @@ namespace spot
             f = formula::binop(kind, f[0], rhs);
 
             formula ap = formula::ap(new_ap_name());
-            extracted.push_back(formula::G(formula::Or({formula::Not(ap), f})));
+            extracted.push_back(formula::G(formula::Or(formula::Not(ap), f)));
             return ap;
           }
         default:
@@ -168,7 +168,7 @@ namespace spot
 
             formula ap = formula::ap(new_ap_name());
             extracted.push_back(
-              formula::G(formula::Or({formula::Not(ap), rhs})));
+              formula::G(formula::Or(formula::Not(ap), rhs)));
 
             return formula::binop(f.kind(), f[0], ap);
           }
