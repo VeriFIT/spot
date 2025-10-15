@@ -722,6 +722,202 @@ namespace spot
     return unique(new(mem) fnode(o, v.begin(), v.end()));
   }
 
+  template<op o>
+  const fnode*
+  fnode::multop_build_and_or(const fnode* left, const fnode* right)
+  {
+    bool liso = left->is(o);
+    bool riso = right->is(o);
+    formula_ptr_less_than_bool_first cmp;
+    if (liso || riso)
+      {
+        if (!liso)              // insert left into the sorted right
+          {
+            if constexpr (o == op::And)
+              {
+                if (left->is_tt())
+                  {
+                    left->destroy();
+                    return right;
+                  }
+                else if (left->is_ff())
+                  {
+                    right->destroy();
+                    return left;
+                  }
+              }
+            if constexpr (o == op::Or)
+              {
+                if (left->is_ff())
+                  {
+                    left->destroy();
+                    return right;
+                  }
+                else if (left->is_tt())
+                  {
+                    right->destroy();
+                    return left;
+                  }
+              }
+            auto pos =
+              std::lower_bound(right->begin(), right->end(), left, cmp);
+            if (pos != right->end() && *pos == left) // already there
+              {
+                left->destroy();
+                return right;
+              }
+            vec v;
+            v.reserve(right->size() + 1);
+            for (auto it = right->begin(); it != pos; ++it)
+              v.emplace_back((*it)->clone());
+            v.emplace_back(left);
+            for (auto end = right->end(); pos != end; ++pos)
+              v.emplace_back((*pos)->clone());
+            right->destroy();
+
+            auto mem = ::operator new(sizeof(fnode)
+                                      + (v.size() - 1)*sizeof(*children));
+            return unique(new(mem) fnode(o, v.begin(), v.end()));
+          }
+        if (!riso)              // insert right into the sorted left
+          {
+            if constexpr (o == op::And)
+              {
+                if (right->is_tt())
+                  {
+                    right->destroy();
+                    return left;
+                  }
+                else if (right->is_ff())
+                  {
+                    left->destroy();
+                    return right;
+                  }
+              }
+            if constexpr (o == op::Or)
+              {
+                if (right->is_ff())
+                  {
+                    right->destroy();
+                    return left;
+                  }
+                else if (right->is_tt())
+                  {
+                    left->destroy();
+                    return right;
+                  }
+              }
+            auto pos =
+              std::lower_bound(left->begin(), left->end(), right, cmp);
+            if (pos != left->end() && *pos == right) // already there
+              {
+                right->destroy();
+                return left;
+              }
+            vec v;
+            v.reserve(left->size() + 1);
+            for (auto it = left->begin(); it != pos; ++it)
+              v.emplace_back((*it)->clone());
+            v.emplace_back(right);
+            for (auto end = left->end(); pos != end; ++pos)
+              v.emplace_back((*pos)->clone());
+            left->destroy();
+
+            auto mem = ::operator new(sizeof(fnode)
+                                      + (v.size() - 1)*sizeof(*children));
+            return unique(new(mem) fnode(o, v.begin(), v.end()));
+          }
+
+        // merge two sorted vectors, while cloning elements
+        vec v;
+        v.reserve(left->size() + right->size());
+        auto lit = left->begin();
+        auto rit = right->begin();
+        auto lend = left->end();
+        auto rend = right->end();
+        while (lit != lend && rit != rend)
+          {
+            // duplicate elements can be removed
+            if (SPOT_UNLIKELY(*lit == *rit))
+              {
+                v.emplace_back((*lit)->clone());
+                ++lit;
+                ++rit;
+              }
+            else if (cmp(*lit, *rit))
+              {
+                v.emplace_back((*lit++)->clone());
+              }
+            else
+              {
+                v.emplace_back((*rit++)->clone());
+              }
+          }
+        while (lit != lend)
+          v.emplace_back((*lit++)->clone());
+        while (rit != rend)
+          v.emplace_back((*rit++)->clone());
+        left->destroy();
+        right->destroy();
+
+        auto mem = ::operator new(sizeof(fnode)
+                                  + (v.size() - 1)*sizeof(*children));
+        return unique(new(mem) fnode(o, v.begin(), v.end()));
+      }
+    if (left == right)
+      {
+        right->destroy();
+        return left;
+      }
+    // neither left nor right is a Multop(o,...)
+    if (cmp(right, left))
+      std::swap(right, left);
+    // if left or right was 0/1, then after the swap left is 0 or 1,
+    // so we don't have to check both sides.
+    if constexpr (o == op::And)
+      {
+        if (left->is_tt())
+          {
+            left->destroy();
+            return right;
+          }
+        else if (left->is_ff())
+          {
+            right->destroy();
+            return left;
+          }
+      }
+    if constexpr (o == op::Or)
+      {
+        if (left->is_ff())
+          {
+            left->destroy();
+            return right;
+          }
+        else if (left->is_tt())
+          {
+            right->destroy();
+            return left;
+          }
+      }
+    vec v{left, right};
+    auto mem = ::operator new(sizeof(fnode)
+                              + (v.size() - 1)*sizeof(*children));
+    return unique(new(mem) fnode(o, v.begin(), v.end()));
+  }
+
+  // Work around the interdiction to use SPOT _ API in *.cc file.
+  // We those explicit template instantiations to have public visibility,
+  // but older versions of gcc will not pickup the visibility from their
+  // template declaration.
+  #define SPOT__API SPOT##_API
+
+  template SPOT__API const fnode*
+  fnode::multop_build_and_or<op::And>(const fnode* left, const fnode* right);
+
+  template SPOT__API const fnode*
+  fnode::multop_build_and_or<op::Or>(const fnode* left, const fnode* right);
+
   const fnode*
   fnode::multop(op o, const fnode* left, const fnode* right)
   {
@@ -833,6 +1029,11 @@ namespace spot
         return multop_sorted(o, std::move(v));
       }
     // neither left nor right is a Multop(o,...)
+    if (left == right)
+      {
+        right->destroy();
+        return left;
+      }
     if (cmp(right, left))
       std::swap(right, left);
     vec v{left, right};

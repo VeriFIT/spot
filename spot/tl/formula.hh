@@ -193,7 +193,12 @@ namespace spot
       static const fnode* binop(op o, const fnode* f, const fnode* g);
       /// \see formula::multop
       static const fnode* multop(op o, const fnode* f, const fnode* g);
+      /// \see formula::multop
       static const fnode* multop(op o, std::vector<const fnode*> l);
+      /// fast path for binary and/or
+      template<op o>
+      static const fnode* multop_build_and_or(const fnode* left,
+                                              const fnode* right);
       /// \see formula::bunop
       static const fnode* bunop(op o, const fnode* f,
           unsigned min, unsigned max = unbounded());
@@ -676,7 +681,7 @@ namespace spot
         bool ltl_formula:1;            // Only LTL operators.
         bool psl_formula:1;            // Only PSL operators.
         bool sere_formula:1;           // Only SERE operators.
-        bool finite:1;                 // Finite SERE formulae, or Bool+X forms.
+        bool finite:1;                 // Finite SERE formulas, or Bool+X forms.
         bool eventual:1;               // Purely eventual formula.
         bool universal:1;              // Purely universal formula.
         bool syntactic_safety:1;       // Syntactic Safety Property (S).
@@ -719,12 +724,12 @@ namespace spot
         if (left == right)
           return false;
 
-        // We want Boolean formulae first.
+        // We want Boolean formulas first.
         bool lib = left->is_boolean();
         if (lib != right->is_boolean())
           return lib;
 
-        // We have two Boolean formulae
+        // We have two Boolean formulas
         if (lib)
         {
           bool lconst = left->is_constant();
@@ -759,11 +764,11 @@ namespace spot
         size_t r = right->id();
         if (l != r)
           return l < r;
-        // Because the hash code assigned to each formula is the
-        // number of formulae constructed so far, it is very unlikely
-        // that we will ever reach a case were two different formulae
+        // Because the id() assigned to each formula is the
+        // number of formulas constructed so far, it is very unlikely
+        // that we will ever reach a case were two different formulas
         // have the same hash.  This will happen only ever with have
-        // produced 256**sizeof(size_t) formulae (i.e. max_count has
+        // produced 256**sizeof(size_t) formulas (i.e. max_count has
         // looped back to 0 and started over).  In that case we can
         // order two formulas by looking at their text representation.
         // We could be more efficient and look at their AST, but it's
@@ -1269,9 +1274,54 @@ namespace spot
       return multop(op::Name, left, right);                             \
     }
 #endif // !SWIG
+#ifdef SWIG
+#define SPOT_DEF_MULTOP2(Name)                                          \
+    static formula Name(const std::vector<formula>& l)                  \
+    {                                                                   \
+      return multop(op::Name, l);                                       \
+    }                                                                   \
+                                                                        \
+    static formula Name(const formula& left, const formula& right)      \
+    {                                                                   \
+      return formula(fnode::multop_build_and_or<op::Name>               \
+                     (left->ptr_->clone(), right->ptr_->clone());       \
+    }
+#else // !SWIG
+#define SPOT_DEF_MULTOP2(Name)                                          \
+    static formula Name(const std::vector<formula>& l)                  \
+    {                                                                   \
+      return multop(op::Name, l);                                       \
+    }                                                                   \
+                                                                        \
+    static formula Name(std::vector<formula>&& l)                       \
+    {                                                                   \
+      return multop(op::Name, std::move(l));                            \
+    }                                                                   \
+                                                                        \
+    static formula Name(const formula& left, const formula& right)      \
+    {                                                                   \
+      return formula(fnode::multop_build_and_or<op::Name>               \
+                     (left.ptr_->clone(), right.ptr_->clone()));        \
+    }                                                                   \
+    static formula Name(const formula& left, formula&& right)           \
+    {                                                                   \
+      return formula(fnode::multop_build_and_or<op::Name>               \
+                     (left.ptr_->clone(), right.to_node_()));           \
+    }                                                                   \
+    static formula Name(formula&& left, const formula& right)           \
+    {                                                                   \
+      return formula(fnode::multop_build_and_or<op::Name>               \
+                     (left.to_node_(), right.ptr_->clone()));           \
+    }                                                                   \
+    static formula Name(formula&& left, formula&& right)                \
+    {                                                                   \
+      return formula(fnode::multop_build_and_or<op::Name>               \
+                     (left.to_node_(), right.to_node_()));              \
+    }
+#endif // !SWIG
     /// \brief Construct an Or formula.
     /// @{
-    SPOT_DEF_MULTOP(Or);
+    SPOT_DEF_MULTOP2(Or);
     /// @}
 
     /// \brief Construct an Or SERE.
@@ -1281,7 +1331,7 @@ namespace spot
 
     /// \brief Construct an And formula.
     /// @{
-    SPOT_DEF_MULTOP(And);
+    SPOT_DEF_MULTOP2(And);
     /// @}
 
     /// \brief Construct an And SERE.
@@ -1788,7 +1838,7 @@ namespace spot
     SPOT_DEF_PROP(is_finite);
     /// \brief Whether the formula is purely eventual.
     ///
-    /// Pure eventuality formulae are defined in
+    /// Pure eventuality formulas are defined in
     ///
     /// A word that satisfies a pure eventuality can be prefixed by
     /// anything and still satisfies the formula.
@@ -1796,7 +1846,7 @@ namespace spot
     SPOT_DEF_PROP(is_eventual);
     /// \brief Whether a formula is purely universal.
     ///
-    /// Purely universal formulae are defined in
+    /// Purely universal formulas are defined in
     ///
     /// Any (non-empty) suffix of a word that satisfies a purely
     /// universal formula also satisfies the formula.
