@@ -27,6 +27,8 @@
 #include <algorithm>
 #include <spot/misc/bareword.hh>
 #include <spot/tl/print.hh>
+#include <spot/priv/robin_hood.hh>
+#include <spot/misc/hashfunc.hh>
 
 #ifndef HAVE_STRVERSCMP
 // If the libc does not have this, a version is compiled in lib/.
@@ -60,14 +62,14 @@ namespace spot
     // children.  This does not use id for the top-level operator,
     // because it is used to decide whether to reuse an equal existing
     // formula.
-    struct formula_cmp
+    struct formula_equal
     {
       bool operator()(const fnode* l, const fnode* r) const
       {
         op opl = l->kind();
         op opr = r->kind();
         if (opl != opr)
-          return opl < opr;
+          return false;
 
         if (SPOT_UNLIKELY(opl == op::Star || opl == op::FStar))
           {
@@ -75,13 +77,13 @@ namespace spot
               auto minl = l->min();
               auto minr = r->min();
               if (minl != minr)
-                return minl < minr;
+                return false;
             }
             {
               auto maxl = l->max();
               auto maxr = r->max();
               if (maxl != maxr)
-                return maxl < maxr;
+                return false;
             }
           }
         else
@@ -89,25 +91,46 @@ namespace spot
             auto szl = l->size();
             auto szr = r->size();
             if (szl != szr)
-              return szl < szr;
+              return false;
           }
 
         auto el = l->end();
         auto ir = r->begin();
         for (auto il = l->begin(); il != el; ++il, ++ir)
           if (*il != *ir)
-            return (*il)->id() < (*ir)->id();
+            return false;
 
-        return false;
+        return true;
+      }
+    };
+
+    struct formula_hash
+    {
+      size_t operator()(const fnode* f) const
+      {
+        op o = f->kind();
+        size_t h = fnv<size_t>::init;
+        h ^= static_cast<size_t>(o);
+        h *= fnv<size_t>::prime;
+        if (SPOT_UNLIKELY(o == op::Star || o == op::FStar))
+          {
+            h ^= f->min();
+            h *= fnv<size_t>::prime;
+          }
+        for (auto child: *f)
+          {
+            h ^= static_cast<size_t>(child->id());
+            h *= fnv<size_t>::prime;
+          }
+        return h;
       }
     };
 
     struct maps_t final
     {
-      std::map<std::string, const fnode*> name2ap;
-      std::map<size_t, std::string> ap2name;
-
-      std::set<const fnode*, formula_cmp> uniq;
+      robin_hood::unordered_map<std::string, const fnode*> name2ap;
+      robin_hood::unordered_map<size_t, std::string> ap2name;
+      robin_hood::unordered_set<const fnode*, formula_hash, formula_equal> uniq;
     };
     static maps_t m;
 
