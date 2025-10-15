@@ -1034,6 +1034,14 @@ namespace spot
       delete a;
     }
 
+    std::unique_ptr<ltlf_one_step_sat_rewrite_with_cache> os_sat;
+    std::unique_ptr<ltlf_one_step_unsat_rewrite_with_cache> os_unsat;
+    if (preprocess)
+      {
+        os_sat = std::make_unique<ltlf_one_step_sat_rewrite_with_cache>();
+        os_unsat = std::make_unique<ltlf_one_step_unsat_rewrite_with_cache>();
+      }
+
     // Keep track of whether we have seen an accepting or rejecting
     // state.  If we are missing one of them, we can reduce the
     // automaton to a single state.
@@ -1067,7 +1075,7 @@ namespace spot
 
         if (realsimp && !label.is_boolean())
           {
-            formula g = ltlf_one_step_sat_rewrite(label);
+            formula g = os_sat->rewrite(label);
 
             realizability_simplifier_base::mapping_t simpl_map;
             std::tie(g, simpl_map) = realsimp->simplify(g);
@@ -1102,7 +1110,7 @@ namespace spot
               }
             else
               {
-                g = ltlf_one_step_unsat_rewrite(label);
+                g = os_unsat->rewrite(label);
                 std::tie(g, simpl_map) = realsimp->simplify(g);
                 b = ltlf_to_mtbdd(g);
 
@@ -1338,6 +1346,14 @@ namespace spot
       delete a;
     }
 
+    std::unique_ptr<ltlf_one_step_sat_rewrite_with_cache> os_sat;
+    std::unique_ptr<ltlf_one_step_unsat_rewrite_with_cache> os_unsat;
+    if (preprocess)
+      {
+        os_sat = std::make_unique<ltlf_one_step_sat_rewrite_with_cache>();
+        os_unsat = std::make_unique<ltlf_one_step_unsat_rewrite_with_cache>();
+      }
+
     prev.emplace_back(0, 0);
     todo.emplace_back(formula_to_int(f));
     do
@@ -1384,7 +1400,7 @@ namespace spot
         bool b_done = false;
         if (preprocess && !label.is_boolean())
           {
-            formula g = ltlf_one_step_sat_rewrite(label);
+            formula g = os_sat->rewrite(label);
 
             realizability_simplifier_base::mapping_t simpl_map;
             std::tie(g, simpl_map) = realsimp.simplify(g);
@@ -1418,7 +1434,7 @@ namespace spot
               }
             else
               {
-                g = ltlf_one_step_unsat_rewrite(label);
+                g = os_unsat->rewrite(label);
                 std::tie(g, simpl_map) = realsimp.simplify(g);
                 b = ltlf_to_mtbdd(g);
                 if (!restrict_bdd_bool(b, true))

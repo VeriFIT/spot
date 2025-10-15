@@ -61,6 +61,28 @@ namespace spot
     cache* cache_;
   };
 
+
   SPOT_API formula ltlf_one_step_sat_rewrite(formula f);
+
+  class SPOT_API ltlf_one_step_sat_rewrite_with_cache
+  {
+  public:
+    ltlf_one_step_sat_rewrite_with_cache();
+    ~ltlf_one_step_sat_rewrite_with_cache();
+    formula rewrite(formula f);
+  private:
+    void *cache_;
+  };
+
   SPOT_API formula ltlf_one_step_unsat_rewrite(formula f, bool negate = false);
+
+  class SPOT_API ltlf_one_step_unsat_rewrite_with_cache
+  {
+  public:
+    ltlf_one_step_unsat_rewrite_with_cache();
+    ~ltlf_one_step_unsat_rewrite_with_cache();
+    formula rewrite(formula f);
+  private:
+    void *cache_;
+  };
 }

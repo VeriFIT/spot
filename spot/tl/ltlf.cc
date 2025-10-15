@@ -89,35 +89,48 @@ namespace spot
   }
 
 
-  formula ltlf_one_step_sat_rewrite(formula f)
+  typedef robin_hood::unordered_map<formula, formula> formula_cache;
+
+  static formula
+  ltlf_one_step_sat_rewrite_cached(formula f, formula_cache* c)
   {
     if (f.is_boolean())
       return f;
+    if (auto it = c->find(f); it != c->end())
+      return it->second;
+    formula g = f;
     switch (f.kind())
       {
       case op::ap:
       case op::tt:
       case op::ff:
-        return f;
+        SPOT_UNREACHABLE();
+        break;
       case op::X:
-        return formula::tt();
+        f = formula::tt();
+        break;
       case op::strong_X:
-        return formula::ff();
+        f = formula::ff();
+        break;
       case op::G:
       case op::F:
-        return ltlf_one_step_sat_rewrite(f[0]);
+        f = ltlf_one_step_sat_rewrite_cached(f[0], c);
+        break;
       case op::R:
       case op::U:
-        return ltlf_one_step_sat_rewrite(f[1]);
+        f = ltlf_one_step_sat_rewrite_cached(f[1], c);
+        break;
       case op::W:
         {
-          formula f0 = ltlf_one_step_sat_rewrite(f[0]);
-          return formula::Or(f0, ltlf_one_step_sat_rewrite(f[1]));
+          formula f0 = ltlf_one_step_sat_rewrite_cached(f[0], c);
+          f = formula::Or(f0, ltlf_one_step_sat_rewrite_cached(f[1], c));
+          break;
         }
       case op::M:
         {
-          formula f0 = ltlf_one_step_sat_rewrite(f[0]);
-          return formula::And(f0, ltlf_one_step_sat_rewrite(f[1]));
+          formula f0 = ltlf_one_step_sat_rewrite_cached(f[0], c);
+          f = formula::And(f0, ltlf_one_step_sat_rewrite_cached(f[1], c));
+          break;
         }
       case op::And:
       case op::Or:
@@ -125,7 +138,8 @@ namespace spot
       case op::Xor:
       case op::Equiv:
       case op::Implies:
-        return f.map(ltlf_one_step_sat_rewrite);
+        f = f.map(ltlf_one_step_sat_rewrite_cached, c);
+        break;
       case op::eword:
       case op::AndNLM:
       case op::AndRat:
@@ -144,88 +158,130 @@ namespace spot
         throw std::runtime_error
           ("ltlf_one_step_sat_rewrite(): unsupported operator");
       }
-    SPOT_UNREACHABLE();
+    c->emplace(g, f);
     return f;
   }
 
-  formula ltlf_one_step_unsat_rewrite(formula f, bool negate)
+  formula ltlf_one_step_sat_rewrite(formula f)
+  {
+    formula_cache c;
+    return ltlf_one_step_sat_rewrite_cached(f, &c);
+  }
+
+  ltlf_one_step_sat_rewrite_with_cache::ltlf_one_step_sat_rewrite_with_cache()
+  {
+    cache_ = new formula_cache;
+  }
+
+  ltlf_one_step_sat_rewrite_with_cache::~ltlf_one_step_sat_rewrite_with_cache()
+  {
+    delete static_cast<formula_cache*>(cache_);
+  }
+
+  formula ltlf_one_step_sat_rewrite_with_cache::rewrite(formula f)
+  {
+    return
+      ltlf_one_step_sat_rewrite_cached(f, static_cast<formula_cache*>(cache_));
+  }
+
+  static formula
+  ltlf_one_step_unsat_rewrite_cached(formula f, bool negate,
+                                     formula_cache* c)
   {
     if (f.is_boolean())
       return negate ? formula::Not(f) : f;
+
+    formula_cache& cc = c[negate];
+    if (auto it = cc.find(f); it != cc.end())
+      return it->second;
+    formula g = f;
     switch (op o = f.kind())
       {
       case op::Not:
-        return ltlf_one_step_unsat_rewrite(f[0], !negate);
+        f = ltlf_one_step_unsat_rewrite_cached(f[0], !negate, c);
+        break;
       case op::ap:
       case op::tt:
       case op::ff:
-        return negate ? formula::Not(f) : f;
+        SPOT_UNREACHABLE();
+        break;
       case op::X:
       case op::strong_X:
-        return formula::tt();
+        f = formula::tt();
+        break;
       case op::F:
         if (negate)           // G
-          return ltlf_one_step_unsat_rewrite(f[0], true);
+          f = ltlf_one_step_unsat_rewrite_cached(f[0], true, c);
         else
-          return formula::tt();
+          f = formula::tt();
+        break;
       case op::G:
         if (negate)           // F
-          return formula::tt();
+          f = formula::tt();
         else
-          return ltlf_one_step_unsat_rewrite(f[0]);
+          f = ltlf_one_step_unsat_rewrite_cached(f[0], false, c);
+        break;
       case op::R:
       case op::M:
         if (negate)           // U, W
           {
-            formula f0 = ltlf_one_step_unsat_rewrite(f[0], true);
-            return formula::Or(f0, ltlf_one_step_unsat_rewrite(f[1], true));
+            formula f0 = ltlf_one_step_unsat_rewrite_cached(f[0], true, c);
+            f = formula::Or(f0,
+                            ltlf_one_step_unsat_rewrite_cached(f[1], true, c));
           }
         else
           {
-            return ltlf_one_step_unsat_rewrite(f[1]);
+            f = ltlf_one_step_unsat_rewrite_cached(f[1], false, c);
           }
+        break;
       case op::U:
       case op::W:
         if (negate)         // R, M
           {
-            return ltlf_one_step_unsat_rewrite(f[1], true);
+            f = ltlf_one_step_unsat_rewrite_cached(f[1], true, c);
           }
         else
           {
-            formula f0 = ltlf_one_step_unsat_rewrite(f[0]);
-            return formula::Or(f0, ltlf_one_step_unsat_rewrite(f[1]));
+            formula f0 = ltlf_one_step_unsat_rewrite_cached(f[0], false, c);
+            f = formula::Or(f0,
+                            ltlf_one_step_unsat_rewrite_cached(f[1], false, c));
           }
+        break;
       case op::Implies:
         if (negate)
           // !(a => b) == a & !b
           {
-            formula f2 = ltlf_one_step_unsat_rewrite(f[1], true);
-            return formula::And(ltlf_one_step_unsat_rewrite(f[0], false), f2);
+            formula f2 = ltlf_one_step_unsat_rewrite_cached(f[1], true, c);
+            f = formula::And(ltlf_one_step_unsat_rewrite_cached(f[0], false, c),
+                             f2);
           }
         else // a => b == !a | b
           {
-            formula f2 = ltlf_one_step_unsat_rewrite(f[1], false);
-            return formula::Or(ltlf_one_step_unsat_rewrite(f[0], true), f2);
+            formula f2 = ltlf_one_step_unsat_rewrite_cached(f[1], false, c);
+            f = formula::Or(ltlf_one_step_unsat_rewrite_cached(f[0], true, c),
+                            f2);
           }
+        break;
       case op::Xor:
       case op::Equiv:
         {
-          formula a = ltlf_one_step_unsat_rewrite(f[0]);
-          formula b = ltlf_one_step_unsat_rewrite(f[1]);
-          formula na = ltlf_one_step_unsat_rewrite(f[0], true);
-          formula nb = ltlf_one_step_unsat_rewrite(f[1], true);
+          formula a = ltlf_one_step_unsat_rewrite_cached(f[0], false, c);
+          formula b = ltlf_one_step_unsat_rewrite_cached(f[1], false, c);
+          formula na = ltlf_one_step_unsat_rewrite_cached(f[0], true, c);
+          formula nb = ltlf_one_step_unsat_rewrite_cached(f[1], true, c);
           if ((o == op::Xor) == negate) // equiv
             {
               formula f1 = formula::And(a, b);
               formula f2 = formula::And(na, nb);
-              return formula::Or(f1, f2);
+              f = formula::Or(f1, f2);
             }
           else
             {
               formula f1 = formula::And(a, nb);
               formula f2 = formula::And(na, b);
-              return formula::Or(f1, f2);
+              f = formula::Or(f1, f2);
             }
+          break;
         }
       case op::And:
       case op::Or:
@@ -236,15 +292,19 @@ namespace spot
             ((o == op::Or) == negate) ? formula::ff() : formula::tt();
           for (unsigned i = 0; i < mos; ++i)
             {
-              formula g = ltlf_one_step_unsat_rewrite(f[i], negate);
+              formula g = ltlf_one_step_unsat_rewrite_cached(f[i], negate, c);
               if (g == abs)     // abort early on absorbent element
-                return abs;
+                {
+                  f = abs;
+                  goto done;
+                }
               v.emplace_back(g);
             }
           op on = o;
           if (negate)
             on = o == op::Or ? op::And : op::Or;
-          return formula::multop(on, v);
+          f = formula::multop(on, v);
+          break;
         }
       case op::eword:
       case op::AndNLM:
@@ -264,9 +324,35 @@ namespace spot
         throw std::runtime_error
           ("ltlf_one_step_unsat_rewrite(): unsupported operator");
       }
-    SPOT_UNREACHABLE();
+  done:
+    cc.emplace(g, f);
     return f;
   }
+
+  formula ltlf_one_step_unsat_rewrite(formula f, bool negated)
+  {
+    formula_cache c[2];
+    return ltlf_one_step_unsat_rewrite_cached(f, negated, c);
+  }
+
+  ltlf_one_step_unsat_rewrite_with_cache::
+  ltlf_one_step_unsat_rewrite_with_cache()
+  {
+    cache_ = new formula_cache[2];
+  }
+
+  ltlf_one_step_unsat_rewrite_with_cache::
+  ~ltlf_one_step_unsat_rewrite_with_cache()
+  {
+    delete[] static_cast<formula_cache*>(cache_);
+  }
+
+  formula ltlf_one_step_unsat_rewrite_with_cache::rewrite(formula f)
+  {
+    return ltlf_one_step_unsat_rewrite_cached
+      (f, false, static_cast<formula_cache*>(cache_));
+  }
+
 
   class ltlf_simplifier::cache
   {
