@@ -26,7 +26,7 @@ The Boolean constants true and false are returned by =formula::tt()=
 and =formula:ff()=.  Atomic propositions can be built with
 =formula::ap("name")=.  Unary and binary operators use a
 straightforward syntax like =formula::F(arg)= or =formula::U(first,
-second)=, while n-ary operators take an initializer list as argument
+second)=, while n-ary operators can additionally take a vector or an initializer list as argument
 as in =formula::And({arg1, arg2, arg3})=.
 
 Here is the list of supported operators:
@@ -67,6 +67,14 @@ Here is the list of supported operators:
   formula::AndNLM({args,...});    // non-length-matching rational And (for r.e.)
   formula::Concat({args,...});    // concatenation (for regular expressions)
   formula::Fusion({args,...});    // concatenation (for regular expressions)
+  // n-ary operators, in their binary versions
+  formula::Or(left, right);       // omega-rational Or
+  formula::OrRat(left, right);    // rational Or (for regular expressions)
+  formula::And(left, right);      // omega-rational And
+  formula::AndRat(left, right);   // rational And (for regular expressions)
+  formula::AndNLM(left, right);   // non-length-matching rational And (for r.e.)
+  formula::Concat(left, right);   // concatenation (for regular expressions)
+  formula::Fusion(left, right);   // concatenation (for regular expressions)
   // star-like operators
   formula::Star(arg, min, max);   // Star (for a Kleene star, set min=0 and omit max)
   formula::FStar(arg, min, max);  // Fusion Star
@@ -82,7 +90,7 @@ simplifications called /trivial identities/.  For instance
 as =formula::tt()=.  These simplifications are those that involve the
 true and false constants, impotence (=F(F(e))=F(e)=), involutions
 (=Not(Not(e))=e=), associativity
-(=And({And({e1,e2},e3})=And({e1,e2,e3})=).  See [[https://spot.lrde.epita.fr/tl.pdf][tl.pdf]] for a list of
+(=And(And(e1,e2),e3)=And({e1,e2,e3})=).  See [[https://spot.lrde.epita.fr/tl.pdf][tl.pdf]] for a list of
 these /trivial identities/.
 
 In addition, the arguments of commutative operators
@@ -93,6 +101,10 @@ subformulas by their unique identifier (a constant incremented each
 time a new subformula is created).  This reordering is useful to favor
 sharing of subformulas, but also helps algorithms that perform
 memoization.
+
+The binary versions of n-ary operators were introduced in Spot 2.15.
+They should be prefered
+
 
 Building a formula using these operators is quite straightforward.
 The second part of the following example shows how to print some
@@ -109,7 +121,7 @@ detail of the top-level operator in the formula.
     spot::formula fga = spot::formula::F(spot::formula::G(spot::formula::ap("a")));
     spot::formula gfb = spot::formula::G(spot::formula::F(spot::formula::ap("b")));
     spot::formula gfc = spot::formula::G(spot::formula::F(spot::formula::ap("c")));
-    spot::formula f = spot::formula::Implies(fga, spot::formula::And({gfb, gfc}));
+    spot::formula f = spot::formula::Implies(fga, spot::formula::And(gfb, gfc));
 
     std::cout << f << '\n';
 
@@ -153,7 +165,7 @@ The Python equivalent is similar:
   fga = spot.formula.F(spot.formula.G(spot.formula.ap("a")))
   gfb = spot.formula.G(spot.formula.F(spot.formula.ap("b")));
   gfc = spot.formula.G(spot.formula.F(spot.formula.ap("c")));
-  f = spot.formula.Implies(fga, spot.formula.And([gfb, gfc]));
+  f = spot.formula.Implies(fga, spot.formula.And(gfb, gfc));
 
   print(f)
 

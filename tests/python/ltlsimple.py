@@ -35,8 +35,8 @@ c2 = spot.formula.ap('c')
 
 tc.assertEqual(c, c2)
 
-op = spot.formula.And([a, b])
-op2 = spot.formula.And([op, c])
+op = spot.formula.And(a, b)
+op2 = spot.formula.And(op, c)
 op3 = spot.formula.And([a, c, b])
 
 tc.assertEqual(op2, op3)
@@ -52,12 +52,17 @@ del a, b, c2
 sys.stdout.write('op3 = %s\n' % str(op3))
 tc.assertEqual(op2, op3)
 
-op4 = spot.formula.Or([op2, op3])
+op4 = spot.formula.Or(op2, op3)
 
 sys.stdout.write('op4 = %s\n' % str(op4))
 tc.assertEqual(op4, op2)
 
-del op2, op3, op4
+op5 = spot.formula.Or([op2, op3, op3])
+
+sys.stdout.write('op5 = %s\n' % str(op5))
+tc.assertEqual(op5, op2)
+
+del op2, op3, op4, op5
 
 # ----------------------------------------------------------------------
 a = spot.formula.ap('a')
