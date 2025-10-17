@@ -126,7 +126,7 @@ namespace spot
     /// \brief Build a new automaton from a list of atomic propositions.
     twacube(const std::vector<std::string> aps);
 
-    virtual ~twacube();
+    ~twacube();
 
     /// \brief Returns the acceptance condition associated to the automaton.
     acc_cond& acc();
