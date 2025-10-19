@@ -10,7 +10,7 @@ spot-x \- Common fine-tuning options and environment variables.
 .\" Add any additional description here
 
 [SAT\-MINIMIZE VALUES]
-When the \fBsat-minimize=K\fR option is used to enable SAT-based
+When the \fBsat\-minimize=K\fR option is used to enable SAT-based
 minimization of deterministic automata, a SAT solver is
 used to minimize an input automaton with N states into an
 output automaton with 1≤M≤N states.  The parameter K specifies
@@ -194,13 +194,13 @@ format.
 .TP
 \fBSPOT_SATSOLVER\fR
 If set, this variable should indicate how to call an external
-SAT\-solver \- by default, Spot uses PicoSAT, which is distributed
-with. This is used by the sat\-minimize option described above.
+SAT-solver.  y default, Spot uses PicoSAT, which is distributed
+with. This is used by the \fBsat\-minimize\fR option described above.
 The format to follow is the following: \fC"<sat_solver> [options] %I >%O"\fR.
 The escape sequences \fC%I\fR and \fC%O\fR respectively
 denote the names of the input and output files.  These temporary files
 are created in the directory specified by \fBSPOT_TMPDIR\fR or
-\fBTMPDIR\fR (see below). The SAT\-solver should follow the convention
+\fBTMPDIR\fR (see below). The SAT-solver should follow the convention
 of the SAT Competition for its input and output format.
 
 .TP
@@ -253,9 +253,9 @@ sl(a) x sl(!a), performed on-the-fly
 cl(a) x cl(!a)
 .RE
 
-This variable is used by the \fB\-\-check=stutter-invariance\fR and
-\fB\-\-stutter-invariant\fR options, but it is ignored by
-\fB\-\-check=stutter-sensitive-example\fR.
+This variable is used by the \fB\-\-check=stutter\-invariance\fR and
+\fB\-\-stutter\-invariant\fR options, but it is ignored by
+\fB\-\-check=stutter\-sensitive\-example\fR.
 .RE
 
 .TP
@@ -281,12 +281,12 @@ This is mostly useful for debugging.
 .TP
 \fBSPOT_XCNF\fR
 Assign a folder path to this variable to generate XCNF files whenever
-SAT\-based minimization is used \- the file is output as "incr.xcnf"
+SAT-based minimization is used \- the file is output as "incr.xcnf"
 in the specified directory. This feature works only with an external
-SAT\-solver. See \fBSPOT_SATSOLVER\fR to know how to provide one. Also note
+SAT-solver. See \fBSPOT_SATSOLVER\fR to know how to provide one. Also note
 that this needs an incremental approach without restarting the encoding i.e
-"sat\-minimize=3,param=-1" for ltl2tgba and ltl2tgta or "incr,param=-1" for
-autfilt (see sat\-minimize options described above or autfilt man page).
+"sat\-minimize=3,param=\-1" for ltl2tgba and ltl2tgta or "incr,param=\-1" for
+autfilt (see \fBsat\-minimize\fR option described above or autfilt man page).
 The XCNF format is the one used by the SAT incremental competition.
 
 [BIBLIOGRAPHY]
@@ -300,7 +300,7 @@ Powerset Construction for Restricted Classes of
 ω-Automata. Proceedings of ATVA'07.  LNCS 4762.
 
 Describes the WDBA-minimization algorithm implemented in Spot.  The
-algorithm used for the tba-det options is also a generalization (to
+algorithm used for the \fBtba-det\fR options is also a generalization (to
 TBA instead of BA) of what they describe in sections 3.2 and 3.3.
 
 .TP
@@ -336,7 +336,7 @@ of LICS'18.
 
 Describes (among other things) the constructions used for translating
 formulas of the form GF(guarantee) or FG(safety), that can be
-disabled with \fB-x gf-guarantee=0\fR.
+disabled with \fB\-x gf\-guarantee=0\fR.
 
 .TP
 6.

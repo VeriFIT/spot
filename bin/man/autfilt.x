@@ -8,7 +8,7 @@ autfilt \- filter, convert, and transform omega-automata
 \fB\fP
 By default, SAT\-based minimization executes a binary search, checking N/2 etc.
 The upper bound being N (the size of the starting automaton), the lower bound
-is always 1 except when \fBsat-langmap\fR option is used.
+is always 1 except when \fBsat\-langmap\fR option is used.
 
 .TP
 \fBacc=DOUBLEQUOTEDSTRING\fP
@@ -33,10 +33,10 @@ either \fB1\fR or \fB2\fR. They correspond respectively to
 the encoding only after (N\-1)\-\fBsat\-incr\-steps\fR states have been won.
 Each iterations of both starts by encoding the research of an N\-1 automaton,
 N being the size of the starting automaton. \fB1\fR uses Picosat assumptions.
-It additionally assumes that the last \fBsat-incr-steps\fR states are
+It additionally assumes that the last \fBsat\-incr\-steps\fR states are
 unnecessary. On failure, it relax the assumptions to do a binary search
-between N\-1 and (N\-1)\-\fBsat-incr-steps\fR. \fBsat-incr-steps\fR defaults
-to 6. \fB2\fR, as for it, after an N-1 state automaton has been found, uses
+between N\-1 and (N\-1)\-\fBsat\-incr\-steps\fR. \fBsat\-incr\-steps\fR defaults
+to 6. \fB2\fR, as for it, after an N\-1 state automaton has been found, uses
 incremental solving for the next \fBsat\-incr\-steps\fR iterations by forbidding
 the usage of an additional state without reencoding the problem again. A full
 encoding occurs after \fBsat\-incr\-steps\fR iterations unless
@@ -49,13 +49,13 @@ set the value of \fBsat\-incr\-steps\fR to M. This is used by \fBsat\-incr\fR
 option.
 
 .TP
-\fBsat-naive\fP
+\fBsat\-naive\fP
 use the naive algorithm to find a smaller automaton. It starts from N (N being
 the size of the starting automaton) and then checks N\-1, N\-2, etc. until the
 last successful check.
 
 .TP
-\fBsat-langmap\fP
+\fBsat\-langmap\fP
 Find the lower bound of default sat\-minimize procedure (1). This relies on the
 fact that the size of the minimal automaton is at least equal to the total
 number of different languages recognized by the automaton's states.
@@ -109,8 +109,8 @@ Alexandre Duret-Lutz, Denis Poitrenaud, Yann Thierry-Mieg:
 Simplifying LTL Model-Checking Given Prior Knowledge.
 Proceedings of PetriNet'25.  LNCS 15714.
 
-Discusses the techniques behind the \fB\-\-given-formula\fR,
-\fB\-\-given-automaton\fR, and \fB\-\-given-strategy\fR options.
+Discusses the techniques behind the \fB\-\-given\-formula\fR,
+\fB\-\-given\-automaton\fR, and \fB\-\-given\-strategy\fR options.
 [SEE ALSO]
 .BR spot-x (7)
 .BR dstar2tgba (1)
