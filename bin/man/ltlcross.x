@@ -118,7 +118,7 @@ automaton.  In this case \fBexit_code\fR is always 0.
 \fC"timeout"\fR
 The translator ran for more than the number of seconds
 specified with the \fB\-\-timeout\fR option.  In this
-case \fBexit_code\fR is always -1.
+case \fBexit_code\fR is always \-1.
 .TP
 \fC"exit code"\fR
 The translator terminated with a non-zero exit code.
@@ -130,11 +130,11 @@ The translator terminated with a signal.
 .TP
 \fC"parse error"\fR
 The translator terminated normally, but ltlcross could not
-parse its output.  In this case \fBexit_code\fR is always -1.
+parse its output.  In this case \fBexit_code\fR is always \-1.
 .TP
 \fC"no output"\fR
 The translator terminated normally, but without creating the specified
-output file.  In this case \fBexit_code\fR is always -1.
+output file.  In this case \fBexit_code\fR is always \-1.
 .RE
 .TP
 \fBtime\fR

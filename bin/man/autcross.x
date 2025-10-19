@@ -67,7 +67,7 @@ automaton.  In this case \fBexit_code\fR is always 0.
 \fC"timeout"\fR
 The tool ran for more than the number of seconds
 specified with the \fB\-\-timeout\fR option.  In this
-case \fBexit_code\fR is always -1.
+case \fBexit_code\fR is always \-1.
 .TP
 \fC"exit code"\fR
 The tool terminated with a non-zero exit code.
@@ -79,11 +79,11 @@ The tool terminated with a signal.
 .TP
 \fC"parse error"\fR
 The tool terminated normally, but autcross could not
-parse its output.  In this case \fBexit_code\fR is always -1.
+parse its output.  In this case \fBexit_code\fR is always \-1.
 .TP
 \fC"no output"\fR
 The tool terminated normally, but without creating the specified
-output file.  In this case \fBexit_code\fR is always -1.
+output file.  In this case \fBexit_code\fR is always \-1.
 .RE
 .TP
 \fBtime\fR

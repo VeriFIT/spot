@@ -28,7 +28,7 @@ with
 .in +4n
 .ft C
 .nf
-% ltl2tgba --ba 'GFa & GFb'
+% ltl2tgba \-\-ba 'GFa & GFb'
 .fi
 .PP
 In the dot output produced by the above commands, the membership of
@@ -59,18 +59,18 @@ For instance:
 .in +4n
 .ft C
 .nf
-% ltl2tgba --lbtt 'GFp0 & GFp1 & FGp2'
+% ltl2tgba \-\-lbtt 'GFp0 & GFp1 & FGp2'
 2 2t                   // 2 states, 2 transition-based acceptance sets
 0 1                    // state 0: initial
-0 -1 t                 //   trans. to state 0, no acc., label: true
-1 -1 | & p0 p2 & p1 p2 //   trans. to state 1, no acc., label: (p0&p2)|(p1&p2)
--1                     // end of state 0
+0 \-1 t                 //   trans. to state 0, no acc., label: true
+1 \-1 | & p0 p2 & p1 p2 //   trans. to state 1, no acc., label: (p0&p2)|(p1&p2)
+\-1                     // end of state 0
 1 0                    // state 1: not initial
-1 0 1 -1 & & p0 p1 p2  //   trans. to state 1, acc. 0 and 1, label: p0&p1&p2
-1 0 -1 & & p1 p2 ! p0  //   trans. to state 1, acc. 0, label: !p0&p1&p2
-1 1 -1 & & p0 p2 ! p1  //   trans. to state 1, acc. 1, label: p0&!p1&p2
-1 -1 & & p2 ! p0 ! p1  //   trans. to state 1, no acc., label: !p0&!p1&p2
--1                     // end if state 1
+1 0 1 \-1 & & p0 p1 p2  //   trans. to state 1, acc. 0 and 1, label: p0&p1&p2
+1 0 \-1 & & p1 p2 ! p0  //   trans. to state 1, acc. 0, label: !p0&p1&p2
+1 1 \-1 & & p0 p2 ! p1  //   trans. to state 1, acc. 1, label: p0&!p1&p2
+1 \-1 & & p2 ! p0 ! p1  //   trans. to state 1, no acc., label: !p0&!p1&p2
+\-1                     // end if state 1
 .fi
 .PP
 Here, the two acceptance sets are represented by the numbers 0 and 1,
@@ -92,15 +92,15 @@ LBT
 .in +4n
 .ft C
 .nf
-% ltl2tgba --ba --lbtt FGp0
+% ltl2tgba \-\-ba \-\-lbtt FGp0
 2 1                 // 2 states, 1 (state-based) accepance set
-0 1 -1              // state 0: initial, non-accepting
+0 1 \-1              // state 0: initial, non-accepting
 0 t                 //   trans. to state 0, label: true
 1 p0                //   trans. to state 1, label: p0
--1                  // end of state 0
-1 0 0 -1            // state 1: not initial, in acceptance set 0
+\-1                  // end of state 0
+1 0 0 \-1            // state 1: not initial, in acceptance set 0
 1 p0                //   trans. to state 0, label: p0
--1                  // end if state 1
+\-1                  // end if state 1
 .fi
 .PP
 You can force ltl2tgba to use the transition-based flavor of the
@@ -109,15 +109,15 @@ format even for Büchi automaton using \fB\-\-lbtt=t\fR.
 .in +4n
 .ft C
 .nf
-% ltl2tgba --ba --lbtt=t FGp0
+% ltl2tgba \-\-ba \-\-lbtt=t FGp0
 2 1t                // 2 states, 1 transition-based accepance set.
 0 1                 // state 0: initial
-0 -1 t              //   trans. to state 0, no acc., label: true
-1 -1 p0             //   trans. to state 1, no acc., label: p0
--1                  // end of state 0
+0 \-1 t              //   trans. to state 0, no acc., label: true
+1 \-1 p0             //   trans. to state 1, no acc., label: p0
+\-1                  // end of state 0
 1 0                 // state 1: not initial
-1 0 -1 p0           //   trans. to state 1, acc. 0, label: p0
--1                  // end if state 1
+1 0 \-1 p0           //   trans. to state 1, acc. 0, label: p0
+\-1                  // end if state 1
 .fi
 .PP
 When representing a Büchi automaton using transition-based acceptance,
@@ -130,19 +130,19 @@ atomic proposition with arbitrary names that do not conflict with
 LBT's operators (e.g. '\fBi\fR' is the symbol of the implication operator so
 it may not be used as an atomic proposition), or as double-quoted
 strings.  Spot will always output atomic-proposition that do not match
-\fBp[0-9]+\fR as double-quoted strings.
+\fBp[0\-9]+\fR as double-quoted strings.
 .PP
 .in +4n
 .ft C
 .nf
-% ltl2tgba --lbtt 'GFa & GFb'
+% ltl2tgba \-\-lbtt 'GFa & GFb'
 1 2t
 0 1
-0 0 1 -1 & "a" "b"
-0 0 -1 & "b" ! "a"
-0 1 -1 & "a" ! "b"
-0 -1 & ! "b" ! "a"
--1
+0 0 1 \-1 & "a" "b"
+0 0 \-1 & "b" ! "a"
+0 1 \-1 & "a" ! "b"
+0 \-1 & ! "b" ! "a"
+\-1
 .fi
 
 [NOTE ON GENERATING MONITORS]
