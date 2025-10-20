@@ -405,7 +405,7 @@ namespace
     // Reverse all the acceptance condition at the destruction of
     // this object, because it occurs after the return of the
     // function simulation.
-    virtual ~sig_calculator()
+    ~sig_calculator()
     {
       a_->get_dict()->unregister_all_my_variables(this);
     }
