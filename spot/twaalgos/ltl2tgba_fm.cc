@@ -1110,7 +1110,6 @@ namespace spot
       {
       }
 
-      virtual
       ~ltl_trad_visitor()
       {
       }
