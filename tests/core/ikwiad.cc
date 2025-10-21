@@ -37,7 +37,6 @@
 #include <spot/twa/twaproduct.hh>
 #include <spot/parseaut/public.hh>
 #include <spot/twaalgos/minimize.hh>
-#include <spot/taalgos/minimize.hh>
 #include <spot/twaalgos/neverclaim.hh>
 #include <spot/twaalgos/sccfilter.hh>
 #include <spot/twaalgos/strength.hh>
@@ -60,10 +59,6 @@
 #include <spot/twaalgos/dtwasat.hh>
 #include <spot/twaalgos/stutter.hh>
 #include <spot/twaalgos/totgba.hh>
-
-#include <spot/taalgos/tgba2ta.hh>
-#include <spot/taalgos/dot.hh>
-#include <spot/taalgos/stats.hh>
 
 static void
 syntax(char* prog)
@@ -156,16 +151,6 @@ syntax(char* prog)
     "  -M    convert into a det. minimal monitor (implies -R3 or R3b)\n"
     "  -s    convert to explicit automaton, and number states in DFS order\n"
     "  -S    convert to explicit automaton, and number states in BFS order\n"
-    "\n"
-    "Conversion to Testing Automaton:\n"
-    "  -TA   output a Generalized Testing Automaton (GTA),\n"
-    "          or a Testing Automaton (TA) with -DS\n"
-    "  -lv   add an artificial livelock state to obtain a Single-pass (G)TA\n"
-    "  -sp   convert into a single-pass (G)TA without artificial "
-    "livelock state\n"
-    "  -in   do not use an artificial initial state\n"
-    "  -TGTA output a Transition-based Generalized TA\n"
-    "  -RT   reduce the (G)TA/TGTA using bisimulation.\n"
     "\n"
     "Options for performing emptiness checks (on TGBA):\n"
     "  -e[ALGO]  run emptiness check, expect and compute an "
@@ -291,12 +276,6 @@ checked_main(int argc, char** argv)
   bool reduction_dir_sim = false;
   bool reduction_rev_sim = false;
   bool reduction_iterated_sim = false;
-  bool opt_bisim_ta = false;
-  bool ta_opt = false;
-  bool tgta_opt = false;
-  bool opt_with_artificial_initial_state = true;
-  bool opt_single_pass_emptiness_check = false;
-  bool opt_with_artificial_livelock = false;
   bool cs_nowdba = true;
   bool cs_wdba_smaller = false;
   bool cs_nosimul = true;
@@ -644,10 +623,6 @@ checked_main(int argc, char** argv)
             opt_dtbasat = 0;
           //output = -1;
         }
-      else if (!strcmp(argv[formula_index], "-RT"))
-        {
-          opt_bisim_ta = true;
-        }
       else if (!strcmp(argv[formula_index], "-ru"))
         {
           simpltl = true;
@@ -677,26 +652,6 @@ checked_main(int argc, char** argv)
       else if (!strcmp(argv[formula_index], "-T"))
         {
           use_timer = true;
-        }
-      else if (!strcmp(argv[formula_index], "-TA"))
-        {
-          ta_opt = true;
-        }
-      else if (!strcmp(argv[formula_index], "-TGTA"))
-        {
-          tgta_opt = true;
-        }
-      else if (!strcmp(argv[formula_index], "-lv"))
-        {
-          opt_with_artificial_livelock = true;
-        }
-      else if (!strcmp(argv[formula_index], "-sp"))
-        {
-          opt_single_pass_emptiness_check = true;
-        }
-      else if (!strcmp(argv[formula_index], "-in"))
-        {
-          opt_with_artificial_initial_state = false;
         }
       else if (!strcmp(argv[formula_index], "-taa"))
         {
@@ -1182,84 +1137,6 @@ checked_main(int argc, char** argv)
 
       if (dupexp)
         a = make_twa_graph(a, spot::twa::prop_set::all());
-
-      //TA, STA, GTA, SGTA and TGTA
-      if (ta_opt || tgta_opt)
-        {
-          bdd atomic_props_set_bdd = atomic_prop_collect_as_bdd(f, a);
-
-          if (ta_opt)
-            {
-              tm.start("conversion to TA");
-              auto testing_automaton
-                  = tgba_to_ta(a, atomic_props_set_bdd, degeneralize_opt
-                      == DegenSBA, opt_with_artificial_initial_state,
-                      opt_single_pass_emptiness_check,
-                      opt_with_artificial_livelock);
-              tm.stop("conversion to TA");
-
-              if (opt_bisim_ta)
-                {
-                  tm.start("TA bisimulation");
-                  testing_automaton = minimize_ta(testing_automaton);
-                  tm.stop("TA bisimulation");
-                }
-
-              if (output != -1)
-                {
-                  tm.start("producing output");
-                  switch (output)
-                    {
-                    case 0:
-                      spot::print_dot(std::cout, testing_automaton);
-                      break;
-                    case 12:
-                      stats_reachable(testing_automaton).dump(std::cout);
-                      break;
-                    default:
-                      std::cerr << "unsupported output option\n";
-                      exit(1);
-                    }
-                  tm.stop("producing output");
-                }
-              a = nullptr;
-              output = -1;
-            }
-          if (tgta_opt)
-            {
-              auto tgta = tgba_to_tgta(a, atomic_props_set_bdd);
-              if (opt_bisim_ta)
-                {
-                  tm.start("TA bisimulation");
-                  a = minimize_tgta(tgta);
-                  tm.stop("TA bisimulation");
-                }
-              else
-                {
-                  a = tgta;
-                }
-
-              if (output != -1)
-                {
-                  tm.start("producing output");
-                  switch (output)
-                    {
-                    case 0:
-                      spot::print_dot(std::cout, std::static_pointer_cast
-                                            <spot::tgta_explicit>(a)->get_ta());
-                      break;
-                    case 12:
-                      stats_reachable(a).dump(std::cout);
-                      break;
-                    default:
-                      std::cerr << "unsupported output option\n";
-                      exit(1);
-                    }
-                  tm.stop("producing output");
-                }
-              output = -1;
-            }
-        }
 
       if (system_aut)
         {

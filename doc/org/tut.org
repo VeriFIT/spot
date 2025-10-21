@@ -84,8 +84,6 @@ real notebooks instead.
 - [[https://spot.lrde.epita.fr/ipynb/randltl.html][=randltl.ipynb=]] demonstrates a Python-version of [[file:randltl.org][=randltl=]]
 - [[https://spot.lrde.epita.fr/ipynb/gen.html][=gen.ipynb=]] show how to generate families of LTL formulas (as done in [[file:genltl.org][=genltl=]]) or automata ([[file:genaut.org][=genaut=]])
 - [[https://spot.lrde.epita.fr/ipynb/decompose.html][=decompose.ipynb=]] illustrates the =decompose_strength()=, =decompose_acc_scc()= and =decompose_scc()= functions
-- [[https://spot.lrde.epita.fr/ipynb/testingaut.html][=testingaut.ipynb=]] shows the steps necessary to build a testing
-  automaton
 - [[https://spot.lrde.epita.fr/ipynb/ltsmin-dve.html][=ltsmin-dve.ipynb=]] loading a DiVinE model using the LTSmin interface.
 - [[https://spot.lrde.epita.fr/ipynb/ltsmin-pml.html][=ltsmin-pml.ipynb=]] loading a Promela model using the LTSmin interface.
 - [[https://spot.lrde.epita.fr/ipynb/word.html][=word.ipynb=]] example for the =twa_run= and =twa_word= classes.
@@ -106,5 +104,5 @@ real notebooks instead.
 
 
 #  LocalWords:  utf html bdd IPython ipynb io randaut accparse acc
-#  LocalWords:  cond randltl genltl genaut scc testingaut ltsmin dve
+#  LocalWords:  cond randltl genltl genaut scc ltsmin dve
 #  LocalWords:  DiVinE LTSmin pml twa atva inv satmin twagraph

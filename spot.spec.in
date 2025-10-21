@@ -33,7 +33,6 @@ logic (LTL & PSL).
 %{_bindir}/genaut
 %{_bindir}/genltl
 %{_bindir}/ltl2tgba
-%{_bindir}/ltl2tgta
 %{_bindir}/ltlcross
 %{_bindir}/ltldo
 %{_bindir}/ltlf2dfa
@@ -50,7 +49,6 @@ logic (LTL & PSL).
 %{_mandir}/man1/genaut.1*
 %{_mandir}/man1/genltl.1*
 %{_mandir}/man1/ltl2tgba.1*
-%{_mandir}/man1/ltl2tgta.1*
 %{_mandir}/man1/ltlcross.1*
 %{_mandir}/man1/ltldo.1*
 %{_mandir}/man1/ltlf2dfa.1*
@@ -173,7 +171,6 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/dstar2tgba
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/genaut
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/genltl
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltl2tgba
-chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltl2tgta
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlcross
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltldo
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlfilt

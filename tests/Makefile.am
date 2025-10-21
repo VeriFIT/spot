@@ -64,7 +64,6 @@ check_PROGRAMS = \
   core/bitvect \
   core/bricks \
   core/checkpsl \
-  core/checkta \
   core/consterm \
   core/cube \
   core/emptchk \
@@ -108,7 +107,6 @@ core_bdddict_SOURCES  = core/bdddict.cc
 core_bitvect_SOURCES  = core/bitvect.cc
 core_bricks_SOURCES = core/bricks.cc
 core_checkpsl_SOURCES = core/checkpsl.cc
-core_checkta_SOURCES = core/checkta.cc
 core_emptchk_SOURCES  = core/emptchk.cc
 core_graph_SOURCES = core/graph.cc
 core_ikwiad_SOURCES = core/ikwiad.cc
@@ -309,8 +307,6 @@ TESTS_twa = \
   core/ltl2dstar2.test \
   core/ltl2dstar3.test \
   core/ltl2dstar4.test \
-  core/ltl2ta.test \
-  core/ltl2ta2.test \
   core/pdegen.test \
   core/randaut.test \
   core/randtgba.test \
@@ -397,7 +393,6 @@ TESTS_ipython = \
   python/split.ipynb \
   python/stutter-inv.ipynb \
   python/synthesis.ipynb \
-  python/testingaut.ipynb \
   python/twagraph-internals.ipynb \
   python/word.ipynb \
   python/zlktree.ipynb

@@ -44,8 +44,6 @@ static const argp_option options[] =
     { DOC("genaut", "Generate ω-automata from scalable patterns.") },
     { DOC("ltl2tgba", "Convert LTL or PSL into variants of Transition-based "
           "Generalized Büchi Automata, and to other types of automata.") },
-    { DOC("ltl2tgta", "Convert LTL or PSL into variants of Transition-based "
-          "Generalized Testing Automata.") },
     { DOC("autfilt", "Filter, convert, and transform ω-automata.") },
     { DOC("dstar2tgba", "Convert ω-automata into variants of "
           "Transition-based Büchi automata.") },

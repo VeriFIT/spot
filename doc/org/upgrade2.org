@@ -235,20 +235,6 @@ that provide a function with a similar service.
 | ~saba/sabastate.hh~                |                                    | not supported anymore                            |
 | ~saba/sabasucciter.hh~             |                                    | not supported anymore                            |
 |------------------------------------+------------------------------------+--------------------------------------------------|
-| ~taalgos/dotty.hh~                 | ~spot/taalgos/dot.hh~              |                                                  |
-| ~taalgos/emptinessta.hh~           | ~spot/taalgos/emptinessta.hh~      |                                                  |
-| ~taalgos/minimize.hh~              | ~spot/taalgos/minimize.hh~         |                                                  |
-| ~taalgos/reachiter.hh~             | ~spot/taalgos/reachiter.hh~        |                                                  |
-| ~taalgos/statessetbuilder.hh~      | ~spot/taalgos/statesetbuilder.hh~  |                                                  |
-| ~taalgos/stats.hh~                 | ~spot/taalgos/stats.hh~            |                                                  |
-| ~taalgos/tgba2ta.hh~               | ~spot/taalgos/tgba2ta.hh~          |                                                  |
-| ~ta/taexplicit.hh~                 | ~spot/ta/taexplicit.hh~            | old implementation (ought to be changed)         |
-| ~ta/ta.hh~                         | ~spot/ta/ta.hh~                    |                                                  |
-| ~ta/taproduct.hh~                  | ~spot/ta/taproduct.hh~             |                                                  |
-| ~ta/tgtaexplicit.hh~               | ~spot/ta/tgtaexplicit.hh~          | old implementation (ought to be changed)         |
-| ~ta/tgta.hh~                       | ~spot/ta/tgta.hh~                  |                                                  |
-| ~ta/tgtaproduct.hh~                | ~spot/ta/tgtaproduct.hh~           |                                                  |
-|------------------------------------+------------------------------------+--------------------------------------------------|
 | ~tgbaalgos/bfssteps.hh~            | ~spot/twaalgos/bfssteps.hh~        |                                                  |
 | ~tgbaalgos/complete.hh~            | ~spot/twaalgos/complete.hh~        |                                                  |
 | ~tgbaalgos/compsusp.hh~            | ~spot/twaalgos/compsusp.hh~        |                                                  |
@@ -670,7 +656,7 @@ for (auto i: aut->succ(s))
 #  LocalWords:  reimplemented cpp SRC bdd bddx BuDDy bvec bvecx fdd
 #  LocalWords:  fddx dstarparse eltlparse iface kripke adhoc ltlast
 #  LocalWords:  kripkeparse ltlenv ltlparse ltlvisit config sabaalgos
-#  LocalWords:  neverparse saba taalgos tgbaalgos dualize tgbaparse
+#  LocalWords:  neverparse saba tgbaalgos dualize tgbaparse
 #  LocalWords:  libbdd libbddx lspot lbddx lbdd namespace ptr xargs
 #  LocalWords:  typedefs sed aut taa tgta acc buchi myalgorithm succ
 #  LocalWords:  iter num dst cond BDDs arg dstar dtgba dupexp bfs dfs

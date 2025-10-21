@@ -41,14 +41,6 @@ be more specific about a particular aspect of Spot.
   This describes the translation from LTL to TGBA used by the
   [[file:ltl2tgba.org][=ltl2tgba=]] tool.
 
-- *Model checking using generalized testing automata*, /Ala Eddine Ben
-  Salem/, /Alexandre Duret-Lutz/, and /Fabrice Kordon/.  In
-  Transactions on Petri Nets and Other Models of Concurrency (ToPNoC
-  VI), LNCS 7400, p. 94--112, 2012.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#bensalem.12.topnoc][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/bensalem.12.topnoc.pdf][pdf]])
-
-  This describes the generalized testing automata produced by the
-  [[file:ltl2tgta.org][=ltl2tgta=]] tool.
-
 - *SAT-based minimization of deterministic ω-automata*, /Souheib
   Baarir/ and /Alexandre Duret-Lutz/.  In Proc. of LPAR'15, LNCS 9450,
   pp. 79--87.  Nov. 2015.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#baarir.15.lpar][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/baarir.15.lpar.pdf][pdf]])
@@ -136,6 +128,15 @@ be more specific about a particular aspect of Spot.
 
   Was the first presentation of the tool [[file:ltlsynt.org][=ltlsynt=]].  The paper
   *Dissecting ltlsynt*, mentioned earlier, is more up-to-date.
+
+- *Model checking using generalized testing automata*, /Ala Eddine Ben
+  Salem/, /Alexandre Duret-Lutz/, and /Fabrice Kordon/.  In
+  Transactions on Petri Nets and Other Models of Concurrency (ToPNoC
+  VI), LNCS 7400, p. 94--112, 2012.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#bensalem.12.topnoc][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/bensalem.12.topnoc.pdf][pdf]])
+
+  This describes the generalized testing automata produced by the
+  [[file:ltl2tgta.org][=ltl2tgta=]] tool, which was last distributed with Spot 2.14.x.
+
 
 
 #  LocalWords:  utf html Alexandre Duret Lutz Lewkowicz Amaury Xu pdf

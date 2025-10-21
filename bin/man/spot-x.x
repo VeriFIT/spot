@@ -284,8 +284,8 @@ Assign a folder path to this variable to generate XCNF files whenever
 SAT-based minimization is used \- the file is output as "incr.xcnf"
 in the specified directory. This feature works only with an external
 SAT-solver. See \fBSPOT_SATSOLVER\fR to know how to provide one. Also note
-that this needs an incremental approach without restarting the encoding i.e
-"sat\-minimize=3,param=\-1" for ltl2tgba and ltl2tgta or "incr,param=\-1" for
+that this needs an incremental approach without restarting the encoding i.e.
+"sat\-minimize=3,param=\-1" for ltl2tgba or "incr,param=\-1" for
 autfilt (see \fBsat\-minimize\fR option described above or autfilt man page).
 The XCNF format is the one used by the SAT incremental competition.
 
@@ -349,6 +349,5 @@ used for Büchi automata when \fBSPOT_CONTAINMENT_CHECK=forq\fR.
 
 [SEE ALSO]
 .BR ltl2tgba (1)
-.BR ltl2tgta (1)
 .BR dstar2tgba (1)
 .BR autfilt (1)

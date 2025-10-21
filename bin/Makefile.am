@@ -66,7 +66,6 @@ bin_PROGRAMS = \
   genaut \
   genltl \
   ltl2tgba \
-  ltl2tgta \
   ltlcross \
   ltldo \
   ltlfilt \
@@ -93,7 +92,6 @@ genltl_LDADD = $(top_builddir)/spot/gen/libspotgen.la $(LDADD)
 randaut_SOURCES = randaut.cc
 randltl_SOURCES = randltl.cc
 ltl2tgba_SOURCES = ltl2tgba.cc
-ltl2tgta_SOURCES = ltl2tgta.cc
 ltlcross_SOURCES = ltlcross.cc
 ltlf2dfa_SOURCES = ltlf2dfa.cc
 ltlfsynt_SOURCES = ltlfsynt.cc

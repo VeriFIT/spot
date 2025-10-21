@@ -318,8 +318,6 @@ spot/             Sources for libspot.
    parseaut/      Parser for automata in multiple formats.
    parsetl/       Parser for LTL/PSL formulas.
    priv/          Private algorithms, used internally but not exported.
-   ta/            TA objects and cousins (TGTA).
-   taalgos/       Algorithms on TA/TGTA.
    twa/           TωA objects and cousins (Transition-based ω-Automata).
    twacube/       TωA objects based on cube (not-bdd).
    twacube_algos/ TωAcube algorithms
@@ -382,7 +380,7 @@ End:
 LocalWords:  optimizations kripkeparse  Automata IPython subdirectory
 LocalWords:  neverparse ltlcounter ltlclasses parallelizing automata
 LocalWords:  wdba WDBA ajax dve DiVinE ltdl Libtool's dlopen userdoc
-LocalWords:  parseaut parsetl priv TGTA taalgos twa twaalgos dtgbasat
+LocalWords:  parseaut parsetl priv twa twaalgos dtgbasat
 LocalWords:  DTGBA compositional invariance ltsmin SpinS Gnulib's PSL
 LocalWords:  Jupyter Doxygen rewritings reimplementation ltlcross utf
 LocalWords:  glibgxx libstdc GLIBCXX Javascript Nemanja Trifunovic's

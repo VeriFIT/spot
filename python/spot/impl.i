@@ -36,11 +36,6 @@
 %shared_ptr(spot::fair_kripke)
 %shared_ptr(spot::kripke)
 %shared_ptr(spot::kripke_graph)
-%shared_ptr(spot::ta)
-%shared_ptr(spot::ta_explicit)
-%shared_ptr(spot::ta_product)
-%shared_ptr(spot::tgta)
-%shared_ptr(spot::tgta_explicit)
 %shared_ptr(spot::bdd_dict)
 %shared_ptr(spot::mtdfa)
 %shared_ptr(spot::mtdtwa)
@@ -182,15 +177,6 @@
 #include <spot/kripke/fairkripke.hh>
 #include <spot/kripke/kripke.hh>
 #include <spot/kripke/kripkegraph.hh>
-
-#include <spot/ta/ta.hh>
-#include <spot/ta/tgta.hh>
-#include <spot/ta/taexplicit.hh>
-#include <spot/ta/tgtaexplicit.hh>
-#include <spot/taalgos/tgba2ta.hh>
-#include <spot/taalgos/dot.hh>
-#include <spot/taalgos/stats.hh>
-#include <spot/taalgos/minimize.hh>
 
 using namespace spot;
 %}
@@ -831,15 +817,6 @@ def state_is_accepting(self, src) -> "bool":
 %template(kripke_graph_state_vector) std::vector<spot::internal::distate_storage<unsigned, internal::boxed_label<kripke_graph_state, false>>>;
 
 %include <spot/parseaut/public.hh>
-
-%include <spot/ta/ta.hh>
-%include <spot/ta/tgta.hh>
-%include <spot/ta/taexplicit.hh>
-%include <spot/ta/tgtaexplicit.hh>
-%include <spot/taalgos/tgba2ta.hh>
-%include <spot/taalgos/dot.hh>
-%include <spot/taalgos/stats.hh>
-%include <spot/taalgos/minimize.hh>
 
 %extend std::set<spot::formula,
                  std::less<spot::formula>,

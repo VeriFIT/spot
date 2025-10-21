@@ -17,7 +17,6 @@ that are listed below.
 .BR genaut (1)
 .BR genltl (1)
 .BR ltl2tgba (1)
-.BR ltl2tgta (1)
 .BR ltlcross (1)
 .BR ltldo (1)
 .BR ltlf2dfa (1)

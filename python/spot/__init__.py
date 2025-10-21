@@ -207,7 +207,7 @@ twa.acc = __twa_acc1_tmp
 twa.get_acceptance = __twa_acc2_tmp
 
 
-@_extend(twa, ta)
+@_extend(twa)
 class twa:
     def _repr_svg_(self, opt=None):
         """Output the automaton as SVG"""

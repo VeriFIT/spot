@@ -30,7 +30,6 @@ dist_man1_MANS = \
   genaut.1 \
   genltl.1 \
   ltl2tgba.1 \
-  ltl2tgta.1 \
   ltlcross.1 \
   ltldo.1 \
   ltlf2dfa.1 \
@@ -59,9 +58,6 @@ dstar2tgba.1: $(common_dep) $(srcdir)/dstar2tgba.x $(srcdir)/../dstar2tgba.cc
 
 ltl2tgba.1: $(common_dep) $(srcdir)/ltl2tgba.x $(srcdir)/../ltl2tgba.cc
 	$(convman) ../ltl2tgba$(EXEEXT) $(srcdir)/ltl2tgba.x $@
-
-ltl2tgta.1: $(common_dep) $(srcdir)/ltl2tgta.x $(srcdir)/../ltl2tgta.cc
-	$(convman) ../ltl2tgta$(EXEEXT) $(srcdir)/ltl2tgta.x $@
 
 ltlcross.1: $(common_dep) $(srcdir)/ltlcross.x $(srcdir)/../ltlcross.cc
 	$(convman) ../ltlcross$(EXEEXT) $(srcdir)/ltlcross.x $@

@@ -276,8 +276,6 @@ AC_CONFIG_FILES([
   spot/parseaut/Makefile
   spot/parsetl/Makefile
   spot/priv/Makefile
-  spot/taalgos/Makefile
-  spot/ta/Makefile
   spot/tl/Makefile
   spot/twaalgos/gtec/Makefile
   spot/twaalgos/Makefile

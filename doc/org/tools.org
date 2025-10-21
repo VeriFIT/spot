@@ -46,7 +46,6 @@ corresponding commands are hidden.
 - [[file:ltlfilt.org][=ltlfilt=]] Filter, convert, and transform LTL/PSL formulas.
 - [[file:genltl.org][=genltl=]] Generate LTL formulas from scalable patterns.
 - [[file:ltl2tgba.org][=ltl2tgba=]] Translate LTL/PSL formulas into various types of automata.
-- [[file:ltl2tgta.org][=ltl2tgta=]] Translate LTL/PSL formulas into testing automata.
 - [[file:ltlf2dfa.org][=ltlf2dfa=]] Translate LTLf formulas to transition-based DFA.
 - [[file:ltlcross.org][=ltlcross=]] Cross-compare LTL/PSL-to-automata translators.
 - [[file:ltlgrind.org][=ltlgrind=]] List formulas similar to but simpler than a given LTL/PSL
@@ -76,7 +75,6 @@ convenience, you can browse their HTML versions:
 [[./man/genaut.1.html][=genaut=]](1),
 [[./man/genltl.1.html][=genltl=]](1),
 [[./man/ltl2tgba.1.html][=ltl2tgba=]](1),
-[[./man/ltl2tgta.1.html][=ltl2tgta=]](1),
 [[./man/ltlf2dfa.1.html][=ltlf2dfa=]](1),
 [[./man/ltlfsynt.1.html][=ltlfsynt=]](1),
 [[./man/ltlcross.1.html][=ltlcross=]](1),
@@ -109,6 +107,11 @@ If you did some benchmark comparison against Spot, or if you built a
 tool above features provided by Spot, please make it clear what
 version of Spot you are using.  Spot is improved regularly, and
 results might be different with another version.
+
+* Deleted tools
+
+- [[file:ltl2tgta.org][=ltl2tgta=]] Translate LTL/PSL formulas into testing automata.
+
 
 #  LocalWords:  num toc helloworld SRC LTL PSL randltl ltlfilt genltl
 #  LocalWords:  scalable ltl tgba Büchi automata tgta ltlcross eval
