@@ -2169,7 +2169,12 @@ namespace spot
 
     mtdfa_ptr dfa;
     if (f.is_boolean())
-      return data.trans(f);
+      {
+        dfa = data.trans(f);
+        if (!data.want_names)
+          dfa->names.clear();
+        return dfa;
+      }
     switch (op o = f.kind())
       {
       case op::tt:
