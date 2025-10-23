@@ -153,5 +153,14 @@ diff out.hoa exp2.hoa
 # We also use different minimization/simplify/translation algorithms,
 # but because the formulas are very simple, the result is expected to
 # be identical.
-ltlf2dfa - --minimize=false --translation=direct --simplify=no >out2.hoa <in
+ltlf2dfa - --minimize=true --translation=direct --simplify=yes >out2.hoa <in
 diff out2.hoa exp2.hoa
+ltlf2dfa -F- --minimize=no --translation=direct --simplify=false >out2.hoa <in
+diff out2.hoa exp2.hoa
+
+ltlf2dfa GFa -q >out
+test "" = "`cat out`"
+
+# PSL is currently not supported
+ltlf2dfa '{(1;1)[*]}!' 2>err && exit 1
+grep 'not an LTLf formula' err

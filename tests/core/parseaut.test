@@ -67,6 +67,14 @@ input:5.1-9: redefinition of the number of states...
 input:2.1-9: ... previously defined here.
 EOF
 
+: >empty
+
+expecterr empty --intersect input <<EOF
+input:5.1-9: redefinition of the number of states...
+input:2.1-9: ... previously defined here.
+autfilt: failed to read automaton from input
+EOF
+
 cat >input <<EOF
 #line 1 "hoa"
 HOA: v1
@@ -717,6 +725,10 @@ input:1.1-2.9: aborted input automaton
 input:3.1-7.14: aborted input automaton
 input:7.15-23: aborted input automaton
 input:8.1-16.12: aborted input automaton
+EOF
+
+expecterr empty --intersect input <<EOF
+autfilt: failed to read automaton from input (--ABORT-- read)
 EOF
 
 # DOS-style new lines should have the same output.

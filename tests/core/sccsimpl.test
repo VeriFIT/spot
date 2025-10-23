@@ -341,3 +341,12 @@ State: 1
 EOF
 cat output
 diff output expected
+
+# Diagnostics for -x misuses.  The first is a warning, the second is an error.
+autfilt -H --any --medium -x sccfilter=2 input >/dev/null 2>output && exit 1
+autfilt -H --any --medium -x sccfilter=x input >/dev/null 2>>output && exit 1
+cat >experror<<EOF
+autfilt: option 'sccfilter' was not used (possible typo?)
+autfilt: failed to parse --options near 'sccfilter=x'
+EOF
+diff experror output

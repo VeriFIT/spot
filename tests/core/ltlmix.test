@@ -137,3 +137,48 @@ Go2 & Xi2 & (i0 U o0)
 Go1 & Xi0 & (i0 U o0) & (i0 U o1)
 EOF
 diff out expected
+
+ltlmix -fXa -fGb -f'c U d' --part-file=part.part -C4 -A3 -n10 2>err && exit 1
+grep 'two-argument version' err
+
+ltlmix -B --seed=42 -fXa -fXb -fXc -n4 >out-B
+cat >expect-B <<\EOF
+Xb -> Xa
+Xb
+Xc xor (Xa & Xc)
+Xa
+EOF
+diff out-B expect-B
+
+P=--boolean-priorities=not=0,xor=0,equiv=0,implies=0
+ltlmix $P -B --allow-dups --seed=42 -fXa -fXb -fXc -n4 >out-B2
+cat >expect-B2 <<\EOF
+Xa & Xb
+Xa & Xb
+Xc & (Xa | Xc)
+Xb & (Xa | Xb)
+EOF
+diff out-B2 expect-B2
+
+ltlmix $P -B --seed=42 -fXa -fXb -fXc -n4 >out-B3
+cat >expect-B3 <<\EOF
+Xa & Xb
+Xc & (Xa | Xc)
+Xb & (Xa | Xb)
+Xa | (Xa & Xc)
+EOF
+diff out-B3 expect-B3
+
+ltlmix $P -B --seed=42 --tree-size=5..2 -fXa -fXb -fXc -n4 >out-B4
+cat >expect-B4 <<\EOF
+Xb | Xc
+Xa & Xb
+Xc
+Xa & Xc
+EOF
+diff out-B4 expect-B4
+
+echo | ltlmix 2>err && exit 1
+grep 'the set of subformulas to build from is empty' err
+
+:

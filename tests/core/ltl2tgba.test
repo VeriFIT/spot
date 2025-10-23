@@ -291,3 +291,12 @@ test 3 = `ltl2tgba -BD -f 'GF((p0 & GF!p0) | (!p0 & FGp0))' --stats=%s`
 
 # Some versions of Spot incorrectly returned "t" automata with -B
 test "Inf(0)" = "`ltl2tgba -B 'Xb | G!b' --stats=%g`"
+
+# Diagnostics for -x misuses.
+ltl2tgba -f a -x sccfilter=2 >/dev/null 2>output && exit 1
+ltl2tgba -f a -x sccfilter=x >/dev/null input 2>>output && exit 1
+cat >experror<<EOF
+ltl2tgba: option 'sccfilter' was not used (possible typo?)
+ltl2tgba: failed to parse --options near 'sccfilter=x'
+EOF
+diff experror output

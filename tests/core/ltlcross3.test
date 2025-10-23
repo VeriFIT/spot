@@ -356,6 +356,6 @@ ltlcross -f a ltl2tgba --determinize-max-edges=10 --determinize  2>stderr &&
 grep 'max-edges.*incompatible' stderr
 
 # Make sure save-inclusion-products outputs the expected number of products.
-ltlcross ltl2tgba 'ltl2tgba -D' -f GFa -f FGa \
+ltlcross --color=no ltl2tgba 'ltl2tgba -D' -f GFa -f FGa \
          --verbose --save-inclusion-products=prod.hoa
 test 12 = `autfilt -c prod.hoa`
