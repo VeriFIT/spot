@@ -155,3 +155,25 @@ diff out.hoa exp2.hoa
 # be identical.
 ltlf2dfa - --minimize=false --translation=direct --simplify=no >out2.hoa <in
 diff out2.hoa exp2.hoa
+
+ltlf2dfa -f 'Ga' --mtdfa-stats=paths | sed '/edges:/q' >out
+ltlf2dfa -f 'Fa' --mtdfa-stats=paths | sed '/edges:/q' >>out
+cat >expected <<\EOF
+states: 1
+aps: 1
+internal nodes: 1
+terminal nodes: 1
+constant nodes: 1 (true)
+total nodes: 3 (0KB)
+paths: 1
+edges: 1
+states: 1
+aps: 1
+internal nodes: 1
+terminal nodes: 1
+constant nodes: 1 (false)
+total nodes: 3 (0KB)
+paths: 2
+edges: 2
+EOF
+diff out expected
