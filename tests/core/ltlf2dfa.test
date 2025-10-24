@@ -164,3 +164,25 @@ test "" = "`cat out`"
 # PSL is currently not supported
 ltlf2dfa '{(1;1)[*]}!' 2>err && exit 1
 grep 'not an LTLf formula' err
+
+ltlf2dfa -f 'Ga' --mtdfa-stats=paths | sed '/edges:/q' >out
+ltlf2dfa -f 'Fa' --mtdfa-stats=paths | sed '/edges:/q' >>out
+cat >expected <<\EOF
+states: 1
+aps: 1
+internal nodes: 1
+terminal nodes: 1
+constant nodes: 1 (true)
+total nodes: 3 (0KB)
+paths: 1
+edges: 1
+states: 1
+aps: 1
+internal nodes: 1
+terminal nodes: 1
+constant nodes: 1 (false)
+total nodes: 3 (0KB)
+paths: 2
+edges: 2
+EOF
+diff out expected

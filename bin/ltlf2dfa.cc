@@ -323,7 +323,7 @@ namespace
               else if (s.has_true && !s.has_false)
                 std::cout << " (true)\n";
               else if (!s.has_true && s.has_false)
-                std::cout << " (true)\n";
+                std::cout << " (false)\n";
               else
                 std::cout << '\n';
               unsigned long long total_nodes
