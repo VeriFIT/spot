@@ -510,13 +510,25 @@ namespace spot
         res = bdd_ithvar(dict_->register_proposition(f, this));
         break;
       case op::Not:
-        // For all purely Boolean subformulas, we want to use the
-        // regular BDD operators, so that the cache entries are long
-        // lived.
-        if (f.is_boolean())
-          res = !ltlf_to_mtbdd(f[0]);
-        else
-          res = combine_not(ltlf_to_mtbdd(f[0]));
+        {
+          formula child = f[0];
+          // For all purely Boolean subformulas, we want to use the
+          // regular BDD operators, so that the cache entries are long
+          // lived.
+          if (f.is_boolean())
+            {
+              // Optimizing for !AP does not seem to be worth the extra test.
+              //
+              //if (child.is(op::ap))
+              //  res = bdd_nithvar(dict_->register_proposition(child, this));
+              //else
+              res = !ltlf_to_mtbdd(child);
+            }
+          else
+            {
+              res = combine_not(ltlf_to_mtbdd(child));
+            }
+        }
         break;
       case op::Xor:
         {
@@ -568,16 +580,26 @@ namespace spot
         {
           unsigned n = f.size();
           res = ltlf_to_mtbdd(f[0]);
-          for (unsigned i = 1; i < n; ++i)
-            res = combine_and(res, ltlf_to_mtbdd(f[i]));
+          unsigned i = 1;
+          // Relies on the fact that Boolean sub-formulas are sorted first
+          // to call bdd_and (instead of combine_and) as long as possible.
+          while (i < n && f[i].is_boolean())
+            res &= ltlf_to_mtbdd(f[i++]);
+          while (i < n)
+            res = combine_and(res, ltlf_to_mtbdd(f[i++]));
           break;
         }
       case op::Or:
         {
           unsigned n = f.size();
           res = ltlf_to_mtbdd(f[0]);
-          for (unsigned i = 1; i < n; ++i)
-            res = combine_or(res, ltlf_to_mtbdd(f[i]));
+          unsigned i = 1;
+          // Relies on the fact that Boolean sub-formulas are sorted first
+          // to call bdd_and (instead of combine_and) as long as possible.
+          while (i < n && f[i].is_boolean())
+            res |= ltlf_to_mtbdd(f[i++]);
+          while (i < n)
+            res = combine_or(res, ltlf_to_mtbdd(f[i++]));
           break;
         }
       case op::X:
