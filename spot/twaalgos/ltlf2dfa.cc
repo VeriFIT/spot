@@ -391,28 +391,39 @@ namespace spot
   namespace
   {
     static ltlf_translator* term_combine_trans;
-    static int term_combine_and(int left, int left_term,
-                                int right, int right_term)
+
+    // For AND and OR, the callbacks will never been called with a constant
+    // argument because those are simplified during the BDD operations.
+
+    static int term_combine_and(int, int left_term,
+                                int, int right_term)
     {
-      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
-      auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
+      formula lf = term_combine_trans->terminal_to_formula(left_term);
+      formula rf = term_combine_trans->terminal_to_formula(right_term);
       formula res = formula::And(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb && rb);
+      bool acc = left_term & right_term & 1;
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res, acc);
     }
 
-    static int term_combine_or(int left, int left_term,
-                               int right, int right_term)
+    static int term_combine_or(int, int left_term,
+                               int, int right_term)
     {
-      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
-      auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
+      formula lf = term_combine_trans->terminal_to_formula(left_term);
+      formula rf = term_combine_trans->terminal_to_formula(right_term);
       formula res = formula::Or(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb || rb);
+      bool acc = (left_term | right_term) & 1;
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res, acc);
     }
 
-    static int term_combine_implies(int left, int left_term,
+    // For implication, the callback will never been called with a constant
+    // left argument because those are simplified during the BDD operations.
+    // However the right could be 0; in that case formula::Implies will simplify
+    // to formula::Not.
+    static int term_combine_implies(int, int left_term,
                                     int right, int right_term)
     {
-      auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
+      formula lf = term_combine_trans->terminal_to_formula(left_term);
+      bool lb = left_term & 1;
       auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
       formula res = formula::Implies(lf, rf);
       return term_combine_trans->formula_to_terminal_bdd_as_int(res, !lb || rb);
