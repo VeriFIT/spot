@@ -209,7 +209,12 @@ namespace swig
 
     PyObject *value() const {
       if (base::current == end) {
+#if SWIG_VERSION < 0x040400
 	throw stop_iteration();
+#else
+        this->raise_stop_iteration();
+        return nullptr;
+#endif
       } else {
 	return from(static_cast<value_type>(&*(base::current)));
       }
@@ -224,7 +229,12 @@ namespace swig
     {
       while (n--) {
 	if (base::current == end) {
-	  throw stop_iteration();
+#if SWIG_VERSION < 0x040400
+          throw stop_iteration();
+#else
+          this->raise_stop_iteration();
+          return nullptr;
+#endif
 	} else {
 	  ++base::current;
 	}
@@ -268,7 +278,12 @@ namespace swig
 
     PyObject *value() const {
       if (base::current == end) {
-	throw stop_iteration();
+#if SWIG_VERSION < 0x040400
+        throw stop_iteration();
+#else
+        this->raise_stop_iteration();
+        return nullptr;
+#endif
       } else {
 	return from(static_cast<value_type>(*(base::current)));
       }
@@ -283,7 +298,12 @@ namespace swig
     {
       while (n--) {
 	if (base::current == end) {
-	  throw stop_iteration();
+#if SWIG_VERSION < 0x040400
+          throw stop_iteration();
+#else
+          this->raise_stop_iteration();
+          return nullptr;
+#endif
 	} else {
 	  ++base::current;
 	}
