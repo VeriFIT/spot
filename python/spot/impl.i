@@ -883,6 +883,44 @@ def state_is_accepting(self, src) -> "bool":
   }
 }
 
+%extend std::vector<spot::formula> {
+  std::string __str__()
+  {
+    std::ostringstream os;
+    os << '[';
+    const char* sep = "";
+    for (spot::formula s: *self)
+      {
+        os << sep;
+        if (s)
+          os << '"' << spot::escape_str(spot::str_psl(s)) << '"';
+        else
+          os << "None";
+        sep = ", ";
+      }
+    os << ']';
+    return os.str();
+  }
+  std::string __repr__()
+  {
+    std::ostringstream os;
+    os << '[';
+    const char* sep = "";
+    for (spot::formula s: *self)
+      {
+        os << sep;
+        if (s)
+          os << "spot.formula(\""
+             << spot::escape_str(spot::str_psl(s)) << "\")";
+        else
+          os << "None";
+        sep = ", ";
+      }
+    os << ']';
+    return os.str();
+  }
+}
+
 %extend spot::acc_cond::rs_pair {
   std::string __repr__()
   {

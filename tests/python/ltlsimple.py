@@ -21,6 +21,23 @@ import sys
 from unittest import TestCase
 tc = TestCase()
 
+# CPython use reference counting, so that automata are destructed
+# when we expect them to be.   However other implementations like
+# PyPy may call destructors latter, causing different output.
+from platform import python_implementation
+if python_implementation() == 'CPython':
+    def gcollect():
+        pass
+else:
+    import gc
+    def gcollect():
+        # From some reason PyPy 7.3.20 (only version tested)
+        # requires double collection() for this test to pass.
+        # That's odd, because collect() is supposed to perform
+        # a full collection pass according to the doc.
+        gc.collect()
+        gc.collect()
+
 # Some of the tests here assume timely destructor calls, as they occur
 # in the reference-counted CPython implementation.  Other
 # implementation such as PyPy, should skip those tests.
@@ -62,7 +79,15 @@ op5 = spot.formula.Or([op2, op3, op3])
 sys.stdout.write('op5 = %s\n' % str(op5))
 tc.assertEqual(op5, op2)
 
+tc.assertEqual(spot.formula.apid_count(), 3)
+tc.assertEqual(str(spot.formula.apid_map()), '["a", "b", "c"]')
+
 del op2, op3, op4, op5
+
+gcollect()
+
+tc.assertEqual(spot.formula.apid_count(), 0)
+tc.assertEqual(str(spot.formula.apid_map()), '[]')
 
 # ----------------------------------------------------------------------
 a = spot.formula.ap('a')
@@ -80,8 +105,8 @@ f5 = spot.formula.Xor(F, c)
 
 del a, b, c, T, F, f1, f2, f4, f5
 
-if is_cpython:
-    tc.assertTrue(spot.fnode_instances_check())
+gcollect()
+tc.assertTrue(spot.fnode_instances_check())
 
 # ----------------------------------------------------------------------
 tc.assertEqual(str([str(x) for x in spot.formula('a &b & c')]),
@@ -162,5 +187,23 @@ def myparse(input):
 # to pf.f inside the destroyed pf.
 tc.assertEqual(myparse('a U b'), spot.formula('a U b'))
 
+
 tc.assertTrue(spot.is_liveness('a <-> GFb'))
 tc.assertFalse(spot.is_liveness('a & GFb'))
+
+gcollect()
+
+tc.assertEqual(spot.formula('a').apid(), 0)
+tc.assertEqual(spot.formula('b').apid(), 1)
+tc.assertEqual(spot.formula.apid_count(), 5)
+tc.assertEqual(str(spot.formula.apid_map()),
+               '["a", "b", None, None, "\\"$strange[0]=name\\""]')
+
+del formula
+gcollect()
+
+tc.assertEqual(str(spot.formula.apid_map()), '["a", "b", None, None]')
+tc.assertEqual(repr(spot.formula.apid_map()),
+               '[spot.formula("a"), spot.formula("b"), None, None]')
+
+tc.assertEqual(str(spot.formula.ap_from_apid(0)), 'a')

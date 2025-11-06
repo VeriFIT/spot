@@ -888,6 +888,8 @@ namespace spot
     printer_(std::ostream& os, formula f, bool full_parent,
              bool ratexp, const char** kw)
     {
+      if (!f)                   // formula(nullptr)
+        return os;
       to_string_visitor v(os, full_parent, ratexp, kw);
       v.visit(f);
       return os;

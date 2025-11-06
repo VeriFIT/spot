@@ -136,6 +136,85 @@ namespace spot
     return res;
   }
 
+  std::vector<unsigned char>
+  collect_apids_with_polarities(formula f)
+  {
+    std::vector<unsigned char> v;
+    collect_apids_with_polarities(f, v);
+    return v;
+  }
+
+  void
+  collect_apids_with_polarities(formula f, std::vector<unsigned char>& v)
+  {
+    v.clear();
+    v.resize(formula::apid_count(), 0U);
+
+    // polarity: 0 = negative, 1 = positive, 2 or 3 = both.
+    auto rec = [&v](formula f, unsigned polarity, auto self)
+    {
+      switch (f.kind())
+        {
+        case op::ff:
+        case op::tt:
+        case op::eword:
+          return;
+        case op::ap:
+          {
+            unsigned char bits = (polarity == 0 ? 0b01 :
+                                  polarity == 1 ? 0b10 :
+                                  0b11);
+            v[f.apid()] |= bits;
+          }
+          return;
+        case op::Not:
+        case op::NegClosure:
+        case op::NegClosureMarked:
+          self(f[0], polarity ^ 1, self);
+          return;
+        case op::Xor:
+        case op::Equiv:
+          self(f[0], 2, self);
+          self(f[1], 2, self);
+          return;
+        case op::Implies:
+        case op::UConcat:
+          self(f[0], polarity ^ 1, self);
+          self(f[1], polarity, self);
+          return;
+        case op::U:
+        case op::R:
+        case op::W:
+        case op::M:
+        case op::EConcat:
+        case op::EConcatMarked:
+          self(f[0], polarity, self);
+          self(f[1], polarity, self);
+          return;
+        case op::X:
+        case op::F:
+        case op::G:
+        case op::Closure:
+        case op::Or:
+        case op::OrRat:
+        case op::And:
+        case op::AndRat:
+        case op::AndNLM:
+        case op::Concat:
+        case op::Fusion:
+        case op::Star:
+        case op::FStar:
+        case op::first_match:
+        case op::strong_X:
+          for (formula c: f)
+            self(c, polarity, self);
+          return;
+        }
+    };
+    rec(f, 1, rec);
+  }
+
+
   atomic_prop_set collect_literals(formula f)
   {
     atomic_prop_set res;
@@ -381,26 +460,28 @@ namespace spot
   {
     mapping_t mapping;
     bool first_mapping = true;
-    relabeling_map rm;
+    std::vector<formula> rm;    // relabeling map: [APID] -> formula
     std::ostream* verbose = data_->verbose;
     auto add_to_mapping = [&](formula from, bool from_is_input, formula to)
     {
       mapping.emplace_back(from, from_is_input, to);
-      rm[from] = to;
-      if (SPOT_LIKELY(!verbose))
-        return;
       if (first_mapping)
         {
-          *verbose << "the following signals can be temporarily removed:\n";
           first_mapping = false;
+          rm.resize(formula::apid_count(), nullptr);
+          if (SPOT_UNLIKELY(verbose))
+            *verbose << "the following signals can be temporarily removed:\n";
         }
-      *verbose << "  " << from << " := " << to <<'\n';
+      rm[from.apid()] = to;
+      if (SPOT_UNLIKELY(verbose))
+        *verbose << "  " << from << " := " << to <<'\n';
     };
     unsigned options = data_->options;
     bool geqoo =
       (options & global_equiv_output_only) == global_equiv_output_only;
 
     formula oldf;
+    std::vector<unsigned char> polarities;
     do
       {
         bool rm_has_new_terms = false;
@@ -413,21 +494,26 @@ namespace spot
             // syntcomp, this occurs more frequently for input
             // variables than output variable.  See issue #529 for
             // some examples.
-            for (auto& [ap, pol]: spot::collect_aps_with_polarities(f))
-              if (pol != 0b11)
-                {
-                  bool neg = pol & 0b01;
-                  bool is_input =
-                    (data_->ins_or_outs.find(ap) != data_->ins_or_outs.end())
-                    == data_->is_inputs;
-                  formula to = (is_input == neg)
-                    ? spot::formula::tt() : spot::formula::ff();
-                  add_to_mapping(ap, is_input, to);
-                  rm_has_new_terms = true;
-                }
+            spot::collect_apids_with_polarities(f, polarities);
+            unsigned sz = polarities.size();
+            for (unsigned apid = 0; apid < sz; ++apid)
+              {
+                unsigned char pol = polarities[apid];
+                if (pol == 0b00 || pol == 0b11)
+                  continue;
+                bool neg = pol & 0b01;
+                formula ap = formula::ap_from_apid(apid);
+                bool is_input =
+                  (data_->ins_or_outs.find(ap) != data_->ins_or_outs.end())
+                  == data_->is_inputs;
+                formula to = (is_input == neg)
+                  ? spot::formula::tt() : spot::formula::ff();
+                add_to_mapping(ap, is_input, to);
+                rm_has_new_terms = true;
+              }
             if (rm_has_new_terms)
               {
-                f = spot::relabel_apply(f, &rm);
+                f = spot::relabel_apply(f, rm);
                 if (verbose)
                   *verbose << "new formula: " << f << '\n';
                 rm_has_new_terms = false;
@@ -518,7 +604,7 @@ namespace spot
               }
             if (rm_has_new_terms)
               {
-                f = spot::relabel_apply(f, &rm);
+                f = spot::relabel_apply(f, rm);
                 if (verbose)
                   *verbose << "new formula: " << f << '\n';
                 rm_has_new_terms = false;

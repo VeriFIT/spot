@@ -671,7 +671,28 @@ namespace spot
         if (i != m->end())
           return i->second;
       }
-    return f.map(relabel_apply, m);
+    // Since relabel_apply is overloaded, we should help the compiler
+    // to understand we are talking about the current function...
+    return f.map(static_cast<formula(*)(formula,
+                                        relabeling_map*)>(&relabel_apply), m);
+  }
+
+  formula
+  relabel_apply(formula f, const std::vector<formula>& m)
+  {
+    if (f.is(op::ap))
+      {
+        unsigned id = f.apid();
+        if (SPOT_UNLIKELY(id >= m.size()))
+          return f;
+        formula g = m[id];
+        return g ? g : f;
+      }
+    // Since relabel_apply is overloaded, we should help the compiler
+    // to understand we are talking about the current function...
+    return f.map(static_cast<formula(*)(formula,
+                                        const std::vector<formula>& m)>
+                 (&relabel_apply), m);
   }
 
 }

@@ -24,6 +24,7 @@
 #include <map>
 #include <set>
 #include <cstring>
+#include <string_view>
 #include <algorithm>
 #include <spot/misc/bareword.hh>
 #include <spot/tl/print.hh>
@@ -128,9 +129,30 @@ namespace spot
 
     struct maps_t final
     {
-      robin_hood::unordered_map<std::string, const fnode*> name2ap;
-      robin_hood::unordered_map<size_t, std::string> ap2name;
+      // Each formula is uniquely represented by the pointer given in this
+      // hash table.
       robin_hood::unordered_set<const fnode*, formula_hash, formula_equal> uniq;
+
+      // Atomic propositions are stored differently from the rest of
+      // other nodes.  The field fnode::ap_id_ is used as an index
+      // into apid2name to retrieve a pair (U, S) where S points to
+      // the name2ap entry, and U should be 0 as long as this atomic
+      // proposition is used.
+      //
+      // Additionally name2ap can be used to associate a name to the
+      // corresponding fnode*.
+      //
+      // free_apid, and the first field of the apid2name element (U)
+      // are used to maintain a linked list of unused apid2name
+      // entries, So that they can be recycled to declare new APs.  If
+      // free_apid or U is 0, the list is empty.  Otherwise, they
+      // designate entry at position free_apid-1 or U-1 as the next free
+      // entry.
+      robin_hood::unordered_node_map<std::string, const fnode*> name2ap;
+      std::vector<std::pair<unsigned,
+                            decltype(name2ap)::value_type*>> apid2name;
+      unsigned free_apid = 0;
+      unsigned free_apid_count = 0;
     };
     static maps_t m;
 
@@ -184,11 +206,29 @@ namespace spot
   {
     if (SPOT_UNLIKELY(is(op::ap)))
       {
-        auto i = m.ap2name.find(id());
-        auto n = m.name2ap.erase(i->second);
+        unsigned apid = ap_id_;
+        auto& entry = m.apid2name[apid];
+        auto n = m.name2ap.erase(entry.second->first);
         assert(n == 1);
         (void)n;
-        m.ap2name.erase(i);
+        ++m.free_apid_count;
+        // If we cleared all variables, let's just reset the vector.
+        if (SPOT_UNLIKELY(m.apid2name.size() == m.free_apid_count))
+          {
+            m.apid2name.clear();
+            m.free_apid_count = m.free_apid = 0;
+          }
+        else if (SPOT_UNLIKELY(apid == m.apid2name.size() - 1))
+          {
+            m.apid2name.pop_back();
+            --m.free_apid_count; // undo
+          }
+        else
+          {
+            entry.first = m.free_apid;
+            entry.second = nullptr;
+            m.free_apid = apid + 1;
+          }
       }
     else
       {
@@ -233,6 +273,12 @@ namespace spot
   {
     throw std::invalid_argument
       ("min() only works on Star and FStar nodes");
+  }
+
+  void
+  fnode::report_apid_on_nonap()
+  {
+    throw std::runtime_error("apid() called on non-AP formula");
   }
 
   void
@@ -1586,28 +1632,35 @@ namespace spot
     auto ires = m.name2ap.emplace(name, nullptr);
     if (!ires.second)
       return ires.first->second->clone();
+
     // Name the formula before creating it, because the constructor
-    // will call ap_name().
-    //
-    // We plan to use next_id_ for identifier, but it is possible that
-    // next_id_ has already wrapped around 0 and that next_id_ is
-    // already the name of another atomic proposition.  In that
-    // unlikely case, simply increment the id.
-    while (SPOT_UNLIKELY(!m.ap2name.emplace(next_id_, name).second))
-      bump_next_id();
-    // next_id_ is incremented by setup_props(), called by the
-    // constructor of fnode
-    return ires.first->second = new fnode(op::ap, {});
+    // will call ap_name() during fnode::setup_props().
+    unsigned apid;
+    if (unsigned freeapid = m.free_apid; freeapid)
+      {
+        // if discared apid entry exist, recycle them
+        apid = freeapid - 1;
+        auto& entry = m.apid2name[apid];
+        m.free_apid = entry.first;
+        --m.free_apid_count;
+        entry.first = 0U;
+        entry.second = &*ires.first;
+      }
+    else
+      {
+        // otherwise, simply extend the vector
+        apid = m.apid2name.size();
+        m.apid2name.emplace_back(0U, &*ires.first);
+      }
+    return ires.first->second = new fnode(op::ap, apid);
   }
 
   const std::string&
   fnode::ap_name() const
   {
-    if (op_ != op::ap)
+    if (SPOT_UNLIKELY(op_ != op::ap))
       throw std::runtime_error("ap_name() called on non-AP formula");
-    auto i = m.ap2name.find(id());
-    assert(i != m.ap2name.end());
-    return i->second;
+    return m.apid2name[apid()].second->first;
   }
 
   size_t fnode::next_id_ = 0U;
@@ -2240,24 +2293,25 @@ namespace spot
           switch (op_)
             {
             case op::Star:
-              if (max_ == unbounded())
+              if (range_.max == unbounded())
                 {
                   is_.finite = false;
-                  is_.syntactic_si = min_ <= 1 && children[0]->is_boolean();
+                  is_.syntactic_si = (range_.min <= 1)
+                    && children[0]->is_boolean();
                 }
               else
                 {
                   is_.syntactic_si = false;
                 }
-              if (min_ == 0)
+              if (range_.min == 0)
                 is_.accepting_eword = true;
               break;
             case op::FStar:
               is_.accepting_eword = false;
               is_.syntactic_si &= !children[0]->is_boolean();
-              if (max_ == unbounded())
+              if (range_.max == unbounded())
                 is_.finite = false;
-              if (min_ == 0)
+              if (range_.min == 0)
                 is_.syntactic_si = false;
               break;
             default:
@@ -2390,12 +2444,82 @@ namespace spot
     unsigned cnt = 0;
     for (auto i: m.uniq)
       if (!i->saturated_)
-        {
+        {                       // GCOVR_EXCL_START
           if (!cnt++)
             std::cerr << "*** m.uniq is not empty ***\n";
           i->dump(std::cerr) << '\n';
-        }
+        }                       // GCOVR_EXCL_STOP
+    if (m.apid2name.size() != m.free_apid_count)
+      {                         // GCOVR_EXCL_START
+        std::cerr << "*** m.apid2name is no empty ***\n";
+        unsigned e = m.apid2name.size();
+        for (unsigned i = 0; i < e; ++i)
+          {
+            auto& ap = m.apid2name[i];
+            std::cerr << " [" << i;
+            if (!ap.second)
+              std::cerr << "] = -> " << ap.first - 1 << '\n';
+            else
+              std::cerr << "] = (" << ap.second->first << ", "
+                        << ap.second->second << ")\n";
+          }
+        std::cerr << "free_apid = " << m.free_apid << '\n';
+        std::cerr << "free_apid_count = " << m.free_apid_count << '\n';
+        ++cnt;
+      }                         // GCOVR_EXCL_STOP
     return cnt == 0;
+  }
+
+  unsigned formula::apid_count() noexcept
+  {
+    return m.apid2name.size();
+  }
+
+  std::vector<formula> formula::apid_map()
+  {
+    std::vector<formula> r;
+    unsigned sz = apid_count();
+    r.reserve(sz);
+    for (unsigned i = 0; i < sz; ++i)
+      {
+        auto* ptr = m.apid2name[i].second;
+        r.emplace_back(ptr ? ptr->second->clone() : nullptr);
+      }
+    return r;
+  }
+
+  namespace
+  {
+    [[noreturn]]
+    void incorrect_apid(const std::string_view fn)
+    {
+      throw std::runtime_error(std::string(fn) + "(): incorrect id");
+    }
+  }
+
+  bool formula::is_valid_apid(unsigned id) noexcept
+  {
+    return (m.apid2name.size() > id) && m.apid2name[id].second;
+  }
+
+  formula formula::ap_from_apid(unsigned id)
+  {
+    if (SPOT_UNLIKELY(m.apid2name.size() <= id))
+      incorrect_apid("formula::ap_from_apid");
+    auto& entry = m.apid2name[id];
+    if (SPOT_UNLIKELY(!entry.second))
+      incorrect_apid("formula::ap_from_apid");
+    return formula(entry.second->second->clone());
+  }
+
+  const std::string& formula::apname_from_apid(unsigned id)
+  {
+    if (SPOT_UNLIKELY(m.apid2name.size() <= id))
+      incorrect_apid("formula::apname_from_apid");
+    auto& entry = m.apid2name[id];
+    if (SPOT_UNLIKELY(!entry.second))
+      incorrect_apid("formula::apname_from_apid");
+    return entry.second->first;
   }
 
   formula formula::sugar_goto(const formula& b, unsigned min, unsigned max)

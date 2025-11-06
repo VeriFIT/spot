@@ -279,7 +279,7 @@ namespace spot
       {
         if (SPOT_UNLIKELY(op_ != op::FStar && op_ != op::Star))
           report_min_invalid_arg();
-        return min_;
+        return range_.min;
       }
 
       /// \see formula::max
@@ -287,7 +287,7 @@ namespace spot
       {
         if (SPOT_UNLIKELY(op_ != op::FStar && op_ != op::Star))
           report_max_invalid_arg();
-        return max_;
+        return range_.max;
       }
 
       /// \see formula::size
@@ -377,7 +377,7 @@ namespace spot
       {
         if (op_ != op::Star)
           return false;
-        return min_ == 0 && max_ == unbounded();
+        return range_.min == 0 && range_.max == unbounded();
       }
 
       /// \see formula::one_star
@@ -398,6 +398,14 @@ namespace spot
 
       /// \see formula::ap_name
       const std::string& ap_name() const;
+
+      /// \see formula::apid
+      unsigned apid() const
+      {
+        if (SPOT_UNLIKELY(op_ != op::ap))
+          report_apid_on_nonap();
+        return ap_id_;
+      }
 
       /// \see formula::dump
       std::ostream& dump(std::ostream& os) const;
@@ -589,6 +597,7 @@ namespace spot
         report_get_child_of_expecting_single_child_node();
       [[noreturn]] static void report_min_invalid_arg();
       [[noreturn]] static void report_max_invalid_arg();
+      [[noreturn]] static void report_apid_on_nonap();
 
       static const fnode* unique(fnode*);
       static const fnode* multop_sorted(op o, std::vector<const fnode*>&& l);
@@ -604,20 +613,21 @@ namespace spot
       template<class iter>
       fnode(op o, iter begin, iter end, bool saturated = false)
         // Clang has some optimization where is it able to combine the
-        // 4 movb initializing op_,min_,max_,saturated_ into a single
+        // 4 movb initializing op_,ap_id_,saturated_ into a single
         // movl.  Also it can optimize the three byte-comparisons of
         // is_Kleene_star() into a single masked 32-bit comparison.
         // The latter optimization triggers warnings from valgrind if
-        // min_ and max_ are not initialized.  So to benefit from the
-        // initialization optimization and the is_Kleene_star()
-        // optimization in Clang, we always initialize min_ and max_
-        // with this compiler.  Do not do it the rest of the time,
-        // since the optimization is not done.
+        // min&max (aka ap_id_) are not initialized.  So to benefit
+        // from the initialization optimization and the
+        // is_Kleene_star() optimization in Clang, we always
+        // initialize ap_id_ with this compiler.  Do not do it the
+        // rest of the time, since the optimization is not done.
         : op_(o),
 #if __llvm__
-         min_(0), max_(0),
+        saturated_(saturated), ap_id_(0)
+#else
+        saturated_(saturated)
 #endif
-         saturated_(saturated)
       {
         size_t s = std::distance(begin, end);
         if (SPOT_UNLIKELY(s > (size_t) UINT16_MAX))
@@ -637,9 +647,18 @@ namespace spot
 
       fnode(op o, const fnode* f, uint8_t min, uint8_t max,
             bool saturated = false)
-        : op_(o), min_(min), max_(max), saturated_(saturated), size_(1)
+        : op_(o), saturated_(saturated), size_(1)
       {
+        range_.min = min;
+        range_.max = max;
         children[0] = f;
+        setup_props(o);
+      }
+
+      fnode(op o, uint16_t apid, bool saturated = false)
+        : op_(o), saturated_(saturated), size_(0)
+      {
+        ap_id_ = apid;
         setup_props(o);
       }
 
@@ -650,12 +669,20 @@ namespace spot
       static const fnode* one_plus_;
 
       op op_;                      // operator
-      uint8_t min_;                // range minimum (for star-like operators)
-      uint8_t max_;                // range maximum;
       mutable uint8_t saturated_;
+      struct range_t
+      {
+        uint8_t min;     // range minimum (for star-like operators)
+        uint8_t max;     // range maximum;
+      };
+      union
+      {
+        range_t range_;
+        uint16_t ap_id_;           // id for atomic proposition
+      };
       uint16_t size_;              // number of children
       mutable uint16_t refs_ = 0;  // reference count - 1;
-      size_t id_;                  // Also used as hash.
+      size_t id_;                  // also used as hash.
       static size_t next_id_;
 
       struct ltl_prop
@@ -925,6 +952,42 @@ namespace spot
     {
       return ptr_ != nullptr;
     }
+
+    /// \brief 1+maximum APID used by atomic propositions
+    ///
+    /// Each atomic proposition created by Spot is assigned
+    /// a unique APID: an integer that is increased from 0.
+    ///
+    /// Internally, the atomic proposition names are stored
+    /// in an array indexed by APIDs.  This function returns the
+    /// size of this array.
+    ///
+    /// This value may change when new atomic propositions are added
+    /// or removed.
+    ///
+    /// \see is_valid_apid
+    /// \see apname_from_apid
+    /// \see ap_from_apid
+    static unsigned apid_count() noexcept;
+    /// \brief check if an APID is valid
+    ///
+    /// Because atomic propositions will be removed when they are no
+    /// longer used, not all APIDs are valid.
+    static bool is_valid_apid(unsigned id) noexcept;
+    /// \brief retrieve the name associated to a valid APID
+    /// \see is_valid_apid
+    static const std::string& apname_from_apid(unsigned id);
+    /// \brief retrieve the formula associated to a valid APID
+    /// \see is_valid_apid
+    static formula ap_from_apid(unsigned id);
+    /// \brief return the map of APID to formulas
+    ///
+    /// This _builds_ and return a vector of formulas indexed by APIDs.
+    /// The size of this vector is equal to apid_count().
+    /// The formulas will either correspond to an atomic proposition, or
+    /// to nullptr if the corresponding APID is invalid (because the
+    /// corresponding atomic proposition is not referenced anymore).
+    static std::vector<formula> apid_map();
 
     /////////////////////////
     // Forwarded functions //
@@ -1746,12 +1809,25 @@ namespace spot
           (is(op::Not) && is_boolean() && is_in_nenoform()));
     }
 
-    /// \brief Print the name of an atomic proposition.
+    /// \brief Get the name of an atomic proposition.
     ///
     /// \pre the formula should be of kind op::ap.
     const std::string& ap_name() const
     {
       return ptr_->ap_name();
+    }
+
+    /// \brief Get the number of an atomic proposition.
+    ///
+    /// Atomic propositions are initially numbered with consecutive
+    /// numbers in the order they are created, starting with 0.  However
+    /// once formulas representing some atomic propositions are no-longer
+    /// referenced, their number are recycled (in LIFO order).
+    ///
+    /// \pre the formula should be of kind op::ap.
+    unsigned apid() const
+    {
+      return ptr_->apid();
     }
 
     /// \brief Print the formula for debugging

@@ -80,6 +80,27 @@ namespace spot
   SPOT_API std::map<formula, unsigned char>
   collect_aps_with_polarities(formula f);
 
+  /// \brief Collect the APs occurring in f, along with their polarities
+  ///
+  /// This function records each atomic proposition occurring in f
+  /// along with the polarity of its occurrence.  For instance if the
+  /// formula is `G(a -> b) & X(!b & c)`, and we assume that atomic
+  /// propositions a, b, and c, use APID 0, 1, and 2, respectively
+  /// then this will output the vector `[0b01, 0b11, 0b10]` where 0x01
+  /// means negative polarity, 0x10 is positive polarity, and 0x11 is
+  /// both.
+  ///
+  /// This function is expected to be faster than
+  /// collect_aps_with_polarities(), with the only drawback that the
+  /// returned vector is as large as the number of declared atomic
+  /// propositions, independently of the propositions actually used by
+  /// the formula.
+  /// @{
+  SPOT_API std::vector<unsigned char>
+  collect_apids_with_polarities(formula f);
+  SPOT_API void
+  collect_apids_with_polarities(formula f, std::vector<unsigned char>& v);
+  /// @}
 
   /// \brief Collect equivalent APs
   ///

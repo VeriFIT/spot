@@ -74,6 +74,12 @@ namespace spot
   ///
   /// Atomic proposition that do not appear in \a m are not
   /// replaced.
+  ///
+  /// The std::vector<formula> variant will be indexed by APIDs.
+  /// @{
   SPOT_API
   formula relabel_apply(formula f, relabeling_map* m);
+  SPOT_API
+  formula relabel_apply(formula f, const std::vector<formula>& m);
+  ///@}
 }
