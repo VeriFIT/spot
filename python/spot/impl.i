@@ -477,9 +477,11 @@ static void handle_any_exception()
   }
   catch (const spot::parse_error& e)
   {
-    std::string er("\n");
-    er += e.what();
-    SWIG_Error(SWIG_SyntaxError, er.c_str());
+    SWIG_Python_Raise(SWIG_NewPointerObj(new spot::parse_error(e),
+                                         SWIGTYPE_p_spot__parse_error,
+                                         SWIG_POINTER_OWN),
+                      "spot::parse_error",
+                      SWIGTYPE_p_spot__parse_error);
   }
   catch (const std::invalid_argument& e)
   {
@@ -510,8 +512,19 @@ static void handle_any_exception()
   }
 }
 
+%exceptionclass spot::parse_error;
 %implicitconv spot::parallel_policy;
 %include <spot/misc/common.hh>
+
+%extend spot::parse_error {
+  std::string __str__()
+  {
+    std::ostringstream os;
+    os << '\n' << self->what();
+    return os.str();
+  }
+}
+
 %include <spot/misc/version.hh>
 %include <spot/misc/minato.hh>
 %include <spot/misc/optionmap.hh>
