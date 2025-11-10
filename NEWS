@@ -10,6 +10,22 @@ New in spot 2.14.2.dev  (not yet released)
     exceptions are now raised as instances of spot.parse_error.
     (Issue #617.)
 
+  - Swig 4.4, released recently, contains a proper fix to Issue #603.
+    However, that new version also requires some update in Spot's
+    code.  While this Spot release preserves compatibility with earlier
+    Swig versions, it is the first to be compatible with Swig 4.4.
+
+  - ltlf2dfa --mtdfa-stats had a bug where if "false" was the only
+    constant used, it would be reported as "true".
+
+  - ltlf_to_mtdfa_compose() would sometimes keep the name of states
+    even when instructed to discard them.
+
+  - Fix several "unnecessary virtual specifiers" reported by newer
+    versions of Clang.
+
+  - Many typos and documentation improvements.
+
 New in spot 2.14.2  (2025-09-18)
 
   Library:
