@@ -1851,7 +1851,7 @@ namespace spot
       {
       }
 
-      bool operator<(const transition& other) const
+      bool operator<(const transition& other) const noexcept
       {
         if (dest < other.dest)
           return true;
@@ -1865,7 +1865,7 @@ namespace spot
       }
     };
 
-    bool postponement_cmp(const transition& lhs, const transition& rhs)
+    bool postponement_cmp(const transition& lhs, const transition& rhs) noexcept
     {
       if (lhs.prom.id() < rhs.prom.id())
         return true;
