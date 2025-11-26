@@ -97,7 +97,7 @@ enum {
 static const argp_option options[] =
   {
     { "reference", OPT_REFERENCE, "COMMANDFMT", 0,
-      "register one translator and assume it is correct (do not"
+      "register one translator and assume it is correct (do not "
       "check it for error, but use it to check other translators)", 2 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "ltlcross behavior:", 5 },
@@ -109,7 +109,7 @@ static const argp_option options[] =
     { "no-complement", OPT_NOCOMP, nullptr, 0,
       "do not complement deterministic automata to perform extra checks", 0 },
     { "determinize", 'D', nullptr, 0,
-      "always determinize non-deterministic automata so that they"
+      "always determinize non-deterministic automata so that they "
       "can be complemented; also implicitly sets --products=0", 0 },
     { "determinize-max-states", OPT_DET_MAX_STATES, "N", 0,
       "attempt to determinize non-deterministic automata so they can be "
@@ -1442,7 +1442,7 @@ namespace
             {
               if (verbose)
                 std::cerr
-                  << ("info: running cross_checks and consistency_checks"
+                  << ("info: running cross_checks and consistency_checks "
                       "just for statistics\n");
             }
           else

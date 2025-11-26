@@ -489,7 +489,7 @@ autfilt --help | sed -n '/Transformations:/,/^$/p' | sed '1d;$d'
                              sat-naive, colored, preproc=N. Spot uses by
                              default its PicoSAT distribution but an external
                              SATsolver can be set thanks to the SPOT_SATSOLVER
-                             environment variable(see spot-x).
+                             environment variable (see spot-x).
       --separate-sets        if both Inf(x) and Fin(x) appear in the acceptance
                              condition, replace Fin(x) by a new Fin(y) and
                              adjust the automaton

@@ -2292,7 +2292,7 @@ namespace spot
           throw std::runtime_error("mealy_machines_to_aig(): One of the "
                                    "mealy like machines is not realizable.");
         case mealy_like::realizability_code::UNKNOWN:
-          throw std::runtime_error("mealy_machines_to_aig(): One of the"
+          throw std::runtime_error("mealy_machines_to_aig(): One of the "
                                    "mealy like objects has "
                                    "status \"unkwnown\"");
         case mealy_like::realizability_code::REALIZABLE_REGULAR:

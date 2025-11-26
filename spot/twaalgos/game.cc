@@ -1160,7 +1160,7 @@ namespace spot
     auto strat_ptr = arena->get_named_prop<strategy_t>("strategy");
     if (!strat_ptr)
       throw std::runtime_error("get_strategy(): Named prop "
-                               "\"strategy\" not set."
+                               "\"strategy\" not set. "
                                "Arena not solved?");
     return *strat_ptr;
   }

@@ -37,7 +37,7 @@ static void help()
 {
   std::cerr <<
     "safra [OPTIONS]\n"
-    "\t-f ltl_formula\tinput string is an ltl formulae\n"
+    "\t-f ltl_formula\tinput string is an ltl formula\n"
     "\t--hoa file.hoa\tinput file has hoa format\n"
     "\t-p\tpretty print states\n"
     "\t-H\toutput hoa format\n"
