@@ -1016,7 +1016,7 @@ namespace
                     }
                   else
                     throw std::runtime_error("ltlsynt: given parity game is not"
-                      "alternating and not trivially fixable!");
+                      " alternating and not trivially fixable!");
                 }
             }
         }

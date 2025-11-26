@@ -418,7 +418,7 @@ static const argp_option options[] =
       " automata). Supported options are acc=STRING, states=N, max-states=N, "
       "sat-incr=N, sat-incr-steps=N, sat-langmap, sat-naive, colored, preproc=N"
       ". Spot uses by default its PicoSAT distribution but an external SAT"
-      "solver can be set thanks to the SPOT_SATSOLVER environment variable"
+      "solver can be set thanks to the SPOT_SATSOLVER environment variable "
       "(see spot-x)."
       , 0 },
     { "to-finite", OPT_TO_FINITE, "alive", OPTION_ARG_OPTIONAL,

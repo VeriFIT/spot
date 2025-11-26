@@ -302,7 +302,7 @@ static const argp_option o_options[] =
       "(iw) inherently weak. Use uppercase letters to negate them.", 0 },
     { "%R, %[LETTERS]R", 0, nullptr,
       OPTION_DOC | OPTION_NO_USAGE,
-      "CPU time (excluding parsing), in seconds; add LETTERS to restrict to"
+      "CPU time (excluding parsing), in seconds; add LETTERS to restrict to "
       "(u) user time, (s) system time, (p) parent process, "
       "or (c) children processes.", 0 },
     { "%n", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
