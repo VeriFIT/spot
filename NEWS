@@ -18,6 +18,11 @@ New in spot 2.14.3.dev  (not yet released)
     syntax is a bit more efficient at inlining arguments when one of
     the argument is using the same n-ary operator.
 
+  - atomic propositions are now assigned a unique 0-based identifier,
+    so that mapping atomic proposition to arbitrary data can easily be
+    done using an array.  See https://www.lre.epita.fr/tut03.html#apid
+    for some discussion.
+
   - formula::map() will not attempt to recreate nodes that haven't
     changed.  This saves time.
 

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+s# -*- coding: utf-8 -*-
 #+TITLE: Constructing and transforming formulas
 #+DESCRIPTION: Code example for constructing and transforming formulas in Spot
 #+INCLUDE: setup.org
@@ -13,7 +13,8 @@ We will first describe how to build a formula from scratch, by using
 the constructors associated to each operator, and show the basic
 accessor methods for formulas.  We will do that for C++ first, and
 then Python.  Once these basics are covered, we will show examples for
-traversing and transforming formulas (again in C++ then Python).
+traversing and transforming formulas, and also discuss the
+identification of atomic propositions.
 
 * Constructing formulas
 
@@ -103,7 +104,7 @@ sharing of subformulas, but also helps algorithms that perform
 memoization.
 
 The binary versions of n-ary operators were introduced in Spot 2.15.
-They should be prefered
+They should be preferred when only two operands are used.
 
 
 Building a formula using these operators is quite straightforward.
@@ -497,6 +498,139 @@ Here is the =F= and =G= exchange:
 
 Like in C++, extra arguments to =map= and =traverse= are passed as
 additional to the function given in the first argument.
+
+* AP identifiers
+
+:PROPERTIES:
+  :CUSTOM_ID: apid
+:END:
+
+Starting with Spot 2.15, each atomic property is now associated to a
+unique identifier.  These 0-based identifiers are assigned
+incrementally in the order of creation of the atomic properties.  One
+use-case for these identifiers is to be able to represent sets of
+atomic propositions compactly, as bit vectors.
+
+On a formula that represents an atomic proposition, the =apid()=
+method of a formula allows to retrieve the associated identifier.
+=apid_count()= static method returns the number of allocated
+propositions, for instance so that we can allocate an array to store
+information about all propositions.  This count will of course be
+adjusted when new atomic proposition are created, and possibly also
+when the last use of an atomic-proposition is destroyed.  However
+atomic propositions are never renumbered during their lifetime.
+
+The =ap_from_apid()= static method returns the formula representing
+the atomic proposition associated to a given ID, and the =apid_map()=
+static method /constructs/ and array listing the atomic proposition
+for each identifier.
+
+** Python example
+
+#+BEGIN_SRC python
+  import spot
+
+  a = spot.formula.ap("a")
+  b = spot.formula.ap("b")
+  c = spot.formula.ap("c")
+  print(f"{a.apid()=}")
+  print(f"{b.apid()=}")
+  print(f"{c.apid()=}")
+  print(f"{spot.formula.apid_count()=}")
+  print(f"{spot.formula.apid_map()=}")
+  del a; print("del a")
+  print(f"{spot.formula.apid_count()=}")
+  del c; print("del c")
+  print(f"{spot.formula.apid_count()=}")
+  print(f"{spot.formula.apid_map()=}")
+  print(f"{spot.formula.ap_from_apid(1)=}")
+  del b; print("del b")
+  print(f"{spot.formula.apid_count()=}")
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+a.apid()=0
+b.apid()=1
+c.apid()=2
+spot.formula.apid_count()=3
+spot.formula.apid_map()=[spot.formula("a"), spot.formula("b"), spot.formula("c")]
+del a
+spot.formula.apid_count()=3
+del c
+spot.formula.apid_count()=2
+spot.formula.apid_map()=[None, spot.formula("b")]
+spot.formula.ap_from_apid(1)=spot.formula("b")
+del b
+spot.formula.apid_count()=0
+#+end_example
+
+** C++ example
+
+#+BEGIN_SRC C++
+  #include <iostream>
+  #include <spot/tl/formula.hh>
+  #include <spot/tl/print.hh>
+  #include <spot/tl/parse.hh>
+
+  std::ostream& print_vec(const std::vector<spot::formula>& m)
+  {
+    const char* sep = "[";
+    for (spot::formula f: m)
+      {
+        std::cout << sep;
+        if (f)
+          std::cout << f;
+        else
+          std::cout << "nullptr";
+        sep = ", ";
+      }
+    return std::cout << ']';
+  }
+
+
+  int main()
+  {
+    spot::formula a = spot::formula::ap("a");
+    spot::formula b = spot::formula::ap("b");
+    spot::formula c = spot::formula::ap("c");
+    std::cout << "a.apid()=" << a.apid() << '\n';
+    std::cout << "b.apid()=" << b.apid() << '\n';
+    std::cout << "c.apid()=" << c.apid() << '\n';
+    std::cout << "spot::formula::apid_count()="
+              << spot::formula::apid_count() << '\n';
+    std::cout << "spot::formula::apid_map()=";
+    print_vec(spot::formula::apid_map()) << '\n';
+    a = nullptr; std::cerr << "a = nullptr\n";
+    std::cout << "spot::formula::apid_count()="
+              << spot::formula::apid_count() << '\n';
+    c = nullptr; std::cerr << "c = nullptr\n";
+    std::cout << "spot::formula::apid_count()="
+              << spot::formula::apid_count() << '\n';
+    std::cout << "spot::formula::apid_map()=";
+    print_vec(spot::formula::apid_map()) << '\n';
+    std::cout << "spot::formula::ap_from_apid(1)="
+              << spot::formula::ap_from_apid(1) << '\n';
+    b = nullptr; std::cerr << "b = nullptr\n";
+    std::cout << "spot::formula::apid_count()="
+              << spot::formula::apid_count() << '\n';
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+a.apid()=0
+b.apid()=1
+c.apid()=2
+spot::formula::apid_count()=3
+spot::formula::apid_map()=[a, b, c]
+spot::formula::apid_count()=3
+spot::formula::apid_count()=2
+spot::formula::apid_map()=[nullptr, b]
+spot::formula::ap_from_apid(1)=b
+spot::formula::apid_count()=0
+#+end_example
 
 #  LocalWords:  utf html args accessor Unary arg ary initializer SRC
 #  LocalWords:  unary SVA's tl pdf subformulas subformula memoization
