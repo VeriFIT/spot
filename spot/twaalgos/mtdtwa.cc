@@ -1189,43 +1189,72 @@ namespace spot
     // Boolean operators follow boolean rules.
     bool obligation_is_accepting(formula f)
     {
+      // Δ₀ do not contribute anything useful to the acceptance of the
+      // formula, they only yield trivial SCCs.  Except true and
+      // false, they can be considered jokers, from the point of view
+      // of acceptance.
+      auto is_delta0 = [](formula f)
+      {
+        return f.is_syntactic_safety() && f.is_syntactic_guarantee();
+      };
+
       switch (f.kind())
         {
         case op::tt:
-        case op::ap:
           return true;
+        case op::ap:            // can return false or true
         case op::ff:
           return false;
-          return true;
         case op::Not:
           return !obligation_is_accepting(f[0]);
         case op::And:
           for (const formula& sub: f)
-            if (!obligation_is_accepting(sub))
-              return false;
+            {
+              if (is_delta0(sub))
+                continue;
+              if (!obligation_is_accepting(sub))
+                return false;
+            }
           return true;
         case op::Or:
           for (const formula& sub: f)
-            if (obligation_is_accepting(sub))
-              return true;
+            {
+              // ignore Δ₀ formulas
+              if (is_delta0(sub))
+                continue;
+              if (obligation_is_accepting(sub))
+                return true;
+            }
           return false;
         case op::Xor:
           {
-            bool left = obligation_is_accepting(f[0]);
-            bool right = obligation_is_accepting(f[1]);
-            return left != right;
+            formula left = f[0];
+            formula right = f[1];
+            if (is_delta0(left) || is_delta0(right))
+              return false;     // or true, it's irrelevant
+            return
+              obligation_is_accepting(left) != obligation_is_accepting(right);
           }
         case op::Implies:
           {
-            bool left = obligation_is_accepting(f[0]);
-            bool right = obligation_is_accepting(f[1]);
-            return !left || right;
+            // if an operand is Δ₀ set its acceptance in a way that it
+            // does not contribute to the final acceptance.
+            formula left = f[0];
+            formula right = f[1];
+            bool lacc = is_delta0(left) ?
+              true : obligation_is_accepting(left);
+            bool racc = is_delta0(right) ?
+              false : obligation_is_accepting(right);
+            return !lacc || racc;
           }
         case op::Equiv:
           {
-            bool left = obligation_is_accepting(f[0]);
-            bool right = obligation_is_accepting(f[1]);
-            return left == right;
+            formula left = f[0];
+            formula right = f[1];
+            if (is_delta0(left) || is_delta0(right))
+              return false;     // or true, it's irrelevant
+            return
+              obligation_is_accepting(left) == obligation_is_accepting(right);
           }
         case op::X:
         case op::strong_X:
