@@ -156,7 +156,7 @@ namespace spot
   // simplifications
   formula ltlf_translator::propeq_representative(formula f)
   {
-    // We start we the simplifications
+    // We start with the simplifications
   again:
     switch (f.kind())
       {
