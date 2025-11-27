@@ -20,6 +20,7 @@
 #include <queue>
 #include <unordered_map>
 #include <algorithm>
+#include <memory>
 #include <spot/twaalgos/mtdtwa.hh>
 #include <spot/twaalgos/isdet.hh>
 #include <spot/priv/robin_hood.hh>
@@ -576,6 +577,123 @@ namespace spot
         res->merge_edges();
       }
     return res;
+  }
+
+
+  namespace
+  {
+    unsigned global_next_state;
+    unsigned global_acc_sink;
+    unsigned global_rej_sink;
+
+    static int tfmap_callback(int root, int)
+    {
+      if (root == 0)
+        {
+          if (global_rej_sink == -1U)
+            global_rej_sink = global_next_state++;
+          return bdd_terminal_as_int(global_rej_sink);
+        }
+      if (root == 1)
+        {
+          if (global_acc_sink == -1U)
+            global_acc_sink = global_next_state++;
+          return bdd_terminal_as_int(global_acc_sink);
+        }
+      return root;
+    }
+  }
+
+  void mtdswa::sinks_as_states()
+  {
+    // Scan the states to find potential accepting and rejecting sinks
+    // that already exist.
+    unsigned ns = states.size();
+    global_acc_sink = -1;
+    global_rej_sink = -1;
+    for (unsigned s = 0; s < ns; ++s)
+      {
+        if (!bdd_is_terminal(states[s]))
+          continue;
+        unsigned t = bdd_get_terminal(states[s]);
+        // a sink is a state that only has itself as successor
+        if (t != s)
+          continue;
+        if (acc.accepting(colors[s]))
+          global_acc_sink = s;
+        else
+          global_rej_sink = s;
+      }
+    global_next_state = ns;
+
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(shared_from_this()), false);
+
+    // Now scan the states again to replace bddtrue/bddfalse
+    for (unsigned s = 0; s < ns; ++s)
+      states[s] = bdd_mt_apply1_leaves(states[s], tfmap_callback,
+                                       &cache, 0);
+
+    bdd_extcache_done(&cache);
+
+    // If a new accepting sink was introduced, we need to create it.
+    // However is the accepting condition is unsatisfiable, we have to
+    // change it.  The following code just deals with the change of
+    // acceptance condition.
+
+    acc_cond::mark_t accepting_mark{};
+    acc_cond::mark_t rejecting_mark{};
+    if (global_acc_sink >= ns)
+      {
+        std::pair<bool, acc_cond::mark_t> sm = acc.sat_mark();
+        if (sm.first)
+          {
+            accepting_mark = sm.second;
+          }
+        else
+          {
+            acc = acc_cond(1, acc_cond::acc_code::buchi());
+            accepting_mark = {0};
+            rejecting_mark = {};
+            for (unsigned s = 0; s < ns; ++s)
+              colors[s] = rejecting_mark;
+          }
+      }
+    if (global_rej_sink >= ns)
+      {
+        std::pair<bool, acc_cond::mark_t> sm = acc.unsat_mark();
+        if (sm.first)
+          {
+            rejecting_mark = sm.second;
+          }
+        else
+          {
+            acc = acc_cond(1, acc_cond::acc_code::buchi());
+            accepting_mark = {0};
+            rejecting_mark = {};
+            for (unsigned s = 0; s < ns; ++s)
+              colors[s] = accepting_mark;
+          }
+      }
+
+    // Now create the new states if any.
+    while (global_next_state > ns)
+      {
+        states.push_back(bdd_terminal(ns));
+        if (global_acc_sink == ns)
+          {
+            colors.push_back(accepting_mark);
+            if (ns == names.size())
+              names.push_back(formula::tt());
+          }
+        else
+          {
+            colors.push_back(rejecting_mark);
+            if (ns == names.size())
+              names.push_back(formula::ff());
+          }
+        ++ns;
+      }
   }
 
   std::ostream& mtdswa::print_dot(std::ostream& os, const char* opts) const

@@ -26,7 +26,7 @@ namespace spot
   typedef std::pair<acc_cond::mark_t, unsigned> terminal_data_t;
   typedef std::vector<terminal_data_t> terminal_data_map_t;
 
-  struct SPOT_API mtdtwa
+  struct SPOT_API mtdtwa: public std::enable_shared_from_this<mtdtwa>
   {
   public:
     mtdtwa(const bdd_dict_ptr& dict) noexcept
@@ -64,7 +64,7 @@ namespace spot
 
 
 
-  struct SPOT_API mtdswa
+  struct SPOT_API mtdswa: public std::enable_shared_from_this<mtdswa>
   {
   public:
     mtdswa(const bdd_dict_ptr& dict) noexcept
@@ -113,13 +113,24 @@ namespace spot
       return states.size() + bdd_has_true(states);
     }
 
-    // Print the MTBDD.
-    //
-    // Add opts="s" to show SCCs.
+    /// \brief Print the MTBDD.
+    ///
+    /// Add opts="s" to show SCCs.
     std::ostream& print_dot(std::ostream& os, const char* opts = nullptr) const;
 
-    // convert to twa
+    /// \brief convert to twa
     twa_graph_ptr as_twa(bool state_based = false, bool labels = true) const;
+
+    /// \brief convert bddtrue/bddfalse nodes to actual states
+    ///
+    /// This modifies the automaton in place so that it does not use the
+    /// bddtrue and bddfalse constants.  Those will be replaced by accepting
+    /// and rejecting sinks respectively.   Those new states are introduced
+    /// only if no existing state can serve the same purpose.
+    ///
+    /// If the automaton had named states, newly introduced sinks will be
+    /// named as formula::tt() or formula::ff().
+    void sinks_as_states();
 
   private:
     bdd_dict_ptr dict_;
