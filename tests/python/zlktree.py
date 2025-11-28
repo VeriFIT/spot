@@ -161,3 +161,41 @@ tc.assertEqual(n, 362880)
 opt = spot.zielonka_tree_options_MERGE_SUBTREES;
 n = spot.zielonka_tree(c, opt).num_branches()
 tc.assertEqual(n, 9)
+
+
+# Related to issue #621, but this automaton was
+# never a problem for zielonka_tree_transform().
+a = spot.automaton("""HOA: v1 States: 1 Start: 0 AP: 1 "p0"
+Acceptance: 1 Inf(0) | Fin(0) --BODY-- State: 0 [0] 0 [!0] 0 {0}
+--END--""")
+b = spot.zielonka_tree_transform(a)
+spot.is_weak_automaton(b)
+tc.assertTrue(spot.are_equivalent(a, b))
+tc.assertTrue(b.acc().is_buchi())
+
+
+# For issue #621:
+
+c = spot.acc_cond('Inf(0)')
+t = spot.zielonka_tree(c)
+tc.assertEqual(1, t.num_branches())
+tc.assertEqual(1, t.first_branch())
+
+c = spot.acc_cond('Inf(0)|Fin(0)')
+t = spot.zielonka_tree(c)
+tc.assertEqual(1, t.num_branches())
+tc.assertEqual(0, t.first_branch())
+
+c = spot.acc_cond('Inf(0)')
+t = spot.zielonka_tree(c, spot.zielonka_tree_options_NO_EMPTY_LAYER)
+tc.assertEqual(1, t.num_branches())
+tc.assertEqual(0, t.first_branch())
+tc.assertEqual(True, t.is_even())
+tc.assertEqual(False, t.empty_layer_is_even())
+
+c = spot.acc_cond('Inf(0)|Fin(0)')
+t = spot.zielonka_tree(c, spot.zielonka_tree_options_NO_EMPTY_LAYER)
+tc.assertEqual(1, t.num_branches())
+tc.assertEqual(0, t.first_branch())
+tc.assertEqual(True, t.is_even())
+tc.assertEqual(True, t.empty_layer_is_even())

@@ -54,9 +54,10 @@ namespace spot
 
     void max_models(acc_cond cond,
                     acc_cond::mark_t colors,
-                    std::vector<size_model>& out)
+                    std::vector<size_model>& out,
+                    bool stop_if_empty)
     {
-      if (!colors)
+      if (!colors && stop_if_empty)
         return;
       if (cond.accepting(colors))
         {
@@ -92,7 +93,7 @@ namespace spot
       // the set.
       if (acc_cond::mark_t fu = cond.fin_unit())
         {
-          max_models(cond.remove(fu, true), colors - fu, out);
+          max_models(cond.remove(fu, true), colors - fu, out, stop_if_empty);
         }
       // Otherwise, we simply have to pick some arbitrary Fin(x) and
       // see if we can satisfy the condition when x is present or
@@ -102,8 +103,10 @@ namespace spot
       else if (auto [fo, fpart] = cond.fin_one_extract(); fo >= 0)
         {
           acc_cond::mark_t fo_m = {(unsigned) fo};
-          max_models(fpart.remove(fo_m, true), colors - fo_m, out);
-          max_models(cond.remove(fo_m, false), colors, out);
+          max_models(fpart.remove(fo_m, true), colors - fo_m, out,
+                     stop_if_empty);
+          max_models(cond.remove(fo_m, false), colors, out,
+                     stop_if_empty);
         }
     }
   }
@@ -121,6 +124,8 @@ namespace spot
     nodes_[0].level = 0;
 
     robin_hood::unordered_node_map<acc_cond::mark_t, unsigned> nmap;
+
+    bool stop_if_empty = !!(opt & zielonka_tree_options::NO_EMPTY_LAYER);
 
     std::vector<size_model> models;
     // This loop is a BFS over the increasing set of nodes.
@@ -167,7 +172,7 @@ namespace spot
 
       acc_cond c = (is_accepting ? negcond : cond).restrict_to(colors);
       models.clear();
-      max_models(c, colors, models);
+      max_models(c, colors, models, stop_if_empty);
 
       unsigned num_children = models.size();
       if (num_children == 0) // This is a leaf of the tree.
@@ -296,7 +301,7 @@ namespace spot
     auto res = make_twa_graph(a->get_dict());
     res->copy_ap_of(a);
     auto& acc = a->get_acceptance();
-    zielonka_tree zlk(acc);
+    zielonka_tree zlk(acc, zielonka_tree_options::NO_EMPTY_LAYER);
     acc_cond::mark_t mask = acc.used_sets();
 
     // Preserve determinism, weakness, and stutter-invariance
