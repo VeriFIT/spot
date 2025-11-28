@@ -128,9 +128,23 @@ namespace spot
     /// and rejecting sinks respectively.   Those new states are introduced
     /// only if no existing state can serve the same purpose.
     ///
+    /// When the acceptance condition is always accepting, or when it
+    /// is always rejecting, introducing a sink state might require
+    /// changing the accepting condition.  When that happens, the
+    /// acceptance will be set to Büchi.
+    ///
     /// If the automaton had named states, newly introduced sinks will be
     /// named as formula::tt() or formula::ff().
     void sinks_as_states();
+
+    /// \brief converse sink states to bddtrue/bddfalse constants
+    ///
+    /// This modifies the automaton in place so that any sink state
+    /// is turned into bddtrue or bddfalse depending on its acceptance.
+    ///
+    /// The original sink states will be removed and the other state
+    /// will be renumbered, unless \a keep_all_states is set.
+    void sinks_as_constants(bool keep_all_states = false);
 
   private:
     bdd_dict_ptr dict_;

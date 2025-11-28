@@ -696,6 +696,107 @@ namespace spot
       }
   }
 
+
+  namespace
+  {
+    static std::vector<int>* global_state_map;
+
+    static int sinkcst_callback(int root, int term)
+    {
+      if (root <= 1)
+        return root;
+      assert((unsigned)term < global_state_map->size());
+      int new_s = (*global_state_map)[term];
+      if (new_s == term)
+        return root;
+      if (new_s == -1)
+        return 0;
+      if (new_s == -2)
+        return 1;
+      return bdd_terminal_as_int(new_s);
+    }
+  }
+
+  void mtdswa::sinks_as_constants(bool keep_all_states)
+  {
+    unsigned ns = states.size();
+    std::vector<int> new_state_number;
+    new_state_number.reserve(ns);
+    global_state_map = &new_state_number;
+    unsigned next_num = 0;
+    for (unsigned i = 0; i < ns; ++i)
+      {
+        new_state_number.push_back(next_num++);
+        bdd s = states[i];
+        if (s == bddfalse)
+          {
+          rejecting_sink:
+            new_state_number[i] = -1;
+            if (!keep_all_states)
+              --next_num;
+            continue;
+          }
+        if (s == bddtrue)
+          {
+          accepting_sink:
+            new_state_number[i] = -2;
+            if (!keep_all_states)
+              --next_num;
+            continue;
+          }
+        if (!bdd_is_terminal(s))
+          continue;
+        unsigned d = bdd_get_terminal(s);
+        if (d != i)
+          continue;
+        if (acc.accepting(colors[i]))
+          goto accepting_sink;
+        else
+          goto rejecting_sink;
+      }
+
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(shared_from_this()), false);
+
+    // Now scan the states again to replace bddtrue/bddfalse
+    int last_state = -1;
+    for (unsigned i = 0; i < ns; ++i)
+      {
+        unsigned new_i = new_state_number[i];
+        if (!keep_all_states && (int) new_i < 0)
+          continue;
+        bdd b = bdd_mt_apply1_leaves(states[i], sinkcst_callback,
+                                     &cache, 0);
+        if (keep_all_states)
+          {
+            states[i] = b;
+          }
+        else
+          {
+            states[new_i] = b;
+            last_state = new_i;
+            if (new_i != i)
+              {
+                colors[new_i] = colors[i];
+                if (names.size() > i)
+                  names[new_i] = names[i];
+              }
+          }
+      }
+    bdd_extcache_done(&cache);
+
+    if (!keep_all_states)
+      {
+        int new_sz = last_state + 1;
+        states.resize(new_sz);
+        colors.resize(new_sz);
+        if (names.size() != ns)
+          names.clear();        // don't bother
+        else
+          names.resize(new_sz);
+      }
+  }
+
   std::ostream& mtdswa::print_dot(std::ostream& os, const char* opts) const
   {
     bool opt_scc = false;
