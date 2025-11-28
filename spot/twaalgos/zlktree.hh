@@ -53,6 +53,10 @@ namespace spot
     /// zielonka_tree_transform().  However it saves memory if the
     /// only use of the zielonka_tree to check the shape.
     MERGE_SUBTREES = 8,
+    /// Do not store a layer for empty sets, to save space.
+    /// You can check whether this layer is odd or even by calling
+    /// empty_layer_is_even().
+    NO_EMPTY_LAYER = 16,
   };
 
 #ifndef SWIG
@@ -149,6 +153,18 @@ namespace spot
     bool is_even() const
     {
       return is_even_;
+    }
+
+    /// \brief Whether the layer corresponding to `{}` is even.
+    ///
+    /// If the Zielonka tree has been built with option NO_EMPTY_LAYER
+    /// to save space, this function can be used to check for the
+    /// parity of that missing layer.  If the empty layer has a parity
+    /// different than the parity of a leaf, then that leaf has an
+    /// implicit child with empty color set.
+    bool empty_layer_is_even() const
+    {
+      return empty_is_even_;
     }
 
     /// \brief Whether the Zielonka tree has Rabin shape.
