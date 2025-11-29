@@ -146,8 +146,33 @@ namespace spot
     /// will be renumbered, unless \a keep_all_states is set.
     void sinks_as_constants(bool keep_all_states = false);
 
+    /// \brief declare a list of controllable variables
+    ///
+    /// Doing so affect the way the automaton is printed in dot
+    /// format, but this is also a prerequisite for interpreting
+    /// the automaton as a game.
+    ///
+    /// This function is expected to be after you have built the
+    /// automaton, in some way (causing atomic propositions to be
+    /// registered).  If \a ignore_non_registered_ap is set, variable
+    /// listed as output but not registered by the automaton will be
+    /// dropped.  Else, an exception will be raised for those
+    /// variables.
+    /// @{
+    void set_controllable_variables(const std::vector<std::string>& vars,
+                                    bool ignore_non_registered_ap = false);
+    void set_controllable_variables(bdd vars);
+    /// @}
+
+    /// \brief Returns the conjunction of controllable variables.
+    bdd get_controllable_variables() const
+    {
+      return controllable_variables_;
+    }
+
   private:
     bdd_dict_ptr dict_;
+    bdd controllable_variables_ = bddtrue;
   };
 
 

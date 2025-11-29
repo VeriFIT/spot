@@ -797,6 +797,46 @@ namespace spot
       }
   }
 
+  namespace
+  {
+    static bdd
+    ap_to_bdd(mtdswa_ptr dfa, const std::vector<std::string>& controllable,
+              bool ignore_non_registered_ap)
+    {
+      bdd_dict_ptr dict = dfa->get_dict();
+      // build the conjunction of all controllable variables
+      bdd controllable_bdd = bddtrue;
+      for (const std::string& s: controllable)
+        {
+          int v = dict->has_registered_proposition(formula::ap(s), dfa);
+          if (v < 0)
+            {
+              if (ignore_non_registered_ap)
+                continue;
+              throw std::runtime_error
+                ("atomic proposition " + s + " is not registered by automaton");
+            }
+          controllable_bdd &= bdd_ithvar(v);
+        }
+      return controllable_bdd;
+    }
+  }
+
+  void
+  mtdswa::set_controllable_variables(bdd vars)
+  {
+    controllable_variables_ = vars;
+  }
+
+  void
+  mtdswa::set_controllable_variables(const std::vector<std::string>& vars,
+                                     bool ignore_non_registered_ap)
+  {
+    set_controllable_variables(ap_to_bdd(shared_from_this(), vars,
+                                         ignore_non_registered_ap));
+  }
+
+
   std::ostream& mtdswa::print_dot(std::ostream& os, const char* opts) const
   {
     bool opt_scc = false;
@@ -812,6 +852,16 @@ namespace spot
             opt_scc = true;
             break;
           }
+
+    std::unordered_set<int> controllable;
+    {
+      bdd b = get_controllable_variables();
+      while (b != bddtrue)
+        {
+          controllable.insert(bdd_var(b));
+          b = bdd_high(b);
+        }
+    }
 
     std::unordered_map<int, int> scc_map;
     std::vector<int> sccs;
@@ -970,8 +1020,13 @@ namespace spot
         else
           label = "var" + std::to_string(var);
 
+        bool outputnode = (!controllable.empty()
+                           && controllable.find(var) != controllable.end());
+        const char* shape = outputnode ? "diamond" : "circle";
+
         os << "    B" << n.id()
-           << " [style=filled, fillcolor=\"#ffffff\", label=\"" << label
+           << " [shape=" << shape
+           << ", style=filled, fillcolor=\"#ffffff\", label=\"" << label
            << "\", tooltip=\"bdd(" << n.id() << ")\"];\n";
 
         bdd low = bdd_low(n);
@@ -1982,10 +2037,14 @@ namespace spot
         colors.push_back(dfa->colors[repr]);
       }
 
-    mtdswa_ptr res = std::make_shared<mtdswa>(dfa->get_dict());
+    bdd_dict_ptr dict = dfa->get_dict();
+    mtdswa_ptr res = std::make_shared<mtdswa>(dict);
+    dict->register_all_propositions_of(dfa, res);
     std::swap(res->names, names);
     std::swap(res->states, signatures);
     std::swap(res->colors, colors);
+    res->aps = dfa->aps;
+
     return res;
   }
 
