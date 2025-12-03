@@ -637,7 +637,7 @@ namespace spot
     bdd_extcache_done(&cache);
 
     // If a new accepting sink was introduced, we need to create it.
-    // However is the accepting condition is unsatisfiable, we have to
+    // However if the acceptance condition is unsatisfiable, we have to
     // change it.  The following code just deals with the change of
     // acceptance condition.
 
@@ -1153,6 +1153,123 @@ namespace spot
   }
 
 
+  std::vector<unsigned> loding_weak_ranking(const mtdswa_ptr& aut,
+                                            bool fix)
+  {
+    std::vector<int> scc_of_state = scc_vector(aut);
+
+    // Reorder the states, so that they appear in increasing order of
+    // SCCs.  This is done in linear time using an implementation
+    // similar to counting sort.
+
+    int scc_count = *std::max_element(scc_of_state.begin(),
+                                      scc_of_state.end()) + 1;
+    std::vector<int> scc_index(scc_count + 1, 0);
+    for (int scc: scc_of_state)
+      ++scc_index[scc];
+    int max_scc_size = scc_index[0];
+    for (int scc = 1; scc < scc_count; ++scc)
+      {
+        max_scc_size = std::max(max_scc_size, scc_index[scc]);
+        scc_index[scc] += scc_index[scc - 1];
+      }
+    unsigned ns = scc_of_state.size();
+    scc_index[scc_count] = ns;
+    assert(ns == (unsigned)scc_index[scc_count - 1]);
+    std::vector<int> ordered_states(ns, 0);
+    for (unsigned s = 0; s < ns; ++s)
+      ordered_states[--scc_index[scc_of_state[s]]] = s;
+
+    // At this point, ordered_states contains the state
+    // in the desired order, and scc_index[i] has the first state of
+    // SCC #i, and SCC #i has size scc_index[i+1] - scc_index[i].
+
+    // ---
+
+    // Now, compute the rank of each SCC using Löding coloring
+    // function.  bddfalse, and bddtrue, which do not appear in the
+    // SCC, are assumed to have rank 0 and 1 respectively.  Odd ranks
+    // represent accepting SCCs, and even ranks are for rejecting
+    // SCCs.   Each SCC should try to use the maximum rank of its
+    // successors, possibly incremented by one if needed to match
+    // its acceptance status.  Transient SCCs, which can be considered
+    // as accepting or not,
+    std::vector<unsigned> scc_rank;
+    scc_rank.reserve(scc_count);
+    std::vector<bdd> cur_scc_states;
+    cur_scc_states.reserve(max_scc_size);
+    for (int scc = 0; scc < scc_count; ++scc)
+      {
+        int begin = scc_index[scc];
+        int end = scc_index[scc + 1];
+        for (int idx = begin; idx < end; ++idx)
+          cur_scc_states.push_back(aut->states[ordered_states[idx]]);
+        unsigned max_rank = 0;
+        bool transient = true; // assume transient SCC unless proven otherwise
+        for (auto& b: leaves_of(cur_scc_states))
+          {
+            if (b == bddfalse)
+              {
+                // max_rank = std::max(max_rank, 0); // is a no-op
+                continue;
+              }
+            if (b == bddtrue)
+              {
+                max_rank = std::max(max_rank, 1U);
+                continue;
+              }
+            int dst = bdd_get_terminal(b);
+            int dst_scc = scc_of_state[dst];
+            assert(dst_scc <= scc);
+            if (dst_scc == scc)
+              {
+                transient = false;
+                continue;
+              }
+            max_rank = std::max(max_rank, scc_rank[dst_scc]);
+          }
+        cur_scc_states.clear();
+        if (!transient)
+          {
+            // Check if the first state of the SCC is accepting.
+            // All states in the SCC should have the same colors.
+            bool is_accepting =
+              aut->acc.accepting(aut->colors[ordered_states[begin]]);
+            // Increment the rank if the acceptance if this SCC does
+            // not match the acceptance of the rank.
+            if ((max_rank & 1) != is_accepting)
+              ++max_rank;
+          }
+        scc_rank.push_back(max_rank);
+      }
+    std::vector<unsigned> state_rank;
+    state_rank.reserve(ns);
+    for (unsigned s = 0; s < ns; ++s)
+      state_rank.push_back(scc_rank[scc_of_state[s]]);
+
+    if (fix)
+      {
+        acc_cond::mark_t accmark{};
+        acc_cond::mark_t rejmark{};
+        if (aut->acc.is_co_buchi())
+          {
+            rejmark.set(0);
+          }
+        else if (aut->acc.is_buchi())
+          {
+            accmark.set(0);
+          }
+        else
+          {
+            aut->acc = acc_cond::acc_code::buchi();
+            accmark.set(0);
+          }
+        for (unsigned s = 0; s < ns; ++s)
+          aut->colors[s] = (state_rank[s] & 1) ? accmark : rejmark;
+      }
+    return state_rank;
+  }
+
   simple_ltl_translator::simple_ltl_translator(const bdd_dict_ptr& dict,
                                                bool simplify_terms)
     : dict_(dict), simplify_terms_(simplify_terms)
@@ -1505,7 +1622,7 @@ namespace spot
             formula left = f[0];
             formula right = f[1];
             if (is_delta0(left) || is_delta0(right))
-              return false;     // or true, it's irrelevant
+              return true;
             return
               obligation_is_accepting(left) != obligation_is_accepting(right);
           }
@@ -1526,7 +1643,7 @@ namespace spot
             formula left = f[0];
             formula right = f[1];
             if (is_delta0(left) || is_delta0(right))
-              return false;     // or true, it's irrelevant
+              return true;
             return
               obligation_is_accepting(left) == obligation_is_accepting(right);
           }
@@ -1763,8 +1880,9 @@ namespace spot
                                        bool fuse_same_bdds)
   {
     mtdswa_ptr dfa = std::make_shared<mtdswa>(dict_);
-    std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
-    std::unordered_map<formula, int> formula_to_state;
+    // the fist int is the bdd's id, complemented if the formula is accepting.
+    robin_hood::unordered_map<int, int> bdd_to_state;
+    robin_hood::unordered_map<formula, int> formula_to_state;
     std::vector<bdd> states;
     std::vector<formula> names;
     std::deque<formula> todo;
@@ -1779,6 +1897,12 @@ namespace spot
       dfa->aps.assign(a->begin(), a->end());
       delete a;
     }
+
+    // We are going to build a Büchi automaton.
+    dfa->acc = acc_cond::acc_code::buchi();
+    acc_cond::mark_t acc_mark{0};
+    acc_cond::mark_t rej_mark{};
+    std::vector<acc_cond::mark_t> colors;
 
     // Keep track of whether we have seen an accepting or rejecting
     // state.  If we are missing one of them, we can reduce the
@@ -1801,8 +1925,13 @@ namespace spot
 
         bdd b = ltl_to_mtbdd(label);
 
+        int key = b.id();
+        bool accepting = obligation_is_accepting(label);
+        if (accepting)
+          key = ~key;
+
         if (fuse_same_bdds)
-          if (auto it = bdd_to_state.find(b); it != bdd_to_state.end())
+          if (auto it = bdd_to_state.find(key); it != bdd_to_state.end())
             {
               formula_to_state[label] = it->second;
               terminal_to_state_map[label_term] = it->second;
@@ -1810,9 +1939,11 @@ namespace spot
             }
         unsigned n = states.size();
         formula_to_state[label] = n;
-        bdd_to_state[b] = n;
+        if (fuse_same_bdds)
+          bdd_to_state[key] = n;
         states.push_back(b);
         names.push_back(label);
+        colors.push_back(accepting ? acc_mark : rej_mark);
         terminal_to_state_map[label_term] = n;
 
         for (bdd leaf: leaves_of(b))
@@ -1862,23 +1993,18 @@ namespace spot
 
     dfa->states = std::move(states);
     dfa->names = std::move(names);
-    dfa->colors.resize(dfa->states.size());
+    dfa->colors = std::move(colors);
     dict_->register_all_propositions_of(this, dfa);
-
-    // Fix the acceptance of states.  We are going for Büchi, but we
-    // could go for Co-Büchi as well.
-    dfa->acc = acc_cond::acc_code::buchi();
-    acc_cond::mark_t macc{0};
-    for (unsigned i = 0; i < dfa->states.size(); ++i)
-      if (obligation_is_accepting(dfa->names[i]))
-        dfa->colors[i] = macc;
-
     return dfa;
   }
 
   mtdswa_ptr obligation_to_mtdswa(formula f, const bdd_dict_ptr& dict,
                                   bool fuse_same_bdds, bool simplify_terms)
   {
+    if (SPOT_UNLIKELY(!f.is_syntactic_obligation()))
+      throw std::runtime_error
+        ("obligation_to_mtdswa(): input is not a syntactic obligation");
+
     simple_ltl_translator trans(dict, simplify_terms);
     return trans.ltl_to_mtdswa(f, fuse_same_bdds);
   }
@@ -1910,8 +2036,22 @@ namespace spot
     }
   }
 
+  namespace
+  {
+    typedef std::pair<bdd, acc_cond::mark_t> sig_t;
+    struct sig_hash
+    {
+      size_t operator()(const sig_t& sig) const noexcept
+      {
+        return sig.second.hash() ^ sig.first.id();
+      }
+    };
+
+  }
+
   mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa,
                              bddExtCache* cache,
+                             const std::vector<unsigned>* initial_partition,
                              int& iteration)
   {
     if (iteration >= (1 << 20))
@@ -1928,45 +2068,67 @@ namespace spot
     // state of the MTDSWA is assigned a class. Initially every state
     // is in a class that corresponds to its colors.  The MTBDD used
     // to represent the states are all rewritten, replacing each
-    // terminal (dst, b) by (class[dst], b).  After this rewriting,
+    // terminal dst by class[dst].  After this rewriting,
     // states whose MTBDD are different are put into different
     // classes, and we start again.  We iterate the process until no
     // more classes are created.
 
     // class is a global vector assigning classes to each state
     classes.clear();
-    classes.reserve(n); // two extra classes for bddtrue/bddfalse
+    classes.reserve(n);
 
-    // loop over all states, and give them a class that match their color
-    {
-      std::unordered_map<acc_cond::mark_t, int> col2cl;
-      for (unsigned i = 0; i < n; ++i)
-        {
-          acc_cond::mark_t col = dfa->colors[i];
-          auto it = col2cl.emplace(col, col2cl.size()).first;
-          classes.push_back(it->second);
-        }
-    }
+    if (!initial_partition)
+      {
+        // loop over all states, and give them a class that match
+        // their color
+        std::unordered_map<acc_cond::mark_t, int> col2cl;
+        for (unsigned i = 0; i < n; ++i)
+          {
+            acc_cond::mark_t col = dfa->colors[i];
+            auto it = col2cl.emplace(col, col2cl.size()).first;
+            classes.push_back(it->second);
+          }
+      }
+    else
+      {
+        if (SPOT_UNLIKELY(initial_partition->size() != n))
+          throw std::runtime_error
+            ("minimize_mtdswa(): initial partition has incorrect size");
+        std::unordered_map<unsigned, int> block2cl;
+        for (unsigned i = 0; i < n; ++i)
+          {
+            unsigned block = (*initial_partition)[i];
+            auto it = block2cl.emplace(block, block2cl.size()).first;
+            classes.push_back(it->second);
+          }
+      }
 
     // The "signature" of each state is their encoding using
     // the current set of classes.  The following vector remember
     // each unique signature in the order they were discovered.
-    std::vector<bdd> signatures;
-    signatures.reserve(n);
+    std::vector<bdd> sig_states;
+    std::vector<acc_cond::mark_t> sig_colors;
+    sig_states.reserve(n);
+    sig_colors.reserve(n);
     // For each distinct signature, GROUPS retains the list of
-    // states that have this signature.
-    std::unordered_map<bdd, std::vector<int>, bdd_hash> groups;
+    // states that have this signature & color.
+
+    robin_hood::unordered_map<sig_t, std::vector<int>, sig_hash> groups;
     for (;;)
       {
         ++iteration;
         for (unsigned i = 0; i < n; ++i)
           {
-            bdd sig = bdd_mt_apply1(dfa->states[i], rename_class,
-                                    bddfalse, bddtrue,
-                                    cache, iteration);
+            bdd b = bdd_mt_apply1(dfa->states[i], rename_class,
+                                  bddfalse, bddtrue,
+                                  cache, iteration);
+            sig_t sig(b, dfa->colors[i]);
             auto& v = groups[sig];
             if (v.empty())
-              signatures.push_back(sig);
+              {
+                sig_states.push_back(sig.first);
+                sig_colors.push_back(sig.second);
+              }
             v.push_back(i);
           }
         // { // debug
@@ -1982,9 +2144,11 @@ namespace spot
         // state.  In this case, we map the class back to n/n+1.
         int curclass = 0;
         bool changed = false;
-        for (bdd sig: signatures)
+        unsigned sn = sig_states.size();
+        for (unsigned s = 0; s < sn; ++s)
           {
             int mapclass = curclass++;
+            sig_t sig(sig_states[s], sig_colors[s]);
             auto& v = groups[sig];
             for (unsigned i: v)
               if (classes[i] != mapclass)
@@ -2008,42 +2172,44 @@ namespace spot
         if (!changed)
           break;
         groups.clear();
-        signatures.clear();
+        sig_states.clear();
+        sig_colors.clear();
       }
 
-    // The BDDs in SIGNATURES are actually our new MTBDD
-    // representation.
+    // The BDDs in SIG_STATES are actually our new MTBDD
+    // representation, with SIG_COLORS as colors.
     //
     // if WANT_NAMES is set we also have to keep one name per class
     // for display.
     bool want_names = dfa->names.size() == n;
     std::vector<formula> names;
-    std::vector<acc_cond::mark_t> colors;
-    // Our automaton will have SZ states;
-    unsigned sz = signatures.size();
     if (want_names)
-      names.reserve(sz);
-    for (bdd sig: signatures)
       {
-        auto& v = groups[sig];
-        // We can pick any state in v as representative of the
-        // class.  Here we simply pick the first one, but this
-        // can be changed if needed (e.g. pick the one with
-        // the shortest name since it is more readable?)
-        unsigned repr = v.front();
-        assert(repr < dfa->names.size());
-        if (want_names)
-          names.push_back(dfa->names[repr]);
-        colors.push_back(dfa->colors[repr]);
+        // Our automaton will have SZ states;
+        unsigned sz = sig_states.size();
+        names.reserve(sz);
+        for (unsigned s = 0; s < sz; ++s)
+          {
+            sig_t sig(sig_states[s], sig_colors[s]);
+            auto& v = groups[sig];
+            // We can pick any state in v as representative of the
+            // class.  Here we simply pick the first one, but this
+            // can be changed if needed (e.g. pick the one with
+            // the shortest name since it is more readable?)
+            unsigned repr = v.front();
+            assert(repr < dfa->names.size());
+            names.push_back(dfa->names[repr]);
+          }
       }
 
     bdd_dict_ptr dict = dfa->get_dict();
     mtdswa_ptr res = std::make_shared<mtdswa>(dict);
     dict->register_all_propositions_of(dfa, res);
     std::swap(res->names, names);
-    std::swap(res->states, signatures);
-    std::swap(res->colors, colors);
+    std::swap(res->states, sig_states);
+    std::swap(res->colors, sig_colors);
     res->aps = dfa->aps;
+    res->acc = dfa->acc;
 
     return res;
   }
@@ -2053,7 +2219,19 @@ namespace spot
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
     int iteration = 0;
-    mtdswa_ptr res = minimize_mtdswa(dfa, &cache, iteration);
+    mtdswa_ptr res = minimize_mtdswa(dfa, &cache, nullptr, iteration);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa,
+                             const std::vector<unsigned>& initial_partition)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_unary(dfa), false);
+    int iteration = 0;
+    mtdswa_ptr res = minimize_mtdswa(dfa, &cache, &initial_partition,
+                                     iteration);
     bdd_extcache_done(&cache);
     return res;
   }

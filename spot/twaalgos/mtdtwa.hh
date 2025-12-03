@@ -130,7 +130,7 @@ namespace spot
     ///
     /// When the acceptance condition is always accepting, or when it
     /// is always rejecting, introducing a sink state might require
-    /// changing the accepting condition.  When that happens, the
+    /// changing the acceptance condition.  When that happens, the
     /// acceptance will be set to Büchi.
     ///
     /// If the automaton had named states, newly introduced sinks will be
@@ -184,12 +184,16 @@ namespace spot
 
   /// \brief find the SCC of each state
   ///
-  /// This builds an SCC as large as the number of states in \a aut,
+  /// This builds a vector as large as the number of states in \a aut,
   /// and giving the SCC number each state belongs too.  SCC are
   /// numbered in topological order (the SCC of the initial state has
-  /// the highest numbers, and SCC with number 0 is a terminal/leaf
+  /// the highest number, and SCC with number 0 is a terminal/leaf
   /// SCC).
   SPOT_API std::vector<int> scc_vector(const mtdswa_ptr& aut);
+
+  // even rank = rejecting, odd rank = accepting
+  SPOT_API std::vector<unsigned> loding_weak_ranking(const mtdswa_ptr& aut,
+                                                     bool fix = false);
 
   /// \ingroup mtdswa
   /// \brief "Semi-internal" for translating LTL using MTBDDs
@@ -249,4 +253,7 @@ namespace spot
 
   SPOT_API
   mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa);
+  SPOT_API
+  mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa,
+                             const std::vector<unsigned>& initial_partition);
 }
