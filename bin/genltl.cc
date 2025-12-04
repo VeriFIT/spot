@@ -105,8 +105,14 @@ static const argp_option options[] =
     OPT_ALIAS(liberouter-patterns),
     { "kr-n", gen::LTL_KR_N, "RANGE", 0,
       "linear formula with doubly exponential DBA", 0 },
+    { "kr-n-delta1", gen::LTL_KR_N_DELTA1, "RANGE", 0,
+      "linear formula with doubly exponential DBA; same as "
+      "kr-n, but fixed to be a syntactic obligation", 0 },
     { "kr-nlogn", gen::LTL_KR_NLOGN, "RANGE", 0,
       "quasilinear formula with doubly exponential DBA", 0 },
+    { "kr-nlogn-delta1", gen::LTL_KR_NLOGN_DELTA1, "RANGE", 0,
+      "quasilinear formula with doubly exponential DBA; same as "
+      "kr-nlogn, but fixed to be a syntactic obligation", 0 },
     { "kv-psi", gen::LTL_KV_PSI, "RANGE", 0,
       "quadratic formula with doubly exponential DBA", 0 },
     OPT_ALIAS(kr-n2),

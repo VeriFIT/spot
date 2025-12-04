@@ -83,13 +83,28 @@ namespace spot
       LTL_HKRSS_PATTERNS,
       /// Linear formula with doubly exponential DBA.
       /// \cite kupferman.10.mochart
+      /// Describes an obligation property, but is not a syntactic obligation.
       LTL_KR_N,
       /// Quasilinear formula with doubly exponential DBA.
+      /// This is a variation on the original formula from
       /// \cite kupferman.10.mochart
+      /// such that the formula is a syntactic obligation
+      /// equivalent to the original formula.
+      LTL_KR_N_DELTA1,
+      /// Quasilinear formula with doubly exponential DBA.
+      /// \cite kupferman.10.mochart
+      /// Describes an obligation property, but is not a syntactic obligation.
       LTL_KR_NLOGN,
+      /// Quasilinear formula with doubly exponential DBA.
+      /// This is a variation on the original formula from
+      /// \cite kupferman.10.mochart
+      /// such that the formula is a syntactic obligation
+      /// equivalent to the original formula.
+      LTL_KR_NLOGN_DELTA1,
       /// Quadratic formula with doubly exponential DBA.
       /// \cite kupferman.10.mochart ,
       /// \cite kupferman.05.tcl .
+      /// Describes an obligation property, but is not a syntactic obligation.
       LTL_KV_PSI,
       /// LTL synthesis examples specification from the Lily 1.0.2
       /// distribution.  \cite jobstmann.06.fmcad

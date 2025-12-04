@@ -8,6 +8,16 @@ New in spot 2.14.3.dev  (not yet released)
   - ltlfilt learned a --satisfiable option to keep only satisfiable
     formulas.  See the comments on ltl_satisfiable() below.
 
+  - genltl's --kr-nlogn=N and --kr-n=N options, introduced in Spot
+    2.3.1 generate LTL formulas that can only be recognized by a DBA
+    of doubly-exponential size.  Those formulas actually describe
+    obligation properties, but they are not syntactic obligations.
+    The new --kr-nlogn-detla1=N and --kr-n-delta1=N options generate
+    variants of those formulas that are equivalent to the previous
+    properties, but that both belong to the Δ₁ fragment of LTL (i.e.,
+    the fact that they are obligation properties can be checked
+    syntactically.)
+
   Library:
 
   - spot::zielonka_tree was changed to include nodes labeled by {} by

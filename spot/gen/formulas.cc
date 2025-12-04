@@ -37,6 +37,7 @@
 #define Or_(x, y) formula::Or((x), (y))
 #define Or3_(x, y, z) formula::Or({(x), (y), (z)})
 #define U_(x, y) formula::U((x), (y))
+#define W_(x, y) formula::W((x), (y))
 #define Xor_(x, y) formula::Xor((x), (y))
 
 namespace spot
@@ -1047,11 +1048,17 @@ namespace spot
       }
 
       static formula
-      kr1_exp_4(int n, int k, formula fc, formula fd, formula fbin[2])
+      kr1_exp_4(int n, int k, formula fc, formula fd, formula fbin[2],
+                bool want_oblig)
       {
-        return U_(Not_(fd),
-                  And_(fd, X_(And_(binary_ki(k, 1, fbin),
-                                   X_n(G_(fc), n * (k + 1))))));
+        formula left = Not_(fd);
+        formula bin = binary_ki(k, 1, fbin);
+        formula right = And_(fd, X_(And_(bin, X_n(G_(fc), n * (k + 1)))));
+        if (!want_oblig)        // original formula
+          return U_(left, right);
+        // fix to return syntactic obligation
+        formula weak = W_(left, right);
+        return And_(weak, F_(fd));
       }
 
       static formula
@@ -1081,7 +1088,7 @@ namespace spot
 
       static formula
       kr1_exp(int n, std::string a, std::string b, std::string c, std::string d,
-              std::string bin0, std::string bin1)
+              std::string bin0, std::string bin1, bool want_oblig = false)
       {
         int k = ceil(log2(n)) + (n == 1);
 
@@ -1104,7 +1111,7 @@ namespace spot
         formula res = formula::And({ kr1_exp_1(k, fc, fd, fbin),
               kr1_exp_2(n, k, fa, fb, fbin),
               kr1_exp_3(n, k, fa, fb, fc, fd, fbin),
-              kr1_exp_4(n, k, fc, fd, fbin),
+              kr1_exp_4(n, k, fc, fd, fbin, want_oblig),
               kr1_exp_5(n, k, fa, fb, fc, fd, fbin) });
 
         return m.constrain(res);
@@ -1138,10 +1145,16 @@ namespace spot
       }
 
       static formula
-      kr2_exp_4(int n, formula* fa, formula* fb, formula fc, formula fd)
+      kr2_exp_4(int n, formula* fa, formula* fb, formula fc, formula fd,
+                bool want_oblig)
       {
-        return U_(Not_(fd),
-                  And_(fd, X_(And_(Or_(fa[0], fb[0]), X_n(G_(fc), n)))));
+        formula left = Not_(fd);
+        formula right = And_(fd, X_(And_(Or_(fa[0], fb[0]), X_n(G_(fc), n))));
+        if (!want_oblig)        // original formula
+          return U_(left, right);
+        // fix to get a syntactic obligation
+        formula weak = W_(left, right);
+        return And_(weak, F_(fd));
       }
 
       static formula
@@ -1186,7 +1199,8 @@ namespace spot
       }
 
       static formula
-      kr2_exp(int n, std::string a, std::string b, std::string c, std::string d)
+      kr2_exp(int n, std::string a, std::string b, std::string c, std::string d,
+              bool want_oblig = false)
       {
         if (n <= 0)
           bad_number("kr-n", n);
@@ -1206,7 +1220,7 @@ namespace spot
         formula res = formula::And({ kr2_exp_1(fa, fb, fc, fd),
               kr2_exp_2(n, fa, fb),
               kr2_exp_3(n, fa, fb, fc, fd),
-              kr2_exp_4(n, fa, fb, fc, fd),
+              kr2_exp_4(n, fa, fb, fc, fd, want_oblig),
               kr2_exp_5(n, fa, fb, fc, fd),
               kr2_exp_mutex(n, fa, fb, fc, fd) });
 
@@ -1834,8 +1848,12 @@ namespace spot
           return hkrss_pattern(n);
         case LTL_KR_N:
           return kr2_exp(n, "a", "b", "c", "d");
+        case LTL_KR_N_DELTA1:
+          return kr2_exp(n, "a", "b", "c", "d", true);
         case LTL_KR_NLOGN:
           return kr1_exp(n, "a", "b", "c", "d", "y", "z");
+        case LTL_KR_NLOGN_DELTA1:
+          return kr1_exp(n, "a", "b", "c", "d", "y", "z", true);
         case LTL_KV_PSI:
           return kv_exp(n, "a", "b", "c", "d");
         case LTL_LILY_PATTERNS:
@@ -1935,7 +1953,9 @@ namespace spot
           "gxf-and",
           "hkrss-patterns",
           "kr-n",
+          "kr-n-delta1",
           "kr-nlogn",
+          "kr-nlogn-delta1",
           "kv-psi",
           "lily-patterns",
           "ms-example",
@@ -2010,7 +2030,9 @@ namespace spot
         case LTL_HKRSS_PATTERNS:
           return 55;
         case LTL_KR_N:
+        case LTL_KR_N_DELTA1:
         case LTL_KR_NLOGN:
+        case LTL_KR_NLOGN_DELTA1:
         case LTL_KV_PSI:
           return 0;
         case LTL_LILY_PATTERNS:
@@ -2085,7 +2107,9 @@ namespace spot
         case LTL_GXF_AND:
         case LTL_HKRSS_PATTERNS:
         case LTL_KR_N:
+        case LTL_KR_N_DELTA1:
         case LTL_KR_NLOGN:
+        case LTL_KR_NLOGN_DELTA1:
         case LTL_KV_PSI:
         case LTL_LILY_PATTERNS:
           return 1;
