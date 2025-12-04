@@ -755,6 +755,23 @@ namespace spot
           goto rejecting_sink;
       }
 
+    // Handle the exceptional case where the initial state should
+    // become bddfalse or bddtrue.
+    if (int z = new_state_number[0]; z < 0)
+      {
+        if (z == -1)
+          states[0] = bddfalse;
+        else
+          states[0] = bddtrue;
+        states.resize(1);
+        colors.resize(1);
+        if (names.size() != ns)
+          names.clear();        // don't bother
+        else
+          names.resize(1);
+        return;
+      }
+
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_unary(shared_from_this()), false);
 
