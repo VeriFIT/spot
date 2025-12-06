@@ -218,6 +218,9 @@ namespace spot
     bdd formula_to_terminal_bdd(formula f);
     int formula_to_terminal_bdd_as_int(formula f);
 
+    // specialized version of conjunction/disjunction
+    int binop_to_terminal_bdd_as_int(formula f, formula g, bool is_and);
+
     bdd combine_and(bdd left, bdd right);
     bdd combine_or(bdd left, bdd right);
     bdd combine_implies(bdd left, bdd right);
@@ -225,7 +228,10 @@ namespace spot
     bdd combine_xor(bdd left, bdd right);
     bdd combine_not(bdd b);
 
+    bdd propeq_encode(formula f);
     formula propeq_representative(formula f);
+    formula propeq_representative_and(formula f, formula g);
+    formula propeq_representative_or(formula f, formula g);
 
     bddExtCache* get_cache()
     {
@@ -234,7 +240,7 @@ namespace spot
 
     ~simple_ltl_translator();
   private:
-    std::unordered_map<formula, int> formula_to_var_;
+    std::unordered_map<formula, bdd> propositional_equiv_bdd_;
     std::unordered_map<bdd, formula, bdd_hash> propositional_equiv_;
 
     std::unordered_map<formula, bdd> formula_to_bdd_;

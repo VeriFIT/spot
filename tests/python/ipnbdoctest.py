@@ -78,8 +78,8 @@ def canonicalize(s, type, ignores):
     # ignore trailing newlines (but not space)
     s = s.rstrip('\n')
 
-    # remove timings in ms
-    s = re.sub(r'\s+\d+\.\d+ms\b', ' timing', s)
+    # remove timings in ms or s
+    s = re.sub(r'\s+\d+\.\d+m?s\b', ' timing', s)
 
     # remove comparisons between timings
     s = re.sub(r'timing [<>] timing', ' timing ? timing', s)
