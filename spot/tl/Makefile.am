@@ -43,6 +43,7 @@ tl_HEADERS =					\
   relabel.hh					\
   remove_x.hh					\
   simplify.hh					\
+  sat.hh					\
   snf.hh					\
   sonf.hh					\
   unabbrev.hh
@@ -69,6 +70,7 @@ libtl_la_SOURCES =				\
   relabel.cc					\
   remove_x.cc					\
   simplify.cc					\
+  sat.cc					\
   snf.cc					\
   sonf.cc					\
   unabbrev.cc

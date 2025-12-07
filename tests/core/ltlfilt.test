@@ -888,3 +888,8 @@ cat > exp<<EOF
 i0 U (o0 U o1)
 EOF
 diff exp out
+
+
+
+test 22 = `ltlfilt -c --satisfiable formulas -f 'GFa & FG!a'`
+test 3 = `ltlfilt -v -c --satisfiable formulas -f 'GFa & FG!a'`

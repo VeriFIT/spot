@@ -5,6 +5,9 @@ New in spot 2.14.3.dev  (not yet released)
   - The 'ltl2tgta' tool, that was used to build "testing automata"
     and print them in dot format, has been removed.
 
+  - ltlfilt learned a --satisfiable option to keep only satisfiable
+    formulas.  See the comments on ltl_satisfiable() below.
+
   Library:
 
   - spot::zielonka_tree was changed to include nodes labeled by {} by
@@ -41,6 +44,12 @@ New in spot 2.14.3.dev  (not yet released)
     ltlf_one_step_unsat_rewrite_cached class makes it possible to
     reuse the same cache between calls.  This is now used by LTLf
     synthesis functions to speed up one-step (un)realizability checks.
+
+  - spot::ltl_satisfiable() is a new function to test if a formula is
+    satisfiable.  The implementation is currently very simple: after
+    some cheap preprocessing, the formula is converted to a TGBA that
+    is then checked for emptiness.  It can be improved later.
+    (Issue #623.)
 
   - all the code supporting (generalized) testing automata has been
     removed.  This code was initially introduced in Spot 1.0, and some

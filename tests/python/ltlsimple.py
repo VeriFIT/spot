@@ -207,3 +207,6 @@ tc.assertEqual(repr(spot.formula.apid_map()),
                '[spot.formula("a"), spot.formula("b"), None, None]')
 
 tc.assertEqual(str(spot.formula.ap_from_apid(0)), 'a')
+
+tc.assertTrue(spot.ltl_satisfiable('(!a U a) & FGa'))
+tc.assertFalse(spot.ltl_satisfiable('(!a U Ga) & GF!a'))

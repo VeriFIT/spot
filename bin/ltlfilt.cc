@@ -46,6 +46,7 @@
 #include <spot/tl/ltlf.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/hierarchy.hh>
+#include <spot/tl/sat.hh>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/minimize.hh>
 #include <spot/twaalgos/product.hh>
@@ -96,6 +97,7 @@ enum {
   OPT_REMOVE_WM,
   OPT_REMOVE_X,
   OPT_SAFETY,
+  OPT_SATISFIABLE,
   OPT_SAVE_PART_FILE,
   OPT_SIGMA2,
   OPT_SIZE,
@@ -257,6 +259,8 @@ static const argp_option options[] =
       "match formulas implying FORMULA", 0 },
     { "equivalent-to", OPT_EQUIVALENT_TO, "FORMULA", 0,
       "match formulas equivalent to FORMULA", 0 },
+    { "satisfiable", OPT_SATISFIABLE, nullptr, 0,
+      "match satisfiable formulas", 0 },
     { "stutter-insensitive", OPT_STUTTER_INSENSITIVE, nullptr, 0,
       "match stutter-insensitive LTL formulas", 0 },
     { "stutter-invariant", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
@@ -367,6 +371,7 @@ static long int match_count = 0;
 static const char* from_ltlf = nullptr;
 static const char* sonf = nullptr;
 static bool to_delta2 = false;
+static bool satisfiable = false;
 
 // We want all these variables to be destroyed when we exit main, to
 // make sure it happens before all other global variables (like the
@@ -590,6 +595,9 @@ parse_opt(int key, char* arg, struct argp_state*)
       break;
     case OPT_SAFETY:
       safety = obligation = true;
+      break;
+    case OPT_SATISFIABLE:
+      satisfiable = true;
       break;
     case OPT_SAVE_PART_FILE:
       opt->output_part.reset(new output_file(arg ? arg : "-"));
@@ -844,11 +852,16 @@ namespace
           matched &= (bsize.max < 0) || (l <= bsize.max);
         }
 
-      matched &= !opt->implied_by || simpl.implication(opt->implied_by, f);
-      matched &= !opt->imply || simpl.implication(f, opt->imply);
-      matched &= !opt->equivalent_to
-        || simpl.are_equivalent(f, opt->equivalent_to);
-      matched &= !stutter_insensitive || spot::is_stutter_invariant(f);
+      if (matched && satisfiable)
+        matched &= spot::ltl_satisfiable(f);
+      if (matched && opt->implied_by)
+        matched &= simpl.implication(opt->implied_by, f);
+      if (matched && opt->imply)
+        matched &= simpl.implication(f, opt->imply);
+      if (matched && opt->equivalent_to)
+        matched &= simpl.are_equivalent(f, opt->equivalent_to);
+      if (matched && stutter_insensitive)
+        matched &=spot::is_stutter_invariant(f);
 
       if (matched && (obligation || recurrence || persistence
                       || !opt->acc_words.empty()
