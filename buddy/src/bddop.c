@@ -1417,9 +1417,12 @@ BDD bdd_mt_apply1(BDD r, int (*termop)(int),
            if (ISTERM(r))
              {
                SYNC_REC_STACKS;
-               int i = bdd_terminal(termop(TERM(r)));
+               int oldt = TERM(r);
+               int newt = termop(oldt);
+               if (oldt != newt)
+                 r = bdd_terminal(newt);
                UPDATE_LOCAL_REC_STACKS;
-               PUSHREF_(i);
+               PUSHREF_(r);
              }
            else
              {
@@ -1451,8 +1454,12 @@ BDD bdd_mt_apply1(BDD r, int (*termop)(int),
            BDD rres = READREF_(1);
            BDD lres = READREF_(2);
            BDD r = POPINT_();
-           SYNC_REC_STACKS;
-           BDD res = bdd_makenode(LEVEL(r), lres, rres);
+           BDD res = r;
+           if (__likely(rres != HIGH(r) || lres != LOW(r)))
+             {
+               SYNC_REC_STACKS;
+               res = bdd_makenode(LEVEL(r), lres, rres);
+             }
            POPREF_(2);
            PUSHREF_(res);
            bddExtCacheEntry* entry = cache->table + index;
@@ -1524,8 +1531,12 @@ BDD bdd_mt_apply1_leaves(BDD r, int (*termop)(int, int),
            BDD rres = READREF_(1);
            BDD lres = READREF_(2);
            BDD r = POPINT_();
-           SYNC_REC_STACKS;
-           BDD res = bdd_makenode(LEVEL(r), lres, rres);
+           BDD res = r;
+           if (__likely(rres != HIGH(r) || lres != LOW(r)))
+             {
+               SYNC_REC_STACKS;
+               res = bdd_makenode(LEVEL(r), lres, rres);
+             }
            POPREF_(2);
            PUSHREF_(res);
            bddExtCacheEntry* entry = cache->table + index;
