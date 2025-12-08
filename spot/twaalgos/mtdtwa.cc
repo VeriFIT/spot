@@ -37,6 +37,7 @@ constexpr int hash_key_equiv = 4;
 constexpr int hash_key_xor = 5;
 constexpr int hash_key_not = 6;
 constexpr int hash_key_rename = 7;
+constexpr int hash_key_propeq = 8;
 //constexpr int hash_key_strat = 8;
 //constexpr int hash_key_strat_bool = 9;
 //constexpr int hash_key_finalstrat = 10;
@@ -1304,453 +1305,6 @@ namespace spot
 
   namespace
   {
-    bool is_temporal(formula f)
-    {
-      switch (f.kind())
-        {
-        case op::ff:
-        case op::tt:
-        case op::ap:
-        case op::Not:
-        case op::Xor:
-        case op::Implies:
-        case op::Equiv:
-        case op::And:
-        case op::Or:
-          return false;
-        default:
-          return true;
-        }
-    }
-
-    bool has_dup_temporal_subformulas(formula f, formula g)
-    {
-      robin_hood::unordered_set<formula> seen_in_f;
-      f.traverse([&seen_in_f](formula sub) {
-        seen_in_f.emplace(sub);
-        return is_temporal(sub);
-      });
-      bool dup = false;
-      g.traverse([&seen_in_f, &dup](formula sub) {
-        if (dup)
-          return true;
-        if (seen_in_f.find(sub) != seen_in_f.end())
-          {
-            dup = true;
-            return true;
-          }
-        return is_temporal(sub);
-      });
-      return dup;
-    }
-  }
-
-
-  // Convert the formula to a BDD suitable for propositional
-  // equivalence.  Any subformula that has a non-boolean
-  // operator is replaced by atomic proposition.
-  bdd simple_ltl_translator::propeq_encode(formula f)
-  {
-    auto encode_new = [&] (formula f) -> bdd
-    {
-      switch (f.kind())
-        {
-        case op::tt:
-          return bddtrue;
-        case op::ff:
-          return bddfalse;
-        case op::ap:
-          return bdd_ithvar(dict_->register_proposition(f, this));
-        case op::Not:
-          if (f[0].is_leaf())   // skip one application of bdd_not.
-            {
-              if (f[0].is_tt())
-                return bddfalse;
-              if (f[0].is_ff())
-                return bddtrue;
-              return bdd_nithvar(dict_->register_proposition(f[0], this));
-            }
-          return bdd_not(propeq_encode(f[0]));
-        case op::And:
-          {
-            bdd res = bddtrue;
-            for (const formula& sub: f)
-              res &= propeq_encode(sub);
-            return res;
-          }
-        case op::Or:
-          {
-            bdd res = bddfalse;
-            for (const formula& sub: f)
-              res |= propeq_encode(sub);
-            return res;
-          }
-        case op::Xor:
-          {
-            bdd left = propeq_encode(f[0]);
-            return left ^ propeq_encode(f[1]);
-          }
-        case op::Implies:
-          {
-            bdd left = propeq_encode(f[0]);
-            return left >> propeq_encode(f[1]);
-          }
-        case op::Equiv:
-          {
-            bdd left = propeq_encode(f[0]);
-            return bdd_biimp(left, propeq_encode(f[1]));
-          }
-        default:
-          return bdd_ithvar(dict_->register_anonymous_variables(1, this));
-        }
-    };
-
-    auto [it, b] = propositional_equiv_bdd_.emplace(f, bddfalse);
-    if (b)
-      it->second = encode_new(f);
-    return it->second;
-  }
-
-  // This implement propositional equivalence plus some very light
-  // simplifications, assuming that f and g are already
-  // representatives.
-  formula simple_ltl_translator::propeq_representative_and(formula f,
-                                                           formula g)
-  {
-    bool f_is_t = is_temporal(f);
-    bool g_is_t = is_temporal(g);
-    if (f_is_t || g_is_t)
-      {
-        if (simplify_terms_)
-          {
-            // (α M β) ∧ β ≡ (α M β)
-            // (α R β) ∧ β ≡ (α R β)
-            // Gα ∧ α ≡ Gα
-            if ((f.is(op::M) || f.is(op::R)) && f[1] == g)
-              return f;
-            if (f.is(op::G) && f[0] == g)
-              return g;
-            if ((g.is(op::M) || g.is(op::R)) && g[1] == f)
-              return g;
-            if (g.is(op::G) && g[0] == f)
-              return f;
-          }
-        if (f_is_t && g_is_t)
-          // nothing to simplify, skip encoding
-          return formula::And(f, g);
-      }
-
-    formula h = formula::And(f, g);
-    if (SPOT_UNLIKELY(h == f || h == g))
-      // f and g are already simplified, so skip encoding
-      return h;
-    if (SPOT_UNLIKELY(!has_dup_temporal_subformulas(f, g)))
-      // f and g do not share temporal subformulas, nothing to simplify
-      return h;
-
-    auto [h_it, h_isnew] = propositional_equiv_bdd_.emplace(h, bddfalse);
-    if (h_isnew)
-      {
-        bdd enc = propeq_encode(f);
-        enc &= propeq_encode(g);
-        h_it->second = enc;
-      }
-    auto [it, isnew] = propositional_equiv_.emplace(h_it->second, h);
-    if (!isnew)
-      // Same encoding as a previous formula, so reuse that.
-      return it->second;
-    return h;
-  }
-
-  // This implement propositional equivalence plus some very light
-  // simplifications, assuming that f and g are already
-  // representatives.
-  formula simple_ltl_translator::propeq_representative_or(formula f,
-                                                          formula g)
-  {
-    bool f_is_t = is_temporal(f);
-    bool g_is_t = is_temporal(g);
-    if (f_is_t || g_is_t)
-      {
-        if (simplify_terms_)
-          {
-            // (α U β) ∨ β ≡ (α U β)
-            // (α W β) ∨ β ≡ (α W β)
-            // Fα ∨ α ≡ Fα
-            if ((f.is(op::U) || f.is(op::W)) && f[1] == g)
-              return f;
-            if (f.is(op::F) && f[0] == g)
-              return g;
-            if ((g.is(op::U) || g.is(op::W)) && g[1] == f)
-              return g;
-            if (g.is(op::F) && g[0] == f)
-              return f;
-          }
-        if (f_is_t && g_is_t)
-          // nothing to simplify, skip encoding
-          return formula::Or(f, g);
-      }
-
-    formula h = formula::Or(f, g);
-    if (SPOT_UNLIKELY(h == f || h == g))
-      // f and g are already simplified, so skip encoding
-      return h;
-    if (SPOT_UNLIKELY(!has_dup_temporal_subformulas(f, g)))
-      // f and g do not share temporal subformulas, nothing to simplify
-      return h;
-    auto [h_it, h_isnew] = propositional_equiv_bdd_.emplace(h, bddfalse);
-    if (h_isnew)
-      {
-        bdd enc = propeq_encode(f);
-        enc |= propeq_encode(g);
-        h_it->second = enc;
-      }
-    auto [it, isnew] = propositional_equiv_.emplace(h_it->second, h);
-    if (!isnew)
-      // Same encoding as a previous formula, so reuse that.
-      return it->second;
-    return h;
-  }
-
-  // This implement propositional equivalence plus some very light
-  // simplifications
-  formula simple_ltl_translator::propeq_representative(formula f)
-  {
-    // We start with the simplifications
-  again:
-    switch (f.kind())
-      {
-      case op::And:
-        {
-          if (!simplify_terms_)
-            break;
-          // The following cheap simplifications avoid creating
-          // unnecessary terminals that will eventually be found
-          // to be equivalent.
-          //
-          // (α M β) ∧ β ≡ (α M β)
-          // (α R β) ∧ β ≡ (α R β)
-          // Gα ∧ α ≡ Gα
-          robin_hood::unordered_set<formula> removable;
-          for (const formula& sub: f)
-            if (sub.is(op::M) || sub.is(op::R))
-              removable.insert(sub[1]);
-            else if (sub.is(op::G))
-              removable.insert(sub[0]);
-          if (removable.empty())
-            break;
-          std::vector<formula> vec;
-          for (const formula& sub: f)
-            if (removable.find(sub) == removable.end())
-              vec.push_back(sub);
-          if (vec.size() == f.size())
-            break;
-          f = formula::And(std::move(vec));
-          goto again;
-          // Rules that are not implemented but for which I have
-          // seen both sides of the equality during some translation:
-          //
-          //  α ∧ Fα ≡ α  (generalizes to α ∧ (β [UW∨] α) ≡ α).
-          //  Gα ∧ (β ∨ α) ≡ Gα
-          //  Fα ∨ (β ∧ α) ≡ Fα
-          //
-          // All of these can be seen as some type of unit-propagation.
-          // See Issue #606.
-        }
-      case op::Or:
-        {
-          if (!simplify_terms_)
-            break;
-          // (α U β) ∨ β ≡ (α U β)
-          // (α W β) ∨ β ≡ (α W β)
-          // Fα ∨ α ≡ Fα
-          robin_hood::unordered_set<formula> removable;
-          for (const formula& sub: f)
-            if (sub.is(op::U) || sub.is(op::W))
-              removable.insert(sub[1]);
-            else if (sub.is(op::F))
-              removable.insert(sub[0]);
-          if (removable.empty())
-            break;
-          std::vector<formula> vec;
-          for (const formula& sub: f)
-            if (removable.find(sub) == removable.end())
-              vec.push_back(sub);
-          if (vec.size() == f.size())
-            break;
-          f = formula::Or(std::move(vec));
-          goto again;
-        }
-      case op::Not:
-      case op::Xor:
-      case op::Implies:
-      case op::Equiv:
-        break;
-      default:
-        // abort immediately if the top-level operator is not Boolean
-        return f;
-      }
-
-    bdd enc = propeq_encode(f);
-    if (enc == bddtrue)
-      f = formula::tt();
-    else if (enc == bddfalse)
-      f = formula::ff();
-    auto [it, _] = propositional_equiv_.emplace(enc, f);
-    (void) _;
-    // std::cerr << f << " ≡ " << it->second << '\n';
-    return it->second;
-  }
-
-  formula simple_ltl_translator::terminal_to_formula(int v) const
-  {
-    assert((unsigned) v < int_to_formula_.size());
-    return int_to_formula_[v];
-  }
-
-  formula simple_ltl_translator::leaf_to_formula(int b, int v) const
-  {
-    if (b == 0)
-      return formula::ff();
-    if (b == 1)
-      return formula::tt();
-    return terminal_to_formula(v);
-  }
-
-  int simple_ltl_translator::formula_to_int(formula f)
-  {
-    if (auto it = formula_to_int_.find(f);
-        it != formula_to_int_.end())
-      return it->second;
-
-    if (formula g = propeq_representative(f); g != f)
-      {
-        auto it = formula_to_int_.find(g);
-        if (it == formula_to_int_.end())
-          {
-            // This can occur if propeq_representative simplifies
-            // the formula.
-            int v = int_to_formula_.size();
-            int_to_formula_.push_back(g);
-            formula_to_int_[g] = v;
-            formula_to_int_[f] = v;
-            return v;
-          }
-        int v = it->second;
-        formula_to_int_[f] = v;
-        return v;
-      }
-
-    int v = int_to_formula_.size();
-    int_to_formula_.push_back(f);
-    formula_to_int_[f] = v;
-    return v;
-  }
-
-  int simple_ltl_translator::formula_to_terminal(formula f)
-  {
-    return formula_to_int(f);
-  }
-
-  int simple_ltl_translator::formula_to_terminal_bdd_as_int(formula f)
-  {
-    if (SPOT_UNLIKELY(f.is_ff()))
-      return 0;
-    if (SPOT_UNLIKELY(f.is_tt()))
-      return 1;
-    int v = formula_to_int(f);
-    f = int_to_formula_[v];     // The formula might have been reduced to tt/ff.
-    if (SPOT_UNLIKELY(f.is_ff()))
-      return 0;
-    if (SPOT_UNLIKELY(f.is_tt()))
-      return 1;
-    return bdd_terminal_as_int(v);
-  }
-
-  int simple_ltl_translator::binop_to_terminal_bdd_as_int(formula f, formula g,
-                                                          bool is_and)
-  {
-    assert(!g.is_ff() && !g.is_tt() && !f.is_ff() && !f.is_tt());
-
-    formula h = is_and ?
-      propeq_representative_and(f, g) :
-      propeq_representative_or(f, g);
-
-    if (SPOT_UNLIKELY(h.is_tt()))
-      return 1;
-    if (SPOT_UNLIKELY(g.is_ff()))
-      return 0;
-
-    auto [it, isnew] = formula_to_int_.emplace(h, 0);
-    if (isnew)
-      {
-        it->second = int_to_formula_.size();
-        int_to_formula_.push_back(h);
-      }
-    return bdd_terminal_as_int(it->second);
-  }
-
-  bdd simple_ltl_translator::formula_to_terminal_bdd(formula f)
-  {
-    return bdd_from_int(formula_to_terminal_bdd_as_int(f));
-  }
-
-  namespace
-  {
-    // For AND and OR, the callbacks will never been called with a constant
-    // argument because those are simplified during the BDD operations.
-
-    static simple_ltl_translator* term_combine_trans;
-    static int term_combine_and(int, int left_term,
-                                int, int right_term)
-    {
-      formula lf = term_combine_trans->terminal_to_formula(left_term);
-      formula rf = term_combine_trans->terminal_to_formula(right_term);
-      return term_combine_trans->binop_to_terminal_bdd_as_int(lf, rf, true);
-    }
-
-    static int term_combine_or(int, int left_term,
-                               int, int right_term)
-    {
-      formula lf = term_combine_trans->terminal_to_formula(left_term);
-      formula rf = term_combine_trans->terminal_to_formula(right_term);
-      return term_combine_trans->binop_to_terminal_bdd_as_int(lf, rf, false);
-    }
-
-    static int term_combine_implies(int, int left_term,
-                                    int right, int right_term)
-    {
-      formula lf = term_combine_trans->terminal_to_formula(left_term);
-      formula rf = term_combine_trans->leaf_to_formula(right, right_term);
-      formula res = formula::Implies(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
-    }
-
-    static int term_combine_equiv(int left, int left_term,
-                                  int right, int right_term)
-    {
-      formula lf = term_combine_trans->leaf_to_formula(left, left_term);
-      formula rf = term_combine_trans->leaf_to_formula(right, right_term);
-      formula res = formula::Equiv(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
-    }
-
-    static int term_combine_xor(int left, int left_term,
-                                int right, int right_term)
-    {
-      formula lf = term_combine_trans->leaf_to_formula(left, left_term);
-      formula rf =  term_combine_trans->leaf_to_formula(right, right_term);
-      formula res = formula::Xor(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
-    }
-
-    static int term_combine_not(int left)
-    {
-      formula ll = term_combine_trans->terminal_to_formula(left);
-      formula res = formula::Not(ll);
-      return term_combine_trans->formula_to_terminal(res);
-    }
-
     // A top-level operator that is weak (G, R, W) is accepting (true)
     // A top-level operator that is strong (F, M, U) is rejecting (false);
     // X(f) is accepting iff f is accepting.
@@ -1867,6 +1421,364 @@ namespace spot
         }
       SPOT_UNREACHABLE();
       return false;
+    }
+
+    bool is_temporal(formula f)
+    {
+      switch (f.kind())
+        {
+        case op::ff:
+        case op::tt:
+        case op::ap:
+        case op::Not:
+        case op::Xor:
+        case op::Implies:
+        case op::Equiv:
+        case op::And:
+        case op::Or:
+          return false;
+        default:
+          return true;
+        }
+    }
+
+    bool has_dup_temporal_subformulas(formula f, formula g)
+    {
+      robin_hood::unordered_set<formula> seen_in_f;
+      f.traverse([&seen_in_f](formula sub) {
+        seen_in_f.emplace(sub);
+        return is_temporal(sub);
+      });
+      bool dup = false;
+      g.traverse([&seen_in_f, &dup](formula sub) {
+        if (dup)
+          return true;
+        if (seen_in_f.find(sub) != seen_in_f.end())
+          {
+            dup = true;
+            return true;
+          }
+        return is_temporal(sub);
+      });
+      return dup;
+    }
+  }
+
+
+  // Convert the formula to a BDD suitable for propositional
+  // equivalence.  Any subformula that has a non-boolean
+  // operator is replaced by atomic proposition.
+  bdd simple_ltl_translator::propeq_encode(formula f)
+  {
+    auto encode_new = [&] (formula f) -> bdd
+    {
+      switch (f.kind())
+        {
+        case op::tt:
+          return bddtrue;
+        case op::ff:
+          return bddfalse;
+        case op::ap:
+          return bdd_ithvar(dict_->register_proposition(f, this));
+        case op::Not:
+          if (f[0].is_leaf())   // skip one application of bdd_not.
+            {
+              if (f[0].is_tt())
+                return bddfalse;
+              if (f[0].is_ff())
+                return bddtrue;
+              return bdd_nithvar(dict_->register_proposition(f[0], this));
+            }
+          return bdd_not(propeq_encode(f[0]));
+        case op::And:
+          {
+            bdd res = bddtrue;
+            for (const formula& sub: f)
+              res &= propeq_encode(sub);
+            return res;
+          }
+        case op::Or:
+          {
+            bdd res = bddfalse;
+            for (const formula& sub: f)
+              res |= propeq_encode(sub);
+            return res;
+          }
+        case op::Xor:
+          {
+            bdd left = propeq_encode(f[0]);
+            return left ^ propeq_encode(f[1]);
+          }
+        case op::Implies:
+          {
+            bdd left = propeq_encode(f[0]);
+            return left >> propeq_encode(f[1]);
+          }
+        case op::Equiv:
+          {
+            bdd left = propeq_encode(f[0]);
+            return bdd_biimp(left, propeq_encode(f[1]));
+          }
+        default:
+          return bdd_ithvar(dict_->register_anonymous_variables(1, this));
+        }
+    };
+
+    if (auto it = propositional_equiv_bdd_.find(f);
+        it != propositional_equiv_bdd_.end())
+      return it->second;
+    // We cannot insert into the map while doing the search
+    // above, because the iterator would be invalidated by
+    // other insertions performed in encode_new.
+    return propositional_equiv_bdd_[f] = encode_new(f);
+  }
+
+  // This implement propositional equivalence plus some very light
+  // simplifications
+  formula simple_ltl_translator::propeq_representative(formula f, bool isacc)
+  {
+    // We start with the simplifications
+  again:
+    switch (f.kind())
+      {
+      case op::And:
+        {
+          if (!simplify_terms_)
+            break;
+          // The following cheap simplifications avoid creating
+          // unnecessary terminals that will eventually be found
+          // to be equivalent.
+          //
+          // (α M β) ∧ β ≡ (α M β)
+          // (α R β) ∧ β ≡ (α R β)
+          // Gα ∧ α ≡ Gα
+          robin_hood::unordered_set<formula> removable;
+          for (const formula& sub: f)
+            if (sub.is(op::M) || sub.is(op::R))
+              removable.insert(sub[1]);
+            else if (sub.is(op::G))
+              removable.insert(sub[0]);
+          if (removable.empty())
+            break;
+          std::vector<formula> vec;
+          for (const formula& sub: f)
+            if (removable.find(sub) == removable.end())
+              vec.push_back(sub);
+          if (vec.size() == f.size())
+            break;
+          f = formula::And(std::move(vec));
+          goto again;
+          // Rules that are not implemented but for which I have
+          // seen both sides of the equality during some translation:
+          //
+          //  α ∧ Fα ≡ α  (generalizes to α ∧ (β [UW∨] α) ≡ α).
+          //  Gα ∧ (β ∨ α) ≡ Gα
+          //  Fα ∨ (β ∧ α) ≡ Fα
+          //
+          // All of these can be seen as some type of unit-propagation.
+          // See Issue #606.
+        }
+      case op::Or:
+        {
+          if (!simplify_terms_)
+            break;
+          // (α U β) ∨ β ≡ (α U β)
+          // (α W β) ∨ β ≡ (α W β)
+          // Fα ∨ α ≡ Fα
+          robin_hood::unordered_set<formula> removable;
+          for (const formula& sub: f)
+            if (sub.is(op::U) || sub.is(op::W))
+              removable.insert(sub[1]);
+            else if (sub.is(op::F))
+              removable.insert(sub[0]);
+          if (removable.empty())
+            break;
+          std::vector<formula> vec;
+          for (const formula& sub: f)
+            if (removable.find(sub) == removable.end())
+              vec.push_back(sub);
+          if (vec.size() == f.size())
+            break;
+          f = formula::Or(std::move(vec));
+          goto again;
+        }
+      case op::Not:
+      case op::Xor:
+      case op::Implies:
+      case op::Equiv:
+        break;
+      default:
+        // abort immediately if the top-level operator is not Boolean
+        return f;
+      }
+
+    bdd enc = propeq_encode(f);
+    if (enc == bddtrue)
+      f = formula::tt();
+    else if (enc == bddfalse)
+      f = formula::ff();
+    auto [it, _] = propositional_equiv_[isacc].emplace(enc, f);
+    (void) _;
+    // std::cerr << f << " ≡ " << it->second << '\n';
+    return it->second;
+  }
+
+  formula simple_ltl_translator::terminal_to_formula(int v) const
+  {
+    assert((unsigned) v < int_to_formula_.size());
+    return int_to_formula_[v];
+  }
+
+  formula simple_ltl_translator::leaf_to_formula(int b, int v) const
+  {
+    if (b == 0)
+      return formula::ff();
+    if (b == 1)
+      return formula::tt();
+    return terminal_to_formula(v);
+  }
+
+  int simple_ltl_translator::formula_to_int(formula f)
+  {
+    if (auto it = formula_to_int_.find(f);
+        it != formula_to_int_.end())
+      return it->second;
+    int v = int_to_formula_.size();
+    int_to_formula_.push_back(f);
+    formula_to_int_[f] = v;
+    return v;
+  }
+
+  int simple_ltl_translator::formula_propeq_to_int(formula f)
+  {
+    std::unordered_map<formula, int>& propeq = propeq_to_int_;
+
+    if (auto it = propeq.find(f); it != propeq.end())
+      return it->second;
+
+    formula g = propeq_representative(f, obligation_is_accepting(f));
+
+    int v;
+    auto it = formula_to_int_.find(g);
+    if (it == formula_to_int_.end())
+      {
+        v = int_to_formula_.size();
+        int_to_formula_.push_back(g);
+        formula_to_int_[g] = v;
+      }
+    else
+      {
+        v = it->second;
+      }
+    propeq[g] = v;
+    if (f != g)
+      {
+        formula_to_int_[f] = v;
+        propeq[f] = v;
+      }
+    return v;
+  }
+
+  int simple_ltl_translator::formula_to_terminal(formula f)
+  {
+    return formula_to_int(f);
+  }
+
+  int simple_ltl_translator::formula_to_terminal_bdd_as_int(formula f)
+  {
+    if (SPOT_UNLIKELY(f.is_ff()))
+      return 0;
+    if (SPOT_UNLIKELY(f.is_tt()))
+      return 1;
+    int v = formula_to_int(f);
+    return bdd_terminal_as_int(v);
+  }
+
+  int simple_ltl_translator::formula_propeq_to_terminal_bdd_as_int(formula f)
+  {
+    if (SPOT_UNLIKELY(f.is_ff()))
+      return 0;
+    if (SPOT_UNLIKELY(f.is_tt()))
+      return 1;
+    int v = formula_propeq_to_int(f);
+    f = int_to_formula_[v];     // The formula might have been reduced to tt/ff.
+    if (SPOT_UNLIKELY(f.is_ff()))
+      return 0;
+    if (SPOT_UNLIKELY(f.is_tt()))
+      return 1;
+    return bdd_terminal_as_int(v);
+  }
+
+  bdd simple_ltl_translator::formula_to_terminal_bdd(formula f)
+  {
+    return bdd_from_int(formula_to_terminal_bdd_as_int(f));
+  }
+
+  namespace
+  {
+    // For AND and OR, the callbacks will never been called with a constant
+    // argument because those are simplified during the BDD operations.
+
+    static simple_ltl_translator* term_combine_trans;
+    static int term_combine_and(int, int left_term,
+                                int, int right_term)
+    {
+      formula lf = term_combine_trans->terminal_to_formula(left_term);
+      formula rf = term_combine_trans->terminal_to_formula(right_term);
+      formula res = formula::And(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
+    }
+
+    static int term_combine_or(int, int left_term,
+                               int, int right_term)
+    {
+      formula lf = term_combine_trans->terminal_to_formula(left_term);
+      formula rf = term_combine_trans->terminal_to_formula(right_term);
+      formula res = formula::Or(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
+    }
+
+    static int term_combine_implies(int, int left_term,
+                                    int right, int right_term)
+    {
+      formula lf = term_combine_trans->terminal_to_formula(left_term);
+      formula rf = term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::Implies(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
+    }
+
+    static int term_combine_equiv(int left, int left_term,
+                                  int right, int right_term)
+    {
+      formula lf = term_combine_trans->leaf_to_formula(left, left_term);
+      formula rf = term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::Equiv(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
+    }
+
+    static int term_combine_xor(int left, int left_term,
+                                int right, int right_term)
+    {
+      formula lf = term_combine_trans->leaf_to_formula(left, left_term);
+      formula rf =  term_combine_trans->leaf_to_formula(right, right_term);
+      formula res = formula::Xor(lf, rf);
+      return term_combine_trans->formula_to_terminal_bdd_as_int(res);
+    }
+
+    static int term_combine_not(int left)
+    {
+      formula ll = term_combine_trans->terminal_to_formula(left);
+      formula res = formula::Not(ll);
+      return term_combine_trans->formula_to_terminal(res);
+    }
+
+    static int terminal_propeq(int root, int termval)
+    {
+      if (root == 0 || root == 1)
+        return root;
+      formula f = term_combine_trans->terminal_to_formula(termval);
+      int res = term_combine_trans->formula_propeq_to_terminal_bdd_as_int(f);
+      return res;
     }
 
   }
@@ -2059,6 +1971,8 @@ namespace spot
 #endif
       return v;
     }
+
+
   }
 
   // This is the main translation function.  It has grown to do a bit
@@ -2112,6 +2026,8 @@ namespace spot
           continue;
 
         bdd b = ltl_to_mtbdd(label);
+        // propositional equivalence on all terminals.
+        b = bdd_mt_apply1_leaves(b, terminal_propeq, &cache_, hash_key_propeq);
 
         int key = b.id();
         bool accepting = obligation_is_accepting(label);
