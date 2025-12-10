@@ -20,6 +20,7 @@
 
 #include <spot/twa/twagraph.hh>
 #include <spot/misc/bddlt.hh>
+#include <unordered_map>
 
 namespace spot
 {
@@ -92,6 +93,16 @@ namespace spot
     std::vector<formula> names;
     std::vector<acc_cond::mark_t> colors;
     acc_cond acc;
+
+    // If this map is non-empty, it is used to map terminal values
+    // to states while printing the automaton.  Use this only for debugging,
+    // other algorithms will ignore it.
+    std::unordered_map<int, int> terminal_to_state_map;
+    // colors some nodes
+    std::unordered_map<int, unsigned> highlight_nodes;
+    // for each element (A, B) put state A in cluster B
+    std::unordered_map<int, int> highlight_groups;
+
     /// \brief get the bdd_dict associated to this automaton
     bdd_dict_ptr get_dict() const
     {
@@ -208,6 +219,9 @@ namespace spot
                           bool simplify_terms = true);
 
     mtdswa_ptr ltl_to_mtdswa(formula f, bool fuse_same_bdds);
+    mtdswa_ptr ltl_to_mtdswa_synthesis(formula f,
+                                       const std::vector<std::string>& outvars,
+                                       bool realizability, int debug = -1);
 
     bdd ltl_to_mtbdd(formula f);
     formula leaf_to_formula(int b, int term) const;
@@ -254,6 +268,12 @@ namespace spot
                                   bool fuse_same_bdds = true,
                                   bool simplify_terms = true);
 
+  SPOT_API
+  mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
+                                  const std::vector<std::string>& outvars,
+                                  bool realizability = false,
+                                  bool simplify_terms = true,
+                                  int debug = -1);
 
   SPOT_API
   mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa);

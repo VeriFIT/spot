@@ -1150,6 +1150,11 @@ def obligation_to_mtdswa(formula, *args, dict=_bdd_dict):
     from spot.impl import obligation_to_mtdswa as otm
     return otm(formula, dict, *args)
 
+def obligation_synthesis(formula, *args, dict=_bdd_dict,
+                         realizability=False, simplify=True, debug=-1):
+    from spot.impl import obligation_synthesis as obsynt
+    return obsynt(formula, dict, *args, realizability, simplify, debug)
+
 # Wrap C++-functions into lambdas so that they get converted into
 # instance methods (i.e., self passed as first argument
 # automatically), because only user-defined functions are converted as
