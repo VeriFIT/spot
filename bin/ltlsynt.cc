@@ -482,6 +482,50 @@ namespace
     outf.close(opt_csv);
   }
 
+  const char*
+  is_valid_strategy(const spot::formula& f, spot::twa_graph_ptr solution)
+  {
+    const char* incomplete_machine =
+        "Strategy is not an input-complete Mealy machine";
+    const char* nondeterministic_machine =
+        "Strategy is not an input-deterministic Mealy machine";
+
+    unsigned num_states = solution->num_states();
+    if (num_states == 0)
+      return incomplete_machine;
+
+    spot::translator trans(gi->dict, &gi->opt);
+    spot::twa_graph_ptr neg_spec = trans.run(spot::formula::Not(f));
+
+    if (neg_spec->intersects(solution))
+      return "Strategy and negated specification do intersect";
+
+    bdd bdd_outs;
+    try {
+      bdd_outs = get_synthesis_outputs(solution);
+    }
+    catch (const std::runtime_error& error)
+    {
+      assert(strcmp(error.what(),
+              "get_synthesis_outputs(): synthesis-outputs not defined") == 0);
+      return "Outputs are not defined";
+    }
+    for (unsigned state = 0; state < num_states; ++state)
+    {
+      bdd bdd_state_cond = bddfalse;
+      for (const auto &edge : solution->out(state))
+      {
+        bdd edge_cond = bdd_exist(edge.cond, bdd_outs);
+        if (bdd_have_common_assignment(edge_cond, bdd_state_cond))
+          return nondeterministic_machine;
+        bdd_state_cond |= edge_cond;
+      }
+      if (bdd_state_cond != bddtrue)
+        return incomplete_machine;
+    }
+    return nullptr;
+  }
+
   static int
   solve_formula(spot::formula original_f,
                 const std::vector<std::string>& input_aps,
@@ -880,12 +924,11 @@ namespace
         return 0;
       }
 
-
-    // TODO: different options to speed up verification?!
-    spot::translator trans(gi->dict, &gi->opt);
-    auto neg_spec = trans.run(spot::formula::Not(original_f));
     if (saig)
       {
+        // TODO: different options to speed up verification?!
+        spot::translator trans(gi->dict, &gi->opt);
+        auto neg_spec = trans.run(spot::formula::Not(original_f));
         // Test the aiger
         auto saigaut = saig->as_automaton(false);
         if (neg_spec->intersects(saigaut))
@@ -895,10 +938,10 @@ namespace
       }
     else if  (tot_strat)
       {
-        // Test the strategy
-        if (neg_spec->intersects(tot_strat))
-          error(2, 0, "Strategy and negated specification do intersect: "
-                "strategy is not OK.");
+        const char* is_valid = is_valid_strategy(original_f, tot_strat);
+        if (is_valid != nullptr)
+          error(2, 0, "%s: strategy is not OK.",
+                is_valid);
         std::cout << "/*Strategy was verified*/\n";
       }
     // Done
