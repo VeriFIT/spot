@@ -2462,7 +2462,6 @@ namespace spot
       delete a;
     }
 
-    prev.emplace_back(0, 0);
     todo.emplace_back(formula_propeq_to_int(f));
     do
       {
@@ -2488,49 +2487,54 @@ namespace spot
             //   std::cerr << ' ' << r;
             // std::cerr << '\n';
           }
-        auto [prev_state, size] = prev.back();
-        // If prev_state is determined, skip the exploration of its successors
-        // and backtrack immediately
-        if (todo.size() == size) // DFS backtrack
-          {
-            prev.pop_back();
-            auto it = terminal_to_state_map.find(prev_state);
-            assert(it != terminal_to_state_map.end());
-            SPOT_ASSUME(it != terminal_to_state_map.end());
-            unsigned prev_rank = it->second;
+        if (SPOT_LIKELY(!prev.empty()))
+          if (auto [prev_state, size] = prev.back();
+              todo.size() == size) // DFS backtrack
+            {
+              prev.pop_back();
+              auto it = terminal_to_state_map.find(prev_state);
+              assert(it != terminal_to_state_map.end());
+              SPOT_ASSUME(it != terminal_to_state_map.end());
+              unsigned prev_rank = it->second;
 
-            assert(!scc_roots.empty());
-            if (scc_roots.back() == prev_rank) // Is this the root of the SCC?
-              {
-                // We are leaving an SCC!
-                scc_roots.pop_back();
+              assert(!scc_roots.empty());
+              if (scc_roots.back() == prev_rank) // Is this the root of the SCC?
+                {
+                  // We are leaving an SCC!
+                  scc_roots.pop_back();
 
-                // This is an accepting SCC?
-                bool is_acc =
-                  obligation_is_accepting(int_to_formula_[prev_state]);
+                  // This is an accepting SCC?
+                  formula label = int_to_formula_[prev_state];
+                  bool is_acc = obligation_is_accepting(label);
 
-                // Mark all states in the SCC as losing or winning,
-                // depending on is_acc. Spot if status of the initial
-                // state becomes known.
-                int s;
-                do
-                  {
-                    s = live_states.back();
-                    live_states.pop_back();
-                    // if realizability is not set, make sure we mark all the
-                    // SCC as accepting, otherwise we will have undeterminate
-                    // node below accepting terminal in the SCC and we won't be
-                    // able to extact a strategy.
-                    if (backprop.root_winner_set_if_unknown(s, is_acc)
-                        && realizability)
-                      break;
-                  }
-                while (s != prev_state);
-                if (backprop.root_is_determined(0))
-                  break;
-              }
-            continue;
-          }
+                  // Mark all states in the SCC as losing or winning,
+                  // depending on is_acc. Spot if status of the initial
+                  // state becomes known.
+                  int s;
+                  do
+                    {
+                      s = live_states.back();
+                      live_states.pop_back();
+                      // if realizability is not set, make sure we mark all the
+                      // SCC as accepting, otherwise we will have undeterminate
+                      // nodes below accepting terminals in the SCC and we
+                      // won't be able to extract a strategy.
+                      if (backprop.root_winner_set_if_unknown(s, is_acc)
+                          && realizability)
+                        break;
+                      auto it = terminal_to_state_map.find(s);
+                      assert(it != terminal_to_state_map.end());
+                      SPOT_ASSUME(it != terminal_to_state_map.end());
+                      it->second = ~it->second;
+                    }
+                  while (s != prev_state);
+                  if (backprop.root_is_determined(0))
+                    break;
+                }
+              continue;
+            }
+
+        assert(!todo.empty());
 
         int label_term = todo.back();
         todo.pop_back();
@@ -2583,15 +2587,17 @@ namespace spot
                 todo.push_back(root);
                 continue;
               }
-            unsigned rank = it->second;
+            int rank = it->second;
+            if (rank < 0)         // already processed SCC
+              continue;
             // We are closing a cycle.
-            while (scc_roots.back() > rank)
+            while (scc_roots.back() > (unsigned) rank)
               scc_roots.pop_back();
           }
         old_rootnums.clear();
         new_rootnums.clear();
       }
-    while (!todo.empty());
+    while (!prev.empty());
 
     // If we were passed the debug parameter, let's build an automaton
     // representing our current state after DEBUG iterations.
@@ -2609,10 +2615,15 @@ namespace spot
               }
           }
         // highlight next state to process
-        if (todo.size() != prev.back().second && !todo.empty())
+        if (!prev.empty() && todo.size() != prev.back().second && !todo.empty())
           highlight_nodes.emplace(bdd_terminal(todo.back()).id(), 6);
 
         unsigned n = states.size();
+
+        for (auto& [term, rank]: terminal_to_state_map)
+          if (rank < 0)
+            rank = ~rank;
+
         // declare all missing states.
         while (!todo.empty())
           {
@@ -2660,6 +2671,10 @@ namespace spot
         dfa->colors.emplace_back(acc_cond::mark_t{});
         return dfa;
       }
+
+    for (auto& [term, rank]: terminal_to_state_map)
+      if (rank < 0)
+        rank = ~rank;
 
     // backprop.backprop.print_dot(std::cerr);
     unsigned sz = states.size();
@@ -2927,5 +2942,89 @@ namespace spot
     return res;
   }
 
+  twa_graph_ptr
+  mtdswa_strategy_to_mealy(mtdswa_ptr strategy, bool labels, bool loop)
+  {
+    bdd_dict_ptr dict = strategy->get_dict();
+    twa_graph_ptr res = make_twa_graph(dict);
+    dict->register_all_propositions_of(strategy, res);
+    res->register_aps_from_dict();
+    res->prop_universal(true);
+    res->prop_weak(true);
+
+    unsigned n = strategy->num_roots();
+    assert(n > 0);
+
+    bdd outputs = strategy->get_controllable_variables();
+    res->set_named_prop<bdd>("synthesis-outputs", new bdd(outputs));
+
+    std::vector<std::string>* names = nullptr;
+    if (labels && strategy->names.size() == strategy->states.size())
+      {
+        names = new std::vector<std::string>;
+        names->reserve(n);
+        res->set_named_prop("state-names", names);
+      }
+
+    robin_hood::unordered_map<int, unsigned> bdd_to_state_map;
+    std::vector<bdd> states;
+    states.reserve(n);
+
+    auto map_state = [&](int state_index) {
+      bdd succs = bddtrue;
+      if (state_index >= 0)
+        succs = strategy->states[state_index];
+      auto [it, b] = bdd_to_state_map.emplace(succs.id(), 0);
+      if (!b)
+        return it->second;
+      unsigned res_index = res->new_state();
+      assert(res_index == states.size());
+      it->second = res_index;
+      states.push_back(succs);
+      if (names)
+        {
+          if (state_index >= 0)
+            names->push_back(str_psl(strategy->names[state_index]));
+          else
+            names->push_back("1");
+        }
+      return res_index;
+    };
+
+    map_state(0);
+    // states.size() will increase in this loop
+    for (unsigned i = 0; i < states.size(); ++i)
+      {
+        bdd succs = states[i];
+        if (succs == bddfalse)
+          continue;
+        if (succs == bddtrue)
+          {
+            res->new_edge(i, i, bddtrue);
+            continue;
+          }
+        bdd previous_output_label = bddfalse;
+        unsigned previous_dst = -1U;
+        unsigned previous_edge = 0;
+        for (auto [b, t]: paths_mt_of(succs))
+          {
+            int dst = -1;
+            if (t != bddtrue)
+              dst = bdd_get_terminal(t);
+            unsigned dst_idx = (loop && dst < 0) ? i : map_state(dst);
+            bdd output_label = bdd_existcomp(b, outputs);
+            if (previous_dst == dst_idx
+                && previous_output_label == output_label)
+              {
+                res->edge_storage(previous_edge).cond |= b;
+                continue;
+              }
+            previous_edge = res->new_edge(i, dst_idx, b);
+            previous_dst = dst_idx;
+            previous_output_label = output_label;
+          }
+      }
+    return res;
+  }
 
 }

@@ -280,4 +280,8 @@ namespace spot
   SPOT_API
   mtdswa_ptr minimize_mtdswa(const mtdswa_ptr& dfa,
                              const std::vector<unsigned>& initial_partition);
+
+  SPOT_API twa_graph_ptr
+  mtdswa_strategy_to_mealy(mtdswa_ptr strategy, bool labels = true,
+                           bool loop = false);
 }
