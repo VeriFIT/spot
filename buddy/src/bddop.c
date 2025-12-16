@@ -64,11 +64,15 @@
 #define CACHEID_COMMON      0x8
 #define CACHEID_SHORTDIST   0x9
 #define CACHEID_SHORTBDD    0xA
+// Do not go above 0xF here, CACHEID_RESTRICT will be combined with other
+// bits higher than that.
 
    /* Hash value modifiers for replace/compose */
 #define CACHEID_REPLACE      0x0
 #define CACHEID_COMPOSE      0x1
 #define CACHEID_VECCOMPOSE   0x2
+// Do not go above 0x3 here, those values will be combined with
+// other bits higher than that.
 
    /* Hash value modifiers for quantification */
 #define CACHEID_EXIST        0x0
@@ -2613,7 +2617,7 @@ BDD bdd_restrict(BDD r, BDD var)
      if (varset2svartable(var) < 0)
        return bddfalse;
 
-      miscid = (var << 3) | CACHEID_RESTRICT;
+      miscid = (var << 4) | CACHEID_RESTRICT;
 
       if (__likely(firstReorder))
 	{
@@ -5050,14 +5054,18 @@ static int varset2vartable(BDD r, int comp)
       return bdd_error(BDD_VARSET);
 #endif
 
-   quantvarsetID++;
    quantvarsetcomp = comp;
 
-   if (quantvarsetID == INT_MAX)
-   {
-      memset(quantvarset, 0, sizeof(int)*bddvarnum);
-      quantvarsetID = 1;
-   }
+   // INT_MAX is used by bdd_mt_quantify_prepare
+   if (quantvarsetID >= INT_MAX - 1)
+     {
+       memset(quantvarset, 0, sizeof(int)*bddvarnum);
+       quantvarsetID = 1;
+     }
+   else
+     {
+       quantvarsetID++;
+     }
 
    for (n=r ; n > 1 ; n=HIGH(n))
    {
@@ -5083,13 +5091,17 @@ static int varset2svartable(BDD r)
       return bdd_error(BDD_VARSET);
 #endif
 
-   quantvarsetID++;
-
-   if (quantvarsetID == INT_MAX/2)
-   {
-      memset(quantvarset, 0, sizeof(int)*bddvarnum);
-      quantvarsetID = 1;
-   }
+   // INT_MAX is used by bdd_mt_quantify_prepare,
+   // and we cannot negate it anyway.
+   if (quantvarsetID >= INT_MAX - 1)
+     {
+       memset(quantvarset, 0, sizeof(int)*bddvarnum);
+       quantvarsetID = 1;
+     }
+   else
+     {
+       quantvarsetID++;
+     }
 
    for (n=r ; !ISCONST(n) ; )
    {
