@@ -12,6 +12,16 @@ New in spot 2.14.2.dev  (not yet released)
     method that can now be used to distinguish between the above two
     trees when the NO_EMPTY_LAYER option is used.  (Issue #621.)
 
+  Bugs fixed:
+
+  - The recent introduction of bdd_mt_quantify_prepare() in BuDDy
+    caused issues with following calls to operations such as
+    bdd_restrict(), due to caching issues.
+
+  - Multiple typos in --help strings.
+
+  - Workarounds for new compiler warnings.
+
 New in spot 2.14.3  (2025-11-11)
 
   Bugs fixed:
