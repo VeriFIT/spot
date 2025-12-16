@@ -1445,7 +1445,7 @@ can be tested:
 \begin{center}
 \begin{tabular}{cl}
   \toprule
-  $f\in \Delta_0$ & \texttt{f.is\_syntactic\_safety() \&\& f.is\_syntactic\_guarantee()} \\
+  $f\in \Delta_0$, $f\in B$ & \texttt{f.is\_syntactic\_safety() \&\& f.is\_syntactic\_guarantee()} \\
   $f\in \Pi_1$, $f\in S$ & \texttt{f.is\_syntactic\_safety()} \\
   $f\in \Sigma_1$, $f\in G$ & \texttt{f.is\_syntactic\_guarantee()} \\
   $f\in \Delta_1$ & \texttt{f.is\_delta1()} \\
@@ -1687,9 +1687,9 @@ $\OR$):
   (f_1 \R f_2)\AND (f_1 \R f_3)&\equiv f_1\R (f_2\AND f_3)&
   (f_1 \R f_2)\OR  (f_3 \R f_2)&\equiv (f_1\OR f_3) \R f_2\\
   (f_1 \R f_2)\AND (f_1 \M f_3)&\equiv f_1\M (f_2\AND f_3)&
-  (f_1 \R f_2)\OR  (f_3 \M f_2)&\equiv (f_1\OR f_3) \R f_3\\
+  (f_1 \R f_2)\OR  (f_3 \M f_2)&\equiv (f_1\OR f_3) \R f_2\\
   (f_1 \M f_2)\AND (f_1 \M f_3)&\equiv f_1\M (f_2\AND f_3)&
-  (f_1 \M f_2)\OR  (f_3 \M f_2)&\equiv (f_1\OR f_3) \M f_3\\
+  (f_1 \M f_2)\OR  (f_3 \M f_2)&\equiv (f_1\OR f_3) \M f_2\\
   (\F g)\AND (f \U g)&\equiv f\U g &
   (\G f)\OR  (f \U g)&\equiv f\W g \\
   (\F g)\AND (f \W g)&\equiv f\U g &
