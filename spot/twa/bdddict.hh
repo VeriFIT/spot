@@ -276,6 +276,12 @@ namespace spot
   class bdd_dict_preorder
   {
   public:
+    bdd_dict_preorder() = default;
+    bdd_dict_preorder(bdd_dict_ptr dict)
+      : dict_(dict)
+    {
+    }
+
     operator bdd_dict_ptr() const
     {
       return dict_;

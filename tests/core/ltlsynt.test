@@ -413,6 +413,22 @@ State: 0
 EOF
 ltlsynt --outs=p0 -x tls-impl=1 --polar=no -f '!XXF(p0 & (p0 M Gp0))' > out
 diff out exp
+
+cat >exp <<EOF
+REALIZABLE
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "p0"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic weak
+controllable-AP: 0
+--BODY--
+State: 0
+[!0] 0
+--END--
+EOF
 ltlsynt --outs=p0 -x tls-impl=0 -f '!XXF(p0 & (p0 M Gp0))' > out
 diff out exp
 
@@ -633,6 +649,27 @@ State: 0
 [!0&!1 | !0&!2 | 0&1&2] 0
 --END--
 EOF
+ltlsynt --ins=a,b --obligation=false -f 'G (a & b <=> c)' >stdout
+diff stdout expected
+ltlsynt --outs=c --obligation=false -f 'G (a & b <=> c)' >stdout
+diff stdout expected
+
+cat >expected <<EOF
+REALIZABLE
+HOA: v1
+States: 1
+Start: 0
+AP: 3 "a" "b" "c"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic weak
+controllable-AP: 2
+--BODY--
+State: 0
+[!0&!2 | !1&!2] 0
+[0&1&2] 0
+--END--
+EOF
 ltlsynt --ins=a,b -f 'G (a & b <=> c)' >stdout
 diff stdout expected
 ltlsynt --outs=c -f 'G (a & b <=> c)' >stdout
@@ -742,7 +779,8 @@ game solved in X seconds
 simplification took X seconds
 AIG circuit was created in X seconds and has 0 latches and 0 gates
 EOF
-ltlsynt -f "Ga <-> Gb" --outs=b --verbose --decompose=0 --verify --aiger 2> out
+ltlsynt -f "Ga <-> Gb" --outs=b --verbose --decompose=0 --verify \
+        --obligation=false --aiger 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -774,7 +812,7 @@ game solved in X seconds
 simplification took X seconds
 AIG circuit was created in X seconds and has 0 latches and 0 gates
 EOF
-ltlsynt -f '((a|x) & (b | y) & b) => (x & y)' \
+ltlsynt -f '((a|x) & (b | y) & b) => (x & y)' --obligation=false \
         --outs="x,y" --aiger=ite --pol=no --verify --verbose 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
@@ -795,7 +833,7 @@ direct strategy has 1 states and 1 edges
 simplification took X seconds
 AIG circuit was created in X seconds and has 0 latches and 0 gates
 EOF
-ltlsynt -f '((a|x) & (b | y) & b) => (x & y)' \
+ltlsynt -f '((a|x) & (b | y) & b) => (x & y)' --obligation=false \
         --outs="x,y" --aiger=ite --verify --verbose 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
@@ -818,7 +856,7 @@ simplification took X seconds
 AIG circuit was created in X seconds and has 0 latches and 0 gates
 EOF
 ltlsynt -f 'G!(!x | !y)' --outs="x, y" --pol=no --aiger=ite \
-        --verify --verbose 2> out
+        --verify --verbose --obligation=false 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -830,7 +868,7 @@ trying to create strategy directly for G!a
 no strategy exists.
 EOF
 ltlsynt -f '!F(a|b)' --outs=b --pol=no --decompose=yes \
-        --aiger --verbose 2> out || true
+        --obligation=false --aiger --verbose 2> out || true
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -840,6 +878,17 @@ there are 2 subformulas
 working on subformula Ga
 trying to create strategy directly for Ga
 no strategy exists.
+EOF
+ltlsynt -f 'G!(a -> b)' --outs=b --decompose=yes --aiger\
+                        --pol=no --verbose --obligation=false 2> out || true
+sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
+diff outx exp
+
+cat >exp <<EOF
+there are 2 subformulas
+working on subformula Ga
+formula is an obligation; solving with the on-the-fly construction
+solving done in X seconds
 EOF
 ltlsynt -f 'G!(a -> b)' --outs=b --decompose=yes --aiger\
                         --pol=no --verbose 2> out || true
@@ -863,7 +912,7 @@ simplification took X seconds
 AIG circuit was created in X seconds and has 0 latches and 0 gates
 EOF
 ltlsynt -f '(a & b) U (b & c)' --outs=b,c --decompose=yes --aiger --verbose\
-                               --pol=no --verify 2> out
+                               --pol=no --oblig=false --verify 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -910,7 +959,7 @@ simplification took X seconds
 AIG circuit was created in X seconds and has 0 latches and 0 gates
 EOF
 ltlsynt -f 'a => (b & c & d)' --outs=b,c,d, --decompose=yes\
-                              --pol=no --verbose --aiger 2> out
+                              --pol=no --verbose --oblig=false --aiger 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -921,7 +970,7 @@ working on subformula G!a
 trying to create strategy directly for G!a
 no strategy exists.
 EOF
-ltlsynt -f '!(F(a | b))' --outs=b, --decompose=yes \
+ltlsynt -f '!(F(a | b))' --outs=b, --decompose=yes --oblig=false \
                          --verbose --pol=no --aiger 2> out || true
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
@@ -946,7 +995,7 @@ ltlsynt --outs="$OUT" -f "$LTL" --aiger=both+ud\
 ltlsynt --outs="$OUT" -f "$LTL" --aiger=both+ud\
   --algo=lar | grep "aag 34 2 3 2 29"
 
-ltlsynt -f 'G(c) & (G(a) <-> GFb)' --outs=b,c --decompose=yes\
+ltlsynt -f 'G(c) & (G(a) <-> GFb)' --outs=b,c --decompose=yes --oblig=false \
                                    --verbose --pol=no --realizability 2> out
 cat >exp <<EOF
 there are 2 subformulas
@@ -959,8 +1008,22 @@ direct strategy was found.
 EOF
 diff out exp
 
+ltlsynt -f 'G(c) & (G(a) <-> GFb)' --outs=b,c --decompose=yes --oblig=true \
+                                   --verbose --pol=no --realizability 2> out
+sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
+cat >exp <<EOF
+there are 2 subformulas
+working on subformula Gc
+formula is an obligation; solving with the on-the-fly construction
+solving done in X seconds
+working on subformula Ga <-> GFb
+trying to create strategy directly for Ga <-> GFb
+direct strategy was found.
+EOF
+diff outx exp
+
 ltlsynt -f 'G(c) & (G(a) <-> GFb)' --outs=b,c --decompose=yes --pol=no \
-                                   --verbose --realizability --bypass=no 2> out
+        --obligation-synthesis=no --verbose --realizability --bypass=no 2> out
 cat >exp <<EOF
 there are 2 subformulas
 working on subformula Gc
@@ -1010,8 +1073,8 @@ solving game with acceptance: all
 game solved in X seconds
 simplification took X seconds
 EOF
-ltlsynt -f '(GFa <-> GFb) && (Gc)' --outs=b,c --verbose --bypass=no\
-                                   --algo=acd --pol=no 2> out
+ltlsynt -f '(GFa <-> GFb) && (Gc)' --outs=b,c --verbose --bypass=no \
+  --obligation-synthesis=no --algo=acd --pol=no 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -1117,8 +1180,8 @@ digraph "" {
   I [label="", style=invis, width=0]
   I -> 0
   0 [label="0"]
-  0 -> 0 [label="i / o"]
   0 -> 1 [label="!i / !o"]
+  0 -> 0 [label="i / o"]
   1 [label="1"]
   1 -> 1 [label="1 / !o"]
 }
@@ -1240,7 +1303,7 @@ State: 0
 --END--
 EOF
 f1='G(i1->(o1|!o2)) & G(!i1->(o3|!o4)) & G(i2->X(!o1|o2)) & G(!i2->X(!o3|o4))'
-ltlsynt -f "$f1" --verbose >out 2>&1
+ltlsynt -f "$f1" --oblig=false --verbose >out 2>&1
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -1289,7 +1352,7 @@ State: 0
 --END--
 EOF
 f2='G(i1->(o1|!o2)) & G(!i1->(o3|!o4)) & G(i2->(!o1|o2)) & G(!i2->(!o3|o4))&Go5'
-ltlsynt -f "$f2" --verbose >out 2>&1
+ltlsynt -f "$f2" --oblig=false --verbose >out 2>&1
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 
@@ -1328,7 +1391,7 @@ State: 0
 --END--
 EOF
 f2='G(i1->(o1|!o2)) & G(!i1->(o3|!o4)) & G(i2->(!o1|o2)) & G(!i2->(!o3|o4))&Go5'
-ltlsynt -f "$f2" --polarity=before-decom --verbose >out 2>&1
+ltlsynt -f "$f2" --polarity=before-decom --verbose --oblig=0 >out 2>&1
 sed 's/ [0-9.e-]* seconds/ X seconds/g;s/ -> /->/g;' out > outx
 diff outx exp
 

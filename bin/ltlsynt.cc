@@ -40,6 +40,7 @@
 #include <spot/twaalgos/mealy_machine.hh>
 #include <spot/twaalgos/synthesis.hh>
 #include <spot/twaalgos/translate.hh>
+#include <spot/twaalgos/mtdtwa.hh>
 
 enum
 {
@@ -53,6 +54,7 @@ enum
   OPT_GEQUIV,
   OPT_HIDE,
   OPT_INPUT,
+  OPT_OBLIGATION,
   OPT_OUTPUT,
   OPT_PART_FILE,
   OPT_POLARITY,
@@ -116,6 +118,10 @@ static const argp_option options[] =
       "whether to remove atomic propositions that are always equivalent to "
       "another one (enabled by default, both before and after decomposition)",
       0 },
+    { "obligation-synthesis", OPT_OBLIGATION, "yes|no", 0,
+      "whether to use on-the-fly MTBDD-based synthesis for obligation "
+      "specifications (enabled by default, but currently ignored if"
+      " --print-game is used)", 0 },
     { "simplify", OPT_SIMPLIFY, "no|bisim|bwoa|sat|bisim-sat|bwoa-sat", 0,
       "simplification to apply to the controller (no) nothing, "
       "(bisim) bisimulation-based reduction, (bwoa) bisimulation-based "
@@ -199,6 +205,7 @@ static const char* opt_dot_arg = nullptr;
 static bool opt_dot = false;
 static spot::synthesis_info* gi;
 static bool show_status = true;
+static bool opt_obligation_synthesis = true;
 
 static char const *const algo_names[] =
   {
@@ -246,32 +253,21 @@ static const semantics_choice semantics_values[] =
 ARGMATCH_VERIFY(semantics_args, semantics_values);
 static semantics_choice opt_semantics = semantics_default;
 
-static const char* const bypass_args[] =
-  {
-    "yes", "true", "enabled", "1",
-    "no", "false", "disabled", "0",
-    nullptr
-  };
-static bool bypass_values[] =
-  {
-    true, true, true, true,
-    false, false, false, false,
-  };
-ARGMATCH_VERIFY(bypass_args, bypass_values);
 bool opt_bypass = true;
 
-static const char* const decompose_args[] =
+static const char* const yesno_args[] =
   {
     "yes", "true", "enabled", "1",
     "no", "false", "disabled", "0",
     nullptr
   };
-static bool decompose_values[] =
+static bool yesno_values[] =
   {
     true, true, true, true,
     false, false, false, false,
   };
-ARGMATCH_VERIFY(decompose_args, decompose_values);
+ARGMATCH_VERIFY(yesno_args, yesno_values);
+
 static const char* const polarity_args[] =
   {
     "yes", "true", "enabled", "1",
@@ -589,6 +585,41 @@ namespace
     assert((sub_form.size() == sub_outs.size())
            && (sub_form.size() == sub_outs_str.size()));
 
+    spot::bdd_dict_preorder preorder(gi->dict); // in case we are using MTBDDs.
+    bool has_oblig = false;
+    if (opt_obligation_synthesis)
+      for (spot::formula f: sub_form)
+        if (f.is_syntactic_obligation())
+          {
+            has_oblig = true;
+            break;
+          }
+    if (has_oblig)
+      {
+        std::unordered_set<spot::formula> outputs;
+        for (auto subs: sub_outs_str)
+          for (const std::string& s: subs)
+            outputs.insert(spot::formula::ap(s));
+        // For Mealy semantics, inputs should appear first in the
+        // MTBDDs.  For Moore semantics, outputs should be first.
+        // Pre-registering those variables will ensure that.  We want
+        // to register them in the order they are found in the
+        // formula, this ways variables that are used together are
+        // more likely to be close in the order.
+        for (spot::formula f: sub_form)
+          f.traverse([&](const spot::formula& f)
+          {
+            if (f.is(spot::op::ap) &&
+                // currently, only mealy semantics are supported by ltlsynt,
+                // so only focus on output variables.
+                ((outputs.find(f) == outputs.end()) /* == mealy_semantics */))
+              preorder.register_proposition(f);
+            return false;
+          });
+      }
+
+    //gi->dict->dump(std::cerr);
+
     std::vector<spot::twa_graph_ptr> arenas;
 
     auto sub_f = sub_form.begin();
@@ -626,11 +657,66 @@ namespace
           rs->merge_mapping(rsub);
         }
 
-      // If we want to print a game,
-      // we never use the direct approach
-      if (!want_game() && opt_bypass)
-        m_like =
-            spot::try_create_direct_strategy(*sub_f, *sub_o, *gi, !opt_real);
+
+      // If we want to print a game, we never use the direct approach
+      // or the obligation code.
+      if (!want_game())
+        {
+          if (opt_obligation_synthesis && sub_f->is_syntactic_obligation())
+            {
+              auto vs = gi->verbose_stream;
+              if (vs)
+                *vs << ("formula is an obligation; "
+                        "solving with the on-the-fly construction\n");
+              spot::stopwatch sw;
+              auto& bv = gi->bv;
+              if (bv)
+                sw.start();
+              spot::mtdswa_ptr aut =
+                spot::obligation_synthesis(*sub_f, gi->dict, *sub_o, opt_real);
+              if (bv)
+                {
+                  auto delta = sw.stop();
+                  bv->sum_trans_time += delta;
+                  if (vs)
+                    *vs << "solving done in " << delta << " seconds\n";
+                }
+              if (aut->acc.is_f())
+                {
+                  m_like.success =
+                    spot::mealy_like::realizability_code::UNREALIZABLE;
+                }
+              else
+                {
+                  m_like.success =
+                    spot::mealy_like::realizability_code::REALIZABLE_REGULAR;
+                  if (bv)
+                    sw.start();
+                  spot::twa_graph_ptr m =
+                    mtdswa_strategy_to_mealy(aut, false, false);
+                  m_like.mealy_like = m;
+                  if (bv)
+                    {
+                      bv->sum_strat2aut_time += sw.stop();
+                      unsigned ns = m->num_states();
+                      unsigned ne = m->num_edges();
+                      if (std::tie(bv->max_strat_states, bv->max_strat_edges)
+                          < std::tie(ns, ne))
+                        {
+                          bv->max_strat_states = ns;
+                          bv->max_strat_edges = ne;
+                        }
+                      bv->sum_strat_states += ns;
+                      bv->sum_strat_edges += ne;
+                    }
+                }
+            }
+          else if (opt_bypass)
+            {
+              m_like = spot::try_create_direct_strategy(*sub_f, *sub_o,
+                                                        *gi, !opt_real);
+            }
+        }
 
       switch (m_like.success)
       {
@@ -1149,7 +1235,7 @@ parse_opt(int key, char *arg, struct argp_state *)
       gi->s = XARGMATCH("--algo", arg, algo_args, algo_types);
       break;
     case OPT_BYPASS:
-      opt_bypass = XARGMATCH("--bypass", arg, bypass_args, bypass_values);
+      opt_bypass = XARGMATCH("--bypass", arg, yesno_args, yesno_values);
       break;
     case OPT_CSV_WITH_FORMULA:
       opt_csv = arg ? arg : "-";
@@ -1161,7 +1247,7 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_DECOMPOSE:
       opt_decompose_ltl = XARGMATCH("--decompose", arg,
-                                    decompose_args, decompose_values);
+                                    yesno_args, yesno_values);
       break;
     case OPT_FROM_PGAME:
       jobs.emplace_back(arg, job_type::AUT_FILENAME);
@@ -1176,6 +1262,10 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_INPUT:
       all_input_aps.emplace();
       split_aps(arg, *all_input_aps);
+      break;
+    case OPT_OBLIGATION:
+      opt_obligation_synthesis = XARGMATCH("--obligation-synthesis", arg,
+                                           yesno_args, yesno_values);
       break;
     case OPT_OUTPUT:
       all_output_aps.emplace();

@@ -52,8 +52,9 @@ ltlsynt --tlsf test.tlsf --tlsf test.tlsf >out2
 cat out1 out1 > out11
 diff out11 out2
 
-# Do it again, without decomposition, we by changing the parameter
-ltlsynt --tlsf test.tlsf/n=1 --tlsf test.tlsf/n=3 --decompose=no > out2
+# Do it again, without decomposition, also try changing the parameter
+ltlsynt --tlsf test.tlsf/n=1 --tlsf test.tlsf/n=3 --decompose=no \
+        --obligation=false > out2
 
 ltlsynt --tlsf test.tlsf/n=1 --tlsf test.tlsf/n=3 --decompose=no \
         --print-game >pgame.hoa
