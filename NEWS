@@ -1,4 +1,4 @@
-New in spot 2.14.3.dev  (not yet released)
+New in spot 2.14.4.dev  (not yet released)
 
   Tools:
 
@@ -19,16 +19,6 @@ New in spot 2.14.3.dev  (not yet released)
     syntactically.)
 
   Library:
-
-  - spot::zielonka_tree was changed to include nodes labeled by {} by
-    default, otherwise it was hard to distinguish the tree for Inf(0)
-    (which had an implicit {} node) from the tree for Inf(0)|Fin(0)
-    (which did not).  The old behavior, which is more memory efficient
-    and still useful in some applications, can be requested by passing
-    the new option zielonka_tree_options::NO_EMPTY_LAYER.
-    Additionally, spot::zielonka_tree::empty_layer_is_even() is a new
-    method that can now be used to distinguish between the above two
-    trees when the NO_EMPTY_LAYER option is used.  (Issue #621.)
 
   - scc_filter() will now preserve and update any "original-states"
     or "degen-levels" property present in the original automaton.
@@ -67,10 +57,32 @@ New in spot 2.14.3.dev  (not yet released)
     Maintaining it in Spot does not seem worth the human effort and
     CI/CD ressources it takes.
 
+New in spot 2.14.4  (2025-12-17)
+
+  Library:
+
+  - spot::zielonka_tree was changed to include nodes labeled by {} by
+    default, otherwise it was hard to distinguish the tree for Inf(0)
+    (which had an implicit {} node) from the tree for Inf(0)|Fin(0)
+    (which did not).  The old behavior, which is more memory efficient
+    and still useful in some applications, can be requested by passing
+    the new option zielonka_tree_options::NO_EMPTY_LAYER.
+    Additionally, spot::zielonka_tree::empty_layer_is_even() is a new
+    method that can now be used to distinguish between the above two
+    trees when the NO_EMPTY_LAYER option is used.  (Issue #621.)
+
   Bugs fixed:
 
   - The isomorphism checker for deterministic automata
     (spot::are_isomorphic_det) was ignoring colors!  (Issue #627.)
+
+  - The recent introduction of bdd_mt_quantify_prepare() in BuDDy
+    caused issues with following calls to operations such as
+    bdd_restrict(), due to caching issues.
+
+  - Multiple typos in --help strings.
+
+  - Workarounds for new compiler warnings.
 
 New in spot 2.14.3  (2025-11-11)
 
