@@ -24,6 +24,9 @@
 
 set -e
 
+# issue #627
+test 0 = `ltlfilt -c --equivalent-to='a R (a U b)' -f 'a M (a U b)'`
+
 checkopt()
 {
   cat >exp
