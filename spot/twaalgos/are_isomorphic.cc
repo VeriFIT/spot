@@ -30,13 +30,15 @@ namespace
   static bool
   tr_t_less_than(const tr_t& t1, const tr_t& t2)
   {
-    return t1.cond.id() < t2.cond.id();
+    int id1 = t1.cond.id();
+    int id2 = t2.cond.id();
+    return std::tie(id1, t1.acc) < std::tie(id2, t2.acc);
   }
 
   static bool
   operator!=(const tr_t& t1, const tr_t& t2)
   {
-    return t1.cond.id() != t2.cond.id();
+    return t1.cond.id() != t2.cond.id() || t1.acc != t2.acc;
   }
 
   static bool
