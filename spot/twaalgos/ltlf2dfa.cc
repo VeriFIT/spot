@@ -750,6 +750,74 @@ namespace spot
     dict_->unregister_all_my_variables(this);
   }
 
+  // Convert the formula to a BDD suitable for propositional
+  // equivalence.  Any subformula that has a non-boolean
+  // operator is replaced by atomic proposition.
+  bdd ltlf_translator::propeq_encode(formula f)
+  {
+    auto encode_new = [&] (formula f) -> bdd
+    {
+      switch (f.kind())
+        {
+        case op::tt:
+          return bddtrue;
+        case op::ff:
+          return bddfalse;
+        case op::ap:
+          return bdd_ithvar(dict_->register_proposition(f, this));
+        case op::Not:
+          if (f[0].is_leaf())   // skip one application of bdd_not.
+            {
+              if (f[0].is_tt())
+                return bddfalse;
+              if (f[0].is_ff())
+                return bddtrue;
+              return bdd_nithvar(dict_->register_proposition(f[0], this));
+            }
+          return bdd_not(propeq_encode(f[0]));
+        case op::And:
+          {
+            bdd res = bddtrue;
+            for (const formula& sub: f)
+              res &= propeq_encode(sub);
+            return res;
+          }
+        case op::Or:
+          {
+            bdd res = bddfalse;
+            for (const formula& sub: f)
+              res |= propeq_encode(sub);
+            return res;
+          }
+        case op::Xor:
+          {
+            bdd left = propeq_encode(f[0]);
+            return left ^ propeq_encode(f[1]);
+          }
+        case op::Implies:
+          {
+            bdd left = propeq_encode(f[0]);
+            return left >> propeq_encode(f[1]);
+          }
+        case op::Equiv:
+          {
+            bdd left = propeq_encode(f[0]);
+            return bdd_biimp(left, propeq_encode(f[1]));
+          }
+        default:
+          return bdd_ithvar(dict_->register_anonymous_variables(1, this));
+        }
+    };
+
+    if (auto it = propositional_equiv_bdd_.find(f);
+        it != propositional_equiv_bdd_.end())
+      return it->second;
+    // We cannot insert into the map while doing the search
+    // above, because the iterator would be invalidated by
+    // other insertions performed in encode_new.
+    return propositional_equiv_bdd_[f] = encode_new(f);
+  }
+
   // This implement propositional equivalence plus some very light
   // simplifications
   formula ltlf_translator::propeq_representative(formula f)
@@ -829,81 +897,7 @@ namespace spot
         return f;
       }
 
-
-    auto formula_to_bddvar = [&] (formula f) -> int
-    {
-      if (auto it = formula_to_var_.find(f);
-          it != formula_to_var_.end())
-        return it->second;
-      if (f.is(op::ap))
-        {
-          int v = dict_->register_proposition(f, this);
-          formula_to_var_[f] = v;
-          return v;
-        }
-      int v = dict_->register_anonymous_variables(1, this);
-      formula_to_var_[f] = v;
-      return v;
-    };
-
-    // Convert the formula to a BDD suitable for propositional
-    // equivalence.  Any subformula that has a non-boolean
-    // operator is replaced by atomic proposition.
-    auto encode_rec = [&] (formula f, auto rec) -> bdd
-    {
-      switch (f.kind())
-        {
-        case op::tt:
-          return bddtrue;
-        case op::ff:
-          return bddfalse;
-        case op::ap:
-          return bdd_ithvar(formula_to_bddvar(f));
-        case op::Not:
-          if (f[0].is_leaf())   // skip one application of bdd_not.
-            {
-              if (f[0].is_tt())
-                return bddfalse;
-              if (f[0].is_ff())
-                return bddtrue;
-              return bdd_nithvar(formula_to_bddvar(f[0]));
-            }
-          return bdd_not(rec(f[0], rec));
-        case op::And:
-          {
-            bdd res = bddtrue;
-            for (const formula& sub: f)
-              res &= rec(sub, rec);
-            return res;
-          }
-        case op::Or:
-          {
-            bdd res = bddfalse;
-            for (const formula& sub: f)
-              res |= rec(sub, rec);
-            return res;
-          }
-        case op::Xor:
-          {
-            bdd left = rec(f[0], rec);
-            return left ^ rec(f[1], rec);
-          }
-        case op::Implies:
-          {
-            bdd left = rec(f[0], rec);
-            return left >> rec(f[1], rec);
-          }
-        case op::Equiv:
-          {
-            bdd left = rec(f[0], rec);
-            return bdd_biimp(left, rec(f[1], rec));
-          }
-        default:
-          return bdd_ithvar(formula_to_bddvar(f));
-        }
-    };
-
-    bdd enc = encode_rec(f, encode_rec);
+    bdd enc = propeq_encode(f);
     if (enc == bddtrue)
       f = formula::tt();
     else if (enc == bddfalse)
@@ -936,33 +930,50 @@ namespace spot
         it != formula_to_int_.end())
       return it->second;
 
-    if (formula g = propeq_representative(f); g != f)
-      {
-        auto it = formula_to_int_.find(g);
-        if (it == formula_to_int_.end())
-          {
-            // This can occur if propeq_representative simplifies
-            // the formula.
-            int v = int_to_formula_.size();
-            int_to_formula_.push_back(g);
-            formula_to_int_[g] = v;
-            formula_to_int_[f] = v;
-            return v;
-          }
-        int v = it->second;
-        formula_to_int_[f] = v;
-        return v;
-      }
-
     int v = int_to_formula_.size();
     int_to_formula_.push_back(f);
     formula_to_int_[f] = v;
     return v;
   }
 
+  int ltlf_translator::formula_propeq_to_int(formula f)
+  {
+    std::unordered_map<formula, int>& propeq = propeq_to_int_;
+
+    if (auto it = propeq.find(f); it != propeq.end())
+      return it->second;
+
+    formula g = propeq_representative(f);
+
+    int v;
+    auto it = formula_to_int_.find(g);
+    if (it == formula_to_int_.end())
+      {
+        v = int_to_formula_.size();
+        int_to_formula_.push_back(g);
+        formula_to_int_[g] = v;
+      }
+    else
+      {
+        v = it->second;
+      }
+    propeq[g] = v;
+    if (f != g)
+      {
+        formula_to_int_[f] = v;
+        propeq[f] = v;
+      }
+    return v;
+  }
+
   int ltlf_translator::formula_to_terminal(formula f, bool maystop)
   {
     return formula_to_int(f) * 2 + maystop;
+  }
+
+  int ltlf_translator::formula_propeq_to_terminal(formula f, bool maystop)
+  {
+    return formula_propeq_to_int(f) * 2 + maystop;
   }
 
   int ltlf_translator::formula_to_terminal_bdd_as_int(formula f,
@@ -973,6 +984,17 @@ namespace spot
     if (SPOT_UNLIKELY(f.is_tt() && maystop))
       return 1;
     int v = formula_to_int(f);
+    return bdd_terminal_as_int(v * 2 + maystop);
+  }
+
+  int ltlf_translator::formula_propeq_to_terminal_bdd_as_int(formula f,
+                                                             bool maystop)
+  {
+    if (SPOT_UNLIKELY(f.is_ff() && !maystop))
+      return 0;
+    if (SPOT_UNLIKELY(f.is_tt() && maystop))
+      return 1;
+    int v = formula_propeq_to_int(f);
     f = int_to_formula_[v];     // The formula might have been reduced to tt/ff.
     if (SPOT_UNLIKELY(f.is_ff() && !maystop))
       return 0;
@@ -1000,7 +1022,8 @@ namespace spot
       formula rf = term_combine_trans->terminal_to_formula(right_term);
       formula res = formula::And(lf, rf);
       bool acc = left_term & right_term & 1;
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res, acc);
+      return
+        term_combine_trans->formula_propeq_to_terminal_bdd_as_int(res, acc);
     }
 
     static int term_combine_or(int, int left_term,
@@ -1010,7 +1033,8 @@ namespace spot
       formula rf = term_combine_trans->terminal_to_formula(right_term);
       formula res = formula::Or(lf, rf);
       bool acc = (left_term | right_term) & 1;
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res, acc);
+      return
+        term_combine_trans->formula_propeq_to_terminal_bdd_as_int(res, acc);
     }
 
     // For implication, the callback will never been called with a constant
@@ -1024,7 +1048,9 @@ namespace spot
       bool lb = left_term & 1;
       auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
       formula res = formula::Implies(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res, !lb || rb);
+      return
+        term_combine_trans->formula_propeq_to_terminal_bdd_as_int(res,
+                                                                  !lb || rb);
     }
 
     static int term_combine_equiv(int left, int left_term,
@@ -1033,7 +1059,9 @@ namespace spot
       auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
       auto [rf, rb] = term_combine_trans->leaf_to_formula(right, right_term);
       formula res = formula::Equiv(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb == rb);
+      return
+        term_combine_trans->formula_propeq_to_terminal_bdd_as_int(res,
+                                                                  lb == rb);
     }
 
     static int term_combine_xor(int left, int left_term,
@@ -1042,14 +1070,16 @@ namespace spot
       auto [lf, lb] = term_combine_trans->leaf_to_formula(left, left_term);
       auto [rf, rb] =  term_combine_trans->leaf_to_formula(right, right_term);
       formula res = formula::Xor(lf, rf);
-      return term_combine_trans->formula_to_terminal_bdd_as_int(res, lb != rb);
+      return
+        term_combine_trans->formula_propeq_to_terminal_bdd_as_int(res,
+                                                                  lb != rb);
     }
 
     static int term_combine_not(int left)
     {
       formula ll = term_combine_trans->terminal_to_formula(left);
       formula res = formula::Not(ll);
-      return term_combine_trans->formula_to_terminal(res, !(left & 1));
+      return term_combine_trans->formula_propeq_to_terminal(res, !(left & 1));
     }
   }
 
@@ -1748,7 +1778,6 @@ namespace spot
                 g = os_unsat->rewrite(label);
                 std::tie(g, simpl_map) = realsimp->simplify(g);
                 b = ltlf_to_mtbdd(g);
-
                 if (!restrict_bdd_bool(b, true))
                   {
                     b_done = true;

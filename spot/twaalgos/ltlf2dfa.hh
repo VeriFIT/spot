@@ -477,7 +477,13 @@ namespace spot
     bdd combine_xor(bdd left, bdd right);
     bdd combine_not(bdd b);
 
+
+    bdd propeq_encode(formula f);
     formula propeq_representative(formula f);
+    int formula_propeq_to_int(formula f);
+    int formula_propeq_to_terminal_bdd_as_int(formula f, bool may_stop);
+    int formula_propeq_to_terminal(formula f, bool may_stop = false);
+
 
     bddExtCache* get_cache()
     {
@@ -487,7 +493,9 @@ namespace spot
     ~ltlf_translator();
     private:
     std::unordered_map<formula, int> formula_to_var_;
+    std::unordered_map<formula, bdd> propositional_equiv_bdd_;
     std::unordered_map<bdd, formula, bdd_hash> propositional_equiv_;
+    std::unordered_map<formula, int> propeq_to_int_;
 
     std::unordered_map<formula, bdd> formula_to_bdd_;
     std::unordered_map<formula, int> formula_to_int_;
