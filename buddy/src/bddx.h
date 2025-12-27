@@ -419,10 +419,16 @@ BUDDY_API BDD      bdd_const_to_terminal(BDD, BDD, BDD,
 BUDDY_API BDD      bdd_terminal_to_const(BDD, BDD, BDD,
                                          bddExtCache*, int);
 BUDDY_API void     bdd_mt_quantify_prepare(BDD);
+BUDDY_API void     bdd_mt_quantify_prepare2(BDD, BDD);
 BUDDY_API int      bdd_mt_quantify_to_bool(BDD, int (*)(int),
                                            bddExtCache*, int);
 BUDDY_API int      bdd_mt_quantify_to_trival(BDD, int (*)(int),
                                              bddExtCache*, int, int);
+
+BUDDY_API BDD      bdd_mt_quantify(BDD r,
+                                   int (*termop)(int),
+                                   int (*leavesop)(int, int, int, int),
+                                   bddExtCache*, int, int, int);
 
 BUDDY_API BDD      bdd_and(BDD, BDD);
 BUDDY_API BDD      bdd_or(BDD, BDD);
@@ -724,11 +730,17 @@ protected:
    friend bdd      bdd_terminal_to_const(const bdd&, const bdd&, const bdd&,
                                          bddExtCache*, int);
    friend void     bdd_mt_quantify_prepare(const bdd&);
+   friend void     bdd_mt_quantify_prepare(const bdd&, const bdd&);
    friend int      bdd_mt_quantify_to_bool(const bdd&,
                                            int (*)(int), bddExtCache*, int);
    friend int      bdd_mt_quantify_to_trival(const bdd&,
                                              int (*)(int), bddExtCache*,
                                              int, int);
+   friend bdd      bdd_mt_quantify(const bdd& r,
+                                   int (*termop)(int),
+                                   int (*leavesop)(int, int, int, int),
+                                   bddExtCache*, int, int, int);
+
    friend bdd      bdd_and(const bdd &, const bdd &);
    friend bdd      bdd_or(const bdd &, const bdd &);
    friend bdd      bdd_xor(const bdd &, const bdd &);
@@ -1041,9 +1053,18 @@ inline bdd bdd_terminal_to_const(const bdd& r,
                                cache, ophash);
 }
 
-inline void bdd_mt_quantify_prepare(const bdd& exist_var)
+// If used with quantification, this lists the variable to quantify away.
+// If used with game solving, shits lists the output (existential) variables.
+inline void bdd_mt_quantify_prepare(const bdd& vars)
 {
-  bdd_mt_quantify_prepare(exist_var.root);
+  bdd_mt_quantify_prepare(vars.root);
+}
+
+// used for synthesis with universal quantification
+inline void bdd_mt_quantify_prepare(const bdd& output_vars,
+                                    const bdd& quant_vars)
+{
+  bdd_mt_quantify_prepare2(output_vars.root, quant_vars.root);
 }
 
 BUDDY_API std::tuple<bool, int, int> bdd_mt_quantified_low_high(int);
@@ -1062,6 +1083,18 @@ inline int bdd_mt_quantify_to_trival(const bdd& r,
 {
   return bdd_mt_quantify_to_trival(r.root, op, cache, ophash, iteration);
 }
+
+inline bdd bdd_mt_quantify(const bdd& r,
+                           int (*termop)(int),
+                           int (*leavesop)(int, int, int, int),
+                           bddExtCache* cache, int quanthash,
+                           int applyhash, int applyop)
+{
+  return bdd_mt_quantify(r.root, termop, leavesop,
+                         cache, quanthash, applyhash, applyop);
+}
+
+
 
 inline bdd bdd_and(const bdd &l, const bdd &r)
 { return bdd_apply(l.root, r.root, bddop_and); }
