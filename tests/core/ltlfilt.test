@@ -643,6 +643,114 @@ run 2 ltlfilt -s -u --relabel=io --part=rel.part --define in 2>err
 grep "expected '.inputs' or '.outputs'" err
 
 cat >exp <<EOF
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+i0 && o0 && Xu0
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+i0 && u0 && []<>(i0 || o0) && <>[](i0 || o0)
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+u0 && []<>(i0 || o0) && <>[](i0 || o0)
+#define o0 (c)
+#define o1 (d)
+#define o2 (e)
+#define o3 (f)
+#define o4 (h)
+#define o5 (i)
+o4 || o5 || [](o1 && o2) || <>[](!o0 || Xo3)
+#define o0 (c)
+#define o1 (e)
+#define o2 (f)
+#define o3 (g)
+#define u0 (b)
+o1 && u0 && (o2 || o3) && !Xo0
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+u0 && []<>(i0 || o0) && ![]<>!(i0 || o0)
+#define i0 (a)
+#define o0 (c)
+#define o1 (d)
+#define u0 (b)
+<>(i0 <-> u0) -> !(o0 <-> o1)
+#define i0 (a)
+#define o0 (c)
+#define o1 (d)
+#define o2 (e)
+#define u0 (b)
+(i0 && o0 && u0) U (o0 && o1 && o2)
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+(i0 && o0 && u0) U !(i0 && o0 && u0)
+#define i0 (a)
+#define o0 (c)
+#define o1 (d)
+#define o2 (e)
+#define u0 (b)
+(i0 && o0 && u0) U (!o0 && o1 && o2)
+#define i0 (a)
+#define o0 (c)
+#define o1 (d)
+#define o2 (e)
+#define o3 (f)
+#define u0 (b)
+(o0 && o1 && (i0 || u0)) U (!o1 && o2 && o3)
+#define i0 (a)
+#define o0 (d)
+#define o1 (e)
+#define o2 (f)
+#define u0 (b)
+(o0 && (i0 || u0)) U (!o0 && o1 && o2)
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+(i0 && !i0) || (u0 && !u0) || (o0 && !o0)
+#define i0 (a)
+#define o0 (c)
+#define o1 (d)
+#define u0 (b)
+((i0 && !i0) || (u0 && !u0) || (o0 && !o0)) U o1
+#define i0 (a)
+#define o0 (c)
+#define o1 (d)
+#define o2 (e)
+#define u0 (b)
+((i0 && !i0) || (u0 && !u0) || (o0 && o2)) U o1
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+((i0 && !u0) || (!i0 && u0)) U o0
+#define i0 (a)
+#define o0 (c)
+#define u0 (b)
+((i0 && !u0) || (i0 -> u0)) U o0
+EOF
+run 0 ltlfilt -s -u --relabel=io --ins=a --unobs=b --define in >out
+diff exp out
+run 0 ltlfilt -s -u --relabel=io --inputs='/[ab]/' --unobs=b --define in >out
+diff exp out
+echo '.inputs /[ab]/ .unobservables b' >rel.part
+run 0 ltlfilt -s -u --relabel=io --part=rel.part --define in >out
+diff exp out
+# even if b matches ^a, a non-regex has priority over a regex
+run 0 ltlfilt -s -u --relabel=io --outs='/[^a]/' --unobs=b --define in >out
+diff exp out
+# this becomes an error if both specifications are regexes
+run 2 ltlfilt -s -u --relabel=io --outs='/[^a]/' --unobs='/b/' --define in 2>err
+grep "'b' matches both --unobservable-ins and --outs" err
+# or if both specifications are non-regexes
+run 2 ltlfilt -s -u --relabel=io --outputs=b --unobs=b --define in 2>err
+grep "'b' appears in both --unobservable-ins and --outs" err
+# using --unobs only is not enough
+run 2 ltlfilt -s -u --relabel=io --unobs=b --define in 2>err
+grep 'ins.*unobservable-ins.*outs' err
+
+cat >exp <<EOF
 #define p0 (a & c)
 #define p1 (b)
 p0 & Xp1
@@ -877,10 +985,11 @@ run 2 ltlfilt -Ffile/1 -Ffile
 :
 
 
-run 0 ltlfilt -f 'i1 U o2 U i3' --save-part=p.part
+run 0 ltlfilt -f 'i1 U o2 U i3 U u4' --save-part=p.part
 cat > exp.part<<EOF
 .inputs i1 i3
 .outputs o2
+.unobservables u4
 EOF
 diff exp.part p.part
 

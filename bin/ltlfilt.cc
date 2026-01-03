@@ -119,6 +119,7 @@ enum {
   OPT_PART_FILE,
   OPT_UNABBREVIATE,
   OPT_UNIVERSAL,
+  OPT_UNOBSERVABLE,
 };
 
 static const argp_option options[] =
@@ -182,16 +183,23 @@ static const argp_option options[] =
       "comma-separated list of input atomic propositions to use with "
       "--relabel=io or --save-part-file, interpreted as a regex if enclosed "
       "in slashes", 0 },
+    { "inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "outs", OPT_OUTS, "PROPS", 0,
       "comma-separated list of output atomic propositions to use with "
       "--relabel=io or --save-part-file, interpreted as a regex if "
       "enclosed in slashes", 0 },
+    { "outputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "part-file", OPT_PART_FILE, "FILENAME", 0,
       "file containing the partition of atomic propositions to use with "
       "--relabel=io", 0 },
     { "save-part-file", OPT_SAVE_PART_FILE, "FILENAME", OPTION_ARG_OPTIONAL,
       "file containing the partition of atomic propositions, "
       "readable by --part-file", 0 },
+    { "unobservable-ins", OPT_UNOBSERVABLE, "PROPS", 0,
+      "comma-separated list of unobservable and uncontrollable atomic"
+      " propositions, to use with --relabel=io or --save-part-file, "
+      "interpreted as a regex if enclosed in slashes", 0 },
+    { "unobservable-inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     DECLARE_OPT_R,
     LEVEL_DOC(4),
     /**************************************************/
@@ -657,6 +665,10 @@ parse_opt(int key, char* arg, struct argp_state*)
     case OPT_UNIVERSAL:
       universal = true;
       break;
+    case OPT_UNOBSERVABLE:
+      all_unobs_aps.emplace();
+      split_aps(arg, *all_unobs_aps);
+      break;
     default:
       return ARGP_ERR_UNKNOWN;
     }
@@ -722,7 +734,6 @@ namespace
       ++order;
       spot::process_timer timer;
       timer.start();
-
 
       if (opt_max_count >= 0 && match_count >= opt_max_count)
         {
@@ -969,16 +980,25 @@ namespace
             {
               std::vector<spot::formula> ins;
               std::vector<spot::formula> outs;
+              std::vector<spot::formula> unobs;
               spot::atomic_prop_set* s = atomic_prop_collect(f);
               for (spot::formula ap: *s)
                 {
                   spot::formula apo = ap;
                   if (auto it = relmap.find(ap); it != relmap.end())
                     apo = it->second;
-                  if (is_output(apo.ap_name(), filename, linenum))
-                    outs.push_back(ap);
-                  else
-                    ins.push_back(ap);
+                  switch (find_ap_type(apo.ap_name(), filename, linenum))
+                    {
+                    case ap_type::OutputAP:
+                      outs.push_back(ap);
+                      break;
+                    case ap_type::InputAP:
+                      ins.push_back(ap);
+                      break;
+                    case ap_type::UnobsAP:
+                      unobs.push_back(ap);
+                      break;
+                    }
                 }
               delete s;
               auto& os = opt->output_part->ostream();
@@ -993,6 +1013,13 @@ namespace
                 {
                   os << ".outputs";
                   for (const auto& ap: outs)
+                    os << ' ' << str_psl(ap);
+                  os << '\n';
+                }
+              if (!unobs.empty())
+                {
+                  os << ".unobservables";
+                  for (const auto& ap: unobs)
                     os << ' ' << str_psl(ap);
                   os << '\n';
                 }

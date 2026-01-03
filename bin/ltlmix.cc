@@ -324,9 +324,13 @@ main(int argc, char* argv[])
 
       spot::srand(opt_seed);
 
+      // FIXME: This currently merges unobservable inputs with
+      // observable inputs.
       std::function<bool(spot::formula)> output_p = nullptr;
       if (opt_out_ap_count)
-        output_p = [&](spot::formula f) { return is_output(f.ap_name()); };
+        output_p = [&](spot::formula f) {
+          return find_ap_type(f.ap_name()) == ap_type::OutputAP;
+        };
 
       spot::randltlgenerator rg
         (opt_ap_count,

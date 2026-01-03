@@ -61,6 +61,7 @@ enum
   OPT_SIMPLIFY_FORMULA,
   OPT_TLSF,
   OPT_TRANS,
+  OPT_UNOBSERVABLE,
   OPT_VERBOSE,
 };
 
@@ -72,9 +73,15 @@ static const argp_option options[] =
     { "outs", OPT_OUTPUT, "PROPS", 0,
       "comma-separated list of controllable (a.k.a. output) atomic"
       " propositions, interpreted as a regex if enclosed in slashes", 0 },
+    { "outputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "ins", OPT_INPUT, "PROPS", 0,
       "comma-separated list of uncontrollable (a.k.a. input) atomic"
       " propositions, interpreted as a regex if enclosed in slashes", 0 },
+    { "inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
+    { "unobservable-ins", OPT_UNOBSERVABLE, "PROPS", 0,
+      "comma-separated list of unobservable and uncontrollable atomic"
+      " propositions, interpreted as a regex if enclosed in slashes", 0 },
+    { "unobservable-inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "part-file", OPT_PART_FILE, "FILENAME", 0,
       "read the I/O partition of atomic propositions from FILENAME", 0 },
     { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,
@@ -403,6 +410,10 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_TRANS:
       opt_trans = XARGMATCH("--translation", arg,
                             translation_args, translation_values);
+      break;
+    case OPT_UNOBSERVABLE:
+      all_unobs_aps.emplace();
+      split_aps(arg, *all_unobs_aps);
       break;
     case OPT_VERBOSE:
       opt_verbose = &std::cerr;
@@ -861,8 +872,10 @@ namespace
                         "formula '%s' is not an LTLf formula",
                         s.c_str());
         }
-      auto [input_aps, output_aps] =
+      auto [input_aps, output_aps, unobs_aps] =
         filter_list_of_aps(f, filename, linenum);
+      if (!unobs_aps.empty())
+        error(2, 0, "unobservable APs are not yet supported");
       return solve_formula(f, input_aps, output_aps,
                            opt_semantics != semantics_moore);
     }
@@ -944,7 +957,7 @@ namespace
           all_output_aps.emplace(std::vector<std::string>{});
           split_aps(res, *all_output_aps);
           for (const std::string& a: *all_output_aps)
-            identifier_map.emplace(a, true);
+            identifier_map.emplace(a, ap_type::OutputAP);
         }
       semantics_choice old_semantics = opt_semantics;
       if (old_semantics == semantics_default)

@@ -24,40 +24,47 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <tuple>
 #include <spot/tl/formula.hh>
 #include <spot/tl/relabel.hh>
 
 // --ins and --outs, as supplied on the command-line
 extern std::optional<std::vector<std::string>> all_output_aps;
 extern std::optional<std::vector<std::string>> all_input_aps;
+// --unobservable-ins
+extern std::optional<std::vector<std::string>> all_unobs_aps;
 
 // Comma-separated list of strings, such as those passed to --ins/--outs
 void split_aps(const std::string& arg, std::vector<std::string>& where);
 
 // process the all_output_aps and all_input_aps above to
-// fill regex_in, regex_out, and identifier_map.
+// fill regex_in, regex_out, regex_unobs and identifier_map.
 void process_io_options();
 
 // Store refirst, separate the filters that are regular expressions from
 // the others.  Compile the regular expressions while we are at it.
 extern std::vector<std::regex> regex_in;
 extern std::vector<std::regex> regex_out;
-// map identifier to input/output (false=input, true=output)
-extern std::unordered_map<std::string, bool> identifier_map;
+extern std::vector<std::regex> regex_unobs;
+// map identifier to input/unobs/output
+enum class ap_type { InputAP = 1, UnobsAP = 2, OutputAP = 0 };
+extern std::unordered_map<std::string, ap_type> identifier_map;
 
 
 // Given an atomic proposition AP and the above
-// regex_in/regex_out/identifier_map, decide if this AP is an output
-// (true) or input (false.
-bool
-is_output(const std::string& ap,
-          const char* filename = nullptr, int linenum = 0);
+// regex_in/regex_out/regex_unobs/identifier_map, decide the type of an AP,
+// and diagnose any conclifcting declaration.
+ap_type
+find_ap_type(const std::string& ap,
+             const char* filename = nullptr, int linenum = 0);
 
 
 // Separate the set of the atomic propositions appearing in f, into
-// two vectors: input APs and output APs, based on regex_in,
-// regex_out, and identifier_map.
-std::pair<std::vector<std::string>, std::vector<std::string>>
+// three vectors: input APs, output APs, unobservable APs,
+// based on regex_in, regex_out, regex_unobs, identifier_map.
+std::tuple<std::vector<std::string>,
+           std::vector<std::string>,
+           std::vector<std::string>>
 filter_list_of_aps(spot::formula f, const char* filename, int linenum);
 
 

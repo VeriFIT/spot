@@ -65,6 +65,7 @@ enum
   OPT_SIMPLIFY,
   OPT_SPLITTYPE,
   OPT_TLSF,
+  OPT_UNOBSERVABLE,
   OPT_VERBOSE,
   OPT_VERIFY
 };
@@ -76,9 +77,15 @@ static const argp_option options[] =
     { "outs", OPT_OUTPUT, "PROPS", 0,
       "comma-separated list of controllable (a.k.a. output) atomic"
       " propositions, interpreted as a regex if enclosed in slashes", 0 },
+    { "outputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "ins", OPT_INPUT, "PROPS", 0,
       "comma-separated list of uncontrollable (a.k.a. input) atomic"
       " propositions, interpreted as a regex if enclosed in slashes", 0 },
+    { "inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
+    { "unobservable-ins", OPT_UNOBSERVABLE, "PROPS", 0,
+      "comma-separated list of unobservable and uncontrollable atomic"
+      " propositions, interpreted as a regex if enclosed in slashes", 0 },
+    { "unobservable-inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "part-file", OPT_PART_FILE, "FILENAME", 0,
       "read the I/O partition of atomic propositions from FILENAME", 0 },
     { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,
@@ -961,8 +968,10 @@ namespace
     int process_formula(spot::formula f,
                         const char* filename, int linenum) override
     {
-      auto [input_aps, output_aps] =
+      auto [input_aps, output_aps, unobs] =
         filter_list_of_aps(f, filename, linenum);
+      if (!unobs.empty())
+        error(2, 0, "unobservable APs are not yet supported");
       int res = solve_formula(f, input_aps, output_aps);
       if (opt_csv)
         {
@@ -1058,7 +1067,7 @@ namespace
           all_output_aps.emplace(std::vector<std::string>{});
           split_aps(res, *all_output_aps);
           for (const std::string& a: *all_output_aps)
-            identifier_map.emplace(a, true);
+            identifier_map.emplace(a, ap_type::OutputAP);
         }
       semantics_choice old_semantics = opt_semantics;
       if (old_semantics == semantics_default)
@@ -1349,6 +1358,10 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_TLSF:
       jobs.emplace_back(arg, job_type::TLSF_FILENAME);
+      break;
+    case OPT_UNOBSERVABLE:
+      all_unobs_aps.emplace();
+      split_aps(arg, *all_unobs_aps);
       break;
     case OPT_VERBOSE:
       gi->verbose_stream = &std::cerr;
