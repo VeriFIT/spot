@@ -78,3 +78,62 @@ ltl2tgba -F input.ltl |
     test $in -ne $out && exit 1
     :
   done
+
+# Issue #627
+
+cat >aut.hoa <<EOF
+/* Reduced test case.
+   Currently the automaton is unaltered by --restrict-dead.
+   This is an improvement over issue #627, but it is not optimal.
+   Ideally we would like to have the edge 0->1 to be labeled by
+   [!0&!1].  Maybe this can be improved later.
+*/
+HOA: v1
+States: 2
+Start: 0
+AP: 2 "b" "c"
+Acceptance: 5 (Inf(1) | Fin(0)) & (Inf(2) | Fin(0))
+--BODY--
+State: 0
+[t] 0 {0}
+[!0] 1
+State: 1
+[0&1] 1 {0 1}
+[!0&!1] 1 {0 2}
+--END--
+/* original test case */
+HOA: v1
+States: 3
+Start: 0
+AP: 3 "a" "b" "c"
+Acceptance: 5 (Inf(3) | Fin(2)) & Fin(1) & (Inf(4) | Fin(0))
+properties: trans-labels explicit-labels trans-acc complete
+properties: semi-deterministic
+--BODY--
+State: 0
+[t] 0 {0}
+[1] 1
+[!1] 2
+State: 1
+[!0&1&!2] 1
+[!1&!2] 1 {0}
+[2] 1 {1}
+[0&1&!2] 1 {4}
+State: 2
+[!0&!1&!2] 2 {2}
+[1&!2] 2 {0 2}
+[!0&!1&2] 2 {3}
+[1&2] 2 {0 3}
+[0&!1&!2] 2 {2 4}
+[0&!1&2] 2 {3 4}
+--END--
+EOF
+autcross -Faut.hoa --language-preserved 'autfilt --restrict-dead'
+# While these automata are unchanged currently, we should be able
+# to improve this eventually.
+autfilt --restrict-dead -Faut.hoa --stats='%T:%t' >out
+cat >exp <<EOF
+8:8
+32:32
+EOF
+diff out exp

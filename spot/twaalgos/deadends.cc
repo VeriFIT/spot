@@ -28,17 +28,24 @@ namespace spot
     // Gather a disjunction of labels that appears on the edges of a
     // dead-end state that have to be seen in order to make an
     // accepting cycle.
-    static bdd
+    //
+    // We actually return two candidates: (U1, U2).
+    // - U1 is the union of labels of edges that are not immediately rejecting
+    // - U2 is only used for Fin-less acceptances, and is a subset of labels
+    //   that are necessary to satisfy one Inf(x) in each branch of the
+    //   acceptance condition.   For acceptance involving Fin, U2 is set to
+    //   bddtrue.
+    static std::pair<bdd, bdd>
     gather_useful_labels(const const_twa_graph_ptr& aut,
                          acc_cond::mark_t used_in_cond,
                          unsigned state)
     {
       // First, simplify the acceptance condition c based on the set
       // of colors occurring around the state.
-      auto c = aut->get_acceptance();
+      acc_cond c = aut->get_acceptance();
       acc_cond::mark_t used_on_no_edge = used_in_cond;
       acc_cond::mark_t used_on_all_edges = used_in_cond;
-      for (auto& e: aut->edges())
+      for (auto& e: aut->out(state))
         {
           used_on_no_edge -= e.acc;
           used_on_all_edges &= e.acc;
@@ -54,21 +61,31 @@ namespace spot
         c = c.remove(used_on_no_edge, true);
 
       if (c.is_f())
-        return bddfalse;
+        return {bddfalse, bddfalse};
       if (c.is_t())
-        return bddtrue;
+        return {bddtrue, bddtrue};
 
-      auto d = c.keep_one_inf_per_branch();
-
-      // Now look for edges that are useful to the simplified
-      // acceptance condition.
-      // We consider an edge as useful if its colors satisfy at
-      // least one Fin(x) or Inf(x) in the acceptance.
+      // any edge that isn't immediately rejecting is useful.
       bdd useful = bddfalse;
       for (auto& e: aut->out(state))
-        if (d.accepting(e.acc))
+        if (c.inf_satisfiable(e.acc))
           useful |= e.cond;
-      return useful;
+      if (useful == bddfalse || c.uses_fin_acceptance())
+        return {useful, useful};
+
+      // For Fin-less acceptance, we can try to pick one inf() per
+      // branch of the AST and see if that can be used to restrict the
+      // incoming edge (this might not always work, depending on how
+      // the incoming edge is labeled).
+      acc_cond d = c.keep_one_inf_per_branch();
+
+      // We consider an edge as useful if its colors satisfy at
+      // least one Fin(x) or Inf(x) in the acceptance.
+      bdd subset = bddfalse;
+      for (auto& e: aut->out(state))
+        if (d.accepting(e.acc))
+          subset |= e.cond;
+      return {useful, subset};
     }
   }
 
@@ -101,10 +118,17 @@ namespace spot
     // This will hold the labels of the useful self-loops of the
     // dead-end states.  But we don't want to initialize it until we
     // need it.
-    std::vector<bdd> dead_end_useful(is_weak ? 0U : ns, bddfalse);
+    //
+    // For each dead-end state S, DEAD_END_USEFUL[S] stores a sequence of
+    // union labels for candidate useful subsets.
+    std::vector<std::pair<bdd, bdd>> dead_end_useful(is_weak ? 0U : ns,
+                                                     {bddfalse, bddfalse});
     std::vector<bool> dead_end_useful_computed(is_weak ? 0U : ns, false);
+
     acc_cond::mark_t used_in_cond = aut->get_acceptance().used_sets();
 
+    // LABEL_UNION[DST] is the union of all labels between current
+    // state S and DST.
     std::vector<bdd> label_unions(ns, bddfalse);
     bool created_false_labels = false;
     bool nondeterministic_for_sure = false;
@@ -117,11 +141,12 @@ namespace spot
 
         // Iterate over all edges (SRC,COND,DST), find those such that
         // (1) DST is a dead-end,
-        // (2) Lab(DST,DST))⇒Lab(SRC,SRC)
+        // (2) Lab(DST,DST)⇒Lab(SRC,SRC)
         // (3) UsefulLab(DST)⇒Lab(SRC,DST)⇒Lab(SRC,SRC)
         //
         // where Lab(X,Y) is the union of all labels between X and Y
-        // And UsefulLab(DST) are the labeled of the "useful" self
+        // (this is stored in label_union[Y]),
+        // and UsefulLab(DST) are the labels of the "useful" self
         // loops of DST (see gather_useful_labels).
         for (auto& e: aut->out(s))
           if (e.src != e.dst && dead_end_states[e.dst])
@@ -129,12 +154,28 @@ namespace spot
               if (bdd u = label_unions[e.dst], sl = self_loops[e.src];
                   bdd_implies(u, sl) && bdd_implies(self_loops[e.dst], sl))
                 {
+                  auto restrict_edge_maybe = [&](bdd d) {
+                    if (bdd_implies(d, u))
+                      {
+                        // Restrict the dead-end transition's label.
+                        bdd cond = e.cond;
+                        cond &= d;
+                        if (cond != e.cond)
+                          {
+                            e.cond = cond;
+                            if (cond == bddfalse)
+                              created_false_labels = true;
+                            else
+                              nondeterministic_for_sure = true;
+                          }
+                      }
+                  };
+
                   // Find the edges of DST that are necessary to an
                   // accepting loop, and gather their labels.
-                  bdd d;
                   if (is_weak)
                     {
-                      d = self_loops[e.dst];
+                      restrict_edge_maybe(self_loops[e.dst]);
                     }
                   else
                     {
@@ -144,21 +185,11 @@ namespace spot
                             gather_useful_labels(aut, used_in_cond, e.dst);
                           dead_end_useful_computed[e.dst] = true;
                         }
-                      d = dead_end_useful[e.dst];
-                    }
-                  if (bdd_implies(d, u))
-                    {
-                      // Restrict the dead-end transition's label.
-                      bdd cond = e.cond;
-                      cond &= d;
-                      if (cond != e.cond)
-                        {
-                          e.cond = cond;
-                          if (cond == bddfalse)
-                            created_false_labels = true;
-                          else
-                            nondeterministic_for_sure = true;
-                        }
+                      auto [d1, d2] = dead_end_useful[e.dst];
+                      if (d1 == bddtrue)
+                        d1 = self_loops[e.dst];
+                      restrict_edge_maybe(d1);
+                      restrict_edge_maybe(d2);
                     }
                 }
             }
