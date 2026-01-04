@@ -312,7 +312,8 @@ namespace spot
     static trival
     partial_eval(acc_cond::mark_t infinitely_often,
                  acc_cond::mark_t always_present,
-                 const acc_cond::acc_word* pos)
+                 const acc_cond::acc_word* pos,
+                 bool all_marks_known)
     {
       switch (pos->sub.op)
         {
@@ -324,7 +325,8 @@ namespace spot
               {
                 --pos;
                 res = res &&
-                  partial_eval(infinitely_often, always_present, pos);
+                  partial_eval(infinitely_often, always_present, pos,
+                               all_marks_known);
                 if (res.is_false())
                   return res;
                 pos -= pos->sub.size;
@@ -339,7 +341,8 @@ namespace spot
               {
                 --pos;
                 res = res ||
-                  partial_eval(infinitely_often, always_present, pos);
+                  partial_eval(infinitely_often, always_present, pos,
+                               all_marks_known);
                 if (res.is_true())
                   return res;
                 pos -= pos->sub.size;
@@ -347,14 +350,18 @@ namespace spot
             return res;
           }
         case acc_cond::acc_op::Inf:
-          return (pos[-1].mark & infinitely_often) == pos[-1].mark;
+          if ((pos[-1].mark & infinitely_often) == pos[-1].mark)
+            return true;
+          if (all_marks_known)
+            return false;
+          return trival::maybe();
         case acc_cond::acc_op::Fin:
           if ((pos[-1].mark & always_present) == pos[-1].mark)
             return false;
-          else if ((pos[-1].mark & infinitely_often) != pos[-1].mark)
+          if (all_marks_known &&
+              (pos[-1].mark & infinitely_often) != pos[-1].mark)
             return true;
-          else
-            return trival::maybe();
+          return trival::maybe();
         case acc_cond::acc_op::FinNeg:
         case acc_cond::acc_op::InfNeg:
           SPOT_UNREACHABLE();
@@ -423,12 +430,14 @@ namespace spot
     if (empty())
       return true;
     return partial_eval(infinitely_often | always_present,
-                        always_present, &back());
+                        always_present, &back(), true);
   }
 
   bool acc_cond::acc_code::inf_satisfiable(mark_t inf) const
   {
-    return !maybe_accepting(inf, {}).is_false();
+    if (empty())
+      return true;
+    return !partial_eval(inf, inf, &back(), false).is_false();
   }
 
 

@@ -1335,8 +1335,9 @@ namespace spot
       /// infinitely often satisfies the acceptance condition.
       bool accepting(mark_t inf) const;
 
-      /// \brief Assuming that we will visit at least all sets in \a
-      /// inf, is there any chance that we will satisfy the condition?
+      /// \brief Assuming that we will visit infinitely often at least
+      /// all sets in \a inf, is there any chance that we will satisfy
+      /// the condition?
       ///
       /// This return false only when it is sure that visiting more
       /// set will never make the condition satisfiable.

@@ -48,6 +48,25 @@ tc.assertTrue(a.maybe_accepting([0, 1], [0, 1]).is_false())
 tc.assertTrue(a.maybe_accepting([0], []).is_true())
 tc.assertTrue(a.maybe_accepting([], [0]).is_true())
 
+a.set_acceptance("Inf(0)")
+tc.assertTrue(a.inf_satisfiable([0])) # accepting right away
+tc.assertTrue(a.inf_satisfiable([]))  # accepting if we see 0 later
+a.set_acceptance("Inf(0)&Fin(1)|Inf(2)")
+tc.assertTrue(a.inf_satisfiable([0])) # accepting right away
+tc.assertTrue(a.inf_satisfiable([1])) # accepting if we see 2 later
+tc.assertTrue(a.inf_satisfiable([2])) # accepting right away
+a.set_acceptance("Inf(0)&Fin(1)&Inf(2)")
+tc.assertTrue(a.inf_satisfiable([0])) # accepting if we see 2 later
+tc.assertFalse(a.inf_satisfiable([1])) # rejecting
+tc.assertTrue(a.inf_satisfiable([2])) # accepting if we see 0 later
+a.set_acceptance('Rabin 2') # Fin(0) & Inf(1)) | (Fin(2) & Inf(3))
+tc.assertTrue(a.inf_satisfiable([0])) # accepting if we see 2 later
+tc.assertTrue(a.inf_satisfiable([0,3])) # accepting right away
+tc.assertFalse(a.inf_satisfiable([0,2])) # rejecting
+tc.assertTrue(a.inf_satisfiable([1,2])) # accepting right away
+tc.assertTrue(a.inf_satisfiable([2])) # accepting if we see 1 later
+tc.assertTrue(a.inf_satisfiable([])) # accepting if we see 1 or 3 later
+
 a = spot.acc_cond(0)
 a.set_acceptance('all')
 tc.assertEqual(a.is_rabin(), -1)
