@@ -63,6 +63,9 @@ New in spot 2.14.4.dev  (not yet released)
     its documentation.   This function was not used and not tested so far,
     but it has become needed for the next bug fix.
 
+  - The restrict_dead_end_edges_here() function introduced in Spot 2.13
+    could produce non-equivalent automata when the acceptance condition
+    involved Fin(x) terms.  (Issue #628).
 
 New in spot 2.14.4  (2025-12-17)
 
