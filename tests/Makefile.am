@@ -354,6 +354,7 @@ TESTS_twa = \
   core/ltlfsynt3.test \
   core/ltlsynt.test \
   core/ltlsynt2.test \
+  core/ltlsynt3.test \
   core/ltlsynt-pgame.test \
   core/syfco.test \
   core/rabin2parity.test \

@@ -219,27 +219,21 @@ namespace spot
   /// \brief Creates a game from a specification and a set of
   /// output propositions
   ///
-  /// \param f The specification given as an LTL/PSL formula, or
-  ///          as a string.
+  /// \param f The specification given as an LTL/PSL formula
   /// \param all_outs The names of all output propositions
   /// \param gi synthesis_info structure
   /// \note All propositions in the formula that do not appear in all_outs
   /// are treated as input variables.
   /// @{
   SPOT_API twa_graph_ptr
-  ltl_to_game(const formula& f,
+  ltl_to_game(formula f,
               const std::vector<std::string>& all_outs,
-              synthesis_info& gi);
+              synthesis_info& gi,
+              const std::vector<std::string>* unobs = nullptr);
   SPOT_API twa_graph_ptr
-  ltl_to_game(const formula& f,
-              const std::vector<std::string>& all_outs);
-  SPOT_API twa_graph_ptr
-  ltl_to_game(const std::string& f,
+  ltl_to_game(formula f,
               const std::vector<std::string>& all_outs,
-              synthesis_info& gi);
-  SPOT_API twa_graph_ptr
-  ltl_to_game(const std::string& f,
-              const std::vector<std::string>& all_outs);
+              const std::vector<std::string>* unobs = nullptr);
   /// @}
 
   /// \ingroup synthesis

@@ -48,12 +48,12 @@ New in spot 2.14.5.dev  (not yet released)
     postprocessing options like --small or --deterministic are given,
     they will also be applied during this loop.
 
-  - ltlfsynt and ltlfilt learned the --unobservable-ins option.
-    For ltlfsynt, this is used to perform synthesis with unobservable
-    inputs.  For ltlfilt, this can be useful to relabel
-    input/output/unobservable variables using the --relabel=io option
-    (renamed unobservable variables will start with u), or to write
-    part files with --save-part-file.
+  - ltlfsynt, ltlsynt, and ltlfilt learned the --unobservable-ins
+    option.  For ltlfsynt and ltlsynt, this is used to perform
+    synthesis with unobservable inputs.  For ltlfilt, this can be
+    useful to relabel input/output/unobservable variables using the
+    --relabel=io option (renamed unobservable variables will start
+    with u), or to write part files with --save-part-file.
 
   Library:
 

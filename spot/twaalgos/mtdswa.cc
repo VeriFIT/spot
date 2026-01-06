@@ -40,8 +40,7 @@ constexpr int hash_key_not = 6;
 constexpr int hash_key_rename = 7;
 constexpr int hash_key_propeq = 8;
 constexpr int hash_key_finalstrat = 9;
-//constexpr int hash_key_strat = 8;
-//constexpr int hash_key_strat_bool = 9;
+constexpr int hash_key_univ_quantify = 10;
 
 
 namespace spot
@@ -2115,6 +2114,11 @@ namespace spot
         *root_ptr = bdd_terminal_as_int(v);
       return 1;
     }
+
+    static int term_id(int x)
+    {
+      return x;
+    }
   }
 
 
@@ -2230,11 +2234,11 @@ namespace spot
     return dfa;
   }
 
-  // This variant of ltl_to_mtdswa performs on-the-fly game solving.
   mtdswa_ptr
   simple_ltl_translator::ltl_to_mtdswa_synthesis
   (formula f, const std::vector<std::string>& outvars,
-   bool realizability, int debug)
+   bool realizability, int debug,
+   const std::vector<std::string>* univquantvars)
   {
     mtdswa_ptr dfa = std::make_shared<mtdswa>(dict_);
 
@@ -2266,7 +2270,8 @@ namespace spot
 
     terminal_to_state_map.clear();
 
-    bdd bddoutvars = bddtrue;      // used if outvars was passed;
+    bdd univvars = bddtrue;     // used if univquantvars was passed
+    bdd bddoutvars = bddtrue;   // used if outvars was passed;
     // this is the number of variables we had the last time
     // we called bdd_mt_quantify_prepare().
     int varnum = 0;
@@ -2279,7 +2284,7 @@ namespace spot
       // variables changed.
       if (int vn = bdd_varnum(); vn != varnum)
         {
-          bdd_mt_quantify_prepare(bddoutvars);
+          bdd_mt_quantify_prepare(bddoutvars, univvars);
           varnum = vn;
         }
     };
@@ -2290,28 +2295,66 @@ namespace spot
     // to that.
     {
       atomic_prop_set* a = atomic_prop_collect(f);
-      dfa->aps.assign(a->begin(), a->end());
+      dfa->aps.reserve(a->size());
 
-      // We need to register the output variables already so we can
-      // call bdd_mt_quantify_prepare.  Let's do it in the order in
-      // which they will be discovered in the formula.
-      std::unordered_set<spot::formula> outputs;
-      for (const std::string& s: outvars)
-        outputs.insert(spot::formula::ap(s));
-      f.traverse([&](const spot::formula& f)
-      {
-        if (f.is(spot::op::ap) && outputs.find(f) != outputs.end()
-            && a->erase(f))
+      if (!outvars.empty())
+        {
+          // We need to register the output variables already so we can
+          // call bdd_mt_quantify_prepare.  Let's do it in the order in
+          // which they will be discovered in the formula.
+          std::unordered_set<spot::formula> outputs;
+          for (const std::string& s: outvars)
+            outputs.insert(spot::formula::ap(s));
+          f.traverse([&](const spot::formula& f)
           {
-            int i = dict_->register_proposition(f, dfa);
-            bddoutvars &= bdd_ithvar(i);
-          }
-        return false;
-      });
-      dfa->set_controllable_variables(bddoutvars);
-
+            if (f.is(spot::op::ap) && outputs.find(f) != outputs.end()
+                && a->erase(f))
+              {
+                dfa->aps.push_back(f);
+                int i = dict_->register_proposition(f, dfa);
+                bddoutvars &= bdd_ithvar(i);
+              }
+            return false;
+          });
+          dfa->set_controllable_variables(bddoutvars);
+        }
+      if (univquantvars)
+        {
+          std::unordered_set<spot::formula> univ;
+          for (const std::string& s: *univquantvars)
+            univ.insert(spot::formula::ap(s));
+          f.traverse([&](const spot::formula& f)
+          {
+            if (f.is(spot::op::ap) && univ.find(f) != univ.end()
+                && a->erase(f))
+              {
+                int i = dict_->register_proposition(f, dfa);
+                univvars &= bdd_ithvar(i);
+              }
+            return false;
+          });
+          if (univvars == bddtrue)
+            univquantvars = nullptr;
+        }
+      // Anything left in a are output
+      dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
       delete a;
     }
+
+    auto trans_succ = [&](formula g) -> bdd {
+      bdd b = ltl_to_mtbdd(g);
+      if (univquantvars)
+        {
+          quantify_prepare_maybe();
+          b = bdd_mt_quantify(b, term_id, term_combine_and, &cache_,
+                              hash_key_univ_quantify, hash_key_and,
+                              bddop_and);
+        }
+      // propositional equivalence on all terminals.
+      b = bdd_mt_apply1_leaves(b, terminal_propeq, &cache_, hash_key_propeq);
+      return b;
+    };
+
 
     term_combine_trans = this;
 
@@ -2403,9 +2446,7 @@ namespace spot
 
         formula label = int_to_formula_[label_term];
 
-        bdd b = ltl_to_mtbdd(label);
-        // propositional equivalence on all terminals.
-        b = bdd_mt_apply1_leaves(b, terminal_propeq, &cache_, hash_key_propeq);
+        bdd b = trans_succ(label);
 
         quantify_prepare_maybe();
         std::string name = str_psl(label);
@@ -2497,6 +2538,8 @@ namespace spot
         dfa->names = std::move(names);
         dfa->colors = std::vector<acc_cond::mark_t>(sz, acc_cond::mark_t{});
         dict_->register_all_propositions_of(this, dfa);
+        for (bdd b = univvars; b != bddtrue; b = bdd_high(b))
+          dict_->unregister_variable(bdd_var(b), dfa);
         for (auto [term, st]: terminal_to_state_map)
           if (backprop.root_is_determined(term))
             dfa->colors[st].set(5 - backprop.root_winner(term));
@@ -2541,6 +2584,8 @@ namespace spot
     dfa->names = std::move(names);
     dfa->colors = std::vector<acc_cond::mark_t>(sz, acc_cond::mark_t{});
     dict_->register_all_propositions_of(this, dfa);
+    for (bdd b = univvars; b != bddtrue; b = bdd_high(b))
+      dict_->unregister_variable(bdd_var(b), dfa);
     return dfa;
   }
 
@@ -2557,6 +2602,7 @@ namespace spot
 
   mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
                                   const std::vector<std::string>& outvars,
+                                  const std::vector<std::string>* univquantvars,
                                   bool realizability, bool simplify_terms,
                                   int debug)
   {
@@ -2565,8 +2611,19 @@ namespace spot
         ("obligation_synthesis(): input is not a syntactic obligation");
 
     simple_ltl_translator trans(dict, simplify_terms);
-    return trans.ltl_to_mtdswa_synthesis(f, outvars, realizability, debug);
+    return trans.ltl_to_mtdswa_synthesis(f, outvars, realizability, debug,
+                                         univquantvars);
   }
+
+  mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
+                                  const std::vector<std::string>& outvars,
+                                  bool realizability, bool simplify_terms,
+                                  int debug)
+  {
+    return obligation_synthesis(f, dict, outvars, nullptr, realizability,
+                                simplify_terms, debug);
+  }
+
 
   /////////////////////////////////////////////////////////////////////////
   //                       minimization of MTDSWA                        //

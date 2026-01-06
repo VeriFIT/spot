@@ -30,6 +30,8 @@
 #include <spot/twaalgos/translate.hh>
 #include <spot/twaalgos/zlktree.hh>
 #include <spot/twaalgos/toparity.hh>
+#include <spot/twaalgos/remprop.hh>
+#include <spot/twaalgos/dualize.hh>
 #include <spot/tl/parse.hh>
 #include <algorithm>
 #include <cassert>
@@ -1793,9 +1795,10 @@ namespace spot
   } // anonymous
 
   twa_graph_ptr
-  ltl_to_game(const formula& f,
+  ltl_to_game(formula f,
               const std::vector<std::string>& all_outs,
-              synthesis_info& gi)
+              synthesis_info& gi,
+              const std::vector<std::string>* unobs)
   {
     using algo = synthesis_info::algo;
 
@@ -1816,11 +1819,35 @@ namespace spot
     auto& bv = gi.bv;
     auto& vs = gi.verbose_stream;
 
+    if (unobs && unobs->empty())
+      unobs = nullptr;
+    if (unobs)
+      {
+        // Quantifying unobservable variables universally will be done
+        // by working on the negated automaton, doing existential
+        // quantification before determinization, and then complementing
+        // the DPA.   This cannot work with DPA/LAR approaches.
+        // FIXME: existential quantification simply should be moved into
+        // translator.
+        if (gi.s != algo::DET_SPLIT && gi.s != algo::SPLIT_DET)
+          throw std::runtime_error("ltl_to_game: universal quantification "
+                                   "currently only work with SPLIT_DET or "
+                                   "DET_SPLIT approaches.");
+        f = formula::Not(f);
+      }
+
     stopwatch sw;
 
     if (bv)
       sw.start();
     auto aut = trans.run(f);
+    if (unobs) // FIXME: this should be moved in TRANS.
+      {
+        remove_ap rem;
+        for (const std::string& s: *unobs)
+          rem.add_ap(s.c_str());
+        aut = rem.strip(aut);
+      }
     if (bv)
       {
         bv->sum_trans_time += sw.stop();
@@ -1885,6 +1912,8 @@ namespace spot
         if (bv)
           sw.start();
         auto tmp = ntgba2dpa(aut, gi.force_sbacc);
+        if (unobs)
+          tmp = dualize(tmp);
         if (vs)
           *vs << "determinization done\nDPA has "
               << tmp->num_states() << " states, "
@@ -1944,6 +1973,8 @@ namespace spot
         if (bv)
           sw.start();
         dpa = ntgba2dpa(split, gi.force_sbacc);
+        if (unobs)
+          dpa = dualize(dpa);
         if (vs)
           *vs << "determinization done\nDPA has "
               << dpa->num_states() << " states, "
@@ -2011,26 +2042,12 @@ namespace spot
   }
 
   twa_graph_ptr
-  ltl_to_game(const formula& f,
-              const std::vector<std::string>& all_outs)
+  ltl_to_game(formula f,
+              const std::vector<std::string>& all_outs,
+              const std::vector<std::string>* unobs)
   {
     synthesis_info dummy;
-    return ltl_to_game(f, all_outs, dummy);
-  }
-
-  twa_graph_ptr
-  ltl_to_game(const std::string& f,
-              const std::vector<std::string>& all_outs)
-  {
-    return ltl_to_game(parse_formula(f), all_outs);
-  }
-
-  twa_graph_ptr
-  ltl_to_game(const std::string& f,
-              const std::vector<std::string>& all_outs,
-              synthesis_info& gi)
-  {
-    return ltl_to_game(parse_formula(f), all_outs, gi);
+    return ltl_to_game(f, all_outs, dummy, unobs);
   }
 
   twa_graph_ptr

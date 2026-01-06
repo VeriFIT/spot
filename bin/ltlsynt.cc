@@ -536,13 +536,22 @@ namespace
   static int
   solve_formula(spot::formula original_f,
                 const std::vector<std::string>& input_aps,
-                const std::vector<std::string>& output_aps)
+                const std::vector<std::string>& output_aps,
+                const std::vector<std::string>& unobs_aps)
   {
     if (opt_semantics == semantics_moore)
       error(2, 0, "Moore semantics are not supported yet");
     spot::formula f = original_f;
     if (opt_csv)              // reset benchmark data
       gi->bv = spot::synthesis_info::bench_var();
+
+    if (!unobs_aps.empty()
+        && gi->s != spot::synthesis_info::algo::DET_SPLIT
+        && gi->s != spot::synthesis_info::algo::SPLIT_DET)
+      error(2, 0,
+            "Using unobservable inputs currently requires "
+            "--algo=ds or --algo=sd");
+
     spot::stopwatch sw;
     if (gi->bv)
       sw.start();
@@ -553,10 +562,21 @@ namespace
         gi->bv->total_time = sw.stop();
     };
 
+
+    // union of inputs_aps and unobs_aps, only filled if the
+    // realizability_simplifier is set.
+    std::vector<std::string> input_and_unobs;
+
     // Attempt to remove superfluous atomic propositions
     std::unique_ptr<spot::realizability_simplifier> rs = nullptr;
     if (opt_polarity != pol_no || opt_gequiv != pol_no)
       {
+        input_and_unobs.reserve(input_aps.size() + unobs_aps.size());
+        input_and_unobs.insert(input_and_unobs.end(),
+                               input_aps.begin(), input_aps.end());
+        input_and_unobs.insert(input_and_unobs.end(),
+                               unobs_aps.begin(), unobs_aps.end());
+
         unsigned opt = 0;
         if (opt_polarity != pol_no)
           opt |= spot::realizability_simplifier::polarity;
@@ -567,7 +587,8 @@ namespace
             else
               opt |= spot::realizability_simplifier::global_equiv;
           }
-        rs.reset(new spot::realizability_simplifier(original_f, input_aps, opt,
+        rs.reset(new spot::realizability_simplifier(original_f, input_and_unobs,
+                                                    opt,
                                                     gi ? gi->verbose_stream
                                                        : nullptr));
         f = rs->simplified_formula();
@@ -647,26 +668,30 @@ namespace
           }
     if (has_oblig)
       {
-        std::unordered_set<spot::formula> outputs;
-        for (auto subs: sub_outs_str)
-          for (const std::string& s: subs)
-            outputs.insert(spot::formula::ap(s));
         // For Mealy semantics, inputs should appear first in the
         // MTBDDs.  For Moore semantics, outputs should be first.
-        // Pre-registering those variables will ensure that.  We want
-        // to register them in the order they are found in the
-        // formula, this ways variables that are used together are
-        // more likely to be close in the order.
-        for (spot::formula f: sub_form)
-          f.traverse([&](const spot::formula& f)
-          {
-            if (f.is(spot::op::ap) &&
-                // currently, only mealy semantics are supported by ltlsynt,
-                // so only focus on output variables.
-                ((outputs.find(f) == outputs.end()) /* == mealy_semantics */))
-              preorder.register_proposition(f);
-            return false;
-          });
+        // Pre-registering those variables will ensure that.  We want to
+        // register them in the order they are found in the formula,
+        // this ways variables that are used together are more
+        // likely to be close in the order.
+        std::unordered_set<spot::formula> come_first;
+        if (opt_semantics != semantics_moore) // Default or Mealy
+          for (const std::string& s: input_aps)
+            come_first.insert(spot::formula::ap(s));
+        else
+          for (const std::string& s: output_aps)
+            come_first.insert(spot::formula::ap(s));
+
+        f.traverse([&](const spot::formula& f) {
+          if (f.is(spot::op::ap) && (come_first.find(f) != come_first.end()))
+            preorder.register_proposition(f);
+          return false;
+        });
+        // Unobservable input can be put anywhere, since they won't be
+        // part of the game, so currently we don't pre-register them.
+        // However the ltlf_to_mtdfa_for_synthesis() function will later
+        // register them at the bottom, where they are easier to
+        // quantify away.
       }
 
     //gi->dict->dump(std::cerr);
@@ -701,13 +726,12 @@ namespace
             }
           if (gi->verbose_stream)
             *gi->verbose_stream << "working on subformula " << *sub_f << '\n';
-          spot::realizability_simplifier rsub(*sub_f, input_aps, opt,
+          spot::realizability_simplifier rsub(*sub_f, input_and_unobs, opt,
                                               gi ?
                                               gi->verbose_stream : nullptr);
           *sub_f = rsub.simplified_formula();
           rs->merge_mapping(rsub);
         }
-
 
       // If we want to print a game, we never use the direct approach
       // or the obligation code.
@@ -724,7 +748,8 @@ namespace
               if (bv)
                 sw.start();
               spot::mtdswa_ptr aut =
-                spot::obligation_synthesis(*sub_f, gi->dict, *sub_o, opt_real);
+                spot::obligation_synthesis(*sub_f, gi->dict, *sub_o,
+                                           &unobs_aps, opt_real);
               if (bv)
                 {
                   auto delta = sw.stop();
@@ -762,7 +787,7 @@ namespace
                     }
                 }
             }
-          else if (opt_bypass)
+          else if (opt_bypass && unobs_aps.empty())
             {
               m_like = spot::try_create_direct_strategy(*sub_f, *sub_o,
                                                         *gi, !opt_real);
@@ -780,7 +805,7 @@ namespace
         }
       case spot::mealy_like::realizability_code::UNKNOWN:
         {
-          auto arena = spot::ltl_to_game(*sub_f, *sub_o, *gi);
+          auto arena = spot::ltl_to_game(*sub_f, *sub_o, *gi, &unobs_aps);
 #ifndef NDEBUG
           auto spptr =
             arena->get_named_prop<std::vector<bool>>("state-player");
@@ -968,11 +993,9 @@ namespace
     int process_formula(spot::formula f,
                         const char* filename, int linenum) override
     {
-      auto [input_aps, output_aps, unobs] =
+      auto [input_aps, output_aps, unobs_aps] =
         filter_list_of_aps(f, filename, linenum);
-      if (!unobs.empty())
-        error(2, 0, "unobservable APs are not yet supported");
-      int res = solve_formula(f, input_aps, output_aps);
+      int res = solve_formula(f, input_aps, output_aps, unobs_aps);
       if (opt_csv)
         {
           if (!filename || linenum <= 0)

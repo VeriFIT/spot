@@ -1169,7 +1169,8 @@ for meth in ('scc_filter', 'scc_filter_states',
              'contains', 'get_strategy',
              'set_state_players', 'get_state_players',
              'set_state_player', 'get_state_player',
-             'get_state_winners', 'get_state_winner'):
+             'get_state_winners', 'get_state_winner',
+             'set_synthesis_outputs'):
     _add_twa_graph(meth)
 _add_twa_graph('are_equivalent', 'equivalent_to')
 

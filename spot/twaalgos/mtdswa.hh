@@ -241,7 +241,9 @@ namespace spot
     mtdswa_ptr ltl_to_mtdswa(formula f, bool fuse_same_bdds);
     mtdswa_ptr ltl_to_mtdswa_synthesis(formula f,
                                        const std::vector<std::string>& outvars,
-                                       bool realizability, int debug = -1);
+                                       bool realizability, int debug = -1,
+                                       const std::vector<std::string>*
+                                       univquantvars = nullptr);
 
     bdd ltl_to_mtbdd(formula f);
     formula leaf_to_formula(int b, int term) const;
@@ -313,12 +315,25 @@ namespace spot
 
   /// \ingroup mtdswa
   /// \brief Reactive synthesis of syntactic-obligations
+  ///
+  /// If \a univquantvars is supplied, all variables listed there will
+  /// be universally quantified.
+  ///
+  /// @{
   SPOT_API
   mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
                                   const std::vector<std::string>& outvars,
                                   bool realizability = false,
                                   bool simplify_terms = true,
                                   int debug = -1);
+  SPOT_API
+  mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
+                                  const std::vector<std::string>& outvars,
+                                  const std::vector<std::string>* univquantvars,
+                                  bool realizability = false,
+                                  bool simplify_terms = true,
+                                  int debug = -1);
+  /// @}
 
   /// \ingroup mtdswa
   /// \brief Convert a strategy represented as MTDSwA into a Mealy machine.
