@@ -351,6 +351,7 @@ TESTS_twa = \
   core/parity2.test \
   core/pgsolver.test \
   core/ltlfsynt2.test \
+  core/ltlfsynt3.test \
   core/ltlsynt.test \
   core/ltlsynt2.test \
   core/ltlsynt-pgame.test \
@@ -395,6 +396,7 @@ TESTS_ipython = \
   python/split.ipynb \
   python/stutter-inv.ipynb \
   python/synthesis.ipynb \
+  python/syntunobs.ipynb \
   python/twagraph-internals.ipynb \
   python/word.ipynb \
   python/zlktree.ipynb

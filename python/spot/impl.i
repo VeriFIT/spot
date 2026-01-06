@@ -437,6 +437,8 @@ namespace swig
     $1 = nullptr;
 }
 
+
+
 // For some reason, Swig can convert [aut1,aut2,...]  into
 // std::vector<spot::twa_graph_ptr>, but not into
 // std::vector<spot::const_twa_graph_ptr>.  Let's fix that by using
@@ -577,6 +579,19 @@ namespace std {
   %template(vectorofvectorofformulas) vector<vector<spot::formula>>;
   %template(setunsigned) set<unsigned>;
   %template(relabeling_map) map<spot::formula, spot::formula>;
+}
+
+// Some function take a vector of strings as pointers, and we want
+// to be able to pass None or ["ab","cd"].
+%typemap(in) std::vector<std::string>* (std::vector<std::string>* temp) {
+    if ($input == Py_None) {
+        $1 = nullptr;
+    } else {
+      if (!SWIG_IsOK(swig::asptr($input, &temp))) {
+        %argument_fail(SWIG_ERROR, "$type", $symname, $argnum);
+      }
+      $1 = temp;
+    }
 }
 
 %include <spot/tl/environment.hh>

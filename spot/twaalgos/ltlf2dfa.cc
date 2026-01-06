@@ -47,6 +47,7 @@ constexpr int hash_key_rename = 7;
 constexpr int hash_key_strat = 8;
 constexpr int hash_key_strat_bool = 9;
 constexpr int hash_key_finalstrat = 10;
+constexpr int hash_key_univ_quantify = 11;
 
 namespace spot
 {
@@ -1597,6 +1598,11 @@ namespace spot
       // keep winning terminals as-is
       return 1;
     }
+
+    static int term_id(int x)
+    {
+      return x;
+    }
   }
 
   // This is the main translation function.  It has grown to do a bit
@@ -1609,7 +1615,9 @@ namespace spot
                                  bool do_backprop,
                                  bool realizability,
                                  bool preprocess,
-                                 bool bfs)
+                                 bool bfs,
+                                 const std::vector<std::string>*
+                                 univquantvars)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
@@ -1629,6 +1637,8 @@ namespace spot
     if (do_backprop)
       backprop.reset(global_backprop = new backprop_bdd_encoder());
 
+    bdd univvars = bddtrue;     // used if univquantvars was passed
+
     bdd bddoutvars = bddtrue;      // used if outvars was passed;
     // this is the number of variables we had the last time
     // we called bdd_mt_quantify_prepare().
@@ -1642,7 +1652,7 @@ namespace spot
       // variables changed.
       if (int vn = bdd_varnum(); vn != varnum)
         {
-          bdd_mt_quantify_prepare(bddoutvars);
+          bdd_mt_quantify_prepare(bddoutvars, univvars);
           varnum = vn;
         }
     };
@@ -1668,7 +1678,7 @@ namespace spot
     // to that.
     {
       atomic_prop_set* a = atomic_prop_collect(f);
-      dfa->aps.assign(a->begin(), a->end());
+      dfa->aps.reserve(a->size());
 
       if (outvars)
         {
@@ -1689,6 +1699,7 @@ namespace spot
             if (f.is(spot::op::ap) && outputs.find(f) != outputs.end()
                 && a->erase(f))
               {
+                dfa->aps.push_back(f);
                 int i = dict_->register_proposition(f, dfa);
                 bddoutvars &= bdd_ithvar(i);
               }
@@ -1696,8 +1707,40 @@ namespace spot
           });
           dfa->set_controllable_variables(bddoutvars);
         }
+      if (univquantvars)
+        {
+          std::unordered_set<spot::formula> univ;
+          for (const std::string& s: *univquantvars)
+            univ.insert(spot::formula::ap(s));
+          f.traverse([&](const spot::formula& f)
+          {
+            if (f.is(spot::op::ap) && univ.find(f) != univ.end()
+                && a->erase(f))
+              {
+                int i = dict_->register_proposition(f, dfa);
+                univvars &= bdd_ithvar(i);
+              }
+            return false;
+          });
+          if (univvars == bddtrue)
+            univquantvars = nullptr;
+        }
+      // Anything left in a are output
+      dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
       delete a;
     }
+
+    auto trans_succ = [&](formula g) -> bdd {
+      bdd b = ltlf_to_mtbdd(g);
+      if (univquantvars)
+        {
+          quantify_prepare_maybe();
+          b = bdd_mt_quantify(b, term_id, term_combine_and, &cache_,
+                              hash_key_univ_quantify, hash_key_and,
+                              bddop_and);
+        }
+      return b;
+    };
 
     std::unique_ptr<ltlf_one_step_sat_rewrite_with_cache> os_sat;
     std::unique_ptr<ltlf_one_step_unsat_rewrite_with_cache> os_unsat;
@@ -1734,7 +1777,6 @@ namespace spot
             != terminal_to_state_map.end())
           continue;
 
-
         bool b_done = false;
         bdd b;
 
@@ -1745,7 +1787,7 @@ namespace spot
             realizability_simplifier_base::mapping_t simpl_map;
             std::tie(g, simpl_map) = realsimp->simplify(g);
 
-            b = ltlf_to_mtbdd(g);
+            b = trans_succ(g);
             if (restrict_bdd_bool(b, realizability))
               {
                 b_done = true;
@@ -1777,7 +1819,7 @@ namespace spot
               {
                 g = os_unsat->rewrite(label);
                 std::tie(g, simpl_map) = realsimp->simplify(g);
-                b = ltlf_to_mtbdd(g);
+                b = trans_succ(g);
                 if (!restrict_bdd_bool(b, true))
                   {
                     b_done = true;
@@ -1790,7 +1832,7 @@ namespace spot
           }
         if (!b_done)
           {
-            b = ltlf_to_mtbdd(label);
+            b = trans_succ(label);
             if (outvars)
               {
                 if (realizability && label.is_boolean())
@@ -1886,6 +1928,8 @@ namespace spot
         dfa->states = std::move(states);
         dfa->names = std::move(names);
         dict_->register_all_propositions_of(this, dfa);
+        for (bdd b = univvars; b != bddtrue; b = bdd_high(b))
+          dict_->unregister_variable(bdd_var(b), dfa);
         return dfa;
       }
 
@@ -1919,6 +1963,8 @@ namespace spot
     dfa->states = std::move(states);
     dfa->names = std::move(names);
     dict_->register_all_propositions_of(this, dfa);
+    for (bdd b = univvars; b != bddtrue; b = bdd_high(b))
+      dict_->unregister_variable(bdd_var(b), dfa);
     return dfa;
   }
 
@@ -2475,9 +2521,9 @@ namespace spot
     return nullptr;
   }
 
-  ////////////////////////////////////////////////////////////////////////
-  //                 various LTLf translation interafaces               //
-  ////////////////////////////////////////////////////////////////////////
+  ///////////////////////////////////////////////////////////////////////
+  //                 various LTLf translation interfaces               //
+  ///////////////////////////////////////////////////////////////////////
 
   mtdfa_ptr ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                           bool fuse_same_bdds, bool simplify_terms,
@@ -2496,25 +2542,46 @@ namespace spot
                                         bool simplify_terms,
                                         bool detect_empty_univ)
   {
+    return ltlf_to_mtdfa_for_synthesis(f, dict, outvars, nullptr,
+                                       backprop, preprocess, realizability,
+                                       fuse_same_bdds, simplify_terms,
+                                       detect_empty_univ);
+  }
+
+  mtdfa_ptr ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
+                                        const std::vector<std::string>& outvars,
+                                        const std::vector<std::string>*
+                                        univquantvars,
+                                        ltlf_synthesis_backprop backprop,
+                                        bool preprocess,
+                                        bool realizability,
+                                        bool fuse_same_bdds,
+                                        bool simplify_terms,
+                                        bool detect_empty_univ)
+  {
     ltlf_translator trans(dict, simplify_terms);
     switch (backprop)
-        {
-        case bfs_node_backprop:
-          return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
-                                     &outvars, true, realizability,
-                                     preprocess, false);
-        case dfs_node_backprop:
-          return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
-                                     &outvars, true, realizability,
-                                     preprocess, true);
-        case state_refine:
-          return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
-                                     &outvars, false, realizability,
-                                     preprocess);
-        case dfs_strict_node_backprop:
-          return trans.ltlf_synthesis_with_dfs(f, &outvars, realizability,
-                                               preprocess);
-        }
+      {
+      case bfs_node_backprop:
+        return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+                                   &outvars, true, realizability,
+                                   preprocess, false, univquantvars);
+      case dfs_node_backprop:
+        return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+                                   &outvars, true, realizability,
+                                   preprocess, true, univquantvars);
+      case state_refine:
+        return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+                                   &outvars, false, realizability,
+                                   preprocess, true, univquantvars);
+      case dfs_strict_node_backprop:
+        if (univquantvars)
+          throw std::runtime_error
+            ("ltlf_to_mtdfa_for_synthesis: universal quantification not"
+             " implemented for dfs_strict_node_backprop");
+        return trans.ltlf_synthesis_with_dfs(f, &outvars, realizability,
+                                             preprocess);
+      }
     SPOT_UNREACHABLE();
     return nullptr;
   }

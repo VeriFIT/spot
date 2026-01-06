@@ -446,6 +446,7 @@ namespace
   solve_formula(spot::formula original_f,
                 const std::vector<std::string>& input_aps,
                 const std::vector<std::string>& output_aps,
+                const std::vector<std::string>& unobs_aps,
                 bool mealy_semantics)
   {
     if (opt_verbose)
@@ -456,28 +457,46 @@ namespace
 
     spot::bdd_dict_preorder dict;
     {
-      std::unordered_set<spot::formula> outputs;
-      for (const std::string& s: output_aps)
-        outputs.insert(spot::formula::ap(s));
       // For Mealy semantics, inputs should appear first in the
       // MTBDDs.  For Moore semantics, outputs should be first.
       // Pre-registering those variables will ensure that.  We want to
       // register them in the order they are found in the formula,
       // this ways variables that are used together are more
       // likely to be close in the order.
-      f.traverse([&](const spot::formula& f)
-      {
-        if (f.is(spot::op::ap) &&
-            ((outputs.find(f) == outputs.end()) == mealy_semantics))
+      std::unordered_set<spot::formula> come_first;
+      if (mealy_semantics)
+        for (const std::string& s: input_aps)
+          come_first.insert(spot::formula::ap(s));
+      else
+        for (const std::string& s: output_aps)
+          come_first.insert(spot::formula::ap(s));
+
+      f.traverse([&](const spot::formula& f) {
+        if (f.is(spot::op::ap) && (come_first.find(f) != come_first.end()))
           dict.register_proposition(f);
         return false;
       });
+      // Unobservable input can be put anywhere, since they won't be
+      // part of the game, so currently we don't pre-register them.
+      // However the ltlf_to_mtdfa_for_synthesis() function will later
+      // register them at the bottom, where they are easier to
+      // quantify away.
     }
+
+    // union of inputs_aps and unobs_aps, only filled if the
+    // realizability_simplifier is set.
+    std::vector<std::string> input_and_unobs;
 
     // Attempt to remove superfluous atomic propositions
     std::unique_ptr<spot::realizability_simplifier> rs = nullptr;
     if (opt_polarity != pol_no || opt_gequiv != pol_no)
       {
+        input_and_unobs.reserve(input_aps.size() + unobs_aps.size());
+        input_and_unobs.insert(input_and_unobs.end(),
+                               input_aps.begin(), input_aps.end());
+        input_and_unobs.insert(input_and_unobs.end(),
+                               unobs_aps.begin(), unobs_aps.end());
+
         unsigned opt = 0;
         if (opt_polarity != pol_no)
           opt |= spot::realizability_simplifier::polarity;
@@ -485,7 +504,7 @@ namespace
           opt |= mealy_semantics ?
             spot::realizability_simplifier::global_equiv :
             spot::realizability_simplifier::global_equiv_moore;
-        rs.reset(new spot::realizability_simplifier(original_f, input_aps,
+        rs.reset(new spot::realizability_simplifier(original_f, input_and_unobs,
                                                     opt, opt_verbose));
         f = rs->simplified_formula();
       }
@@ -518,7 +537,7 @@ namespace
     }
 
     // FIXME: revisit this after split_independent_formulas() has
-    // been tuned to LTLf.
+    // been tuned to LTLf.   See issue #610.
     //
     // When trying to split the formula, we can apply transformations
     // that increase its size. This is why we will use the original
@@ -590,7 +609,7 @@ namespace
                 spot::realizability_simplifier::global_equiv_moore;
             if (opt_verbose)
               *opt_verbose << "working on subformula " << *sub_f << '\n';
-            spot::realizability_simplifier rsub(*sub_f, input_aps, opt,
+            spot::realizability_simplifier rsub(*sub_f, input_and_unobs, opt,
                                                 opt_verbose);
             *sub_f = rsub.simplified_formula();
             rs->merge_mapping(rsub);
@@ -645,6 +664,8 @@ namespace
                            << (opt_one_step ? "" : "out")
                            << " one-step preprocess\n";
             a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
+                                                  unobs_aps.empty() ?
+                                                  nullptr : &unobs_aps,
                                                   spot::state_refine,
                                                   opt_one_step,
                                                   false /* realizability */);
@@ -655,6 +676,9 @@ namespace
           case translation_direct_full:
             if (opt_verbose)
               *opt_verbose << indent << "starting full translation\n";
+            if (SPOT_UNLIKELY(!unobs_aps.empty()))
+              error(2, 0,
+                    "direct translation does not support --unobservables");
             a = spot::ltlf_to_mtdfa(*sub_f, dict);
             a->names.clear();
             a->set_controllable_variables(*sub_o, true);
@@ -669,6 +693,10 @@ namespace
                            << " minimization, with "
                            << (opt_composition_by_ap ? "AP" : "size")
                            << "-based ordering\n";
+            if (SPOT_UNLIKELY(!unobs_aps.empty()))
+              error(2, 0,
+                    "compositional translation does not "
+                    "support --unobservables");
             a = spot::ltlf_to_mtdfa_compose(*sub_f, dict,
                                             opt_minimize,
                                             opt_composition_by_ap,
@@ -700,6 +728,8 @@ namespace
                          : (dfs ? spot::dfs_node_backprop
                             : spot::bfs_node_backprop));
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
+                                                    unobs_aps.empty() ?
+                                                    nullptr : &unobs_aps,
                                                     bp, opt_one_step,
                                                     opt_realizability);
               a->names.clear();
@@ -874,9 +904,7 @@ namespace
         }
       auto [input_aps, output_aps, unobs_aps] =
         filter_list_of_aps(f, filename, linenum);
-      if (!unobs_aps.empty())
-        error(2, 0, "unobservable APs are not yet supported");
-      return solve_formula(f, input_aps, output_aps,
+      return solve_formula(f, input_aps, output_aps, unobs_aps,
                            opt_semantics != semantics_moore);
     }
 

@@ -300,6 +300,9 @@ namespace spot
   ///
   /// The set of output variables should be specified with \a outvars.
   ///
+  /// If \a univquantvars is supplied, all variables listed there will
+  /// be universally quantified.
+  ///
   /// If \a backprop is set to `bdd_node_backprop`,
   /// `dfs_node_backprop`, or `dfs_strict_node_backprop`, then a
   /// backpropagation graph it constructed while the automaton for \a
@@ -325,6 +328,7 @@ namespace spot
   /// simplify_terms, \a detect_empty_univ.
   ///
   /// \cite duret.25.ciaa
+  /// @{
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,
@@ -335,6 +339,18 @@ namespace spot
                               bool fuse_same_bdds = true,
                               bool simplify_terms = true,
                               bool detect_empty_univ = true);
+  SPOT_API mtdfa_ptr
+  ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
+                              const std::vector<std::string>& outvars,
+                              const std::vector<std::string>* univquantvars,
+                              ltlf_synthesis_backprop backprop
+                              = dfs_node_backprop,
+                              bool one_step_preprocess = false,
+                              bool realizability = false,
+                              bool fuse_same_bdds = true,
+                              bool simplify_terms = true,
+                              bool detect_empty_univ = true);
+  /// @}
 
   /// \ingroup mtdfa
   /// \brief Convert an LTLf formula into a MTDFA, with a compositional
@@ -442,8 +458,8 @@ namespace spot
   /// working of the translation.  Do not rely on the interface to be
   /// stable.
   class SPOT_API ltlf_translator
-    {
-    public:
+  {
+  public:
     ltlf_translator(const bdd_dict_ptr& dict,
                     bool simplify_terms = true);
 
@@ -453,7 +469,9 @@ namespace spot
                             bool do_backprop = false,
                             bool realizability = false,
                             bool one_step_preprocess = false,
-                            bool bfs = true);
+                            bool bfs = true,
+                            const std::vector<std::string>*
+                            univquantvars = nullptr);
 
     mtdfa_ptr ltlf_synthesis_with_dfs(formula f,
                                       const std::vector<std::string>*
@@ -491,7 +509,7 @@ namespace spot
     }
 
     ~ltlf_translator();
-    private:
+  private:
     std::unordered_map<formula, int> formula_to_var_;
     std::unordered_map<formula, bdd> propositional_equiv_bdd_;
     std::unordered_map<bdd, formula, bdd_hash> propositional_equiv_;
@@ -503,7 +521,7 @@ namespace spot
     bdd_dict_ptr dict_;
     bddExtCache cache_;
     bool simplify_terms_;
-    };
+  };
 
   /// \ingroup mtdfa
   /// \brief Compute the winning region of the MTDFA interpreted

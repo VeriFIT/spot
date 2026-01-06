@@ -1,0 +1,124 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. ./defs || exit 1
+
+set -e
+
+# LTLf synthesis with universal quantification
+
+ltlfsynt --real -f 'G((!u | X!u) & (u | Xu)) -> X[!]F(u <-> o)'
+
+ltlfsynt -f 'G((!u | X!u) & (u | Xu)) -> X[!]F(u <-> o)' >out
+cat >exp <<EOF
+REALIZABLE
+HOA: v1
+States: 3
+Start: 0
+AP: 1 "o"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic
+controllable-AP: 0
+--BODY--
+State: 0
+[t] 1
+State: 1
+[0] 2
+State: 2
+[0] 2
+--END--
+EOF
+diff out exp
+
+ltlfsynt -f 'G((!u | X!u) & (u | Xu)) -> X[!](F(u <-> o) && F(u <-> !o))' >out
+diff out exp
+
+ltlfsynt -f 'G((!u|X!u)&(u|Xu))->X[!]F((u->(o&X[!]!o))&(!u->(!o&X[!]o)))' >out
+cat >exp <<EOF
+REALIZABLE
+HOA: v1
+States: 6
+Start: 0
+AP: 1 "o"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic
+controllable-AP: 0
+--BODY--
+State: 0
+[t] 1
+State: 1
+[0] 2
+State: 2
+[!0] 3
+State: 3
+[0] 4
+State: 4
+[0] 5
+State: 5
+[!0] 5
+--END--
+EOF
+diff out exp
+
+ltlfsynt -f 'G((!u | X!u) & (u | Xu)) & X[!]F(u <-> o)' && exit 0
+
+
+# derived from
+# https://github.com/whitemech/ltlf-synth-unrel-input-aaai2025/
+# blob/main/tests/hiker-3-solv/
+tr -d '\n' >formula <<EOF
+(!(!a1 & !a3 & !a4 & G(X[!]a4 <-> (X[!]1 & ((a4 & !(a3 & o2)) | (a0 &
+z0 & X[!]o1)))) & XXXa1 & XXXX(a1 & Ga1) & G(!a0 | !a1) & X!a1 & XX!a1
+& G(a0 | !z0) & G(!a0 | !a2) & G(X[!]a3 <-> (X[!]1 & ((a3 & !o2) | (a2
+& X[!]o0)))) & XXa2) | (G(!(a0 & !z0) | Xo1) & Fa1)) & (!(!a1 & !a3 &
+!a4 & G(X[!]a4 <-> (X[!]1 & ((a4 & !(a3 & o2)) | (a0 & z0 & X[!]o1))))
+& XXXa1 & XXXX(a1 & Ga1) & G(!a0 | !a1) & X!a1 & XX!a1 & G(a0 | !z0) &
+G(!a0 | !a2) & G(X[!]a3 <-> (X[!]1 & ((a3 & !o2) | (a2 & X[!]o0)))) &
+XXa2) | F(a1 & !a4))
+EOF
+cat >part <<EOF
+.inputs a0 a1 /a[2-4]/
+.outputs o0 o1 o2
+.unobservables z0
+EOF
+ltlfsynt --semantics=moore -Fformula --real --part=part
+
+# same source
+# blob/main/tests/hiker-4-unsolv/
+tr -d '\n' >formula <<EOF
+(!(!i1 & !i3 & !i4 & G(X[!]i4 <-> (X[!]1 & ((i4 & !(i3 & o2)) | (i0 &
+u0 & X[!]o1)))) & XXXXi1 & XXXXX(i1 & Gi1) & G(!i0 | !i1) & X!i1 &
+XX!i1 & XXX!i1 & G(i0 | !u0) & G(!i0 | !i2) & G(X[!]i3 <-> (X[!]1 &
+((i3 & !o2) | (i2 & X[!]o0))))) | (G(!(i0 & !u0) | Xo1) & Fi1)) &
+(!(!i1 & !i3 & !i4 & G(X[!]i4 <-> (X[!]1 & ((i4 & !(i3 & o2)) | (i0 &
+u0 & X[!]o1)))) & XXXXi1 & XXXXX(i1 & Gi1) & G(!i0 | !i1) & X!i1 &
+XX!i1 & XXX!i1 & G(i0 | !u0) & G(!i0 | !i2) & G(X[!]i3 <-> (X[!]1 &
+((i3 & !o2) | (i2 & X[!]o0))))) | F(i1 & !i4))
+EOF
+
+ltlfsynt --semantics=moore -Fformula && exit 1
+
+
+# example formula from Shufang that caused a crash because
+# of a bug in the an early implementation of bdd_mt_quantify
+run 1 ltlfsynt -f '(u & !o & XG(u|o)) | (!u & !o & X[!]F!o)'
+
+:
