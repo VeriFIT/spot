@@ -391,6 +391,8 @@ BUDDY_API void     bdd_free_minterm(mintermEnumerator*);
 BUDDY_API pathEnumerator* bdd_init_path(BDD);
 BUDDY_API int      bdd_first_path(pathEnumerator*);
 BUDDY_API int      bdd_next_path(pathEnumerator*);
+BUDDY_API int      bdd_first_path0(pathEnumerator*);
+BUDDY_API int      bdd_next_path0(pathEnumerator*);
 BUDDY_API void     bdd_free_path(pathEnumerator*);
 BUDDY_API BDD      bdd_current_path(const pathEnumerator*);
 BUDDY_API BDD      bdd_not(BDD);
@@ -943,8 +945,14 @@ inline pathEnumerator* bdd_init_path(const bdd& fun)
 inline int bdd_first_pathpp(pathEnumerator* me)
 { return bdd_first_path(me); }
 
+inline int bdd_first_path0pp(pathEnumerator* me)
+{ return bdd_first_path0(me); }
+
 inline int bdd_next_pathpp(pathEnumerator* me)
 { return bdd_next_path(me); }
+
+inline int bdd_next_path0pp(pathEnumerator* me)
+{ return bdd_next_path0(me); }
 
 inline void bdd_free_pathpp(pathEnumerator* me)
 { return bdd_free_path(me); }
@@ -1235,6 +1243,8 @@ inline int bdd_addvarblock(const bdd &v, int f)
 #define bdd_free_minterm bdd_free_mintermpp
 #define bdd_first_path bdd_first_pathpp
 #define bdd_next_path bdd_next_pathpp
+#define bdd_first_path0 bdd_first_path0pp
+#define bdd_next_path0 bdd_next_path0pp
 #define bdd_free_path bdd_free_pathpp
 #define bdd_current_path bdd_current_pathpp
 #define bdd_anodecount bdd_anodecountpp
@@ -1527,7 +1537,7 @@ typedef minterms_of_<true> minterms_mt_of;
 
 // Iterate over all successfull paths of a BDD
 
-template<bool path, bool mt>
+template<bool path, bool mt, bool false_too>
 class paths_of_
 {
 public:
@@ -1573,7 +1583,10 @@ public:
 
   path_iterator begin()
   {
-    done_ = !bdd_first_path(me_);
+    if constexpr (false_too)
+      done_ = !bdd_first_path0(me_);
+    else
+      done_ = !bdd_first_path(me_);
     return this;
   }
 
@@ -1602,8 +1615,16 @@ public:
 
   void operator++()
   {
-    if (!bdd_next_path(me_))
-      done_ = true;
+    if constexpr (false_too)
+      {
+        if (!bdd_next_path0(me_))
+          done_ = true;
+      }
+    else
+      {
+        if (!bdd_next_path(me_))
+          done_ = true;
+      }
   }
 
 protected:
@@ -1611,44 +1632,47 @@ protected:
   bool done_;
 };
 
-template<bool path, bool mt>
-inline typename paths_of_<path, mt>::path_iterator&
-paths_of_<path, mt>::path_iterator::operator++()
+template<bool path, bool mt, bool false_too>
+inline typename paths_of_<path, mt, false_too>::path_iterator&
+paths_of_<path, mt, false_too>::path_iterator::operator++()
 {
   ++*me_;
   return *this;
 }
 
-template<bool path, bool mt>
+template<bool path, bool mt, bool false_too>
 inline bool
-paths_of_<path, mt>::path_iterator::operator==(std::nullptr_t) const
+paths_of_<path, mt, false_too>::path_iterator::operator==(std::nullptr_t) const
 {
   return me_->done();
 }
 
-template<bool path, bool mt>
+template<bool path, bool mt, bool false_too>
 inline bool
-paths_of_<path, mt>::path_iterator::operator!=(std::nullptr_t) const
+paths_of_<path, mt, false_too>::path_iterator::operator!=(std::nullptr_t) const
 {
   return !me_->done();
 }
 
-template<bool path, bool mt>
+template<bool path, bool mt, bool false_too>
 inline std::conditional_t<path,
                           std::conditional_t<mt, std::pair<bdd, bdd>, bdd>,
                           bdd>
-paths_of_<path, mt>::path_iterator::operator*() const
+paths_of_<path, mt, false_too>::path_iterator::operator*() const
 {
   return **me_;
 }
 
 // iterate on conditions that lead to a non-false leave
-typedef paths_of_<true, false> paths_of;
+typedef paths_of_<true, false, false> paths_of;
 // same, but returns pairs (conditions, leaves)
-typedef paths_of_<true, true> paths_mt_of;
+typedef paths_of_<true, true, false> paths_mt_of;
+// same, including paths leading to bddfalse
+typedef paths_of_<true, false, true> all_paths_of;
+typedef paths_of_<true, true, true> all_paths_mt_of;
 // same, but returns just the leaves without building the conditions
 // a leaf might be returned several times if there are multiple paths to it.
-typedef paths_of_<false, true> silent_paths_mt_of;
+typedef paths_of_<false, true, false> silent_paths_mt_of;
 
 #endif /* CPLUSPLUS */
 

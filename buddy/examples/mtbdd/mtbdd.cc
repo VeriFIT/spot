@@ -48,7 +48,7 @@ int main(int argc, char** argv)
      // bdd_printall();
      // bdd_gbc();
      // bdd_printall();
-     bdd arr[4] = {x, y};
+     bdd arr[5] = {x, y};
 
      bddExtCache mt_cache;
      bdd_extcache_init(&mt_cache, 100, true);
@@ -69,30 +69,50 @@ int main(int argc, char** argv)
                             [](int a) { return a + 1; },
                             bddfalse, bddtrue,
                             &mt_cache, 2);
+     arr[4] = bdd_ite(a,
+                      bddfalse,
+                      bdd_ite(b, t1, t3)),
 
      bdd_extcache_done(&mt_cache);
-     bdd_printdot_array(arr, 4);
+     bdd_printdot_array(arr, 5);
 
      bdd sup = bdd_support(arr[2]);
      assert(sup == (a & b & c));
 
+     std::cout << "--minterms_mt_of(arr[2])\n";
      for (auto [minterm, term]: minterms_mt_of(arr[2], sup))
        std::cout << minterm << " -> " << term << '\n';
-     std::cout << "--\n";
+     std::cout << "--paths_mt_of(arr[2])\n";
      for (auto [path, term]: paths_mt_of(arr[2]))
        std::cout << path << " -> " << term << '\n';
-     std::cout << "--\n";
+     std::cout << "--all_paths_mt_of(arr[2])\n";
+     for (auto [path, term]: all_paths_mt_of(arr[2]))
+       std::cout << path << " -> " << term << '\n';
+     std::cout << "--silent_paths_mt_of(arr[2])\n";
      for (bdd term: silent_paths_mt_of(arr[2]))
        std::cout << "terminal " << term << '\n';
 
-     std::cout << "--\n";
+     std::cout << "--all_paths_mt_of(arr[4])  arr[4]=" << arr[4] << '\n';
+     for (auto [path, term]: all_paths_mt_of(arr[4]))
+       std::cout << path << " -> " << term << '\n';
+
+     std::cout << "--paths_of(sup)\n";
      for (bdd sat: paths_of(sup))
        std::cout << sat << '\n';
-     std::cout << "--\n";
+     std::cout << "--all_paths_of(sup)\n";
+     for (bdd sat: all_paths_of(sup))
+       std::cout << sat << '\n';
+     std::cout << "--paths_of(bddtrue)\n";
      for (bdd sat: paths_of(bddtrue))
        std::cout << sat << '\n';
-     std::cout << "--\n";
+     std::cout << "--paths_of(bddfalse)\n";
      for (bdd sat: paths_of(bddfalse))
+       std::cout << sat << '\n';
+     std::cout << "--all_paths_of(bddtrue)\n";
+     for (bdd sat: all_paths_of(bddtrue))
+       std::cout << sat << '\n';
+     std::cout << "--all_paths_of(bddfalse)\n";
+     for (bdd sat: all_paths_of(bddfalse))
        std::cout << sat << '\n';
      std::cout << "--\n";
 

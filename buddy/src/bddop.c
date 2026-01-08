@@ -634,6 +634,18 @@ static int reset_path(pathEnumerator* me)
   return 1;
 }
 
+static int reset_path0(pathEnumerator* me)
+{
+  int* stacktop = me->stacktop;
+  while (!ISCONST(*stacktop) && !ISTERM(*stacktop))
+    {
+      BDD low = LOW(*stacktop);
+      *++stacktop = low;
+    }
+  me->stacktop = stacktop;
+  return 1;
+}
+
 
 int bdd_first_path(pathEnumerator* me)
 {
@@ -641,6 +653,12 @@ int bdd_first_path(pathEnumerator* me)
     return 0;
   me->stacktop = me->stack;
   return reset_path(me);
+}
+
+int bdd_first_path0(pathEnumerator* me)
+{
+  me->stacktop = me->stack;
+  return reset_path0(me);
 }
 
 int bdd_next_path(pathEnumerator* me)
@@ -660,6 +678,27 @@ int bdd_next_path(pathEnumerator* me)
           *++stacktop = h;
           me->stacktop = stacktop;
           return reset_path(me);
+        }
+    }
+  // no next path
+  me->stacktop = stacktop;
+  return 0;
+}
+
+int bdd_next_path0(pathEnumerator* me)
+{
+  // rewind the stack until we backtrack a LOW link
+  int* stack = me->stack;
+  int* stacktop = me->stacktop;
+  while (stack < stacktop)
+    {
+      bdd child = *stacktop--;
+      bdd parent = *stacktop;
+      if (child == LOW(parent))
+        {
+          *++stacktop = HIGH(parent);
+          me->stacktop = stacktop;
+          return reset_path0(me);
         }
     }
   // no next path
