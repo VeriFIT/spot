@@ -468,7 +468,8 @@ test "6,0" = `ltl2tgba --med "$f" --stats=%s,%d`
 f='X((p1 & Xp1) M Fp1)'
 test "4,1" = `ltl2tgba -D "$f" --stats=%s,%d`
 test "4,1" = `ltl2tgba -D -x wdba-minimize=2 "$f" --stats=%s,%d`
-test "4,0" = `ltl2tgba -D -x wdba-minimize=0 "$f" --stats=%s,%d`
+test "4,1" = `ltl2tgba -D -x wdba-minimize=0 "$f" --stats=%s,%d`
+test "4,0" = `ltl2tgba -D -x wdba-minimize=0,new-oblig=0 "$f" --stats=%s,%d`
 test "4,1" = `ltl2tgba -D --med "$f" --stats=%s,%d`
 
 # Issue #418.

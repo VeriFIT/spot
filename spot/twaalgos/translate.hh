@@ -151,6 +151,7 @@ namespace spot
     int relabel_bool_;
     int relabel_overlap_;
     int tls_impl_;
+    int new_oblig_ = -1;
     bool gf_guarantee_ = true;
     bool gf_guarantee_set_ = false;
     bool ltl_split_;

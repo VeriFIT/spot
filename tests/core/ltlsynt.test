@@ -759,6 +759,7 @@ direct strategy was found.
 direct strategy has 2 states and 3 edges
 simplification took X seconds
 EOF
+
 ltlsynt -f "Fa <-> FGb" --outs=b,c --verbose --decompose=0 --verify 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
@@ -777,10 +778,21 @@ automaton has 10 states
 solving game with acceptance: Büchi
 game solved in X seconds
 simplification took X seconds
-AIG circuit was created in X seconds and has 0 latches and 0 gates
+AIG circuit was created in X seconds and has 1 latches and 1 gates
 EOF
 ltlsynt -f "Ga <-> Gb" --outs=b --verbose --decompose=0 --verify \
         --obligation=false --aiger 2> out
+sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
+diff outx exp
+
+cat >exp <<EOF
+formula is an obligation; solving with the on-the-fly construction
+solving done in X seconds
+simplification took X seconds
+AIG circuit was created in X seconds and has 0 latches and 0 gates
+EOF
+ltlsynt -f "Ga <-> Gb" --outs=b --verbose --decompose=0 --verify \
+        --obligation=true --aiger 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
 

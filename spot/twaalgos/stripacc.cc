@@ -23,10 +23,8 @@ namespace spot
 {
   void strip_acceptance_here(twa_graph_ptr a)
   {
-    unsigned n = a->num_states();
-    for (unsigned s = 0; s < n; ++s)
-      for (auto& t: a->out(s))
-        t.acc = {};
+    for (auto& t: a->edges())
+      t.acc = {};
     a->set_generalized_buchi(0);
     a->release_named_properties();
     a->prop_weak(true);

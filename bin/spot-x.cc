@@ -221,6 +221,9 @@ states reached in the powerset construction or in the followup products \
 exceeds this value, WDBA-minimization is aborted.  \
 Defaults to 4096.  Set to 0 to disable.  This limit is ignored when -D used \
 or when det-max-states is set.") },
+    { DOC("new-oblig", "If 1 (the default), use MTBDD-based obligation \
+when translating syntactic obligations into deterministic automata.  Set to \
+0 to disable this optimization.") },
     { DOC("tba-det", "Set to 1 to attempt a powerset determinization \
 if the TGBA is not already deterministic.  Doing so will degeneralize \
 the automaton.  This is disabled by default, unless sat-minimize is set.") },

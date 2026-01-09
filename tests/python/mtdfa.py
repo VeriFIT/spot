@@ -31,14 +31,14 @@ hoa = a.as_twa().to_str('hoa')
 tc.assertEqual(hoa, '''HOA: v1
 States: 2
 Start: 0
-AP: 2 "b" "a"
+AP: 2 "a" "b"
 acc-name: Buchi
 Acceptance: 1 Inf(0)
 properties: trans-labels explicit-labels trans-acc colored
 properties: deterministic
 --BODY--
 State: 0
-[0&!1] 0 {0}
+[!0&1] 0 {0}
 [0&1] 1 {0}
 State: 1
 [t] 1 {0}

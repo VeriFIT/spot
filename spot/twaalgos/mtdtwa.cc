@@ -124,7 +124,7 @@ namespace spot
     if (!is_deterministic(twa))
       throw std::runtime_error("dtwa_to_mtdtwa: input is not deterministic");
     mtdtwa_ptr dfa = std::make_shared<mtdtwa>(twa->get_dict());
-    dfa->dict_->register_all_variables_of(&twa, dfa);
+    dfa->dict_->register_all_propositions_of(twa, dfa);
     unsigned n = twa->num_states();
     unsigned init = twa->get_init_state_number();
 
@@ -257,9 +257,8 @@ namespace spot
     //     names = new std::vector<std::string>;
     //     names->reserve(n);
     //     res->set_named_prop("state-names", names);
-    //     if (!state_based)
-    //       for (unsigned i = 0; i < n; ++i)
-    //         names->push_back(str_psl(this->names[i]));
+    //     for (unsigned i = 0; i < n; ++i)
+    //       names->push_back(str_psl(this->names[i]));
     //   }
 
     if (!state_based)
@@ -474,7 +473,8 @@ namespace spot
   }
 
   // convert the MTBDD DFA representation into a DFA.
-  twa_graph_ptr mtdswa::as_twa(bool state_based, bool labels) const
+  twa_graph_ptr mtdswa::as_twa(bool state_based, bool labels,
+                               bool complete) const
   {
     // If the initial state is bddtrue, we can simply return an
     // all-accepting automaton.
@@ -511,15 +511,26 @@ namespace spot
     assert(n > 0);
 
     acc_cond::mark_t sat_colors{};
-    auto true_state = [&res, this, &sat_colors, sink = -1] () mutable -> int {
+    auto true_state = [&res, this, &sat_colors, sink = -1]() mutable -> int {
       if (sink >= 0)
         return sink;
 
       auto [satisfiable, satcols] = acc.sat_mark();
       if (SPOT_UNLIKELY(!satisfiable))
-        throw std::runtime_error
-          ("mtdtwa::as_twa cannot declare "
-           "an accepting sink with this acceptance");
+        {
+          // Tweak the acceptance conditions to allow the accepting
+          // state to be accepting.  Since the acceptance was not
+          // accepting we could actually reduce the acceptance
+          // conditions to inf(0) and ingnore existing colors, but in
+          // case these colors have some purpose to the user, let's
+          // just augment the acceptance condition with ...|inf(n)
+          // where n is a new color used only for sink states.
+          unsigned n = acc.num_sets();
+          res->set_acceptance(n + 1,
+                              acc.get_acceptance() |
+                              acc_cond::acc_code::inf({n}));
+          satcols = {n};
+        }
 
       sat_colors = satcols;
       sink = res->new_state();
@@ -527,59 +538,235 @@ namespace spot
       return sink;
     };
 
-    (void) labels;
-    // std::vector<std::string>* names = nullptr;
-    // if (labels && this->names.size() == this->states.size())
-    //   {
-    //     names = new std::vector<std::string>;
-    //     names->reserve(n);
-    //     res->set_named_prop("state-names", names);
-    //     if (!state_based)
-    //       for (unsigned i = 0; i < n; ++i)
-    //         names->push_back(str_psl(this->names[i]));
-    //   }
+    acc_cond::mark_t unsat_colors{};
+    auto false_state = [&res, this, &unsat_colors, sink = -1]() mutable -> int {
+      if (sink >= 0)
+        return sink;
+
+      auto [unsatisfiable, unsatcols] = acc.unsat_mark();
+      if (SPOT_UNLIKELY(!unsatisfiable))
+        {
+          // see comment above in true_state.
+          unsigned n = acc.num_sets();
+          res->set_acceptance(n + 1,
+                              acc.get_acceptance() &
+                              acc_cond::acc_code::fin({n}));
+          unsatcols = {n};
+        }
+
+      unsat_colors = unsatcols;
+      sink = res->new_state();
+      res->new_edge(sink, sink, bddtrue, unsatcols);
+      return sink;
+    };
+
+    // in case we need to rename states
+    std::vector<int> new_num;
 
     if (!state_based)
       {
-        res->new_states(n);
-        for (unsigned i = 0; i < n; ++i)
-          for (auto [b, t]: paths_mt_of(states[i]))
-            if (t != bddtrue)
+        if (complete)
+          {
+            res->new_states(n);
+            for (unsigned i = 0; i < n; ++i)
+              for (auto [b, t]: all_paths_mt_of(states[i]))
+                if (t == bddtrue)
+                  {
+                    res->new_edge(i, true_state(), b, sat_colors);
+                  }
+                else if (t == bddfalse)
+                  {
+                    res->new_edge(i, false_state(), b, unsat_colors);
+                  }
+                else
+                  {
+                    unsigned dst = bdd_get_terminal(t);
+                    res->new_edge(i, dst, b, colors[dst]);
+                  }
+            res->prop_complete(true);
+          }
+        else
+          {
+            // Scan all states to renumber them ignoring rejecting sinks.
+            new_num.reserve(n);
+            unsigned cur_num = 0;
+            for (unsigned i = 0; i < n; ++i)
+              if (!acc.accepting(colors[i]) && states[i] == bdd_terminal(i))
+                new_num.push_back(-1);
+              else
+                new_num.push_back(cur_num++);
+            res->new_states(std::max(1U, cur_num));
+            bool so_far_complete = cur_num > 0;
+            for (unsigned i = 0; i < n; ++i)
               {
-                unsigned dst = bdd_get_terminal(t);
-                res->new_edge(i, dst, b, colors[dst]);
+                int ni = new_num[i];
+                if (ni < 0)
+                  continue;
+                if (so_far_complete)
+                  for (auto [b, t]: all_paths_mt_of(states[i]))
+                    if (t == bddtrue)
+                      {
+                        res->new_edge(ni, true_state(), b, colors[ni]);
+                      }
+                    else if (t == bddfalse)
+                      {
+                        so_far_complete = false;
+                      }
+                    else
+                      {
+                        int dst = new_num[bdd_get_terminal(t)];
+                        if (dst < 0) // edge going to a sink
+                          {
+                            so_far_complete = false;
+                            continue;
+                          }
+                        res->new_edge(ni, dst, b, colors[ni]);
+                      }
+                else
+                  for (auto [b, t]: paths_mt_of(states[i]))
+                    if (t == bddtrue)
+                      {
+                        res->new_edge(ni, true_state(), b, colors[ni]);
+                      }
+                    else
+                      {
+                        int dst = new_num[bdd_get_terminal(t)];
+                        if (dst < 0) // edge going to a sink
+                          continue;
+                        res->new_edge(ni, dst, b, colors[ni]);
+                      }
               }
-            else
-              {
-                res->new_edge(i, true_state(), b, sat_colors);
-              }
+            res->prop_complete(so_far_complete);
+          }
         res->merge_edges();
       }
     else                        // state-based
       {
-
         // The set of states in the new automaton is STATES,
         // plus optionally an accepting sink (if bddtrue appears in
         // the MTBDDs).
 
         // For now, just declare states for each of terminal_data_map.
         unsigned ns = states.size();
-        res->new_states(ns);
+        // We are going to merge edges while we create the automaton,
+        // to avoid calling merge_edges() which is costly.
 
-        res->set_init_state(0);
-        for (unsigned i = 0; i < ns; ++i)
+        // For a given state i, edge_dst[j] is going to store label of
+        // the edge going to j.  used_dst will record the different j
+        // for which edge_dst[j]!=bddfalse.
+        std::vector<bdd> edge_dst(ns + 1 + complete, bddfalse);
+        std::vector<int> used_dst;
+        used_dst.reserve(ns);
+
+        if (complete)
           {
-            auto& col = colors[i];
-            for (auto [b, t]: paths_mt_of(states[i]))
+            res->new_states(ns);
+            for (unsigned i = 0; i < ns; ++i)
               {
-                if (t != bddtrue)
-                  res->new_edge(i, bdd_get_terminal(t), b, col);
-                else
-                  res->new_edge(i, true_state(), b, col);
+                auto& col = colors[i];
+                for (auto [b, t]: all_paths_mt_of(states[i]))
+                  {
+                    int dst;
+                    if (t == bddtrue)
+                      dst = true_state();
+                    else if (t == bddfalse)
+                      dst = false_state();
+                    else
+                      dst = bdd_get_terminal(t);
+
+                    if (edge_dst[dst] == bddfalse)
+                      used_dst.push_back(dst);
+                    edge_dst[dst] |= b;
+                  }
+                for (unsigned dst: used_dst)
+                  {
+                    res->new_edge(i, dst, edge_dst[dst], col);
+                    edge_dst[dst] = bddfalse;
+                  }
+                used_dst.clear();
               }
+            res->prop_complete(true);
           }
-        res->merge_edges();
+        else
+          {
+            // Scan all states to renumber them ignoring rejecting sinks.
+            new_num.reserve(n);
+            unsigned cur_num = 0;
+            for (unsigned i = 0; i < n; ++i)
+              if (!acc.accepting(colors[i]) && states[i] == bdd_terminal(i))
+                new_num.push_back(-1);
+              else
+                new_num.push_back(cur_num++);
+            res->new_states(std::max(1U, cur_num));
+            bool so_far_complete = cur_num > 0;
+            for (unsigned i = 0; i < ns; ++i)
+              {
+                int ni = new_num[i];
+                if (ni < 0)
+                  continue;
+
+                auto& col = colors[i];
+                if (so_far_complete)
+                  // Use all_paths_mt_of until we have found that
+                  // the automaton is incomplete.
+                  for (auto [b, t]: all_paths_mt_of(states[i]))
+                    {
+                      if (t == bddfalse)
+                        {
+                          so_far_complete = false;
+                          continue;
+                        }
+                      int dst = (t != bddtrue) ?
+                        new_num[bdd_get_terminal(t)] : true_state();
+                      if (dst < 0)
+                        {
+                          so_far_complete = false;
+                          continue;
+                        }
+                      if (edge_dst[dst] == bddfalse)
+                        used_dst.push_back(dst);
+                      edge_dst[dst] |= b;
+                    }
+                else
+                  for (auto [b, t]: paths_mt_of(states[i]))
+                    {
+                      int dst = (t != bddtrue) ?
+                        new_num[bdd_get_terminal(t)] : true_state();
+                      if (dst < 0)
+                        continue;
+                      if (edge_dst[dst] == bddfalse)
+                        used_dst.push_back(dst);
+                      edge_dst[dst] |= b;
+                    }
+
+                for (unsigned dst: used_dst)
+                  {
+                    res->new_edge(ni, dst, edge_dst[dst], col);
+                    edge_dst[dst] = bddfalse;
+                  }
+                used_dst.clear();
+              }
+            res->prop_complete(so_far_complete);
+          }
       }
+
+    res->set_init_state(0);
+
+    std::vector<std::string>* names = nullptr;
+    if (labels && this->names.size() == this->states.size())
+      {
+        names = new std::vector<std::string>;
+        names->reserve(n);
+        res->set_named_prop("state-names", names);
+        if (new_num.empty())
+          for (unsigned i = 0; i < n; ++i)
+            names->push_back(str_psl(this->names[i]));
+        else
+          for (unsigned i = 0; i < n; ++i)
+            if (int ni = new_num[i]; ni >= 0)
+              names->push_back(str_psl(this->names[ni]));
+      }
+
     return res;
   }
 
@@ -1136,7 +1323,7 @@ namespace spot
         ("dtwa_to_mtdswa: input does not have state-based acceptance");
 
     mtdswa_ptr dfa = std::make_shared<mtdswa>(twa->get_dict());
-    dfa->get_dict()->register_all_variables_of(&twa, dfa);
+    dfa->get_dict()->register_all_propositions_of(twa, dfa);
     unsigned n = twa->num_states();
     unsigned init = twa->get_init_state_number();
 
@@ -2299,6 +2486,8 @@ namespace spot
     acc_cond::mark_t rej_mark{};
     std::vector<acc_cond::mark_t> colors;
 
+    term_combine_trans = this;
+
     // Keep track of whether we have seen an accepting or rejecting
     // state.  If we are missing one of them, we can reduce the
     // automaton to a single state.
@@ -2461,6 +2650,8 @@ namespace spot
 
       delete a;
     }
+
+    term_combine_trans = this;
 
     todo.emplace_back(formula_propeq_to_int(f));
     do

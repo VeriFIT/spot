@@ -30,6 +30,9 @@
 #include <spot/twaalgos/product.hh>
 #include <spot/twaalgos/sccinfo.hh>
 #include <spot/twaalgos/dbranch.hh>
+#include <spot/twaalgos/mtdtwa.hh>
+#include <spot/twaalgos/stripacc.hh>
+#include <spot/twaalgos/hoa.hh>
 
 #define OBLIGATION_ (pref_ & Obligation)
 
@@ -70,6 +73,7 @@ namespace spot
     tls_max_ops_ = std::max(0, opt->get("tls-max-ops", 16));
     exprop_ = opt->get("exprop", -1);
     branchpost_ = opt->get("branch-post", -1);
+    new_oblig_ = opt->get("new-oblig", -1);
   }
 
   void translator::build_simplifier(const bdd_dict_ptr& dict)
@@ -134,6 +138,9 @@ namespace spot
         unambiguous = false;
         pref_ |= postprocessor::Deterministic;
       }
+
+    if (new_oblig_ < 0)
+      new_oblig_ = !!(pref_ & postprocessor::Deterministic);
 
     // This helps ltl_to_tgba_fm() to order BDD variables in a more
     // natural way (improving the degeneralization).
@@ -426,25 +433,86 @@ namespace spot
                   }
               }
           }
-        bool exprop = unambiguous
-          || (level_ == postprocessor::High && exprop_ != 0)
-          || exprop_ > 0;
-        // branch-post: 1 == force branching postponement
-        //              0 == disable branching post. and delay_branching
-        //              2 == force delay_branching
-        //             -1 == auto (delay_branching)
-        // Some quick experiments suggests that branching postponement
-        // can produce larger automata on non-obligations formulas, and
-        // that even on obligation formulas, delay_branching is faster.
-        bool bpost = branchpost_ == 1;
-        aut = ltl_to_tgba_fm(r, simpl_->get_dict(), exprop,
-                             true, bpost, false, nullptr, nullptr,
-                             unambiguous,
-                             nullptr, false, type_ == Finite);
-        if (!bpost && branchpost_ != 0 && delay_branching_here(aut))
+        if (new_oblig_ == 1
+            && r.is_syntactic_obligation()
+            && r.is_ltl_formula()) // does not support PSL at that point
           {
-            aut->purge_unreachable_states();
-            aut->merge_edges();
+            mtdswa_ptr mtdwa = obligation_to_mtdswa(r, simpl_->get_dict());
+            if (wdba_minimize_ != 0)
+              {
+                mtdwa->sinks_as_states();
+                std::vector<unsigned> part = loding_weak_ranking(mtdwa, true);
+                mtdwa = minimize_mtdswa(mtdwa, part);
+              }
+            // The output of obligation_to_mtdswa is always Büchi.  Since
+            // the automaton is complete and weak, we can obtain CoBüchi
+            // simply by flipping the colors.
+            if (type_ == CoBuchi)
+              {
+                acc_cond::mark_t good = {};
+                acc_cond::mark_t bad = {0};
+                for (auto& c: mtdwa->colors)
+                  c = mtdwa->acc.accepting(c) ? good : bad;
+                mtdwa->acc = acc_cond(1, acc_cond::acc_code::cobuchi());
+              }
+            bool want_complete = pref_ & Complete;
+            aut = mtdwa->as_twa(true, false, want_complete);
+            aut->prop_weak(true);
+            // Unless we need a Büchi or colored automaton, if the
+            // weak automaton has all its edges marked as accepting,
+            // we can reduce the acceptance to t.
+            if (type_ != Buchi && type_ != CoBuchi && aut->num_sets() > 0)
+              {
+                acc_cond::mark_t c = {};
+                // If the automaton has no edge, we are good to reduce
+                // the acceptance to t.
+                bool good = true;
+
+                for (auto& e: aut->edges()) // pick first colors
+                  {
+                    c = e.acc;
+                    good = false; // don't reduce to t
+                    break;
+                  }
+                // unless all edges are accepting.
+                if (aut->acc().accepting(c))
+                  {
+                    good = true;
+                    // check that all edges have the same colors
+                    for (auto& e: aut->edges())
+                      if (e.acc != c)
+                        {
+                          good = false;
+                          break;
+                        }
+                  }
+                if (good)
+                  strip_acceptance_here(aut);
+              }
+            return finalize(aut);
+          }
+        else
+          {
+            bool exprop = unambiguous
+              || (level_ == postprocessor::High && exprop_ != 0)
+              || exprop_ > 0;
+            // branch-post: 1 == force branching postponement
+            //              0 == disable branching post. and delay_branching
+            //              2 == force delay_branching
+            //             -1 == auto (delay_branching)
+            // Some quick experiments suggests that branching postponement
+            // can produce larger automata on non-obligations formulas, and
+            // that even on obligation formulas, delay_branching is faster.
+            bool bpost = branchpost_ == 1;
+            aut = ltl_to_tgba_fm(r, simpl_->get_dict(), exprop,
+                                 true, bpost, false, nullptr, nullptr,
+                                 unambiguous,
+                                 nullptr, false, type_ == Finite);
+            if (!bpost && branchpost_ != 0 && delay_branching_here(aut))
+              {
+                aut->purge_unreachable_states();
+                aut->merge_edges();
+              }
           }
       }
     if (!postprocess_was_done)

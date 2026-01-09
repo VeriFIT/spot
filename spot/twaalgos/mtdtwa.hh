@@ -130,7 +130,9 @@ namespace spot
     std::ostream& print_dot(std::ostream& os, const char* opts = nullptr) const;
 
     /// \brief convert to twa
-    twa_graph_ptr as_twa(bool state_based = false, bool labels = true) const;
+    twa_graph_ptr as_twa(bool state_based = false,
+                         bool labels = true,
+                         bool complete = false) const;
 
     /// \brief convert bddtrue/bddfalse nodes to actual states
     ///
