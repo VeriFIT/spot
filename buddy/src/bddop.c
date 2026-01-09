@@ -609,8 +609,8 @@ pathEnumerator* bdd_init_path(BDD fun)
 
 void bdd_free_path(pathEnumerator* me)
 {
-  bdd_delref(*me->stacktop);
-  free(me->stacktop);
+  bdd_delref(*me->stack);
+  free(me->stack);
   free(me);
 }
 
