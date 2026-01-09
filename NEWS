@@ -12,6 +12,9 @@ New in spot 2.14.4.dev  (not yet released)
     could produce non-equivalent automata when the acceptance condition
     involved Fin(x) terms.  (Issue #628).
 
+  - BuDDy's bdd_free_path(), used in some iterations using paths_of(...) and
+    variants, was behaving incorrectly when the iteration was aborted.
+
 New in spot 2.14.4  (2025-12-17)
 
   Library:
