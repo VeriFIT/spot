@@ -15,6 +15,14 @@ New in spot 2.14.4.dev  (not yet released)
   - BuDDy's bdd_free_path(), used in some iterations using paths_of(...) and
     variants, was behaving incorrectly when the iteration was aborted.
 
+  - Because of an optimization introduced in Spot 2.11 to improve the
+    parsing of large disjunctions or conjunctions, the LTL parser
+    could instantiate Boolean subformulas in different order depending
+    on the architecture's calling convention.  This could cause
+    different ordering of operands when printing formulas, causing
+    spurious failures in the test suite (e.g. if a test case expects
+    "α & β" as a result, but gets "β & α" instead).
+
 New in spot 2.14.4  (2025-12-17)
 
   Library:

@@ -955,84 +955,84 @@ boolformula: booleanatom
 	      { $$ = pnode(op::And, $1, $3); }
 	    | boolformula OP_AND error
               { missing_right_binop($$, $1, @2, "and operator"); }
-	    | boolformula OP_SHORT_AND boolformula
+            | boolformula OP_SHORT_AND boolformula
               { $$ = pnode(op::And, $1, $3); }
-	    | boolformula OP_SHORT_AND error
+            | boolformula OP_SHORT_AND error
               { missing_right_binop($$, $1, @2, "and operator"); }
-	    | boolformula OP_STAR boolformula
-	      { $$ = pnode(op::And, $1, $3); }
-	    | boolformula OP_STAR error
+            | boolformula OP_STAR boolformula
+              { $$ = pnode(op::And, $1, $3); }
+            | boolformula OP_STAR error
               { missing_right_binop($$, $1, @2, "and operator"); }
-	    | boolformula OP_OR boolformula
-	      { $$ = pnode(op::Or, $1, $3); }
-	    | boolformula OP_OR error
+            | boolformula OP_OR boolformula
+              { $$ = pnode(op::Or, $1, $3); }
+            | boolformula OP_OR error
               { missing_right_binop($$, $1, @2, "or operator"); }
-	    | boolformula OP_XOR boolformula
-	      { $$ = fnode::binop(op::Xor, $1, $3); }
-	    | boolformula OP_XOR error
-	      { missing_right_binop($$, $1, @2, "xor operator"); }
-	    | boolformula OP_IMPLIES boolformula
-	      { $$ = fnode::binop(op::Implies, $1, $3); }
-	    | boolformula OP_IMPLIES error
-	      { missing_right_binop($$, $1, @2, "implication operator"); }
-	    | boolformula OP_EQUIV boolformula
-	      { $$ = fnode::binop(op::Equiv, $1, $3); }
-	    | boolformula OP_EQUIV error
-	      { missing_right_binop($$, $1, @2, "equivalent operator"); }
-	    | OP_NOT boolformula
-	      { $$ = fnode::unop(op::Not, $2); }
-	    | OP_NOT error
-	      { missing_right_op($$, @1, "not operator"); }
+            | boolformula OP_XOR boolformula
+              { const fnode* left = $1; $$ = fnode::binop(op::Xor, left, $3); }
+            | boolformula OP_XOR error
+              { missing_right_binop($$, $1, @2, "xor operator"); }
+            | boolformula OP_IMPLIES boolformula
+              { const fnode* left = $1; $$ = fnode::binop(op::Implies, left, $3); }
+            | boolformula OP_IMPLIES error
+              { missing_right_binop($$, $1, @2, "implication operator"); }
+            | boolformula OP_EQUIV boolformula
+              { const fnode* left = $1; $$ = fnode::binop(op::Equiv, left, $3); }
+            | boolformula OP_EQUIV error
+              { missing_right_binop($$, $1, @2, "equivalent operator"); }
+            | OP_NOT boolformula
+              { $$ = fnode::unop(op::Not, $2); }
+            | OP_NOT error
+              { missing_right_op($$, @1, "not operator"); }
 
 subformula: booleanatom
             | parenthesedsubformula
-	    | subformula OP_AND subformula
+            | subformula OP_AND subformula
               { $$ = pnode(op::And, $1, $3); }
-	    | subformula OP_AND error
+            | subformula OP_AND error
               { missing_right_binop($$, $1, @2, "and operator"); }
-	    | subformula OP_SHORT_AND subformula
+            | subformula OP_SHORT_AND subformula
               { $$ = pnode(op::And, $1, $3); }
-	    | subformula OP_SHORT_AND error
+            | subformula OP_SHORT_AND error
               { missing_right_binop($$, $1, @2, "and operator"); }
-	    | subformula OP_STAR subformula
-	      { $$ = pnode(op::And, $1, $3); }
-	    | subformula OP_STAR error
+            | subformula OP_STAR subformula
+              { $$ = pnode(op::And, $1, $3); }
+            | subformula OP_STAR error
               { missing_right_binop($$, $1, @2, "and operator"); }
-	    | subformula OP_OR subformula
-	      { $$ = pnode(op::Or, $1, $3); }
-	    | subformula OP_OR error
+            | subformula OP_OR subformula
+              { $$ = pnode(op::Or, $1, $3); }
+            | subformula OP_OR error
               { missing_right_binop($$, $1, @2, "or operator"); }
-	    | subformula OP_XOR subformula
- 	      { $$ = fnode::binop(op::Xor, $1, $3); }
-	    | subformula OP_XOR error
-	      { missing_right_binop($$, $1, @2, "xor operator"); }
-	    | subformula OP_IMPLIES subformula
-	      { $$ = fnode::binop(op::Implies, $1, $3); }
-	    | subformula OP_IMPLIES error
-	      { missing_right_binop($$, $1, @2, "implication operator"); }
-	    | subformula OP_EQUIV subformula
-	      { $$ = fnode::binop(op::Equiv, $1, $3); }
-	    | subformula OP_EQUIV error
-	      { missing_right_binop($$, $1, @2, "equivalent operator"); }
-	    | subformula OP_U subformula
-	      { $$ = fnode::binop(op::U, $1, $3); }
-	    | subformula OP_U error
-	      { missing_right_binop($$, $1, @2, "until operator"); }
-	    | subformula OP_R subformula
-	      { $$ = fnode::binop(op::R, $1, $3); }
-	    | subformula OP_R error
-	      { missing_right_binop($$, $1, @2, "release operator"); }
-	    | subformula OP_W subformula
-	      { $$ = fnode::binop(op::W, $1, $3); }
-	    | subformula OP_W error
-	      { missing_right_binop($$, $1, @2, "weak until operator"); }
-	    | subformula OP_M subformula
-	      { $$ = fnode::binop(op::M, $1, $3); }
-	    | subformula OP_M error
-	      { missing_right_binop($$, $1, @2, "strong release operator"); }
-	    | OP_F subformula
-	      { $$ = fnode::unop(op::F, $2); }
-	    | OP_F error
+            | subformula OP_XOR subformula
+              { const fnode* left = $1; $$ = fnode::binop(op::Xor, left, $3); }
+            | subformula OP_XOR error
+              { missing_right_binop($$, $1, @2, "xor operator"); }
+            | subformula OP_IMPLIES subformula
+              { const fnode* left = $1; $$ = fnode::binop(op::Implies, left, $3); }
+            | subformula OP_IMPLIES error
+              { missing_right_binop($$, $1, @2, "implication operator"); }
+            | subformula OP_EQUIV subformula
+              { const fnode* left = $1; $$ = fnode::binop(op::Equiv, left, $3); }
+            | subformula OP_EQUIV error
+              { missing_right_binop($$, $1, @2, "equivalent operator"); }
+            | subformula OP_U subformula
+              { const fnode* left = $1; $$ = fnode::binop(op::U, left, $3); }
+            | subformula OP_U error
+              { missing_right_binop($$, $1, @2, "until operator"); }
+            | subformula OP_R subformula
+              { const fnode* left = $1; $$ = fnode::binop(op::R, left, $3); }
+            | subformula OP_R error
+              { missing_right_binop($$, $1, @2, "release operator"); }
+            | subformula OP_W subformula
+              { const fnode* left = $1; $$ = fnode::binop(op::W, left, $3); }
+            | subformula OP_W error
+              { missing_right_binop($$, $1, @2, "weak until operator"); }
+            | subformula OP_M subformula
+              { const fnode* left = $1; $$ = fnode::binop(op::M, left, $3); }
+            | subformula OP_M error
+              { missing_right_binop($$, $1, @2, "strong release operator"); }
+            | OP_F subformula
+              { $$ = fnode::unop(op::F, $2); }
+            | OP_F error
 	      { missing_right_op($$, @1, "sometimes operator"); }
 	    | OP_FREP sqbkt_num OP_SQBKT_CLOSE subformula %prec OP_FREP
               { unsigned n = $2;
@@ -1165,32 +1165,34 @@ subformula: booleanatom
             | bracedsere
 	      { $$ = fnode::unop(op::Closure, $1); }
             | bracedsere OP_UCONCAT subformula
-	      { $$ = fnode::binop(op::UConcat, $1, $3); }
+	      { const fnode* left = $1; $$ = fnode::binop(op::UConcat, left, $3); }
             | bracedsere parenthesedsubformula
-	      { $$ = fnode::binop(op::UConcat, $1, $2); }
+	      { const fnode* left = $1; $$ = fnode::binop(op::UConcat, left, $2); }
             | bracedsere OP_UCONCAT error
               { missing_right_op($$, @2,
                                  "universal overlapping concat operator"); }
             | bracedsere OP_ECONCAT subformula
-	      { $$ = fnode::binop(op::EConcat, $1, $3); }
+	      { const fnode* left = $1; $$ = fnode::binop(op::EConcat, left, $3); }
             | bracedsere OP_ECONCAT error
 	      { missing_right_op($$, @2,
                                  "existential overlapping concat operator");
 	      }
             | bracedsere OP_UCONCAT_NONO subformula
 	      /* {SERE}[]=>EXP = {SERE;1}[]->EXP */
-	      { $$ = fnode::binop(op::UConcat,
-				  pnode(op::Concat, $1, fnode::tt()),
-				  $3); }
+	      {
+                const fnode* left = pnode(op::Concat, $1, fnode::tt());
+                $$ = fnode::binop(op::UConcat, left, $3);
+              }
             | bracedsere OP_UCONCAT_NONO error
 	      { missing_right_op($$, @2,
                                  "universal non-overlapping concat operator");
 	      }
             | bracedsere OP_ECONCAT_NONO subformula
 	      /* {SERE}<>=>EXP = {SERE;1}<>->EXP */
-	      { $$ = fnode::binop(op::EConcat,
-				  pnode(op::Concat, $1, fnode::tt()),
-				  $3); }
+	      {
+                const fnode* left = pnode(op::Concat, $1, fnode::tt());
+                $$ = fnode::binop(op::EConcat, left, $3);
+              }
             | bracedsere OP_ECONCAT_NONO error
 	      { missing_right_op($$, @2,
                                  "existential non-overlapping concat operator");
@@ -1216,11 +1218,11 @@ lbtformula: atomprop
             | '|' lbtformula lbtformula
 	      { $$ = pnode(op::Or, $2, $3); }
             | '^' lbtformula lbtformula
-	      { $$ = fnode::binop(op::Xor, $2, $3); }
+              { const fnode* left = $2; $$ = fnode::binop(op::Xor, left, $3); }
             | 'i' lbtformula lbtformula
-	      { $$ = fnode::binop(op::Implies, $2, $3); }
+	      { const fnode* left = $2; $$ = fnode::binop(op::Implies, left, $3); }
             | 'e' lbtformula lbtformula
-	      { $$ = fnode::binop(op::Equiv, $2, $3); }
+	      { const fnode* left = $2; $$ = fnode::binop(op::Equiv, left, $3); }
             | 'X' lbtformula
 	      { $$ = fnode::unop(op::X, $2); }
             | 'F' lbtformula
@@ -1228,15 +1230,15 @@ lbtformula: atomprop
             | 'G' lbtformula
 	      { $$ = fnode::unop(op::G, $2); }
             | 'U' lbtformula lbtformula
-	      { $$ = fnode::binop(op::U, $2, $3); }
+	      { const fnode* left = $2; $$ = fnode::binop(op::U, left, $3); }
             | 'V' lbtformula lbtformula
-	      { $$ = fnode::binop(op::R, $2, $3); }
+	      { const fnode* left = $2; $$ = fnode::binop(op::R, left, $3); }
             | 'R' lbtformula lbtformula
-	      { $$ = fnode::binop(op::R, $2, $3); }
+	      { const fnode* left = $2; $$ = fnode::binop(op::R, left, $3); }
             | 'W' lbtformula lbtformula
-	      { $$ = fnode::binop(op::W, $2, $3); }
+	      { const fnode* left = $2; $$ = fnode::binop(op::W, left, $3); }
             | 'M' lbtformula lbtformula
-	      { $$ = fnode::binop(op::M, $2, $3); }
+	      { const fnode* left = $2; $$ = fnode::binop(op::M, left, $3); }
             | 't'
 	      { $$ = fnode::tt(); }
             | 'f'

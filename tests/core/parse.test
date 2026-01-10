@@ -93,3 +93,20 @@ fi
 
 # Make sure running the parser in debug mode does not crash
 run 0 ../ikwiad -d 'a U b'
+
+
+# Make sure formulas get named in the same order, regardless of the ABI.
+echo '((o1 & !(o0 | o2)) <-> (!o1 & !((!o0 & o2) <-> (o0 & !o2))))' >in
+../ltl2text in | sed 's/,/,\n/g' >out
+cat out
+cat >exp <<EOF
+Equiv(@17 #0 [And(@15 #0 [ap(@3 #1 "o1"),
+ Not(@7 #0 [Or(@6 #0 [ap(@4 #2 "o0"),
+ ap(@5 #2 "o2")])])]),
+ And(@16 #0 [Not(@8 #0 [ap(@3 #1 "o1")]),
+ Not(@14 #0 [Equiv(@13 #0 [And(@11 #0 [Not(@9 #0 [ap(@4 #2 "o0")]),
+ ap(@5 #2 "o2")]),
+ And(@12 #0 [ap(@4 #2 "o0"),
+ Not(@10 #0 [ap(@5 #2 "o2")])])])])])])
+EOF
+diff exp out
