@@ -338,3 +338,7 @@ diff expected output
 # branching postponement should work as well
 ltl2tgba -F formulas.ltl -x branch-post=1 --stats=%s,%e >output
 diff expected output
+
+# These should be instantaneous
+test 21 -eq "`genltl --tv-f1=20 | ltl2tgba -GDC --stats=%s`"
+test 21 -eq "`genltl --tv-g1=20 | ltl2tgba -GDC --stats=%s`"

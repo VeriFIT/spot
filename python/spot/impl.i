@@ -89,6 +89,7 @@
 #include <spot/tl/print.hh>
 #include <spot/tl/simplify.hh>
 #include <spot/tl/delta2.hh>
+#include <spot/tl/distribute.hh>
 #include <spot/tl/sonf.hh>
 #include <spot/tl/unabbrev.hh>
 #include <spot/tl/randomltl.hh>
@@ -668,6 +669,7 @@ namespace std {
 %include <spot/tl/print.hh>
 %include <spot/tl/simplify.hh>
 %include <spot/tl/delta2.hh>
+%include <spot/tl/distribute.hh>
 %include <spot/tl/unabbrev.hh>
 %include <spot/tl/randomltl.hh>
 %include <spot/tl/length.hh>

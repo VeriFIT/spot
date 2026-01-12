@@ -27,6 +27,7 @@
 #include <spot/misc/escape.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/apcollect.hh>
+#include <spot/tl/distribute.hh>
 #include <spot/twaalgos/backprop.hh>
 
 // Some of the MTBDD operations may share the same operation cache, so
@@ -1741,6 +1742,14 @@ namespace spot
             bdd left = propeq_encode(f[0]);
             return bdd_biimp(left, propeq_encode(f[1]));
           }
+        case op::X:
+          {
+            formula g = distribute_next(f);
+            if (g != f)
+              return propeq_encode(g);
+            f = g;
+          }
+          SPOT_FALLTHROUGH;
         default:
           return bdd_ithvar(dict_->register_anonymous_variables(1, this));
         }
