@@ -224,6 +224,7 @@ TESTS_twa = \
   core/522.test \
   core/566.test \
   core/568.test \
+  core/631.test \
   core/acc.test \
   core/acc2.test \
   core/basetred.test \

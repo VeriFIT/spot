@@ -1,0 +1,39 @@
+#!/bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. ./defs
+
+set -e
+
+# Issue #631.  The hashing function used in tgba_determinize was quite
+# poor, consing robin_hood to abort on formulas such as the following.
+# In practice the error was not seen very often, because other
+# optimizations (such as simulation-based reduction, or
+# wdba-minimization) would be used before resorting to
+# tgba_determinize.
+
+genltl --tv-f1=10..11 --tv-f2=10..11 |
+  ltl2tgba -x wdba-minimize=0,simul=0,new-oblig=0 -GDC --low --stats=%s >out
+cat >exp <<EOF
+31522
+107618
+31522
+107618
+EOF
+diff exp out

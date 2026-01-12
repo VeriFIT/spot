@@ -69,6 +69,9 @@ New in spot 2.14.5.dev  (not yet released)
 
   - Let ltlfilt's --save-part-file work even if -q is used.  (Issue #632.)
 
+  - A poorly defined hash function used in tgba_determinize() could
+    cause that function to throw a "robin_hood::map overflow"
+    exception.  (Issue #631.)
 
 New in spot 2.14.5  (2025-01-11)
 

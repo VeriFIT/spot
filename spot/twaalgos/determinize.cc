@@ -829,21 +829,17 @@ namespace spot
   size_t
   safra_state::hash() const
   {
-    size_t res = 0;
-    //std::cerr << this << " [";
+    size_t res = fnv<size_t>::init;
     for (const auto& p : nodes_)
       {
-        res ^= (res << 3) ^ p.first;
-        res ^= (res << 3) ^ p.second;
-        //  std::cerr << '(' << p.first << ',' << p.second << ')';
+        res ^= (p.first << 3) + p.second;
+        res *= fnv<size_t>::prime;
       }
-    //    std::cerr << "][ ";
     for (const auto& b : braces_)
       {
-        res ^= (res << 3) ^ b;
-        //  std::cerr << b << ' ';
+        res ^= b;
+        res *= fnv<size_t>::prime;
       }
-    //    std::cerr << "]: " << std::hex << res << std::dec << '\n';
     return res;
   }
 
