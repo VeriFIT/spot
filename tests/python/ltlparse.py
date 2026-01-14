@@ -231,3 +231,8 @@ tc.assertEqual(spot.str_sere(pf.f), 'b[->]')
 pf = spot.parse_infix_sere('b[->1]')
 tc.assertEqual(spot.str_latex_sere(pf.f), 'b\\SereGoto{}')
 tc.assertEqual(spot.str_sclatex_sere(pf.f), 'b^{\\to}')
+pf = spot.parse_infix_sere('(1;1)[:*][*]') # brace grouping under exponent
+tc.assertEqual(spot.str_latex_sere(pf.f),
+               '{{\\ttrue\\SereStar{2}}\\SereFStar{}}\\SereStar{}')
+tc.assertEqual(spot.str_sclatex_sere(pf.f),
+               '{{\\top^{\\star2}}^{\\mathsf{:}\\star}}^{\\star}')

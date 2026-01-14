@@ -424,10 +424,19 @@ namespace spot
             // braces, because they are already output for the node
             // below.
             bool need_parent = (!full_parent_ && b.is(op::Not));
-            if (need_parent)
+            // latex is a special case because we use exponent notation
+            // for Star and FStar, and chaining 2 or more exponents
+            // requires braces otherwise MathJax throws a syntax error.
+            bool need_brace = (kw_ == latex_kw || kw_ == sclatex_kw)
+                              && b.is(op::Star, op::FStar);
+            if (need_brace)
+              os_ << '{';
+            else if (need_parent)
               openp();
             this->visit(b);
-            if (need_parent)
+            if (need_brace)
+              os_ << '}';
+            else if (need_parent)
               closep();
           };
 
@@ -764,8 +773,10 @@ namespace spot
               unsigned default_min = 0;
               unsigned default_max = formula::unbounded();
 
-              // Abbreviate "1[*]" as "[*]".
-              if (!c.is_tt() || o != op::Star)
+              // Abbreviate "1[*]" as "[*]", but avoid floating exponent
+              // with no operand in LaTeX
+              if ((kw_ == sclatex_kw || kw_ == latex_kw) ||
+                  (!c.is_tt() || o != op::Star))
                 {
                   if (o == op::Star)
                     {
