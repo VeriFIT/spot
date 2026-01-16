@@ -27,7 +27,6 @@
 #include <spot/misc/escape.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/apcollect.hh>
-#include <spot/tl/distribute.hh>
 #include <spot/twaalgos/backprop.hh>
 
 // Some of the MTBDD operations may share the same operation cache, so
@@ -1688,10 +1687,12 @@ namespace spot
   }
 
 
-  // Convert the formula to a BDD suitable for propositional
-  // equivalence.  Any subformula that has a non-boolean
-  // operator is replaced by atomic proposition.
-  bdd simple_ltl_translator::propeq_encode(formula f)
+  // Convert the formula at a given level to a BDD suitable for
+  // propositional equivalence.  Any subformula that has a non-boolean
+  // operator is replaced by atomic proposition, but X are traversed
+  // so that we get the effect of calling distribute_next() without
+  // calling it.
+  bdd simple_ltl_translator::propeq_encode(formula f, int level)
   {
     auto encode_new = [&] (formula f) -> bdd
     {
@@ -1702,7 +1703,10 @@ namespace spot
         case op::ff:
           return bddfalse;
         case op::ap:
-          return bdd_ithvar(dict_->register_proposition(f, this));
+          if (level == 0)
+            return bdd_ithvar(dict_->register_proposition(f, this));
+          else
+            return bdd_ithvar(dict_->register_anonymous_variables(1, this));
         case op::Not:
           if (f[0].is_leaf())   // skip one application of bdd_not.
             {
@@ -1710,58 +1714,70 @@ namespace spot
                 return bddfalse;
               if (f[0].is_ff())
                 return bddtrue;
-              return bdd_nithvar(dict_->register_proposition(f[0], this));
+              if (level == 0)
+                return bdd_nithvar(dict_->register_proposition(f[0], this));
+              else
+                return bdd_nithvar(dict_->register_anonymous_variables(1,
+                                                                       this));
             }
-          return bdd_not(propeq_encode(f[0]));
+          return bdd_not(propeq_encode(f[0], level));
         case op::And:
           {
             bdd res = bddtrue;
             for (const formula& sub: f)
-              res &= propeq_encode(sub);
+              res &= propeq_encode(sub, level);
             return res;
           }
         case op::Or:
           {
             bdd res = bddfalse;
             for (const formula& sub: f)
-              res |= propeq_encode(sub);
+              res |= propeq_encode(sub, level);
             return res;
           }
         case op::Xor:
           {
-            bdd left = propeq_encode(f[0]);
-            return left ^ propeq_encode(f[1]);
+            bdd left = propeq_encode(f[0], level);
+            return left ^ propeq_encode(f[1], level);
           }
         case op::Implies:
           {
-            bdd left = propeq_encode(f[0]);
-            return left >> propeq_encode(f[1]);
+            bdd left = propeq_encode(f[0], level);
+            return left >> propeq_encode(f[1], level);
           }
         case op::Equiv:
           {
-            bdd left = propeq_encode(f[0]);
-            return bdd_biimp(left, propeq_encode(f[1]));
+            bdd left = propeq_encode(f[0], level);
+            return bdd_biimp(left, propeq_encode(f[1], level));
           }
         case op::X:
-          {
-            formula g = distribute_next(f);
-            if (g != f)
-              return propeq_encode(g);
-            f = g;
-          }
-          SPOT_FALLTHROUGH;
+        case op::strong_X:
+          SPOT_UNREACHABLE();
         default:
+          // For any temporal operator (not X), create a BDD variable.
+          // The variable represents this formula at this specific level
           return bdd_ithvar(dict_->register_anonymous_variables(1, this));
         }
     };
 
-    if (auto it = propositional_equiv_bdd_.find(f);
+    // Process X operators by incrementing level instead of
+    // distributing if multiple X are nested, let's just go through
+    // them all, to reduce the entries in propositional_equiv_bdd_.
+    while (f.is(op::X, op::strong_X))
+      {
+        f = f[0];
+        ++level;
+      }
+
+    formula_level_pair flp = {f, level};
+    if (auto it = propositional_equiv_bdd_.find(flp);
         it != propositional_equiv_bdd_.end())
       return it->second;
     // We cannot insert into the map while doing the search
     // above, because the iterator would be invalidated by
     // other insertions performed in encode_new.
-    return propositional_equiv_bdd_[f] = encode_new(f);
+    bdd b = encode_new(f);
+    return propositional_equiv_bdd_[flp] = b;
   }
 
   // This implement propositional equivalence plus some very light
@@ -1843,7 +1859,7 @@ namespace spot
         return f;
       }
 
-    bdd enc = propeq_encode(f);
+    bdd enc = propeq_encode(f);  // Always start at level 0
     if (enc == bddtrue)
       f = formula::tt();
     else if (enc == bddfalse)

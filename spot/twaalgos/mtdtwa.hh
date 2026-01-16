@@ -243,7 +243,7 @@ namespace spot
     bdd combine_xor(bdd left, bdd right);
     bdd combine_not(bdd b);
 
-    bdd propeq_encode(formula f);
+    bdd propeq_encode(formula f, int level = 0);
     formula propeq_representative(formula f, bool isacc);
 
     bddExtCache* get_cache()
@@ -253,7 +253,28 @@ namespace spot
 
     ~simple_ltl_translator();
   private:
-    std::unordered_map<formula, bdd> propositional_equiv_bdd_;
+    // Pair representing a formula at a given X-nesting level
+    struct formula_level_pair
+    {
+      formula f;
+      int level;
+
+      bool operator==(const formula_level_pair& other) const
+      {
+        return f == other.f && level == other.level;
+      }
+    };
+
+    struct formula_level_pair_hash
+    {
+      std::size_t operator()(const formula_level_pair& p) const
+      {
+        return p.f.id() ^ (p.level * 0x9e3779b9);
+      }
+    };
+
+    std::unordered_map<formula_level_pair, bdd,
+                       formula_level_pair_hash> propositional_equiv_bdd_;
     std::unordered_map<bdd, formula, bdd_hash> propositional_equiv_[2];
 
     std::unordered_map<formula, bdd> formula_to_bdd_;
