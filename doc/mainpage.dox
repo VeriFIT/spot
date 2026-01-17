@@ -6,7 +6,7 @@
 /// structures to manipulate omega-automata, and implement the
 /// automata-theoretic approach to model-checking.
 ///
-/// See <a href="https://spot.lrde.epita.fr/">spot.lrde.epita.fr</a>
+/// See <a href="https://spot.lre.epita.fr/">spot.lre.epita.fr</a>
 /// for more information about this project.
 ///
 /// \section thisdoc This Document
@@ -14,8 +14,8 @@
 /// This document describes all the public data structures and functions
 /// of Spot.  This aims to be a reference manual, not a tutorial.
 ///
-/// If you are new to this manual, start with <a href="modules.html">the
-/// module page</a>.  This is what looks the closest to a table of contents.
+/// If you are new to this manual, start with <a href="topics.html">the
+/// topics page</a>.  This is what looks the closest to a table of contents.
 ///
 /// \section pointers Handy starting points
 ///
