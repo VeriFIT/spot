@@ -407,6 +407,7 @@ namespace spot
     fixed_size_pool<pool_type::Unsafe> p_; ///< \brief The allocator
   };
 
+  /// \ingroup model_checking
   /// \brief This class implements the SCC decomposition algorithm of bloemen
   /// as described in PPOPP'16. It uses a shared union-find augmented to manage
   /// work stealing between threads.

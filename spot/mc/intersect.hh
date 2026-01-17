@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup model_checking
   /// \brief Find the first couple of iterator (from a given pair of
   /// iterators) that intersect. This method can be used in any
   /// DFS/BFS-like exploration algorithm. The \a parameter indicates

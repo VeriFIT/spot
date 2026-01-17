@@ -36,6 +36,7 @@ namespace spot
                                transition_info_t *transition_info,
                                int *dst);
 
+  /// \ingroup ltsmin_interface
   /// \brief Implementation of the PINS interface. This class
   /// is a wrapper that, given a file, will compile it w.r.t
   /// the PINS interface. The class can then be manipulated

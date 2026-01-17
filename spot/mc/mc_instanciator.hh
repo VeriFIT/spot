@@ -37,6 +37,7 @@
 namespace spot
 {
 
+  /// \ingroup model_checking
   /// \brief This class allows to ensure (at compile time) if
   /// a given parameter can be considered as a modelchecking algorithm
   /// (i.e., usable by instantiate)

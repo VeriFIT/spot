@@ -26,6 +26,12 @@
 
 #include <spot/misc/common.hh>
 
+/// \defgroup model_checking Parallel Model Checking
+/// \ingroup twa
+///
+/// Algorithms and data structures for parallel model checking,
+/// including deadlock detection, reachability, and SCC computation.
+
 namespace spot
 {
   /// \brief The list of parallel model-checking algorithms available

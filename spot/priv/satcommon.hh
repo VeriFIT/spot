@@ -28,6 +28,13 @@
 
 #define DEBUG_CMN 0
 
+/// \addtogroup private Internal Utilities
+/// \ingroup misc_tools
+///
+/// Private utilities and implementation details not part of the public API.
+/// This can only be used from within Spot.  In particular, they should not be
+/// used in public headers.
+
 namespace spot
 {
   struct src_cond

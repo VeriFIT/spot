@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_algorithms
   /// \brief Helper class combine outgoing edges in alternating
   /// automata
   ///
@@ -56,7 +57,7 @@ namespace spot
     void new_dests(unsigned st, bdd out) const;
   };
 
-  /// @{
+  /// \ingroup twa_algorithms
   /// \brief Combine two states in a conjunction.
   ///
   /// This creates a new state whose outgoing transitions are the
@@ -65,7 +66,7 @@ namespace spot
   /// Acceptance marks are dropped.
   ///
   /// The results is very likely to be alternating.
-  /// @}
+  /// @{
   template<class I>
   SPOT_API
   unsigned states_and(const twa_graph_ptr& aut, I begin, I end)
@@ -91,6 +92,7 @@ namespace spot
   }
   /// @}
 
+  /// \ingroup twa_algorithms
   /// \brief Remove universal edges from a weak alternating automaton.
   ///
   /// This procedure is restricted to weak alternating automata as
@@ -105,7 +107,6 @@ namespace spot
   ///
   /// \param raise_if_too_many_sets when set to false, return
   /// nullptr in cases where we would need too many colors
-  /// @}
   SPOT_API
   twa_graph_ptr remove_alternation(const const_twa_graph_ptr& aut,
                                    bool named_states = false,
@@ -114,7 +115,6 @@ namespace spot
 
 
   // Remove universal edges on the fly.
-
   class SPOT_API univ_remover_state: public state
   {
   protected:
@@ -153,6 +153,7 @@ namespace spot
 
   typedef std::shared_ptr<twa_univ_remover> twa_univ_remover_ptr;
 
+  /// \ingroup twa_algorithms
   /// \brief Remove universal edges on the fly from an alternating
   /// Büchi automaton.
   ///

@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_reduction
   /// \brief Attempt to synthetize an equivalent deterministic TωA
   /// with a SAT solver.
   ///

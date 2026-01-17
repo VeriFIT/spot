@@ -31,6 +31,7 @@ namespace spot
 {
   class printable;
 
+  /// \ingroup misc_tools
   /// \brief Interface with a given sat solver.
   ///
   /// When created, it checks if SPOT_SATSOLVER env var is set. If so,

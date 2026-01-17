@@ -25,6 +25,7 @@
 
 namespace spot
 {
+  /// \ingroup private
   /// \brief Manage for a given automaton a vector of counter indexed by
   /// its acceptance condition
 

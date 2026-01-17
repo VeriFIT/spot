@@ -122,6 +122,7 @@ namespace spot
       return res;
     }
 
+    /// \ingroup misc_tools
     /// \brief Recycle \a size bytes of memory.
     ///
     /// Despite the name, the memory is not really deallocated in the

@@ -34,6 +34,7 @@
 
 namespace spot
 {
+  /// \ingroup model_checking
   /// \brief This class aims to explore a model to detect wether it
   /// contains a deadlock. This deadlock detection performs a DFS traversal
   /// sharing information shared among multiple threads.

@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_reduction
   /// \brief Attempt to synthetize an equivalent deterministic TBA
   /// with a SAT solver.
   ///
@@ -43,6 +44,7 @@ namespace spot
                       int target_state_number,
                       bool state_based = false);
 
+  /// \ingroup twa_reduction
   /// \brief Attempt to minimize a deterministic TBA with a SAT solver.
   ///
   /// This calls dtba_sat_synthetize() in a loop, with a decreasing

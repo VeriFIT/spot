@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup misc_tools
   /// \brief Total number of pages in use by the program.
   ///
   /// \return The total number of pages in use by the program if known.

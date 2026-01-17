@@ -75,6 +75,7 @@ namespace spot
       return p.first->second;
     }
 
+    /// \ingroup graph_data_structures
     /// \brief Give an alternate name to a state.
     /// \return true iff the newname state was already existing
     /// (in this case the existing newname state will be merged

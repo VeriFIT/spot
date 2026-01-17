@@ -25,6 +25,12 @@
 #include <spot/tl/apcollect.hh>
 #include <tuple>
 
+/// \defgroup ltsmin_interface LTSmin Interface
+/// \ingroup twa
+///
+/// Interface to external model checkers DiVinE and SpinS through the
+/// LTSmin API.
+
 namespace spot
 {
   class SPOT_API ltsmin_model final

@@ -29,6 +29,7 @@
 
 namespace spot
 {
+  /// \ingroup model_checking
   /// \brief This class implements the sequential emptiness check as
   /// presented in "Three SCC-based Emptiness Checks for Generalized
   /// Büchi Automata" (Renault et al, LPAR 2013). Among the three

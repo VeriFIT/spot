@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup private
   /// \brief Remove spaces at the front and back of \a str.
   void trim(std::string& str);
 }

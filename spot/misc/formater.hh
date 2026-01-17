@@ -124,6 +124,7 @@ namespace spot
     {
     }
 
+    /// \ingroup misc_tools
     /// \brief Scan the %-sequences occurring in \a fmt.
     ///
     /// Set has['c'] for each %c in \a fmt.   \a has must

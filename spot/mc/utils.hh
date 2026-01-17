@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup model_checking
   /// \brief convert a (cube) model  into a twa.
   /// Note that this algorithm cannot be run in parallel but could.
   template<typename State, typename SuccIterator,
@@ -161,6 +162,7 @@ namespace spot
     std::unordered_map<int, int> reverse_binder_;
   };
 
+  /// \ingroup model_checking
   /// \brief convert a (cube) product automaton into a twa
   /// Note that this algorithm cannot be run in parallel.
   template<typename State, typename SuccIterator,

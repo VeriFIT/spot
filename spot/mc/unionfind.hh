@@ -24,6 +24,7 @@
 namespace spot
 {
 
+  /// \ingroup model_checking
   /// \brief This Union-Find data structure is a particular
   /// union-find, dedicated for emptiness checks below, see ec.hh. The
   /// key of this union-find is int. Moreover, we suppose that only

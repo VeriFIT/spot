@@ -32,6 +32,7 @@
 /// to build a kripke that is thread safe
 namespace spot
 {
+  /// \ingroup ltsmin_interface
   /// \brief A Spins state is represented as an array of integer
   /// Note that this array has two reserved slots (position 0 an 1).
   ///
@@ -42,6 +43,7 @@ namespace spot
   /// allows to compress the state
   typedef int* cspins_state;
 
+  /// \ingroup ltsmin_interface
   /// \brief This class provides the ability to compare two states
   struct cspins_state_equal
   {
@@ -51,6 +53,7 @@ namespace spot
     }
   };
 
+  /// \ingroup ltsmin_interface
   /// \brief This class provides the ability to hash a state
   struct cspins_state_hash
   {
@@ -60,6 +63,7 @@ namespace spot
     }
   };
 
+  /// \ingroup ltsmin_interface
   /// \brief The management of states (i.e. allocation/deallocation) can
   /// be painless since every time we have to consider wether the state will
   /// be compressed or not. This class aims to simplify this management.

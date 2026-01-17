@@ -33,6 +33,11 @@
 #  include <thread>
 #endif // SPOT_ENABLE_PTHREAD
 
+/// \defgroup graph_data_structures Graph Data Structures
+/// \ingroup misc_tools
+///
+/// Generic graph representations and algorithms used throughout Spot.
+
 namespace spot
 {
   template <typename State_Data, typename Edge_Data>
@@ -590,6 +595,7 @@ namespace spot
   } // namespace internal
 
 
+  /// \ingroup graph_data_structures
   /// \brief A directed graph
   ///
   /// \tparam State_Data data to attach to states

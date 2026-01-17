@@ -22,12 +22,14 @@
 
 namespace spot
 {
+  /// \ingroup twa_algorithms
   /// \brief Complete a twa_graph in place.
   ///
   /// If the TωA is incomplete and has an acceptance condition that is
   /// a tautology, it will be changed into a Büchi automaton.
   SPOT_API void complete_here(twa_graph_ptr aut);
 
+  /// \ingroup twa_algorithms
   /// \brief Clone a twa and complete it.
   ///
   /// If the TωA is incomplete and has an acceptance condition that is

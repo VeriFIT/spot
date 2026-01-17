@@ -23,6 +23,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_algorithms
   /// \brief Complement a deterministic TωA
   ///
   /// The automaton \a aut should be deterministic.  It will be
@@ -44,6 +45,7 @@ namespace spot
   SPOT_API twa_graph_ptr
   dtwa_complement(const const_twa_graph_ptr& aut);
 
+  /// \ingroup twa_algorithms
   /// \brief Complement a semideterministic TωA
   ///
   /// The automaton \a aut should be semideterministic.
@@ -54,6 +56,7 @@ namespace spot
   complement_semidet(const const_twa_graph_ptr& aut, bool show_names = false);
 
 
+  /// \ingroup twa_algorithms
   /// \brief Complement a TωA
   ///
   /// This employs different complementation strategies depending
