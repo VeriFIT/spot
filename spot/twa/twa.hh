@@ -1529,9 +1529,9 @@ namespace spot
     ///    aut->prop_copy(other_aut, {true, false, false, false, false, true});
     /// \endcode
     /// This would copy the "state-based acceptance" and
-    /// "stutter invariant" properties from \c other_aut to \c code.
+    /// "stutter invariant" properties from \c other_aut to \c aut.
     ///
-    /// There are two flags for the determinism.  If \code
+    /// There are two flags for the determinism.  If \c
     /// deterministic is set, the universal, semi-deterministic,
     /// and unambiguous properties are copied as-is.  If deterministic
     /// is unset but improve_det is set, then those properties are
@@ -1724,7 +1724,7 @@ namespace spot
   /// \addtogroup twa_io Input/Output of TωA
   /// \ingroup twa_algorithms
 
-  /// \addtogroup stutter_inv Stutter-invariance checks
+  /// \addtogroup stutter_inv Stutter-invariance checks and related functions
   /// \ingroup twa_algorithms
 
   /// \addtogroup twa_acc_transform Conversion between acceptance conditions

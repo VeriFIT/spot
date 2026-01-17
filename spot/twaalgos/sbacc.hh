@@ -46,7 +46,7 @@ namespace spot
   /// corresponding state in the input automaton.  If the input
   /// automaton also had an "original-states" property, the two
   /// vectors will be composed, so the `original-states[s]` in the
-  /// output will contains the value of `original-states[y] if state s
+  /// output will contains the value of `original-states[y]` if state s
   /// was created from state y.
   ///
   /// If the input has a property named "original-classes", then the

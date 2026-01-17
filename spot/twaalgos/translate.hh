@@ -160,6 +160,5 @@ namespace spot
     int exprop_;
     const option_map* opt_;
   };
-  /// @}
 
 }

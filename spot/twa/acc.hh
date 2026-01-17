@@ -2153,7 +2153,7 @@ namespace spot
     ///
     /// If multiple unit-Fin appear as unit-clauses, the set of
     /// those will be returned.  For instance applied to
-    /// `Fin(0)&Fin(1)&(Inf(2)|Fin(3))``, this will return `{0,1}`.
+    /// `Fin(0)&Fin(1)&(Inf(2)|Fin(3))`, this will return `{0,1}`.
     ///
     /// \see acc_cond::mafins
     mark_t fin_unit() const

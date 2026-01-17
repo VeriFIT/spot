@@ -813,8 +813,10 @@ EXCLUDE_SYMLINKS       = YES
 
 EXCLUDE_PATTERNS       = */misc/location.hh \
                          */misc/position.hh \
-                         */*parse/stack.hh \
-                         */*parse/*parse*.hh \
+                         */parseaut/stack.hh \
+                         */parseaut/parseaut.hh \
+                         */parsetl/stack.hh \
+                         */parsetl/parsetl.hh \
                          *test/* \
                          *priv/*
 
@@ -827,7 +829,7 @@ EXCLUDE_PATTERNS       = */misc/location.hh \
 # Note that the wildcards are matched against the file with absolute path, so to
 # exclude all test directories use the pattern */test/*
 
-EXCLUDE_SYMBOLS        =
+EXCLUDE_SYMBOLS        = spot::internal::*
 
 # The EXAMPLE_PATH tag can be used to specify one or more files or directories
 # that contain example code fragments that are included (see the \include

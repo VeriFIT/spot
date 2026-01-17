@@ -28,10 +28,14 @@
 
 namespace spot
 {
-  // This works almost like a digraph, but it does not support removal
-  // of edges, does not support data on edges, prepend edges instead
-  // of appending them, and only stores the destinations of edges, not
-  // their source.   So this is a more compact memory representation.
+  /// \ingroup graph_data_structures
+  /// \brief A compact adjacency list representation for directed graphs.
+  ///
+  /// This class works almost like a digraph, but it does not support
+  /// removal of edges, does not support data on edges, prepend edges
+  /// instead of appending them, and only stores the destinations of
+  /// edges, not their source. So this is a more compact memory
+  /// representation.
   template<class State_Data>
   class SPOT_API adjlist
   {
@@ -66,6 +70,10 @@ namespace spot
     std::vector<state_storage> states_;
 
   public:
+    /// \brief Constructor for adjacency list.
+    /// \param max_states Initial capacity for states vector
+    /// \param max_trans Initial capacity for edges vector (default:
+    /// max_states * 2)
     adjlist(unsigned max_states = 10, unsigned max_trans = 0)
     {
       states_.reserve(max_states);
@@ -77,6 +85,8 @@ namespace spot
       edges_.push_back({-1U, 0U});
     }
 
+    /// \brief Create a new state with given data.
+    /// \return The index of the newly created state
     template <typename... Args>
     unsigned new_state(Args&&... args)
     {
@@ -85,6 +95,9 @@ namespace spot
       return s;
     }
 
+    /// \brief Create multiple new states with the same data.
+    /// \param n Number of states to create
+    /// \return The index of the first newly created state
     template <typename... Args>
     unsigned new_states(unsigned n, Args&&... args)
     {
@@ -107,6 +120,9 @@ namespace spot
       return states_[s].data();
     }
 
+    /// \brief Add a new edge between two states.
+    /// \param src Source state index
+    /// \param dst Destination state index
     void new_edge(unsigned src, unsigned dst)
     {
       unsigned pos = edges_.size();
@@ -115,7 +131,7 @@ namespace spot
       ss.first_edge = pos;
     }
 
-    // Iterator for range-based for loop support
+    /// \brief Iterator for traversing successors of a state.
     class successor_iterator
     {
     private:
@@ -172,6 +188,7 @@ namespace spot
       }
     };
 
+    /// \brief Range wrapper for successor iteration.
     class successor_range
     {
     private:

@@ -34,7 +34,7 @@ namespace spot
   /// the usual `bddfalse` and `bddtrue`, but some integer-valued
   /// terminal representing the destination state.  A terminal with
   /// integer label $2d+b$ represents destination state $d$ and uses
-  /// $b\in\{0,1\}$ to indicate whether the transition is accepting
+  /// \f$b\in\{0,1\}\f$ to indicate whether the transition is accepting
   /// (i.e., the evaluation can stop after reading the last letter).
   /// The `bddfalse` and `bddtrue` nodes are kept to represent
   /// rejecting and accepting sinks; using them helps some to shortcut

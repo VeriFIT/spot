@@ -23,6 +23,15 @@
 
 namespace spot
 {
+  /// \defgroup tl_environment Environment classes for atomic propositions
+  /// \ingroup tl
+  ///
+  /// Environment classes can be passed to the parser to interpret and
+  /// restrict the set of atomic propositions. For instance, the
+  /// default_environment will allow all atomic propositions, while
+  /// the declarative_environment will allow only a predeclared set of
+  /// atomic propositions.
+
   /// \ingroup tl_environment
   /// \brief An environment that describes atomic propositions.
   class environment

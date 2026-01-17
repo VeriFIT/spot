@@ -157,7 +157,7 @@ namespace spot
   /// \brief Remove universal edges on the fly from an alternating
   /// Büchi automaton.
   ///
-  /// This function uses Myiano & Hayashi's \cite{miyano.84.tcs}
+  /// This function uses Miyano & Hayashi's \cite miyano.84.tcs
   /// breakpoint algorithm to construct a non-deterministic Büchi
   /// automaton from an alternating Büchi automaton on the fly.
   SPOT_API
