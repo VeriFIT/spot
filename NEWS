@@ -18,6 +18,14 @@ New in spot 2.14.5.dev  (not yet released)
     the fact that they are obligation properties can be checked
     syntactically.)
 
+  - autfilt --given-strategy=... learned "auto-small" and "auto-si",
+    to implement a loop where the automaton is regularly simplified
+    with --given-strategy=minato and --given-strategy=relax, returning
+    the smallest automaton found (with "auto-small"), or the smallest
+    automaton that is stutter-invarent (with "auto-si").  If
+    postprocessing options like --small or --deterministic are given,
+    they will also be applied during this loop.
+
   Library:
 
   - scc_filter() will now preserve and update any "original-states"

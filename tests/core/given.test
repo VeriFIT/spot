@@ -39,6 +39,8 @@ done <<EOF
 minato 2 2 3
 stutter 3 7 3
 stutter-restrict 3 7 3
+auto-small 2 2 3
+auto-si 2 2 3
 EOF
 
 while read opt exp; do
@@ -48,6 +50,8 @@ done <<EOF
 minato 1 1 0
 stutter 3 7 3
 stutter-restrict 3 7 3
+auto-small 1 1 0
+auto-si 1 1 0
 EOF
 
 for opt in minato; do
@@ -65,6 +69,8 @@ done <<EOF
 minato 3 4 2
 stutter 2 3 2
 stutter-restrict 3 6 2
+auto-small 2 3 2
+auto-si 2 3 2
 EOF
 
 
@@ -76,6 +82,8 @@ done <<EOF
 minato 3 4 2
 stutter 2 3 2
 stutter-restrict 3 6 2
+auto-small 2 3 2
+auto-si 2 3 2
 EOF
 
 # We could hope for a better reduction on this case
@@ -87,6 +95,8 @@ done <<EOF
 minato 3 4 2
 stutter 2 3 2
 stutter-restrict 3 6 2
+auto-small 2 3 2
+auto-si 2 3 2
 EOF
 
 # Test case from Yann's 2022-03-29 email.

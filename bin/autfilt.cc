@@ -432,13 +432,16 @@ static const argp_option options[] =
       "simplify input automata assuming they are only used in a context where "
       "FORMULA holds", 0 },
     { "given-strategy", OPT_GIVEN_STRAT,
-      "minato|stutter-relax|stutter-restrict", 0,
+      "minato|stutter-relax|stutter-restrict|auto-small|auto-si", 0,
       "strategy to use to simplify input automata based on given knowledge: "
       "(minato) simplify edge labels based on knowledge [the default], "
-      "(stutter,stutter-relax) build a stutter-invariant results if the"
+      "(stutter-relax) build a stutter-invariant results if the"
       " added words are outside the given knowledge, "
       "(stutter-restrict) build a stutter-invariant results by removing "
-      "words outside the given knowledge", 0 },
+      "words outside the given knowledge, "
+      "(auto-small) and (auto-si) apply minato and stutter-relax in a loop, "
+      "returning the smallest results they have seen, focussing on "
+      "stuttter-invarant results in the case of auto-si", 0 },
     { "given-fixpoint", OPT_GIVEN_FIXPOINT, nullptr, 0,
       "If multiple knowledges have been given with --given-formula or "
       "--given-automaton repeat their application until we reach a fixpoint.",
@@ -567,17 +570,23 @@ enum given_strategy {
   GIVEN_MINATO = 1,
   GIVEN_STUTTER_RELAX = 2,
   GIVEN_STUTTER_RESTRICT = 4,
+  GIVEN_LOOP = 8,
+  GIVEN_WANT_SI = 16,
 };
 static char const *const given_args[] =
 {
   "minato",
   "stutter", "stutter-relax", "stutter-restrict",
+  "auto-small",
+  "auto-si",
   nullptr
 };
-static given_strategy const given_types[] =
+static int const given_types[] =
 {
   GIVEN_MINATO,
   GIVEN_STUTTER_RELAX, GIVEN_STUTTER_RELAX, GIVEN_STUTTER_RESTRICT,
+  GIVEN_LOOP | GIVEN_MINATO | GIVEN_STUTTER_RELAX,
+  GIVEN_LOOP | GIVEN_WANT_SI | GIVEN_MINATO | GIVEN_STUTTER_RELAX,
 };
 ARGMATCH_VERIFY(given_args, given_types);
 
@@ -728,7 +737,7 @@ static bool opt_is_weak = false;
 static bool opt_is_inherently_weak = false;
 static bool opt_is_very_weak = false;
 static bool opt_is_stutter_invariant = false;
-static given_strategy opt_given_strat = GIVEN_MINATO;
+static int opt_given_strat = GIVEN_MINATO;
 static bool opt_given_fixpoint = false;
 static bool opt_invert = false;
 static range opt_states = { 0, std::numeric_limits<int>::max() };
@@ -1705,20 +1714,81 @@ namespace
       if (!opt->rem_ap.empty())
         aut = opt->rem_ap.strip(aut);
 
-      bool changed = false;
-      if (opt_given_strat & GIVEN_MINATO)
-        do
-          for (spot::const_twa_graph_ptr knowledge: opt->given_automata)
-            aut = spot::update_bounds_given_here(aut, knowledge, &changed);
-        while (changed && opt_given_fixpoint);
+      spot::twa_graph_ptr given_best = nullptr;
       if (!opt->given_automata.empty())
         {
-          if (opt_given_strat & GIVEN_MINATO)
-            aut = spot::bounds_simplify_here(aut);
+        given_loop:
+          if (aut == given_best)
+            // We do not want any change to aut to affect given_best,
+            // so we copy the automaton.
+            aut = spot::make_twa_graph(aut, spot::twa::prop_set::all());
+          spot::twa_graph_ptr si;
+          // do the stutter version first, because updaate_bounds_given_here
+          // will work inplace.
           if (opt_given_strat & GIVEN_STUTTER_RELAX)
-            aut = spot::stutterize_given(aut, opt->given_automata, true);
-          if (opt_given_strat & GIVEN_STUTTER_RESTRICT)
-            aut = spot::stutterize_given(aut, opt->given_automata, false);
+            si = spot::stutterize_given(aut, opt->given_automata, true);
+          else if (opt_given_strat & GIVEN_STUTTER_RESTRICT)
+            si = spot::stutterize_given(aut, opt->given_automata, false);
+          if (opt_given_strat & GIVEN_MINATO)
+            {
+              bool changed = false;
+              do
+                for (spot::const_twa_graph_ptr knowledge: opt->given_automata)
+                  aut = spot::update_bounds_given_here(aut, knowledge,
+                                                       &changed);
+              while (changed && opt_given_fixpoint);
+              aut = spot::bounds_simplify_here(aut);
+            }
+
+          if (opt_given_strat & GIVEN_LOOP)
+            {
+              auto keep_best = [&](spot::twa_graph_ptr candidate) -> bool {
+                if (given_best == nullptr)
+                  {
+                    given_best = candidate;
+                    return true;
+                  }
+                if (opt_given_strat & GIVEN_WANT_SI)
+                  {
+                    if (given_best->prop_stutter_invariant().is_true() &&
+                        !candidate->prop_stutter_invariant().is_true())
+                      return false;
+                    if (!given_best->prop_stutter_invariant().is_true() &&
+                        candidate->prop_stutter_invariant().is_true())
+                      {
+                        given_best = candidate;
+                        return true;
+                      }
+                  }
+                if (given_best->num_states() < candidate->num_states())
+                  return false;
+                if (given_best->ap().size() < candidate->ap().size())
+                  return false;
+                if (given_best->num_edges() < candidate->num_edges())
+                  return false;
+                if ((given_best->num_states() > candidate->num_states())
+                    || (given_best->ap().size() > candidate->ap().size())
+                    || (given_best->num_edges() > candidate->num_edges())
+                    || (!given_best->prop_universal().is_true() &&
+                        candidate->prop_universal().is_true()))
+                  {
+                    given_best = candidate;
+                    return true;
+                  }
+                return false;
+              };
+              // Always try both.
+              bool try1 = keep_best(post.run(aut));
+              bool try2 = keep_best(post.run(si));
+              aut = given_best;
+              if (try1 || try2)
+                goto given_loop;
+            }
+          else
+            {
+              if (si)
+                aut = si;
+            }
         }
       // opt_simplify_exclusive_ap is handled only after
       // post-processing.
@@ -1793,7 +1863,8 @@ namespace
       if (opt_dualize)
         aut = spot::dualize(aut);
 
-      aut = post.run(aut, nullptr);
+      if (aut != given_best)
+        aut = post.run(aut, nullptr);
 
       if (opt_gra)
         aut = spot::to_generalized_rabin(aut, opt_gra == GRA_SHARE_INF);
@@ -1851,7 +1922,7 @@ namespace
         {
           auto tmp =
             spot::canonicalize(make_twa_graph(aut,
-                                                 spot::twa::prop_set::all()));
+                                              spot::twa::prop_set::all()));
           if (!opt->uniq->emplace(tmp).second)
             return 0;
         }
