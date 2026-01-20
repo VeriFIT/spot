@@ -965,9 +965,7 @@ namespace
                                oldname, filename,
                                std::to_string(linenum).c_str()) << ")\n";
             }
-          if (opt->output_part
-              && output_format != count_output
-              && output_format != quiet_output)
+          if (opt->output_part)
             {
               std::vector<spot::formula> ins;
               std::vector<spot::formula> outs;

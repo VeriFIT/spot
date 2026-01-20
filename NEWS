@@ -65,6 +65,11 @@ New in spot 2.14.5.dev  (not yet released)
     Maintaining it in Spot does not seem worth the human effort and
     CI/CD ressources it takes.
 
+  Bug fixes:
+
+  - Let ltlfilt's --save-part-file work even if -q is used.  (Issue #632.)
+
+
 New in spot 2.14.5  (2025-01-11)
 
   Bug fixes:

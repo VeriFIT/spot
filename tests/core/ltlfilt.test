@@ -892,6 +892,12 @@ i0 U (o0 U o1)
 EOF
 diff exp out
 
+run 0 ltlfilt -f 'a U b U c' --ins=a -q --relabel=io --save-part >out
+cat > exp<<EOF
+.inputs i0
+.outputs o0 o1
+EOF
+diff exp out
 
 
 test 22 = `ltlfilt -c --satisfiable formulas -f 'GFa & FG!a'`
