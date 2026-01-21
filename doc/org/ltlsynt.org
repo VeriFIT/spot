@@ -237,9 +237,9 @@ separately, and then combine them while encoding the AIGER circuit.
 This is enabled by default, but can be disabled by passing option
 =--decompose=no=.
 
-The ad hoc construction on the top is just a shortcut for some type of
-constraints that can be solved directly by converting the constraint
-into a DBA.
+The two specialized constructions shown at the top are used when the
+specification has a specific shape.  They can be disabled by passing
+=--obligation-synthesis=no= or =--bypass=no=.
 
 Otherwise, conversion to parity game (represented by the blue zone) is
 done using one of several algorithms specified by the =--algo= option.

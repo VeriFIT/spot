@@ -41,20 +41,28 @@
     \node[lproc,right=of transLAR] (paritizeLAR) {paritize (CAR,IAR,{\tiny ...})};
     \draw[->] (transLAR) edge (paritizeLAR)
               (paritizeLAR) edge (middetsplit |- paritizeLAR);
-    \node[proc,below=of transLAR] (transPS) {translate to DPA};
+
+    \node[proc,below=of transLAR] (transACD) {translate to DELA};
+    \node[lproc,right=of transACD] (paritizeACD) {paritize (ACD)};
+    \draw[->] (transACD) edge (paritizeACD)
+              (paritizeACD) edge (middetsplit |- paritizeACD);
+
+    \node[proc,below=of transACD] (transPS) {translate to DPA};
     \draw[rounded corners,->] (transPS) -| (middetsplit);
     \coordinate (choicecenter) at ($(current bounding box.west) - (3.3cm,0)$);
     \path[draw] (choicecenter) node[choice](algoin){}
           +(60:8mm) node[choice](algosd){}
-          +(30:8mm) node[choice](algods){}
-          +(0:8mm) node[choice](algolarold){}
-          +(-30:8mm) node[choice](algolar){}
+          +(36:8mm) node[choice](algods){}
+          +(12:8mm) node[choice](algolarold){}
+          +(-12:8mm) node[choice](algolar){}
+          +(-36:8mm) node[choice](algoacd){}
           +(-60:8mm) node[choice](algops){};
 
     \draw[->,algoopt={-{}-algo=sd}] (algosd) to[out=60,in=180] (transSD);
-    \draw[->,algoopt={-{}-algo=ds}] (algods) to[out=30,in=180] (transDS);
-    \draw[->,algoopt={-{}-algo=lar.old}] (algolarold) -- (transLARold);
-    \draw[->,algoopt={-{}-algo=lar}] (algolar) to[out=-30,in=180] (transLAR);
+    \draw[->,algoopt={-{}-algo=ds}] (algods) to[out=36,in=180] (transDS);
+    \draw[->,algoopt={-{}-algo=lar.old}] (algolarold) to[out=12,in=180] (transLARold);
+    \draw[->,algoopt={-{}-algo=lar}] (algolar) to[out=-12,in=180] (transLAR);
+    \draw[->,algoopt={-{}-algo=acd}] (algoacd) to[out=-36,in=180] (transACD);
     \draw[->,algoopt={-{}-algo=ps}] (algops) to[out=-60,in=180] (transPS);
     \draw[ultra thick] (algoin) -- (algolar.north);
 
@@ -107,8 +115,11 @@
 
   \coordinate (solveright) at ($(solve.east)+(2mm,0)$);
   \path (bypassin) -- coordinate(medblue) (solveright);
-  \node[wproc,above,xshift=-1mm,yshift=4mm] (bypass) at (medblue |- detSD.north) {specialized strategy construction for formulas of the form $\mathsf{G}(b_1) \land (\varphi \leftrightarrow \mathsf{G}\mathsf{F} b_2)$};
-  \draw[rounded corners,->] (bypassin) |- (bypass);
+  \node[wproc,above,xshift=-3mm,yshift=4mm,anchor=south east] (bypass) at (solve.north east) {specialized strategy construction for formulas of the form $\mathsf{G}(b_1) \land (\varphi \leftrightarrow \mathsf{G}\mathsf{F} b_2)$};
+  \node[wproc,above,yshift=4mm,anchor=south east] (oblig) at (bypass.north east) {specialized MTBDD-based on-the-fly synthesis for syntactic obligations};
+  \draw[rounded corners,->] (bypassin) |- node[at end,anchor=south east]{\texttt{--bypass}} (bypass);
+  \draw[rounded corners,->] (bypassin) |- node[at end,anchor=south east]{\texttt{--obligation-synthesis}} (oblig);
   \draw[rounded corners,->] (bypass) -| (solveright) |- (reachoice);
+    \draw[rounded corners] (oblig) -| (solveright);
   \end{tikzpicture}}
 \end{document}
