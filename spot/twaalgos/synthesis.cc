@@ -2164,7 +2164,8 @@ namespace spot
 
     public:
 
-      formula_2_inout_props(std::vector<std::string> outs) : outs_(outs)
+      formula_2_inout_props(std::vector<std::string> outs)
+        : outs_(std::move(outs))
       {}
 
       std::pair<std::set<formula>, std::set<formula>>
@@ -2550,7 +2551,7 @@ namespace // anonymous for subsformula
           {
             unsigned current_index = todo.top();
             todo.pop();
-            formula current_form = assumptions[current_index];
+            const formula& current_form = assumptions[current_index];
             done[current_index] = true;
             auto [ins_current, outs_current]
               = form2props.aps_of(current_form);
@@ -2560,11 +2561,11 @@ namespace // anonymous for subsformula
               {
                 if (done[i])
                   continue;
-                auto other_form = assumptions[i];
+                const formula& other_form = assumptions[i];
                 auto [ins_other, outs_other]
                   = form2props.aps_of(other_form);
                 if (are_intersecting(ins_current, ins_other) ||
-                    are_intersecting(outs_other, outs_other))
+                    are_intersecting(outs_current, outs_other))
                   todo.push(i);
               }
           }
@@ -3029,8 +3030,6 @@ namespace spot
 
     arena_r.unregister_ap(arena_r.register_ap(in_mark_s));
     arena_r.unregister_ap(arena_r.register_ap(out_mark_s));
-
-    return;
   }
 
 } // spot

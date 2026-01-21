@@ -104,6 +104,10 @@ New in spot 2.14.5.dev  (not yet released)
     cause that function to throw a "robin_hood::map overflow"
     exception.  (Issue #631.)
 
+  - The decomposition in the context of LTL synthesis contained an error in the
+    splitting of implications. The correction did not impact any cases in the
+    Syntcomp or any of the tests.
+
 New in spot 2.14.5  (2025-01-11)
 
   Bug fixes:
