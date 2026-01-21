@@ -168,6 +168,7 @@
 #include <spot/twaalgos/toweak.hh>
 #include <spot/twaalgos/hoa.hh>
 #include <spot/twaalgos/dtwasat.hh>
+#include <spot/twaalgos/mtdswa.hh>
 #include <spot/twaalgos/mtdtwa.hh>
 #include <spot/twaalgos/relabel.hh>
 #include <spot/twaalgos/word.hh>
@@ -828,6 +829,7 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/toweak.hh>
 %include <spot/twaalgos/hoa.hh>
 %include <spot/twaalgos/dtwasat.hh>
+%include <spot/twaalgos/mtdswa.hh>
 %include <spot/twaalgos/mtdtwa.hh>
 %include <spot/twaalgos/relabel.hh>
 %include <spot/twaalgos/word.hh>

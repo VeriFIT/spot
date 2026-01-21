@@ -30,7 +30,7 @@
 #include <spot/twaalgos/product.hh>
 #include <spot/twaalgos/sccinfo.hh>
 #include <spot/twaalgos/dbranch.hh>
-#include <spot/twaalgos/mtdtwa.hh>
+#include <spot/twaalgos/mtdswa.hh>
 #include <spot/twaalgos/stripacc.hh>
 #include <spot/twaalgos/hoa.hh>
 

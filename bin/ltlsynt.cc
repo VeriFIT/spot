@@ -40,7 +40,7 @@
 #include <spot/twaalgos/mealy_machine.hh>
 #include <spot/twaalgos/synthesis.hh>
 #include <spot/twaalgos/translate.hh>
-#include <spot/twaalgos/mtdtwa.hh>
+#include <spot/twaalgos/mtdswa.hh>
 
 enum
 {

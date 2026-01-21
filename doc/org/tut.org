@@ -100,7 +100,10 @@ real notebooks instead.
 - [[https://spot.lrde.epita.fr/ipynb/zlktree.html][=zlktree.ipynb=]] demonstration of Zielonka Trees and ACD
 - [[https://spot.lrde.epita.fr/ipynb/given.html][=given.ipynb=]] simplification of automata given some apriori knowledge
 - [[https://spot.lrde.epita.fr/ipynb/ltlf2dfa.html][=ltlf2dfa.ipynb=]] translation between LTLf and MTDFA
-- [[https://spot.lrde.epita.fr/ipynb/mtdtwa.html][=mtdtwa.ipynb=]] support for MTBDD-based deterministic twa
+- [[https://spot.lrde.epita.fr/ipynb/mtdtwa.html][=mtdtwa.ipynb=]] MTBDD-based deterministic transition-based ω-automata
+  (not very developed)
+- [[https://spot.lrde.epita.fr/ipynb/mtdswa.html][=mtdswa.ipynb=]] MTBDD-based deterministic transition-based
+  ω-automata, with obligation translation and synthesis support
 
 
 #  LocalWords:  utf html bdd IPython ipynb io randaut accparse acc

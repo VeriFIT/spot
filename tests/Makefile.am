@@ -385,6 +385,7 @@ TESTS_ipython = \
   python/ltlf2dfa.ipynb \
   python/ltsmin-dve.ipynb \
   python/ltsmin-pml.ipynb \
+  python/mtdswa.ipynb \
   python/mtdtwa.ipynb \
   python/parity.ipynb \
   python/product.ipynb \
