@@ -78,11 +78,49 @@ namespace spot
                 const output_aborter* aborter,
                 std::vector<unsigned>* accepting_sinks)
   {
-    unsigned ns = aut->num_states();
-    unsigned nap = aut->ap().size();
+    // We represent the automaton as an array 'bv' of
+    // ns*nc bit vectors of size 'ns'.  Each original state is
+    // represented by 'nc' consecutive bitvectors representing the
+    // possible destinations for each condition.
+    //
+    //  src  cond
+    //  0   !a&!b   [...bit vector of size ns...]
+    //      !a&b    [...bit vector of size ns...]
+    //       a&!b   [...bit vector of size ns...]
+    //       a&b    [...bit vector of size ns...]
+    //  1   !a&!b   [...bit vector of size ns...]
+    //      !a&b    [...bit vector of size ns...]
+    //       a&!b   [...bit vector of size ns...]
+    //       a&b    [...bit vector of size ns...]
+    //  2   !a&!b   [...bit vector of size ns...]
+    //      !a&b    [...bit vector of size ns...]
+    //       a&!b   [...bit vector of size ns...]
+    //       a&b    [...bit vector of size ns...]
+    //  ...
+    //
+    // Since there are nc possible "cond" value, and ns sources, the
+    // ns*nc bitvectors of ns bits each can take a lot of space.  In
+    // issue #302, we had the case of an automaton with ns=8777
+    // states, and 8 atomic propositions (nc=256): this large array
+    // would require 2.3GB, causing out-of-memory error on small
+    // systems.
+    //
+    // To work around this, we reduce the number of states we store in
+    // this array to reduced_ns, which we currently limit to 512
+    // (chosen arbitrarily), and use it as a least-recently-used
+    // cache.  A separate vector of size ns, contains pointers
+    // (i.e. iterators) to a list cell that gives an index in this
+    // cache.  The purpose of the list is to maintain the
+    // least-recently-used order.
+    constexpr unsigned max_stored_states = 512U;
 
-    if ((-1UL / ns) >> nap == 0)
-      throw std::runtime_error("too many atomic propositions (or states)");
+    const unsigned ns = aut->num_states();
+    const unsigned reduced_ns = std::min(max_stored_states, ns);
+    const unsigned nap = aut->ap().size();
+
+    if ((-1UL / reduced_ns) >> nap == 0)
+      throw std::runtime_error
+        ("tgba_powerset(): too many atomic propositions (or states)");
 
     // we have two ways of "spliting" the labels when determinizing.
     // One is to iterate over 2^AP, the second is to partition the set
@@ -123,44 +161,9 @@ namespace spot
     size_t nc = num2bdd.size();        // number of conditions
     assert(will_use_labels || nc == (1UL << nap));
 
-    // Conceptually, we represent the automaton as an array 'bv' of
-    // ns*nc bit vectors of size 'ns'.  Each original state is
-    // represented by 'nc' consecutive bitvectors representing the
-    // possible destinations for each condition.
-    //
-    //  src  cond
-    //  0   !a&!b   [...bit vector of size ns...]
-    //      !a&b    [...bit vector of size ns...]
-    //       a&!b   [...bit vector of size ns...]
-    //       a&b    [...bit vector of size ns...]
-    //  1   !a&!b   [...bit vector of size ns...]
-    //      !a&b    [...bit vector of size ns...]
-    //       a&!b   [...bit vector of size ns...]
-    //       a&b    [...bit vector of size ns...]
-    //  2   !a&!b   [...bit vector of size ns...]
-    //      !a&b    [...bit vector of size ns...]
-    //       a&!b   [...bit vector of size ns...]
-    //       a&b    [...bit vector of size ns...]
-    //  ...
-    //
-    // Since there are nc possible "cond" value, and ns sources, the
-    // ns*nc bitvectors of ns bits each can take a lot of space.  In
-    // issue #302, we had the case of an automaton with ns=8777
-    // states, and 8 atomic propositions (nc=256): this large array
-    // would require 2.3GB, causing out-of-memory error on small
-    // systems.
-    //
-    // To work around this, we reduce the number of states we store in
-    // this array to reduced_ns, which we currently limit to 512
-    // (chosen arbitrarily), and use it as a least-recently-used
-    // cache.  A separate vector of size ns, contains pointers
-    // (i.e. iterators) to a list cell that gives an index in this
-    // cache.  The purpose of the list is to maintain the
-    // least-recently-used order.
     typedef std::list<std::pair<unsigned, unsigned>>::const_iterator iter;
     std::list<std::pair<unsigned, unsigned>> lru; // list of (idx in bv, state#)
     std::vector<iter> iters(ns, lru.end());
-    const unsigned reduced_ns = std::min(512U, ns);
     auto bv =
       std::unique_ptr<bitvect_array>(make_bitvect_array(ns, reduced_ns * nc));
 
