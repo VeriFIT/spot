@@ -237,7 +237,7 @@ There is now query for the list of input propositions: any proposition
 that appear in the formula but that is not an output proposition is
 assumed to be an input proposition.
 
-Finally the last call to [[https://github.com/reactive-systems/syfco][=syfco=]] is used to retrieve the semantics
+Finally, the last call to [[https://github.com/reactive-systems/syfco][=syfco=]] is used to retrieve the semantics
 that should be used to check for realizability.  In this case this
 declared as Mealy: the output player can see the choices of the input
 player at the current turn before making his decision.
@@ -252,7 +252,7 @@ syfco --print-target chomp.tlsf
 
 Note that you can use =--semantics=, =--ins=, or =--outs= to override
 the partition of propositions or the semantics.  In this case, =ltlfsynt=
-will not make unnecesary calls [[https://github.com/reactive-systems/syfco][=syfco=]].
+will not make unnecessary calls to [[https://github.com/reactive-systems/syfco][=syfco=]].
 
 #+BEGIN_SRC sh
   ltlfsynt --tlsf chomp.tlsf --semantics=Moore --outs='/^o/' --realizability \

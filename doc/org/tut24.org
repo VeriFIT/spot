@@ -132,7 +132,7 @@ edge (=twa_graph::univ_dests(t)=).  The =univ_dests()= method will
 also work on non-universal edges, but in this case it will simply
 iterate on the given state.
 
-Therefor in order to print the universal destinations of any universal
+Therefore, in order to print the universal destinations of any universal
 edge in an alternating automaton, we can use =univ_dests()=
 unconditionally.  In this example, we simply call =is_univ_dest()= to
 decide whether to enclose the destinations in braces.

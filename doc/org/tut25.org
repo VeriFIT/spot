@@ -290,7 +290,7 @@ option, introduced in Spot 2.12, is =separate_edges()=: this looks at
 the labels used in the automaton and intersects them to construct a
 new set of disjoint labels that can be used as a basis for all labels.
 In the worst case, the basis will be equal to $2^{\{a,b,c\}}$ and this
-reduces to =split_edges()=.  However in many cases, as in our running
+reduces to =split_edges()=.  However, in many cases, as in our running
 example, it will require fewer labels.
 
 #+NAME: tut25ex3

@@ -1135,7 +1135,7 @@ One of these words is accepted, the other is rejected, and the two are
 stutter-equivalent (i.e., they differ only by some stuttering).
 
 The headers are called =spot.accepted-word= and =spot.rejected-word=
-if HOA v1.1 is selected.  However since these are also useful to
+if HOA v1.1 is selected.  However, since these are also useful to
 third-party tools, we also output them as =spot-accepted-word= and
 =spot-rejected-word= in HOA v1.
 

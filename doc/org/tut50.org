@@ -842,7 +842,7 @@ print it.
                          spot::twa_succ_iterator*>> todo;
 
     // push receives a newly-allocated state and immediately store it in
-    // seen.  Therefore any state on todo is already in seen and does
+    // seen.  Therefore, any state on todo is already in seen and does
     // not need to be destroyed.
     auto push = [&](const spot::state* s)
       {

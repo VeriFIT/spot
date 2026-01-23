@@ -355,7 +355,7 @@ as an indication of accepting transitions.
 
 Here is how to compute an MTDFA for =(a U b) & GF(c S d)=.  Note again
 that we do not parse this formula, since Spot does not understand past
-operators.  Instead we pass =a U b= and =c S d= separately, and we let
+operators.  Instead, we pass =a U b= and =c S d= separately, and we let
 =ppLTLTT= parse the pure-past LTL formula.
 
 #+NAME: tut60e

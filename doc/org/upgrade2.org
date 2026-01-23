@@ -553,7 +553,7 @@ written more efficiently as:
 If the original code did $1$ virtual call to =first()=, $n+1$ virtual
 calls to =done()=, and $n$ virtual calls to =next()=, the new version
 does as many calls to =first()= and =done()= while avoiding all the
-calls to =done()=.  Furthermore the call =release_iter()= makes it
+calls to =done()=.  Furthermore, the call =release_iter()= makes it
 possible for the next call to =succ_iter()= to reuse the same
 iterator.
 

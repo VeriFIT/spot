@@ -183,7 +183,7 @@ This option was originally developed to remove superfluous formulas
 from benchmarks of LTL translators.  For instance the automata
 generated for =GF(a|b)= and =GF(p0)= should be structurally
 equivalent: replacing =p0= by =a|b= in the second automaton should
-turn in into the first automaton, and vice versa.  (However algorithms
+turn in into the first automaton, and vice versa.  (However, algorithms
 dealing with =GF(a|b)= might be slower because they have to deal with
 more atomic propositions.)  So given a long list of LTL formulas, we
 can combine =--relabel-bool= and =-u= to keep only one instance of

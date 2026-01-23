@@ -542,7 +542,7 @@ Here is the very same example, but written in Python:
           print(' ', ap, ' (=', bdict.varnum(ap), ')', sep='', end='')
       print()
       # Templated methods are not available in Python, so we cannot
-      # retrieve/attach arbitrary objects from/to the automaton.  However the
+      # retrieve/attach arbitrary objects from/to the automaton.  However, the
       # Python bindings have get_name() and set_name() to access the
       # "automaton-name" property.
       name = aut.get_name()
@@ -561,7 +561,7 @@ Here is the very same example, but written in Python:
           for t in aut.out(s):
               print(f"  edge({t.src} -> {t.dst})")
               # bdd_print_formula() is designed to print on a std::ostream, and
-              # is inconvenient to use in Python.  Instead we use
+              # is inconvenient to use in Python.  Instead, we use
               # bdd_format_formula() as this simply returns a string.
               print("    label =", spot.bdd_format_formula(bdict, t.cond))
               print("    acc sets =", t.acc)

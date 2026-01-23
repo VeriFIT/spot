@@ -219,7 +219,7 @@ The formula "=G(F(!b & (X!a M (F!a & F!b))) U !b)=" can in fact be
 minimized into an even smaller automaton if we use multiple acceptance
 sets.
 
-Unfortunately because =dstar2tgba= does not know the formula being
+Unfortunately, because =dstar2tgba= does not know the formula being
 translated, and it always converts a DRA into a DBA (with a single
 acceptance set) before further processing, it does not know if using
 more acceptance sets could be useful to further minimize it.  This

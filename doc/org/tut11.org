@@ -173,7 +173,7 @@ languages.
 
 For instance if we want to ensure that whenever we press a button, the
 red light will be on until the green light is on, we would use the
-following formula: =G(press -> red U green)=.  Unfortunately it is not
+following formula: =G(press -> red U green)=.  Unfortunately, it is not
 a safety property:
 
 #+BEGIN_SRC sh :epilogue true

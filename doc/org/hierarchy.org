@@ -433,7 +433,7 @@ faithfully by monitors, i.e., automata that accept all their infinite
 runs.
 
 For most safety formulas, the acceptance output by =ltl2tgba= will
-already be =t= (meaning that all runs are accepting).  However since
+already be =t= (meaning that all runs are accepting).  However, since
 the translator does not do anything particular about safety formulas,
 it is possible to find some pathological formulas for which the
 translator outputs a non-deterministic Büchi automaton where not all
@@ -638,7 +638,7 @@ $txt
 [[file:hier-persistence-1.svg]]
 
 
-However since the *negation* of =FGa= is a /recurrence/, this negation
+However, since the *negation* of =FGa= is a /recurrence/, this negation
 can be represented by a deterministic Büchi automaton, which means
 that =FGa= could be represented by a deterministic co-Büchi automaton.
 =ltl2tgba= does not generate co-Büchi acceptance, but we can do the
@@ -684,7 +684,7 @@ ltlfilt -f 'F(G!a | G(b U a))' --format='%[v]h'
 #+RESULTS:
 : persistence
 
-Unfortunately the default output of the translation is not weak:
+Unfortunately, the default output of the translation is not weak:
 
 #+NAME: hier-persistence-3
 #+BEGIN_SRC sh :exports code
