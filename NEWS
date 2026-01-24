@@ -8,7 +8,7 @@ New in spot 2.14.5.dev  (not yet released)
     disabled in ltl2tgba and ltlsynt by passing option -xnew-oblig=0.
 
   - ltlsynt has a new option --obligation-synthesis=no that can be
-    used to disable MTBDD-based synthesis when the spefication is
+    used to disable MTBDD-based synthesis when the specification is
     an obligation.
 
   - The 'ltl2tgta' tool, that was used to build "testing automata"
@@ -21,7 +21,7 @@ New in spot 2.14.5.dev  (not yet released)
     2.3.1 generate LTL formulas that can only be recognized by a DBA
     of doubly-exponential size.  Those formulas actually describe
     obligation properties, but they are not syntactic obligations.
-    The new --kr-nlogn-detla1=N and --kr-n-delta1=N options generate
+    The new --kr-nlogn-delta1=N and --kr-n-delta1=N options generate
     variants of those formulas that are equivalent to the previous
     properties, but that both belong to the Δ₁ fragment of LTL (i.e.,
     the fact that they are obligation properties can be checked
@@ -31,7 +31,7 @@ New in spot 2.14.5.dev  (not yet released)
     to implement a loop where the automaton is regularly simplified
     with --given-strategy=minato and --given-strategy=relax, returning
     the smallest automaton found (with "auto-small"), or the smallest
-    automaton that is stutter-invarent (with "auto-si").  If
+    automaton that is stutter-invariant (with "auto-si").  If
     postprocessing options like --small or --deterministic are given,
     they will also be applied during this loop.
 
@@ -47,10 +47,10 @@ New in spot 2.14.5.dev  (not yet released)
     syntactic-obligations to weak spot::mtdswa.
 
   - spot::loding_weak_ranking() and spot::minimize_mtdswa()
-    are new function that can be used together to minimize
+    are new functions that can be used together to minimize
     a weak spot::mtdswa.
 
-  - spot::obligation_synthesis() is a new function to synthesis
+  - spot::obligation_synthesis() is a new function to synthesize
     syntactic-obligations specification using MTBDDs.
 
   - scc_filter() will now preserve and update any "original-states"
@@ -88,7 +88,7 @@ New in spot 2.14.5.dev  (not yet released)
     removed.  This code was initially introduced in Spot 1.0, and some
     minimal update for Spot 2.0, was poorly tested/covered.
     Maintaining it in Spot does not seem worth the human effort and
-    CI/CD ressources it takes.
+    CI/CD resources it takes.
 
   Bug fixes:
 
@@ -155,7 +155,7 @@ New in spot 2.14.3  (2025-11-11)
   - Spot's Python bindings used to map spot::parse_error exceptions
     into Python's SyntaxError exception.  However, recent ipython
     versions have a handling of SyntaxError that really assume a
-    SyntaxError in Python, not an error comming from some third-party
+    SyntaxError in Python, not an error coming from some third-party
     parser reading some third-party format...  That spot::parse_error
     exceptions are now raised as instances of spot.parse_error.
     (Issue #617.)
@@ -244,7 +244,7 @@ New in spot 2.14  (2025-06-26)
     https://spot.lre.epita.fr/ltlf2dfs.html for some examples.
 
   - ltlfsynt is a new tool that solves the reactive synthesis for LTLf
-    specification, using a reachability game interpreted oveer MTDFA.
+    specification, using a reachability game interpreted over MTDFA.
     See https://spot.lre.epita.fr/ltlfsynt.html
 
     The output of --realizability has been compared to several other
@@ -335,7 +335,7 @@ New in spot 2.13.1  (2025-05-21)
 
   - Work around a couple of compilation issues with GCC 15 and later.
 
-  - Miscelaneous documentation fixes.
+  - Miscellaneous documentation fixes.
 
 New in spot 2.13  (2025-03-24)
 
@@ -344,7 +344,7 @@ New in spot 2.13  (2025-03-24)
   - ltlmix is a new tool that generates formulas by combining existing
     ones. See https://spot.lre.epita.fr/ltlmix.html for examples.
 
-  - ltlf2dfa is a new tool convering LTLf formula to transition-based
+  - ltlf2dfa is a new tool converting LTLf formula to transition-based
     DFAs.  See https://spot.lre.epita.fr/ltlf2dfa.html.
 
   - randltl can now set the prority of the X[!] operator to generate
@@ -515,7 +515,7 @@ New in spot 2.13  (2025-03-24)
     can now describe a permutation of the state numbers.
 
   - spot::maximum_cardinality_search() and
-    spot::maximum_cardinality_search_reorder_here() are new function
+    spot::maximum_cardinality_search_reorder_here() are new functions
     to compute (and apply) an ordering of states based on a maximum
     cardinality search.
 
@@ -539,7 +539,7 @@ New in spot 2.12.2  (2025-01-18)
   - to_finite() was dealing incorrectly with edges that were
     both alive and dead.  (Issue #596.)
 
-  - LaTeX output of the X[!] operator with broken in both
+  - LaTeX output of the X[!] operator was broken in both
     LaTeX and self-contained LaTeX mode.  (Issue #597)
 
   - Fix a bug in the AIGER encoding with certain forms of
@@ -551,7 +551,7 @@ New in spot 2.12.1  (2024-09-23)
 
   Bug fixes:
 
-  - Generating random formula without any unary opertors would very
+  - Generating random formula without any unary operators would very
     often create formulas much smaller than asked.
 
   - The parity game solver, which internally works on "parity max
@@ -604,14 +604,14 @@ New in spot 2.12  (2024-05-16)
     https://spot.lre.epita.fr/tut25.html for some motivation.
 
   - autfilt learned --reduce-acceptance-set/--enlarge-acceptance-set
-    to heurisitcally remove/add to unnecessary acceptance marks in
+    to heuristically remove/add to unnecessary acceptance marks in
     Büchi automata.  (Issue #570)
 
   - ltlfilt has a new option --relabel-overlapping-bool=abc|pnn that
     will replace boolean subformulas by fresh atomic propositions even
     if those subformulas share atomic propositions.
 
-  - ltlsynt's --ins and --outs options will iterpret any atomic
+  - ltlsynt's --ins and --outs options will interpret any atomic
     proposition surrounded by '/' as a regular expression.
     For intance with
 
@@ -735,7 +735,7 @@ New in spot 2.12  (2024-05-16)
 
   - Given a twa_word_ptr W and a twa_ptr A both sharing the same
     alphabet, one can now write W->intersects(A) or A->intersects(W)
-    instead of the longuer W->as_automaton()->intersects(A) or
+    instead of the longer W->as_automaton()->intersects(A) or
     A->intersects(W->as_automaton()).
 
   - spot::scc_info has a new option PROCESS_UNREACHABLE_STATES that
@@ -785,7 +785,7 @@ New in spot 2.12  (2024-05-16)
     change ensures that the dual of a Büchi automaton will always be a
     co-Büchi automaton.  Previously cleanup_acceptance(), which remove
     unused colors from the acceptance, was sometimes able to simplify
-    co-Büchi to "t", causing surprizes.
+    co-Büchi to "t", causing surprises.
 
   - Function minimize_obligation_garanteed_to_work() was renamed to
     minimize_obligation_guaranteed_to_work().  We believe this
@@ -818,7 +818,7 @@ New in spot 2.12  (2024-05-16)
       https://github.com/jupyterlab/jupyterlab/issues/10464
 
     This version of Spot now declares its svg outputs as HTML to
-    prevent Jypyter from wrapping them is images.
+    prevent Jupyter from wrapping them is images.
 
   Bugs fixed:
 
@@ -944,7 +944,7 @@ New in spot 2.11.5  (2023-04-20)
     verbatim.  We also changed the behavior of as_twa() to not merge
     identical states.
 
-  - Fix segfaults occuring in determinization of 1-state terminal
+  - Fix segfaults occurring in determinization of 1-state terminal
     automata.
 
   - Fix incorrect assertion in game solver when the edge vector
@@ -1114,13 +1114,13 @@ New in spot 2.11  (2022-10-08)
     "original-states".  It maps an each state to an unsigned integer
     such that if two classes are in the same class, they are expected
     to recognize the same language.  The "original-states" should be
-    prefered property when that integer correspond to some actual
+    preferred property when that integer correspond to some actual
     state.
 
   - tgba_determinize() learned to fill the "original-classes" property.
     States of the determinized automaton that correspond to the same
     subset of states of the original automaton belong to the same
-    class.  Filling this property is only done on demand as it inccurs
+    class.  Filling this property is only done on demand as it incurs
     a small overhead.
 
   - sbacc() learned to take the "original-classes" property into
@@ -1191,8 +1191,8 @@ New in spot 2.11  (2022-10-08)
 
   - spot::postprocessor has a new extra option "merge-states-min" that
     indicates above how many states twa_graph::merge_states() (which
-    perform a very cheap pass to fuse states with identicall
-    succesors) should be called before running simulation-based
+    perform a very cheap pass to fuse states with identical
+    successors) should be called before running simulation-based
     reductions.
 
   - A new function delay_branching_here(aut) can be used to simplify
@@ -1306,7 +1306,7 @@ New in spot 2.10.4  (2022-02-01)
   Bug fixed:
 
   - Fix memory leaks in Python bindings for several iteration objects.
-    This occured while itering on twa_graph.out(), twa_graph.edges(),
+    This occurred while iterating on twa_graph.out(), twa_graph.edges(),
     twa_graph.univ_dests(), kripke_graph.out(), kripke_graph.edges(),
     mark_t.sets(), scc_info.edges_of(), scc_info.inner_edges_of(), and
     on an scc_info instance.
@@ -1348,7 +1348,7 @@ New in spot 2.10.2  (2021-12-03)
   - only use sched_getcpu() and pthread_setaffinity_np() when they are
     available.
 
-  - Using ##300 in a SERE will report that the repeatition exceeds the
+  - Using ##300 in a SERE will report that the repetition exceeds the
     allowed value using a parse error, not as an exception.
 
   - spot::formula::is_literal() should be const.
@@ -1396,7 +1396,7 @@ New in spot 2.10.1  (2021-11-19)
     can be reproduced regardless of the IPykernel version.  This fix
     was easier to do in Python 3.5.
 
-  - Fix sevaral minor documentation errors.
+  - Fix several minor documentation errors.
 
 New in spot 2.10  (2021-11-13)
 
@@ -1501,14 +1501,14 @@ New in spot 2.10  (2021-11-13)
     algorithms.
 
     The class ltsmin_model class, providing support for loading
-    various models that follow ltsmin's PINS interinterface, has
+    various models that follow ltsmin's PINS interface, has
     been adjusted and can now produce either a kripke instance, or
     a kripkecube instance.
 
   - The postprocessor::set_type() method can now accept
     options postprocessor::Buchi and postprocessor::GeneralizedBuchi.
 
-    These syntaxes is more homogeneous with the rest of the supported
+    This syntax is more homogeneous with the rest of the supported
     types.  Note that postprocessor::BA and postprocessor::TGBA, while
     still supported and not yet marked as deprecated, are best avoided
     in new code.
@@ -1542,15 +1542,15 @@ New in spot 2.10  (2021-11-13)
     propagate_marks_vector(), both in the general case and in the
     Rabin-like case.
 
-  - simplify_acceptance() learned to simplify acceptence formulas of
+  - simplify_acceptance() learned to simplify acceptance formulas of
     the form Inf(x)&Inf(y) or Fin(x)|Fin(y) when the presence of x
     always implies that of y.  (Issue #406.)
 
-  - simplifiy_acceptance_here() and propagate_marks_here() learned to
+  - simplify_acceptance_here() and propagate_marks_here() learned to
     use some patterns of the acceptance condition to remove or add
     (depending on the function) colors on edges.  As an example, with
     a condition such as Inf(0) | Fin(1), an edge labeled by {0,1} can
-    be simplied to {0}, but the oppose rewriting can be useful as
+    be simplified to {0}, but the opposite rewriting can be useful as
     well.  (Issue #418.)
 
   - The parity_game class has been removed, now any twa_graph_ptr that
@@ -1609,7 +1609,7 @@ New in spot 2.10  (2021-11-13)
 
       dpa-simul      Set to 0/1 to disable/enable simulation-based
                      reduction performed after running a Safra-like
-                     determinization to optain a DPA.  By default, it is
+                     determinization to obtain a DPA.  By default, it is
                      only disabled with --low or if simul=0.
 
       dba-simul      Set to 0/1 to disable/enable simulation-based
@@ -1755,7 +1755,7 @@ New in spot 2.9.7 (2021-05-12)
   - Work around GraphViz issue 1931, causing spurious failures in the
     test suite.
 
-  - Miscelaneous documentation fixes.
+  - Miscellaneous documentation fixes.
 
 New in spot 2.9.6 (2021-01-18)
 
@@ -2102,7 +2102,7 @@ New in spot 2.8.6 (2020-02-19)
     spot.translate(..., 'det', 'any') triggered a syntax error in the
     Python code to handle this error.
 
-  - degeneralize_tba() was incorrectly not honnoring the "skip_level"
+  - degeneralize_tba() was incorrectly not honoring the "skip_level"
     optimization after creating an accepting transition; as a
     consequence, some correct output could be larger than necessary
     (but still correct).
@@ -3552,7 +3552,7 @@ New in spot 2.4 (2017-09-06)
     spot::acc_cond::is_rabin_like() works similarly.
 
   - The degeneralize() function has learned to consider acceptance
-    marks common to all edges comming to a state to select its initial
+    marks common to all edges coming to a state to select its initial
     level.  A similar trick was already used in sbacc(), and saves a
     few states in some cases.
 
@@ -3638,7 +3638,7 @@ New in spot 2.4 (2017-09-06)
   - If the SPOT_BDD_TRACE environment variable is set, statistics
     about BDD garbage collection and table resizing are shown.
 
-  - The & and | operators for acceptannce conditions have been changed
+  - The & and | operators for acceptance conditions have been changed
     slightly to be more symmetrical.  In older versions, operator &
     would move Fin() terms to the front, but that is not the case
     anymore.  Also operator & was already grouping all Inf() terms
@@ -3756,7 +3756,7 @@ New in spot 2.3.4 (2017-05-11)
   - ltldo and ltlcross could leave temporary files behind when
     aborting on error.
 
-  - The LTL simplifcation rule that turns F(f)|q into F(f|q)
+  - The LTL simplification rule that turns F(f)|q into F(f|q)
     when q is a subformula that is both eventual and universal
     was documented but not applied in some forgotten cases.
 
@@ -3829,7 +3829,7 @@ New in spot 2.3.2 (2017-03-15)
     only if %p was used as well.
 
   - genltl was never meant to have (randomly attributed) short
-    options for --postive and --negative.
+    options for --positive and --negative.
 
   - a typo in the code for transformating transition-based acceptance
     to state-based acceptance could cause a superfluous initial state
@@ -4238,7 +4238,7 @@ New in spot 2.1.2 (2016-10-14)
   * ltlcross's --csv and --json output was changed to not include
     information about the ambiguity or strength of the automata by
     default.   Computing those can be costly and not needed by
-    every user, so it should now be requested explicitely using
+    every user, so it should now be requested explicitly using
     options --strength and --ambiguous.
 
   Library:
@@ -4418,7 +4418,7 @@ New in spot 2.1 (2016-08-08)
 
   * Arguments passed to -x (in ltl2tgba, ltl2tgta, autfilt, dstar2tgba)
     that are not used are now reported as they might be typos.
-    This ocurred a couple of times in our test-suite.  A similar
+    This occurred a couple of times in our test-suite.  A similar
     check is done for the arguments of autfilt --sat-minimize=...
 
   Library:
@@ -4496,7 +4496,7 @@ New in spot 2.1 (2016-08-08)
   Python:
 
   * The __format__() method for formula supports the same
-    operator-rewritting feature introduced in ltldo and ltlcross.
+    operator-rewriting feature introduced in ltldo and ltlcross.
     So "{:[i]s}".format(f) is the same as
     "{:s}".format(f.unabbreviate("i")).
 
@@ -4772,7 +4772,7 @@ New in spot 1.99.8 (2016-02-18)
   * Option "k" is automatically used by print_dot() and print_hoa()
     when printing Kripke structures.
 
-  * print_dot() also honnor two new automaton properties called
+  * print_dot() also honors two new automaton properties called
     "highlight-edges" and "highlight-states".  These are used to color
     a subset of edges or transitions.
 
@@ -4881,7 +4881,7 @@ New in spot 1.99.7 (2016-01-15)
     This implies that when Spot headers are installed in
     /usr/include/spot/... (the default when using the Debian packages)
     or /usr/local/include/spot/... (the default when compiling from
-    source), then it is no longuer necessary to add
+    source), then it is no longer necessary to add
     -I/usr/include/spot or -I/usr/local/include/spot when compiling,
     as /usr/include and /usr/local/include are usually searched by
     default.
@@ -4929,7 +4929,7 @@ New in spot 1.99.7 (2016-01-15)
   * Automata property flags (those that tell whether the automaton is
     deterministic, weak, stutter-invariant, etc.) are now stored using
     three-valued logic: in addition to "maybe"/"yes" they can now also
-    represent "no".  This is some preparation for the upcomming
+    represent "no".  This is some preparation for the upcoming
     support of the HOA v1.1 format, but it also saves time in some
     algorithms (e.g, is_deterministic() can now return immediately on
     automata marked as not deterministic).
@@ -5257,7 +5257,7 @@ New in spot 1.99.4 (2015-10-01)
   * Directories ltlast/, ltlenv/, and ltlvisit/, have been merged into
     a single tl/ directory (for temporal logic).  This is motivated by
     the fact that these formulas are not restricted to LTL, and by the
-    fact that we no longuer use the "visitor" pattern.
+    fact that we no longer use the "visitor" pattern.
 
   * The LTL/PSL parser is now declared in tl/parse.hh (instead of
     ltlparse/public.hh).
@@ -5509,7 +5509,7 @@ New in spot 1.99.1 (2015-06-23)
     - ltlfilt's old -q/--quiet option has been renamed to
       --ignore-errors.  The new -q/--quiet semantic is the
       same as in grep (and also autfilt): disable all normal
-      input, for situtations where only the exit status matters.
+      input, for situations where only the exit status matters.
 
     - ltlfilt's old -n/--negate option can only be used as --negate
       now.  The short '-n NUM' option is now the same as the new
@@ -5571,7 +5571,7 @@ New in spot 1.99.1 (2015-06-23)
     - The documentation now includes some simple code examples
       for both Python and C++.  (This is still a work in progress.)
 
-    - The curstomized version of BuDDy (libbdd) used by Spot has be
+    - The customized version of BuDDy (libbdd) used by Spot has been
       renamed as (libbddx) to avoid issues with copies of BuDDy
       already installed on the system.
 
@@ -5717,7 +5717,7 @@ New in spot 1.99.1 (2015-06-23)
 	    //     i->current_acceptance_conditions()
 	  }
 
-      And the above syntax is really just syntactic suggar for
+      And the above syntax is really just syntactic sugar for
 
 	twa_succ_iterator* i = aut->succ_iter(s);
 	if (i->first())
@@ -5794,11 +5794,11 @@ New in spot 1.99.1 (2015-06-23)
       represented by automata has been removed.  It was never used in
       practice because it had no practical user interface, and the
       translation was a purely-based BDD encoding producing huge
-      automata (when viewed explictely), using the above and non
-      longuer supported tgba_bdd_concrete class.
+      automata (when viewed explicitly), using the above and no
+      longer supported tgba_bdd_concrete class.
 
     - Our implementation of the Kupferman-Vardi complementation has
-      been removed: it was unused in practice beause of the size of
+      been removed: it was unused in practice because of the size of
       the automata built, and it did not survive the conversion of
       acceptance sets from BDDs to bitsets.
 
@@ -5919,7 +5919,7 @@ New in spot 1.2.4 (2014-05-15)
     - Fix four incorrect formula-simplification rules, three were
       related to the factorization of Boolean subformulas in
       operands of the non-length-matching "&" SERE operator, and
-      a fourth one could only be enabled by explicitely passing the
+      a fourth one could only be enabled by explicitly passing the
       favor_event_univ option to the simplifier (not the default).
     - Fix incorrect translation of the fusion operator (":") in SERE
       such as {xx;1}:yy[*] where the left operand has 1 as tail.
@@ -5998,7 +5998,7 @@ New in spot 1.2.1 (2013-12-11)
       translations, and remove these two columns.
 
     - if ltlcross is used with --products=+5 instead of --products=5
-      then the stastics for each of the five products will be output
+      then the statistics for each of the five products will be output
       separately instead of being averaged.
 
     - if ltlcross is used with tools that produce deterministic Streett
@@ -6028,7 +6028,7 @@ New in spot 1.2.1 (2013-12-11)
   * Bug fixes:
 
     - ltlcross' CSV output has been changed to be more RFC 4180
-      compliant: it no longuer output useless cosmetic spaces, and
+      compliant: it no longer outputs useless cosmetic spaces, and
       use double-quotes with proper escaping for strings.  The only
       RFC 4180 rule that it does not follow is that it will terminate
       lines with \n instead of \r\n because the latter cause issues
@@ -6221,7 +6221,7 @@ New in spot 1.2 (2013-10-01)
     - Cleanup of exported symbols
 
       All symbols in the library now have hidden visibility on ELF systems.
-      Public classes and functions have been marked explicitely for export
+      Public classes and functions have been marked explicitly for export
       with the SPOT_API macro.
 
       During this massive update, some of functions that should not have
@@ -6240,7 +6240,7 @@ New in spot 1.2 (2013-10-01)
 
   * Bug fixes:
 
-    - Degeneralization was not indempotant on automata with an
+    - Degeneralization was not idempotent on automata with an
       accepting initial state that was on a cycle, but without
       self-loop.
 
@@ -6360,7 +6360,7 @@ New in spot 1.1.1 (2013-05-13):
 
 New in spot 1.1 (2013-04-28):
 
-  Several of the new features described below are discribed in
+  Several of the new features described below are described in
 
     Tomáš Babiak, Thomas Badie, Alexandre Duret-Lutz, Mojmír
     Křetínský, Jan Strejček: Compositional Approach to Suspension and
@@ -6686,7 +6686,7 @@ New in spot 1.0 (2012-10-27):
 
     - The '*' operator can (again) be used as an AND in LTL formulas.
       This is for compatibility with formula written in Wring's
-      syntax.  However inside SERE it is interpreted as the Kleen
+      syntax.  However inside SERE it is interpreted as the Kleene
       star.
 
     - When printing a formula using Spin's LTL syntax, we don't
@@ -6722,7 +6722,7 @@ New in spot 0.9.2 (2012-07-02):
       due to a bug in the definition of product with symbolic
       automata.
     - The Makefile.am of BuDDy, LBTT, and Spot have been adjusted to
-      accomodate Automake 1.12 (while still working with 1.11).
+      accommodate Automake 1.12 (while still working with 1.11).
     - Better error recovery when parsing broken LTL formulae.
     - Fix errors and warnings reported by clang 3.1 and the
       upcoming g++ 4.8.
@@ -6765,7 +6765,7 @@ New in spot 0.9 (2012-05-09):
 
   * New features:
     - Operators from the linear fragment of PSL are supported.  This
-      basically extends LTL with Sequential Extended Regulat
+      basically extends LTL with Sequential Extended Regular
       Expressions (SERE), and a couple of operators to bridge SERE and
       LTL.  See doc/tl/tl.pdf for the list of operators and their
       semantics.
@@ -6774,7 +6774,7 @@ New in spot 0.9 (2012-05-09):
       See doc/tl/tl.pdf for the list of the rewritings implemented.
     - Some of these rewritings that may produce larger formulas
       (for instance to rewrite "{a;b;c}" into "a & X(b & Xc)")
-      may be explicitely disabled with a new option.
+      may be explicitly disabled with a new option.
     - The src/ltltest/randltl tool can now generate random SEREs
       and random PSL formulae.
     - Only one translator (ltl2tgba_fm) has been augmented to
@@ -6840,7 +6840,7 @@ New in spot 0.9 (2012-05-09):
       -R2s, and -R2t are deprecated and all made equivalent to -RDS.
     - The tgba_explicit hierarchy has been reorganized in order to
       make room for sba_explicit classes that share most of the code.
-      The main consequence is that the tgba_explicit type no longuer
+      The main consequence is that the tgba_explicit type no longer
       exists.  However the tgba_explicit_number,
       tgba_explicit_formula, and tgba_explicit_string still do.
 

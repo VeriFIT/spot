@@ -46,7 +46,7 @@ automatically, please do contribute!
 Keeping in touch
 ================
 
-If you have questions regarding Spot, or bug to report, please send
+If you have questions regarding Spot, or bugs to report, please send
 them to <spot@lrde.epita.fr>.  This is a public mailing list which you
 may subscribe to at https://www.lrde.epita.fr/mailman/listinfo/spot
 but you should feel free to post without subscribing.
@@ -186,7 +186,7 @@ flags specific to Spot:
    --enable-pthread
      Build and link with the -pthread option, and activate a few
      parallel variants of the algorithms.  This is currently disabled
-     by default, as it require all third-party tools using Spot to
+     by default, as it requires all third-party tools using Spot to
      build with -pthread as well.
 
    --enable-c++20
