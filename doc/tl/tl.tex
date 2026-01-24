@@ -302,9 +302,9 @@ these characters.
   with a characters that is not an uppercase \samp{F}, \samp{G}, or
   \samp{X}, is also an atomic proposition.  In this case the double
   quotes are not necessary.
-\item \label{rule:ap3} Any sequence of alphanumeric character that
+\item \label{rule:ap3} Any sequence of alphanumeric characters that
   starts with \samp{F}, \samp{G}, or \samp{X}, has a digit in second
-  position, and anything afterwards, is also an atomic propositions,
+  position, and anything afterwards, is also an atomic proposition,
   and the double quotes are not necessary.
 \end{enumerate}
 
@@ -535,7 +535,7 @@ $\M$, and $\W$ if you are only familiar with $\X$ and $\U$.
 \subsection{Syntactic Sugar}
 
 The syntax on the left is equivalent to the syntax on the right.
-Some of rewritings taken from the syntax of TSLF~\citep{jacobs.16.synt}
+Some of rewritings taken from the syntax of TLSF~\citep{jacobs.16.synt}
 are performed from left to right when parsing a formula.  They express
 the fact that some formula $f$ has to be true in $n$ steps, or at some
 or all times between $n$ and $m$ steps.
@@ -793,11 +793,11 @@ omitted.
 \begin{align*}
   f\DELAYR{\mvar{i}..\mvar{j}}g & \equiv f\CONCAT{}\1\STAR{\mvar{i-1}..\mvar{j-1}}\CONCAT{}g\quad\text{if~}i>0                                                    \\
   f\DELAYR{0..\mvar{j}}g        & \equiv f\FUSION(\1\STAR{0..\mvar{j}}\CONCAT{}g)\quad\text{if~}\varepsilon\nVDash f                                              \\
-  f\DELAYR{0..\mvar{j}}g        & \equiv (f\CONCAT{}\1\STAR{0..\mvar{j}})\FUSION{}g)\quad\text{if~}\varepsilon\VDash f \land \varepsilon\nVDash g                 \\
+  f\DELAYR{0..\mvar{j}}g        & \equiv (f\CONCAT{}\1\STAR{0..\mvar{j}})\FUSION{}g\quad\text{if~}\varepsilon\VDash f \land \varepsilon\nVDash g                 \\
   f\DELAYR{0..\mvar{j}}g        & \equiv (f\FUSION{}g)\OR(f\CONCAT{}\1\STAR{0..\mvar{j-1}}\CONCAT{}g)\quad\text{if~}\varepsilon\VDash f \land \varepsilon\VDash g \\
   f\DELAYR{\mvar{i}..}g         & \equiv f\CONCAT{}\1\STAR{\mvar{i-1}..}\CONCAT{}g\quad\text{if~}i>0                                                              \\
   f\DELAYR{0..}g                & \equiv f\FUSION(\1\STAR{}\CONCAT{}g)\quad\text{if~}\varepsilon\nVDash f                                                         \\
-  f\DELAYR{0..}g                & \equiv (f\CONCAT{}\1\STAR{})\FUSION{}g)\quad\text{if~}\varepsilon\VDash f \land \varepsilon\nVDash g                            \\
+  f\DELAYR{0..}g                & \equiv (f\CONCAT{}\1\STAR{})\FUSION{}g\quad\text{if~}\varepsilon\VDash f \land \varepsilon\nVDash g                            \\
   f\DELAYR{0..}g                & \equiv (f\FUSION{}g)\OR(f\CONCAT{}\1\STAR{}\CONCAT{}g)\quad\text{if~}\varepsilon\VDash f \land \varepsilon\VDash g
 \end{align*}
 \begin{align*}
@@ -805,8 +805,8 @@ omitted.
   f\DELAY{\mvar{i}} g           & \equiv f\DELAYR{\mvar{i}..\mvar{i}} g       & {}\DELAY{\mvar{i}} g  & \equiv \1\STAR{\mvar{i}}\CONCAT g                         \\
   f\DELAYP{}g                   & \equiv f\DELAYR{1..}g                       & \DELAYP{} g           & \equiv\DELAYR{1..}g                                       \\
   f\DELAYS{}g                   & \equiv f\DELAYR{0..}g                       & \DELAYS{} g           & \equiv\DELAYR{0..}g                                       \\
-  f\DELAYR{..\mvar{j}} g        & \equiv f\DELAYR{0..\mvar{j}} g\}            & \DELAYR{..\mvar{j}} g & \equiv \1\DELAYR{0..\mvar{j}} g\}                         \\
-  f\DELAYR{..} g                & \equiv f\DELAYR{0..} f g\}                  & \DELAYR{..} g         & \equiv \1\DELAYR{0..} g\}
+  f\DELAYR{..\mvar{j}} g        & \equiv f\DELAYR{0..\mvar{j}} g            & \DELAYR{..\mvar{j}} g & \equiv \1\DELAYR{0..\mvar{j}} g                         \\
+  f\DELAYR{..} g                & \equiv f\DELAYR{0..} g                  & \DELAYR{..} g         & \equiv \1\DELAYR{0..} g
 \end{align*}
 
 \subsection{Trivial Identities (Occur Automatically)}
@@ -1010,7 +1010,7 @@ operator, even if the operator has multiple synonyms (like \samp{|},
 
 \begin{align*}
 \mathit{constant} ::={}     & \0 \mid \1                                                                                                                                                                                                       \\
-\mathit{atomic\_prop} ::={} & \text{see secn~\ref{sec:ap}}                                                                                                                                                                                     \\[1ex]
+\mathit{atomic\_prop} ::={} & \text{see section~\ref{sec:ap}}                                                                                                                                                                                     \\[1ex]
   \mathit{bformula} ::={}   & \mathit{constant}                                      & \mid{} & \tsamp{(}\,\mathit{bformula}\,\tsamp{)}                    & \mid{} & \mathit{bformula}\,\msamp{\XOR}\,\mathit{bformula}                       \\
   \mid{}                    & \mathit{atomic\_prop}                                  & \mid{} & \msamp{\NOT}\,\mathit{bformula}                            & \mid{} & \mathit{bformula}\,\msamp{\EQUIV}\,\mathit{bformula}                     \\
   \mid{}                    & \mathit{atomic\_prop}\code{=0}                         & \mid{} & \mathit{bformula}\,\msamp{\AND}\,\mathit{bformula}         & \mid{} & \mathit{bformula}\,\msamp{\IMPLIES}\,\mathit{bformula}                   \\
@@ -1357,7 +1357,7 @@ fragment originally.
 
 If the objective is to classify properties syntactically, it is useful
 to use some slightly more complete grammar rules.  In the following
-list, the rules the initial $G$, $S$, $O$, $P$, $R$ of their
+list, the rules use the initial $G$, $S$, $O$, $P$, $R$ of their
 corresponding property clases, as listed in Fig.~\ref{fig:hierarchy}
 (i.e., Guarantee, Safety, Obligation, Persistence, Recurrence).
 Additionally, $B$ denotes the ``bottom'' class (a.k.a. $\Delta_0$).
@@ -1939,7 +1939,7 @@ $q,\,q_i$           & a pure eventuality that is also purely universal \\
   \G(f_1\AND\ldots\AND f_n \AND \X e_1 \AND \ldots \AND \X e_p)&\equiv \G(f_1\AND\ldots\AND f_n \AND e_1 \AND \ldots \AND e_p) \\
   \G(f_1\AND\ldots\AND f_n \AND \F (g_1 \AND \ldots \AND g_p \AND \X e_1 \AND \ldots \AND \X e_m))&\equiv \G(f_1\AND\ldots\AND f_n \AND \F(g_1 \AND \ldots \AND g_p) \AND e_1 \AND \ldots \AND e_m) \\
   \F(f_1\OR\ldots\OR f_n \OR \X u_1 \OR \ldots \OR \X u_p)&\equiv \F(f_1\OR\ldots\OR f_n \OR u_1 \OR \ldots \OR u_p) \\
-  \F(f_1\OR\ldots\OR f_n \OR \G (g_1 \OR \ldots \OR g_p \OR \X u_1 \OR \ldots \OR \X u_m))&\equiv \F(f_1\OR\ldots\AND f_n \OR \G(g_1 \OR \ldots \OR g_p) \OR u_1 \OR \ldots \OR u_m) \\
+  \F(f_1\OR\ldots\OR f_n \OR \G (g_1 \OR \ldots \OR g_p \OR \X u_1 \OR \ldots \OR \X u_m))&\equiv \F(f_1\OR\ldots\OR f_n \OR \G(g_1 \OR \ldots \OR g_p) \OR u_1 \OR \ldots \OR u_m) \\
   \G(f_1\OR\ldots\OR f_n \OR q_1 \OR \ldots \OR q_p)&\equiv \G(f_1\OR\ldots\OR f_n)\OR q_1 \OR \ldots \OR q_p \\
   \F(f_1\AND\ldots\AND f_n \AND q_1 \AND \ldots \AND q_p)&\equivEU \F(f_1\AND\ldots\AND f_n)\AND q_1 \AND \ldots \AND q_p \\
   \G(f_1\AND\ldots\AND f_n \AND q_1 \AND \ldots \AND q_p)&\equivEU \G(f_1\AND\ldots\AND f_n)\AND q_1 \AND \ldots \AND q_p \\
