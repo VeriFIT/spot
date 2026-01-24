@@ -163,7 +163,7 @@ ltldo '{name} foo/bar/owl-21.00 ltl2nba' -f GFa 2>stderr && exit 1
 grep % stderr && exit 1
 grep 'ltldo:.*foo/bar/owl-21.00' stderr
 
-ltldo '{name} foo/bar/owl-21.00 non-existant' -f GFa 2>stderr && exit 1
+ltldo '{name} foo/bar/owl-21.00 non-existent' -f GFa 2>stderr && exit 1
 grep % stderr
 
 test 2 = `genltl --and-gf=1..4 | ltldo ltl2tgba -n2 | autfilt -c`

@@ -1572,7 +1572,7 @@ namespace
 
 #ifdef TRACE
     if (succ)
-      std::cout << "Relabeling succesfull with " << relabel_maps.env_map.size()
+      std::cout << "Relabeling successful with " << relabel_maps.env_map.size()
                 << " letters\n";
     else
       std::cout << "Relabeling aborted\n";
@@ -1764,7 +1764,7 @@ namespace
     for (unsigned groupidx = 0; groupidx < n_groups; ++groupidx)
       {
         all_bdd.clear();
-        // List all bdds occuring in this group, no matter the order
+        // List all bdds occurring in this group, no matter the order
         for (unsigned s = 0; s < n_env; ++s)
           {
             if (red.which_group[s] != groupidx)

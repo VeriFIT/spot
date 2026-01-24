@@ -76,12 +76,30 @@ for dir in "$TOP/spot" "$TOP/bin" "$TOP/tests"; do
 
     fail=false
 
-    # Check this before stripping comments and strings.
+    # Check for frequent typos before stripping comments and strings.
     $GREP -i 'accepting cond' $file && diag 'accepting -> acceptance'
     $GREP -i 'dictionnar[yi]' $file && diag 'dictionnary -> dictionary'
     # "an uninstalled" seems to be the exception so far, but we want
     # "a unique", "a universal", etc.
     $GREP -i 'an uni[^n]' $file && diag 'an uni... -> a uni...'
+    $GREP -iE 'occured|occuring|occurence' $file &&
+      diag 'occured/occuring/occurence -> occurred/occurring/occurrence'
+    $GREP -iE 'explicitely|implicitely' $file && diag '...icitely -> ...icitly'
+    $GREP -iE 'seperate|seprat' $file && diag 'sep(e)rat... -> separat...'
+    $GREP -E '([uU]se|[sS]uccess|[cC]are)full[^y]' $file &&
+      diag '...full -> ...ful'
+    $GREP -iE '(transfer|refer|prefer)ed' $file && diag '...fered -> ...ferred'
+    $GREP -iE 'formated' $file && diag 'formated -> formatted'
+    $GREP -iE 'writting' $file && diag 'writting -> writing'
+    $GREP -iE '(exist|depend)ant' $file && diag '...ant -> ...ent'
+    $GREP -iE 'ressources?' $file && diag 'ressource -> resource'
+    $GREP -iE 'accomodate' $file && diag 'accomodate -> accommodate'
+    $GREP -iE 'neccessary' $file && diag 'neccessary -> necessary'
+    $GREP -iE 'succesful' $file && diag 'succesful -> successful'
+    $GREP -iE 'identitical' $file && diag 'identitical -> identical'
+    $GREP -iE 'spefication|speficication' $file &&
+      diag 'spe...cation -> specification'
+    $GREP -iE 'honnor|honour' $file && diag 'honnor/honour -> honor'
 
     $GREP -i 'version 2 of the License' $file &&
       diag 'license text should refer to version 2'

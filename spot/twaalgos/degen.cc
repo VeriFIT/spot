@@ -297,18 +297,18 @@ namespace spot
         unsigned maxorig = *std::max_element(orig_states->begin(),
                                              orig_states->end());
         std::vector<unsigned>
-          bottommost_occurence(maxorig + 1);
+          bottommost_occurrence(maxorig + 1);
         {
           unsigned n = res_scc_count;
           do
             for (unsigned s: si_res.states_of(--n))
-              bottommost_occurence[(*orig_states)[s]] = s;
+              bottommost_occurrence[(*orig_states)[s]] = s;
           while (n);
         }
         std::vector<unsigned> retarget(res_ns);
         for (unsigned n = 0; n < res_ns; ++n)
           {
-            unsigned other = bottommost_occurence[(*orig_states)[n]];
+            unsigned other = bottommost_occurrence[(*orig_states)[n]];
             retarget[n] =
               (si_res.scc_of(n) != si_res.scc_of(other)) ? other : n;
           }
