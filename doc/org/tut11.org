@@ -29,7 +29,7 @@ ltl2tgba -D -M '!F(red & Xyellow)' -d
 
 This monitor stays in the initial state until *red* becomes true, it
 can then wait in the second state while *red* holds and *yellow* does
-not,, and will only move back to the initial state when both *red* and
+not, and will only move back to the initial state when both *red* and
 *yellow* are false.  The only way this monitor would not be able to
 progress is if *yellow* becomes true while in the second state; in
 that case a violation should be reported.
@@ -98,7 +98,7 @@ State: 1
 
 ** C++
 
-The code very similar to [[file:tut10.org][the never claim example]].
+The code is very similar to [[file:tut10.org][the never claim example]].
 
 #+BEGIN_SRC C++
   #include <iostream>

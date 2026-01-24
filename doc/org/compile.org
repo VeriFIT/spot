@@ -8,7 +8,7 @@
 This page is not about compiling Spot itself (for this, please refer
 to the [[file:install.org][installation instructions]]), but about how to compile and
 execute a C++ program written using Spot.  Even if some of those
-explanations might be GNU/Linux specific, they may hint you amount how
+explanations might be GNU/Linux specific, they may hint you about how
 to solve problems on other systems.
 
 As an example we will take the following simple program, stored in a

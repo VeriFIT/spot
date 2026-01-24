@@ -10,7 +10,7 @@ random LTL formula using atomic propositions supplied on the
 command-line.  It can be instructed to generate random Boolean or PSL
 formulas instead, but let us first focus on LTL generation.
 
-For instance to obtain fave random LTL formula over the propositions
+For instance to obtain five random LTL formulas over the propositions
 =a=, =b=, or =c=, use:
 
 #+BEGIN_SRC sh
@@ -144,7 +144,7 @@ randltl -n 5 a b c --tree-size=22..30
 The tree size is just the number of nodes in the syntax tree of the
 formula during its construction.  However, because Spot automatically
 applies some /trivial simplifications/ during the construction of its
-formulas (e.g., =F(F(a)= is reduced to =F(a)=, =a&0= to =0=, etc.),
+formulas (e.g., =F(F(a))= is reduced to =F(a)=, =a&0= to =0=, etc.),
 the actual size of the formula output may be smaller than the
 tree size specified.
 

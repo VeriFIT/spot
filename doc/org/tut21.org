@@ -850,7 +850,7 @@ rm -f tut21.hoa
 
 * Going further
 
-As another example of printing an autoamton, see our page about
+As another example of printing an automaton, see our page about
 [[file:tut25.org][printing a Büchi automaton in "BA format"]].
 
 #  LocalWords:  utf html args mathit src dst cond accsets tgba Fb Fc

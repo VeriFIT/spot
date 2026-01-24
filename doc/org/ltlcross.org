@@ -240,7 +240,7 @@ with and without some =--reference= translators.
    :END:
 
 If a translator exits with a non-zero status code, or fails to output
-an automaton =ltlcross= can read, and error will be displayed and the
+an automaton =ltlcross= can read, an error will be displayed and the
 result of the translation will be discarded.
 
 Otherwise, =ltlcross= performs the following checks on all translated

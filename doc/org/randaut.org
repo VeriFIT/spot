@@ -118,7 +118,7 @@ randaut --help | sed -n '/^ \(ACCEPTANCE\|RANGE\)/,/^$/p'
    condition with at least one set).
 
 In addition, =-B= (or =--ba=) is a shorthand for =-A1 -S=,
-ans =-s= (or =--spin=) implies =-B=.
+and =-s= (or =--spin=) implies =-B=.
 
 
 #+NAME: randaut4

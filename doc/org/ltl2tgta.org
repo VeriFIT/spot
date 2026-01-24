@@ -9,7 +9,7 @@
 forms of Testing Automata, i.e., automata that observe the /changes/
 of atomic propositions, not their values.
 
-For mode details, read [[https://www.lrde.epita.fr/~adl/dl/adl/bensalem.12.topnoc.pdf][*Model checking using generalized testing
+For more details, read [[https://www.lrde.epita.fr/~adl/dl/adl/bensalem.12.topnoc.pdf][*Model checking using generalized testing
 automata*]], /Ala Eddine Ben Salem/, /Alexandre Duret-Lutz/, and
 /Fabrice Kordon/, in Transactions on Petri Nets and Other Models of
 Concurrency (ToPNoC VI), LNCS 7400, p. 94--112, 2012.
@@ -21,7 +21,7 @@ Since it had no known uses (outside of a few publication about testing
 automata), we removed it from Spot to lower the maintenance burden.
 If you are interested in testing automata, and want to try this tool,
 please download a version prior to Spot 2.15.  You are also welcome
-to get in touch an make a case for the reintegration of this tool.
+to get in touch and make a case for the reintegration of this tool.
 
 #  LocalWords:  ltl tgta num toc Automata automata GraphViz UTF Gb na
 #  LocalWords:  Geldenhuys tgba SRC init invis nb Acc augb sed png fn

@@ -26,7 +26,7 @@ two possible successors:
 Initially both variables will be 0.  The complete state space is
 expected to have 9 states.  But even if it is small because it is a
 toy example, we do not want to precompute it.  It should be computed
-as needed, using [[file:tut50.org::#on-the-fly-interface][the one-the-fly interface]] previously discussed.
+as needed, using [[file:tut50.org::#on-the-fly-interface][the on-the-fly interface]] previously discussed.
 
 In addition, we would like to label each state by atomic propositions
 =odd_x= and =odd_y= that are true only when the corresponding

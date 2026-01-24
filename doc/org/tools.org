@@ -53,7 +53,7 @@ corresponding commands are hidden.
 - [[file:ltldo.org][=ltldo=]] Run LTL/PSL formulas through other tools using common [[file:ioltl.org][input]]
   and [[file:oaut.org][output]] interfaces.
 - [[file:ltlsynt.org][=ltlsynt=]] Synthesize AIGER circuits from LTL/PSL specifications.
-- [[file:ltlfsynt.org][=ltlfsynt=]] Check realizability of LTLf specifications.
+- [[file:ltlfsynt.org][=ltlfsynt=]] Synthesize AIGER circuits from LTLf specifications.
 - [[file:dstar2tgba.org][=dstar2tgba=]] Convert \omega-automata with any acceptance into
   variants of Büchi automata.
 - [[file:randaut.org][=randaut=]] Generate random \omega-automata.

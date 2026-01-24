@@ -7,7 +7,7 @@
 
 Spot supports different output syntaxes for automata.  This page
 documents the options, common to all tools where it makes sense, that
-are used to specify how to output of automata.
+are used to specify how to output automata.
 
 * Common output options
 

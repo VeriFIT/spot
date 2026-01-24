@@ -12,7 +12,7 @@ The tool operates a loop over 5 phases:
 - optionally pre-process the automaton
 - optionally filter the automaton (i.e., decide whether to ignore the
   automaton or continue with it)
-- optionally post-process the automaton (to simply it or change its acceptance)
+- optionally post-process the automaton (to simplify it or change its acceptance)
 - output the automaton
 
 The simplest way to use the tool is simply to use it for input and

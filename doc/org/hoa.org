@@ -97,7 +97,7 @@ the HOA format, the output may not be exactly the same as the input.
   - If one of the original initial states has no incoming edge, it can
     serve as the new initial state.  The parse simply has to duplicate
     the edges leaving the other initial states onto this one.  (As an
-    optimization, if the other initial state alsos do not have any
+    optimization, if the other initial state also does not have any
     incoming edge, the source of its outgoing edges are changed to
     avoid copying them.)
 
@@ -792,7 +792,7 @@ State: 2 "so am I" {0 1}
 #+end_SRC
 
 However, when Spot performs some transformation, and actually has to
-construct a new automaton, those properties will not be quarried over
+construct a new automaton, those properties will not be carried over
 to the new automaton.  First because it is not obvious that the new
 automaton should have the same name, and second because if a new
 automaton is created, there might not be clear correspondence between

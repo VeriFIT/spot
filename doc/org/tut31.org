@@ -52,7 +52,7 @@ non-alternating automaton.
 
 Alternation support in Spot should be considered as experimental.
 Currently, alternation removal is only supported for weak alternating
-automata, i.e., SCCs should have all there transitions in the same
+automata, i.e., SCCs should have all their transitions in the same
 acceptance marks.  The =remove_alternation()= procedure of Spot will
 produce a [[file:concepts.org::#trans-acc][TGBA]] for [[file:concepts.org::#property-flags][weak]] input, but the smallest automata are obtained
 if the input is [[file:concepts.org::#property-flags][very-weak]].

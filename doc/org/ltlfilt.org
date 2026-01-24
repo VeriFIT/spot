@@ -317,8 +317,8 @@ while =ack= and =grant= are outputs.   Tool such as =ltlsynt= need
 to be told using options such as =--ins= or =--outs= which atomic
 propositions are input or output.  Often these atomic propositions
 can have very long names, so it is useful to be able to rename
-them without fogeting about their nature.  Option =--relabel=io=
-combined with one if =--ins=, =--outs=, or =--part-file= will do exactly that:
+them without forgetting about their nature.  Option =--relabel=io=
+combined with one of =--ins=, =--outs=, or =--part-file= will do exactly that:
 
 #+BEGIN_SRC sh
 ltlfilt -f 'G(req -> Fack) & G(go -> Fgrant)' --relabel=io --ins=req,go

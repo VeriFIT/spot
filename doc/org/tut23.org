@@ -173,7 +173,7 @@ State: 2
 
 Alternating automata in Spot can also have a universal initial state:
 e.g, an automaton may start in =0&1&2=.  Use =set_univ_init_state()=
-to declare such as state.
+to declare such a state.
 
 We have a [[file:tut24.org][separate page]] describing how to explore the edges of an
 alternating automaton.

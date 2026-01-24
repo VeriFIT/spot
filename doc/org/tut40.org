@@ -167,7 +167,7 @@ automaton interface, and the owners are set by calling
       # These arrays are indiced by state numbers.
       names = []
       owners = []
-      # The reverse assotiation (x,y) -> state number
+      # The reverse association (x,y) -> state number
       # must be kept for each player, since (x,y) can mean two different thing.
       s_orig_states = {}
       d_orig_states = {}

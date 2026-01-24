@@ -649,7 +649,7 @@ follows:
 #+END_SRC
 
 Now we have only $1$ call to =first()= and $n$ calls to =next()=,
-so we halved to number of virtual calls.
+so we halved the number of virtual calls.
 
 Using C++11's ranged =for= loop, this example can be reduced to the
 following equivalent code:

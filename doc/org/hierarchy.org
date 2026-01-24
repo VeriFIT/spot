@@ -214,7 +214,7 @@ rm -f random-?.ltl
 #+END_SRC
 #+RESULTS:
 
-* Deciding classes membership syntactically
+* Deciding class membership syntactically
 
 LTL formulas can also be classified into related classes which we
 shall call /syntactic-safety/, /syntactic-guarantee/, etc.  See [[https://spot.lrde.epita.fr/tl.pdf][tl.pdf]]

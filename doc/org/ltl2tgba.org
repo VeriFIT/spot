@@ -150,7 +150,7 @@ these acceptance sets ensures that atomic propositions =a= and =b= must
 be true infinitely often.
 
 A Büchi automaton for the previous formula can be obtained with the
-=-B= or =-b= options, depending on whether we insist on have
+=-B= or =-b= options, depending on whether we insist on having
 state-based acceptance (=-B=) or if transition-based acceptance is OK
 (=-b=).
 

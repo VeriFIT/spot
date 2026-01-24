@@ -86,12 +86,12 @@ ltl2tgba -f Xa -f 'G("switch == on" -> F"tab[3,5] < 12")' --stats '"%f",%s,%e'
 : "Xa",3,3
 : "G(!""switch == on"" | F""tab[3,5] < 12"")",2,4
 
-The formater will detect your double quotes and automatically double
+The formatter will detect your double quotes and automatically double
 any double quote output between them, as per [[https://www.rfc-editor.org/rfc/rfc4180.txt][RFC 4180]].
 
 The tool [[file:ltlcross.org][=ltlcross=]] has its own =--csv=FILENAME= option to format the
 statistics it gathers in a CSV file, but you have very little control
-hover how this CSV file is formatted (it can only be changed
+over how this CSV file is formatted (it can only be changed
 via option such as =--products= or =--omit-missing=).
 
 * Reading CSV files

@@ -45,7 +45,7 @@ EOF
 
 We will first implement this scenario without =ltldo=.
 
-A first problem that the input is not in the correct syntax: although
+A first problem is that the input is not in the correct syntax: although
 =ltl3ba= understands =G= and =F=, it does not support =xor= or =M=,
 and requires the Boolean operators =||= and =&&=.  This syntax
 issue can be fixed by processing the input with [[file:ltlfilt.org][=ltlfilt -s=]].

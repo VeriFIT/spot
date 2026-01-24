@@ -91,7 +91,7 @@ be more specific about a particular aspect of Spot.
   In Proc. of PetriNet'25, LNCS 15714, pp. 433--456, June 2025.
   ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.25.pn][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.25.pn.pdf][pdf]])
 
-  Discuss the use of implementation of =autfilt --given-formula=.
+  Discuss the use and implementation of =autfilt --given-formula=.
 
 - *Engineering an LTLf Synthesis Tool*
   /Alexandre Duret-Lutz/, /Shufang Zhu/, /Nir Piterman/,

@@ -86,7 +86,7 @@ In this example, we generate 3 random Büchi automata (because
 them to =autcross=.  For each of those automata, =autcross= displays
 the source location of that automaton (here =-= indicates that the
 automaton is read from standard input, and this is followed by
-=beginline.column-endline.colum= specifying the position of that
+=beginline.column-endline.column= specifying the position of that
 automaton in the input.  If the automata had names, they would be
 displayed as well.
 
@@ -258,7 +258,7 @@ not the case in our complementation test above).
 
 If the transformation being tested does preserve the language of an
 automaton, it is worth to pass the =--language-preserved= option to
-=autfilt=.  Doing so a bit like adding =cat %H>%O= as another tool: it
+=autfilt=.  This is a bit like adding =cat %H>%O= as another tool: it
 will also ensure that the output is equivalent to the input.
 
 Similarly, if the tools being tested implement some complementation
@@ -330,7 +330,7 @@ Here, for each automaton, we get an example of word that is accepted
 by the automaton and rejected by the input (i.e., accepted by
 =Comp(input)=), as well as an example of word accepted by the input
 but rejected by the automaton (i.e. accepted by =Comp(A0)=).  Those
-examples would not exit if the language was really preserved by the
+examples would not exist if the language was really preserved by the
 tool.
 
 Incoherence between the output of several tools (even with
