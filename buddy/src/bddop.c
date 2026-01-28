@@ -509,7 +509,7 @@ mintermEnumerator* bdd_init_minterm(BDD fun, BDD vars)
 void bdd_free_minterm(mintermEnumerator* me)
 {
   bdd_delref(me->fun);
-  free(me->stacktop);
+  free(me->stack);
   free(me->vars);
   free(me);
 }
