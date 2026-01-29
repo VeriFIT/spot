@@ -937,7 +937,7 @@ inline int bdd_next_mintermpp(mintermEnumerator* me)
 { return bdd_next_minterm(me); }
 
 inline void bdd_free_mintermpp(mintermEnumerator* me)
-{ return bdd_free_minterm(me); }
+{ bdd_free_minterm(me); }
 
 inline pathEnumerator* bdd_init_path(const bdd& fun)
 { return bdd_init_path(fun.root); }
@@ -955,7 +955,7 @@ inline int bdd_next_path0pp(pathEnumerator* me)
 { return bdd_next_path0(me); }
 
 inline void bdd_free_pathpp(pathEnumerator* me)
-{ return bdd_free_path(me); }
+{ bdd_free_path(me); }
 
 inline bdd bdd_current_pathpp(const pathEnumerator* me)
 { return bdd_current_path(me); }
@@ -1043,7 +1043,7 @@ inline bdd bdd_terminal_to_const(const bdd& r,
 
 inline void bdd_mt_quantify_prepare(const bdd& exist_var)
 {
-  return bdd_mt_quantify_prepare(exist_var.root);
+  bdd_mt_quantify_prepare(exist_var.root);
 }
 
 BUDDY_API std::tuple<bool, int, int> bdd_mt_quantified_low_high(int);
