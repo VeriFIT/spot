@@ -1375,15 +1375,8 @@ namespace
               if (!is_p_incomp(e1.dst - n_env, e2.dst - n_env))
                 continue; //Compatible -> no prob
               // Reachable under same letter?
-              if (is_partitioned) // -> Yes
-                {
-                  trace << s1 << " and " << s2 << " directly incomp "
-                        "due to successors " << e1.dst << " and " << e2.dst
-                        << '\n';
-                  return true;
-                }
-              else if (!is_partitioned
-                       && bdd_have_common_assignment(e1.cond, e2.cond))
+              if (is_partitioned ||
+                    bdd_have_common_assignment(e1.cond, e2.cond)) // -> Yes
                 {
                   trace << s1 << " and " << s2 << " directly incomp "
                         "due to successors " << e1.dst << " and " << e2.dst
@@ -4297,7 +4290,7 @@ namespace spot
   {
     auto si = synthesis_info();
     si.minimize_lvl = minimize_lvl;
-    return simplify_mealy_here(m, si, split_out);
+    simplify_mealy_here(m, si, split_out);
   }
 
   void

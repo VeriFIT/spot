@@ -1479,7 +1479,6 @@ namespace spot
           auto t = states_[s].succ;
           while (t)
             std::swap(t, edges_[t].next_succ);
-          continue;
         }
       states_.resize(used_states);
 
