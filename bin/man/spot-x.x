@@ -150,7 +150,7 @@ memory allocation failures, and the stack is usually unwinded up to
 top-level, losing the original context of the error.  Note that at
 least \fCltlcross\fR has some custom handling of
 \fCstd::bad_alloc\fR to recover from products that are too large (by
-ignoring them), and setting this variable will interfer with that.
+ignoring them), and setting this variable will interfere with that.
 
 .TP
 \fBSPOT_PR_CHECK\fR
@@ -170,11 +170,11 @@ tell if f belongs to the persistence (or the recurrence) class.
 .IP 2
 It checks if f (or !f) is det-Büchi realizable via a reduction
 to deterministic-Rabin in order to tell if f belongs to the
-recurrence (or the persistance) class.
+recurrence (or the persistence) class.
 .IP 3
 It checks if f (or !f) is det-Büchi realizable via a reduction
 to deterministic-parity in order to tell if f belongs to the
-recurrence (or the persistance) class.
+recurrence (or the persistence) class.
 .RE
 .RE
 
@@ -194,8 +194,8 @@ format.
 .TP
 \fBSPOT_SATSOLVER\fR
 If set, this variable should indicate how to call an external
-SAT-solver.  y default, Spot uses PicoSAT, which is distributed
-with. This is used by the \fBsat\-minimize\fR option described above.
+SAT-solver.  By default, Spot uses PicoSAT, which is distributed
+with Spot. This is used by the \fBsat\-minimize\fR option described above.
 The format to follow is the following: \fC"<sat_solver> [options] %I >%O"\fR.
 The escape sequences \fC%I\fR and \fC%O\fR respectively
 denote the names of the input and output files.  These temporary files
@@ -223,7 +223,7 @@ dedicated algorithm works better for most Streett automata with 3 or
 more pairs (and many 2-pair Streett automata as well, but the
 difference here is less clear).  Setting this variable to 0 will
 disable the dedicated algorithm.  Setting it to 1 will enable it for
-all Streett automata, however we do not recommand setting it to less
+all Streett automata, however we do not recommend setting it to less
 than 2, because the "Fin-removal" approach is better for single-pair
 Streett automata.
 
@@ -348,6 +348,6 @@ The containment check implemented as \fCspot::contains_forq()\fR, and
 used for Büchi automata when \fBSPOT_CONTAINMENT_CHECK=forq\fR.
 
 [SEE ALSO]
-.BR ltl2tgba (1)
-.BR dstar2tgba (1)
+.BR ltl2tgba (1),
+.BR dstar2tgba (1),
 .BR autfilt (1)

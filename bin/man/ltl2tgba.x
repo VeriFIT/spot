@@ -9,10 +9,10 @@ LTL Formulae to Büchi Automata), although similar automata have been
 used under different names long before that.
 .PP
 As its name implies a TGBA uses a generalized Büchi acceptance
-condition, meanings that a run of the automaton is accepted iff it
-visits ininitely often multiple acceptance sets, and it also uses
+condition, meaning that a run of the automaton is accepted iff it
+visits infinitely often multiple acceptance sets, and it also uses
 transition-based acceptance, i.e., those acceptance sets are sets of
-transitions.  TGBA are often more consise than traditional Büchi
+transitions.  TGBA are often more concise than traditional Büchi
 automata.  For instance the LTL formula \fCGFa & GFb\fR can be
 translated into a single-state TGBA while a traditional Büchi
 automaton would need 3 states.  Compare
@@ -33,8 +33,8 @@ with
 .PP
 In the dot output produced by the above commands, the membership of
 the transitions to the various acceptance sets is denoted using names
-in braces.  The actuall names do not really matter as they may be
-produced by the translation algorithm or altered by any latter
+in braces.  The actual names do not really matter as they may be
+produced by the translation algorithm or altered by any later
 postprocessing.
 .PP
 When the \fB\-\-ba\fR option is used to request a Büchi automaton, Spot
@@ -43,7 +43,7 @@ either all outgoing transitions are accepting (this is equivalent to
 the state being accepting) or none of them are.  Double circles are
 used to highlight accepting states in the output, but the braces
 denoting the accepting transitions are still shown because the
-underling structure really is a TGBA.
+underlying structure really is a TGBA.
 
 [NOTE ON LBTT'S FORMAT]
 .UR http://www.tcs.hut.fi/Software/lbtt/doc/html/Format-for-automata.html
@@ -93,7 +93,7 @@ LBT
 .ft C
 .nf
 % ltl2tgba \-\-ba \-\-lbtt FGp0
-2 1                 // 2 states, 1 (state-based) accepance set
+2 1                 // 2 states, 1 (state-based) acceptance set
 0 1 \-1              // state 0: initial, non-accepting
 0 t                 //   trans. to state 0, label: true
 1 p0                //   trans. to state 1, label: p0
@@ -110,7 +110,7 @@ format even for Büchi automaton using \fB\-\-lbtt=t\fR.
 .ft C
 .nf
 % ltl2tgba \-\-ba \-\-lbtt=t FGp0
-2 1t                // 2 states, 1 transition-based accepance set.
+2 1t                // 2 states, 1 transition-based acceptance set.
 0 1                 // state 0: initial
 0 \-1 t              //   trans. to state 0, no acc., label: true
 1 \-1 p0             //   trans. to state 1, no acc., label: p0
@@ -162,7 +162,7 @@ the formula.  For instance a monitor for the LTL formula \fCa U b\fR
 will reject (for instance) any word starting with \fC!a&!b\fR as
 there is no way such a word can validate the formula, but it will not
 reject a finite prefix repeating only \fCa&!b\fR as such a prefix
-could be extented in a way that is comptible with \fCa U b\fR.
+could be extended in a way that is compatible with \fCa U b\fR.
 .PP
 For more information about monitors, we refer the readers to the
 following two papers (the first paper describes the construction of

@@ -87,5 +87,5 @@ Proceedings of IJCAI'19.
 .BR genaut (1),
 .BR ltlfilt (1),
 .BR randaut (1),
-.BR randltl (1)
+.BR randltl (1),
 .BR ltlmix (1)

@@ -60,7 +60,7 @@ values:
 .RS
 .TP
 \fC"ok"\fR
-The tool ran succesfully (this does not imply that the produced
+The tool ran successfully (this does not imply that the produced
 automaton is correct) and autcross could parse the resulting
 automaton.  In this case \fBexit_code\fR is always 0.
 .TP
@@ -88,7 +88,7 @@ output file.  In this case \fBexit_code\fR is always \-1.
 .TP
 \fBtime\fR
 A floating point number giving the run time of the tool in seconds.
-This is reported for all executions, even failling ones.
+This is reported for all executions, even failing ones.
 
 [SEE ALSO]
 .BR randaut (1),

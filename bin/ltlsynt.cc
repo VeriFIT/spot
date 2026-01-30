@@ -75,7 +75,7 @@ static const argp_option options[] =
     { nullptr, 0, nullptr, 0, "Input options:", 1 },
     { "outs", OPT_OUTPUT, "PROPS", 0,
       "comma-separated list of controllable (a.k.a. output) atomic"
-      " propositions, , interpreted as a regex if enclosed in slashes", 0 },
+      " propositions, interpreted as a regex if enclosed in slashes", 0 },
     { "ins", OPT_INPUT, "PROPS", 0,
       "comma-separated list of uncontrollable (a.k.a. input) atomic"
       " propositions, interpreted as a regex if enclosed in slashes", 0 },

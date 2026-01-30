@@ -12,5 +12,5 @@ and Moshe Y. Vardi: Engineering an LTLf Synthesis Tool. Proceedings
 of CIAA'25.  LNCS 15981.  pp. 129–147.
 
 [SEE ALSO]
-.BR ltlf2dfa (1)
+.BR ltlf2dfa (1),
 .BR ltlsynt (1)

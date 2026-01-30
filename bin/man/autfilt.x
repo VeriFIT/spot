@@ -94,7 +94,7 @@ Practical stutter-invariance checks for ω-regular languages.
 Proceedings of SPIN'15.  LNCS 9232.
 
 Describes the algorithms used by the \fB\-\-destut\fR and
-\fB\-\-instut\fR options.  These options correpond respectively to
+\fB\-\-instut\fR options.  These options correspond respectively to
 cl() and sl() in the paper.
 .TP
 \(bu
@@ -112,5 +112,5 @@ Proceedings of PetriNet'25.  LNCS 15714.
 Discusses the techniques behind the \fB\-\-given\-formula\fR,
 \fB\-\-given\-automaton\fR, and \fB\-\-given\-strategy\fR options.
 [SEE ALSO]
-.BR spot-x (7)
+.BR spot-x (7),
 .BR dstar2tgba (1)

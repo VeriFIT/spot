@@ -27,14 +27,16 @@ The next command compares
 and
 .BR ltl2tgba (1)
 on a set of formulas saved in file \fCinput.ltl\fR.
-Statistics are again writen
-as CSV into \fCresults.csv\fR.  This examples specify the
+Statistics are again written
+as CSV into \fCresults.csv\fR.  These examples specify the
 input and output for each tool, to show how this can be done.
-Note the use of \fC%L\fR to indicate that the formula passed t
+Note the use of \fC%L\fR for the formula in
+.B lbt
+syntax, \fC%s\fR
 for the formula in
 .BR spin (1)'s
 format, and \fC%f\fR for the
-formula in Spot's format.  Each of these tool produces an
+formula in Spot's format.  Each of these tools produces an
 automaton in a different format (respectively, LBTT's format,
 Spin's never claims, and HOA format), but Spot's parser can
 distinguish and understand these three formats.
@@ -61,7 +63,7 @@ file specified with \fC%D\fR instead of \fC%O\fR.  For instance:
   'ltl2dstar \-\-automata=streett \-\-ltl2nba=spin:ltl2tgba@\-Ds %L %D' \e
 .fi
 .PP
-However, we now recommand to use the HOA output of
+However, we now recommend to use the HOA output of
 .BR ltl2dstar ,
 as supported since version 0.5.2:
 .PP
@@ -111,7 +113,7 @@ values:
 .RS
 .TP
 \fC"ok"\fR
-The translator ran succesfully (this does not imply that the produced
+The translator ran successfully (this does not imply that the produced
 automaton is correct) and ltlcross could parse the resulting
 automaton.  In this case \fBexit_code\fR is always 0.
 .TP
@@ -139,7 +141,7 @@ output file.  In this case \fBexit_code\fR is always \-1.
 .TP
 \fBtime\fR
 A floating point number giving the run time of the translator in seconds.
-This is reported for all executions, even failling ones.
+This is reported for all executions, even failing ones.
 .PP
 Unless the \fB\-\-omit\-missing\fR option is used, data for all the
 following columns might be missing.
@@ -229,7 +231,7 @@ Proceedings of ATVA'13.  LNCS 8172.
 .PP
 .B ltlcross
 is a Spot-based reimplementation of a tool called LBTT.  LBTT
-was developped by Heikki Tauriainen at the Helsinki University of
+was developed by Heikki Tauriainen at the Helsinki University of
 Technology.  The main motivation for the reimplementation was to
 support PSL, and output more statistics about the translations.
 .PP

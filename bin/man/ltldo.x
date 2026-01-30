@@ -5,4 +5,4 @@ ltldo \- run LTL/PSL formulas through other tools
 .BR genltl (1),
 .BR ltlfilt (1),
 .BR ltl2tgba (1),
-.BR ltldo (1)
+.BR ltlcross (1)
