@@ -1,0 +1,661 @@
+# -*- coding: utf-8 -*-
+#+TITLE: Working with Multi-Terminal BDDs (MTBDDs)
+#+DESCRIPTION: Tutorial on Multi-Terminal BDD support in BuDDy
+#+INCLUDE: setup.org
+#+HTML_LINK_UP: tut.html
+#+PROPERTY: header-args:C+++ :results verbatim :exports code
+
+This tutorial describes the Multi-Terminal BDD (MTBDD) support added
+to BuDDy (Spot's BDD library).  MTBDDs extend traditional BDDs by
+allowing leaves to be arbitrary integer values (called /terminals/)
+instead of just =bddtrue= and =bddfalse=.
+
+* Introduction to MTBDDs
+
+A traditional BDD has two terminal nodes: =bddtrue= (1) and =bddfalse=
+(0).  An MTBDD generalizes this by allowing any number of terminal
+values.  Each terminal is identified by an integer value, and terminal
+nodes are created using =bdd_terminal(value)=.
+
+MTBDDs are useful for representing functions that map Boolean inputs
+to integer outputs.  For instance, they can represent:
+- State numbers in deterministic automata (the main use-case for Spot)
+- Cost functions
+- Multi-valued logic
+
+*Important*: MTBDDs use the same =bdd= class as regular BDDs, but the
+presence of new terminals breaks many standard BDD operations
+(=bdd_apply=, =bdd_exist=, etc.).  Except in a few exceptions where
+you know that terminals won't need to be combined, you must use the
+=bdd_mt_*= family of functions, which take callbacks to specify how
+terminals should be combined.
+
+* Creating and Inspecting Terminals
+
+** Basic Terminal Operations
+
+Three functions are provided to work with terminals:
+
+| Function                  | Description                            |
+|---------------------------+----------------------------------------|
+| =bdd_terminal(int v)=     | Create a terminal node with value =v=  |
+| =bdd_is_terminal(bdd b)=  | Return non-zero if =b= is a terminal   |
+| =bdd_get_terminal(bdd b)= | Return the integer value of a terminal |
+
+Note that =bddtrue= and =bddfalse= are *not* terminals.  They are the
+traditional BDD constants and =bdd_is_terminal()= returns 0 for them.
+
+** Example: Building a Simple MTBDD
+
+#+BEGIN_SRC C++ :exports both
+  #include <iostream>
+  #include "bddx.h"
+
+  void example()
+  {
+    bdd a = bdd_ithvar(0);  // variable a
+    bdd b = bdd_ithvar(1);  // variable b
+
+    // Create terminals with values 0, 1, 2, 3
+    bdd t0 = bdd_terminal(0);
+    bdd t1 = bdd_terminal(1);
+    bdd t2 = bdd_terminal(2);
+    bdd t3 = bdd_terminal(3);
+
+    // Build an MTBDD.  bdd_ite() is safe to use if it follows the shape
+    // of the MTBDD that we want to construct: in this case, the terminals
+    // will not need to be combined.
+    bdd mtbdd = bdd_ite(a,
+                        bdd_ite(b, t1, t2),
+                        bdd_ite(b, t3, t0));
+
+    // Check terminal properties
+    std::cout << "mtbdd: " << mtbdd << '\n';
+    std::cout << "t3 is a terminal: " << bdd_is_terminal(t3) << '\n';
+    std::cout << "t3 value: " << bdd_get_terminal(t3) << '\n';
+    std::cout << "bddtrue is not a terminal: " << bdd_is_terminal(bddtrue) << '\n';
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(2);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+: mtbdd: <0:0, 1:0, Terminal(0)><0:0, 1:1, Terminal(3)><0:1, 1:0, Terminal(2)><0:1, 1:1, Terminal(1)>
+: t3 is a terminal: 1
+: t3 value: 3
+: bddtrue is not a terminal: 0
+
+=bdd_done()= should not be called before all =bdd= have been
+destroyed, this is why we run our examples from a function separate
+from =main()=.  In what follows, we will only show the contents of
+this function, and assume the same =main()=.
+
+Here is another example that shows that we can build an MTBDD that
+mixes terminals with =bddfalse= and =bddtrue=, and that uses
+=bdd_printdot= to obtain a GraphViz description that we can render
+graphically:
+
+#+NAME: print-dot
+#+BEGIN_SRC C++
+  bdd a = bdd_ithvar(0);
+  bdd b = bdd_ithvar(1);
+  bdd l0 = bddfalse;
+  bdd l1 = bddtrue;
+  bdd l2 = bdd_terminal(2);
+  bdd l3 = bdd_terminal(3);
+  bdd mtbdd = bdd_ite(a,
+                      bdd_ite(b, l1, l2),
+                      bdd_ite(b, l3, l0));
+  bdd_printdot(mtbdd);
+#+END_SRC
+
+#+NAME: print-dot-main
+#+BEGIN_SRC C++ :exports none :noweb strip-export
+  #include <iostream>
+  #include "bddx.h"
+
+  void example()
+  {
+    <<print-dot>>
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(2);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut91-mtbdd-1.svg :var txt=print-dot-main :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut91-mtbdd-1.svg]]
+
+This representation uses gray squares for constants, gray pentagons
+for terminals, and ellipses for internal nodes.  The numbers in
+parentheses are the BDD node numbers (for the constants 0 and 1, the
+node numbers are not repeated because they are 0 and 1 too).  The
+numbers displayed before the parentheses are the variable numbers (for
+internal nodes) or the terminal value (for terminals).
+
+
+* External Caches for MTBDD Operations
+
+MTBDD operations take user-defined callback functions to specify how
+terminals should be combined.  Because these callbacks may depend on
+external data, the operation cache cannot be managed internally by the
+library.  Instead, users must create and manage /external caches/.
+
+** Cache Management Functions
+
+| Function                     | Description                               |
+|------------------------------+-------------------------------------------|
+| =bdd_extcache_init(c, n, e)= | Initialize cache =c= with =n= entries     |
+| =bdd_extcache_reset(c)=      | Clear all entries in cache =c=            |
+| =bdd_extcache_reserve(c, n)= | Ensure cache =c= has at least =n= entries |
+| =bdd_extcache_done(c)=       | Free cache =c=                            |
+
+The =bddExtCache= structure holds the cache.  The third argument to
+=bdd_extcache_init= (=erase_on_gc=) specifies whether the cache should
+be automatically cleared during garbage collection.  Set this to 1
+(true) by default.  Only set this to 0 (false) if you are sure that
+the cache cannot be used to reference nodes that might be garbage
+collected.
+
+If the =n= argument to =bdd_extcache_init= is negative, it is
+interpreted as a ratio: the cache size will be
+=bddnodesize / (-n)=.  If =n= is 0, it defaults to the same size as
+the standard BDD caches allocated by BuDDy.
+
+** Cache Entries, and Their Use by Multiple Operations
+
+Each cache entry contains four integers usually interpreted as
+=(left,right,op,res)=: given MTBDDs =left= and =right=, the result of
+operation =op= is =res=.  Functions that implement MTBDD operations
+will usually take =op= as an argument.  If the callback implementing
+the operation is using some global data to perform its computation,
+you may want to update =op= each time the global data is changing.
+
+
+* Binary Operations: =bdd_mt_apply2= and =bdd_mt_apply2_leaves=
+
+** =bdd_mt_apply2=
+
+#+BEGIN_SRC C++
+BDD bdd_mt_apply2(bdd l, bdd r,
+                  int (*termop)(int, int),
+                  bddExtCache* cache, int ophash,
+                  int applyop_shortcut);
+#+END_SRC
+
+This function applies a binary operation to two MTBDDs.  The =termop=
+callback receives the integer values of two terminals and returns the
+integer value of the result terminal.
+
+Parameters:
+- =l=, =r=: The two input MTBDDs
+- =termop=: Callback function =int f(int left_val, int right_val)=
+- =cache=: External cache for memoization
+- =ophash=: Unique identifier for this operation (for cache keying)
+- =applyop_shortcut=: If ≥0, use BDD shortcuts (e.g., =bddop_and=)
+
+Without shortcuts, the operation will perform a recursive traversal
+of =l= and =r= until it reaches two terminals to combine with =termop=.
+MTBDD should not contain =bddtrue= or =bddfalse= in this case.
+
+If =applyop_shortcut= is set to an operation like
+=bddop_and= or =bddop_or= that knows how to deal with both constants
+(=bddtrue= and =bddfalse=), then the MTBDD may use those constants.
+The recursion will terminate earlier each time one side is a constant.
+In that case the result is computed using the semantics of the
+operation passed to =applyop_shortcut=.
+
+
+** =bdd_mt_apply2_leaves=
+
+#+BEGIN_SRC C++
+bdd bdd_mt_apply2_leaves(bdd l, bdd r,
+                         int (*termop)(int l_bdd, int l_val,
+                                       int r_bdd, int r_val),
+                         bddExtCache* cache, int ophash,
+                         int applyop_shortcut);
+#+END_SRC
+
+Similar to =bdd_mt_apply2=, but the callback receives both the BDD
+node number and the terminal value.  This allows distinguishing
+between =bddtrue=/=bddfalse= (they have BDD number 1 and 0
+respectively) and actual terminals.
+
+You should use this variant when the MTBDD mixes terminals and
+constants, and when =applyop_shortcut= will not always be able to
+remove all constants.  For instance, if =applyop_shortcut= is set to
+work like an implication (=bddop_imp=), only the following short-cuts
+are used: $\top \rightarrow b = b$, $\bot \rightarrow b = \top$, $b
+\rightarrow b = \top$, $b \rightarrow \top = \top$.  What isn't
+implemented is a reduction for $b \rightarrow \bot$ because how to
+complement $b$ actually depends on the semantics of the terminals it
+contains.
+
+** Example: Adding Terminal Values
+
+This example uses =paths_mt_of()=, described later, to iterate over
+all the paths in the MTBDDs.
+
+#+NAME: mtbdd-add
+#+BEGIN_SRC C++
+  bdd a = bdd_ithvar(0);
+  bdd b = bdd_ithvar(1);
+  bdd t1 = bdd_terminal(1);
+  bdd t2 = bdd_terminal(2);
+  bdd t3 = bdd_terminal(3);
+
+  bdd x = bdd_ite(a, t1, t2);
+  bdd y = bdd_ite(a, t3, bdd_ite(b, t1, t3));
+
+  std::cout << "MTBDD for x:\n";
+  for (auto [path, term]: paths_mt_of(x))
+    std::cout << "  " << path << " -> " << bdd_get_terminal(term) << '\n';
+
+  std::cout << "MTBDD for y:\n";
+  for (auto [path, term]: paths_mt_of(y))
+    std::cout << "  " << path << " -> " << bdd_get_terminal(term) << '\n';
+
+  bddExtCache cache;
+  bdd_extcache_init(&cache, 100, true);
+
+  // Add terminal values
+  bdd sum = bdd_mt_apply2(x, y,
+                          [](int a, int b) { return a + b; },
+                          &cache, 1, -1);
+
+  std::cout << "MTBDD for sum:\n";
+  for (auto [path, term]: paths_mt_of(sum))
+    std::cout << "  " << path << " -> " << bdd_get_terminal(term) << '\n';
+
+  bdd_extcache_done(&cache);
+#+END_SRC
+
+#+NAME: mtbdd-add-main
+#+BEGIN_SRC C++ :exports results :noweb strip-export
+  #include <iostream>
+  #include "bddx.h"
+
+  void example()
+  {
+    <<mtbdd-add>>
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(2);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS: mtbdd-add-main
+#+begin_example
+MTBDD for x:
+  <0:0> -> 2
+  <0:1> -> 1
+MTBDD for y:
+  <0:0, 1:0> -> 3
+  <0:0, 1:1> -> 1
+  <0:1> -> 3
+MTBDD for sum:
+  <0:0, 1:0> -> 5
+  <0:0, 1:1> -> 3
+  <0:1> -> 4
+#+end_example
+
+
+* Unary Operations: =bdd_mt_apply1= and =bdd_mt_apply1_leaves=
+
+Unary operations are easier to describe, as they do not have any
+notion of shortcut.
+
+** =bdd_mt_apply1=
+
+#+BEGIN_SRC C++
+bdd bdd_mt_apply1(bdd r, int (*termop)(int),
+                  bdd replace_false, bdd replace_true,
+                  bddExtCache* cache, int ophash);
+#+END_SRC
+
+Apply a unary operation to all terminals of an MTBDD.  The =termop=
+callback receives a terminal value and returns the new terminal value.
+
+Parameters:
+- =r=: Input MTBDD
+- =termop=: Callback function =int f(int val)=
+- =replace_false=: BDD to substitute for =bddfalse= leaves
+- =replace_true=: BDD to substitute for =bddtrue= leaves
+- =cache=: External cache
+- =ophash=: Unique operation identifier
+
+** =bdd_mt_apply1_leaves=
+
+#+BEGIN_SRC C++
+bdd bdd_mt_apply1_leaves(bdd r, int (*termop)(int bdd, int val),
+                         bddExtCache* cache, int ophash);
+#+END_SRC
+
+Similar to =bdd_mt_apply1=, but the callback receives both the BDD
+node number and the terminal value, allowing it to handle constants
+specially.  The callback can return any BDD (not just a terminal).
+
+** Example: Incrementing All Terminals
+
+#+NAME: mtbdd-increment
+#+BEGIN_SRC C++
+  bdd a = bdd_ithvar(0);
+  bdd t1 = bdd_terminal(1);
+  bdd t2 = bdd_terminal(2);
+  bdd x = bdd_ite(a, t1, t2);
+
+  std::cout << "before:  " << x << '\n';
+
+  bddExtCache cache;
+  bdd_extcache_init(&cache, 100, true);
+
+  // Increment all terminals by 10
+  bdd y = bdd_mt_apply1(x,
+                        [](int v) { return v + 10; },
+                        bddfalse, bddtrue,
+                        &cache, 1);
+
+  bdd_extcache_done(&cache);
+
+  std::cout << "after:  " << y << '\n';
+#+END_SRC
+
+#+NAME: mtbdd-increment-main
+#+BEGIN_SRC C++ :exports results :noweb strip-export
+  #include <iostream>
+  #include "bddx.h"
+
+  void example()
+  {
+    <<mtbdd-increment>>
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(2);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS: mtbdd-increment-main
+: before:  <0:0, Terminal(2)><0:1, Terminal(1)>
+: after:  <0:0, Terminal(12)><0:1, Terminal(11)>
+
+* Converting Between Constants and Terminals
+
+Two functions convert between BDD constants and terminals:
+
+| Function                | Description                                      |
+|-------------------------+--------------------------------------------------|
+| =bdd_const_to_terminal= | Replace =bddfalse= and =bddtrue= with given BDDs |
+| =bdd_terminal_to_const= | Replace specified terminals with constants       |
+
+#+BEGIN_SRC C++
+bdd bdd_const_to_terminal(bdd r,
+                          bdd for_false,  // replaces bddfalse
+                          bdd for_true,   // replaces bddtrue
+                          bddExtCache* cache, int ophash);
+
+bdd bdd_terminal_to_const(bdd r,
+                          bdd map_to_false,  // terminal to map to bddfalse
+                          bdd map_to_true,   // terminal to map to bddtrue
+                          bddExtCache* cache, int ophash);
+#+END_SRC
+
+These functions can be seen as specialized variants of =bdd_mt_apply1=.
+
+#+NAME: mtbdd-term-to-const
+#+BEGIN_SRC C++
+  bdd a = bdd_ithvar(0);
+  bdd t1 = bdd_terminal(1);
+  bdd t2 = bdd_terminal(2);
+  bdd x = bdd_ite(a, t1, t2);
+
+  std::cout << "step 1: " << x << '\n';
+
+  bddExtCache cache;
+  bdd_extcache_init(&cache, 100, true);
+
+  // 1->false, 2->true
+  x = bdd_terminal_to_const(x, t1, t2, &cache, 1);
+  std::cout << "step 2: " << x << '\n';
+
+  // false->3, true->4
+  x = bdd_const_to_terminal(x, bdd_terminal(3), bdd_terminal(4), &cache, 1);
+  std::cout << "step 3: " << x << '\n';
+
+  bdd_extcache_done(&cache);
+#+END_SRC
+
+#+NAME: mtbdd-term-to-const-main
+#+BEGIN_SRC C++ :exports results :noweb strip-export
+  #include <iostream>
+  #include "bddx.h"
+
+  void example()
+  {
+    <<mtbdd-term-to-const>>
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(2);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS: mtbdd-term-to-const-main
+: step 1: <0:0, Terminal(2)><0:1, Terminal(1)>
+: step 2: <0:0>
+: step 3: <0:0, Terminal(4)><0:1, Terminal(3)>
+
+
+* Quantification on MTBDDs
+
+MTBDD quantification combines existential and universal quantification
+with a user-defined terminal evaluation function.
+
+** =bdd_mt_quantify_prepare=
+
+#+BEGIN_SRC C++
+void bdd_mt_quantify_prepare(bdd varset);
+#+END_SRC
+
+Prepare for quantification by specifying which variables should be
+quantified existentially.  The =varset= BDD is a conjunction of
+variables (as produced by =bdd_ithvar= anded together).  Variables in
+=varset= will be quantified existentially; other variables will be
+quantified universally.
+
+This function must be called before =bdd_mt_quantify_to_bool=,
+=bdd_mt_quantify_to_trival=, or =bdd_mt_apply1_synthesis=.
+
+** =bdd_mt_quantify_to_bool=
+
+#+BEGIN_SRC C++ :exports code
+int bdd_mt_quantify_to_bool(bdd r, int (*termop)(int),
+                            bddExtCache* cache, int ophash);
+#+END_SRC
+
+Quantify all variables in =r= and return a Boolean result (0 or 1).
+The =termop= callback evaluates each terminal to 0 or 1.
+
+Variables are quantified as specified with =bdd_mt_quantify_prepare=:
+
+- Existential variables: result is OR of children
+- Universal variables: result is AND of children
+
+** =bdd_mt_quantify_to_trival=
+
+#+BEGIN_SRC C++ :exports code
+int bdd_mt_quantify_to_trival(bdd r, int (*termop)(int),
+                              bddExtCache* cache, int ophash,
+                              int iteration);
+#+END_SRC
+
+Like =bdd_mt_quantify_to_bool=, but =termop= returns one of three
+values:
+- 0: false
+- 2: unknown
+- 3: true
+
+The =iteration= parameter is used for cache management: "unknown"
+results are only reused within the same iteration.  This function is
+typically used to compute attractors in two-player games, where false
+and true are stable values that indicate that the vertex is in the
+attractor of player 0 or 1, and "unknown" values will be changed after
+some iterations.
+
+** =bdd_mt_quantified_low_high=
+
+#+BEGIN_SRC C++
+std::tuple<bool, int, int> bdd_mt_quantified_low_high(int bdd);
+#+END_SRC
+
+For a node in an MTBDD, return whether the node's variable should be
+quantified existentially, and the low/high children with any
+quantified variables collapsed.
+
+Calling functions across shared libraries is expensive, so this
+returns three values at once to avoid making three different calls.
+
+* Synthesis Functions
+
+Two specialized functions support reactive synthesis workflows:
+
+** =bdd_mt_apply1_synthesis=
+
+#+BEGIN_SRC C++
+int bdd_mt_apply1_synthesis(bdd& r,
+                            int (*opleaf)(int* bdd, int term),
+                            bddExtCache* cache, int ophash);
+#+END_SRC
+
+Perform synthesis traversal on an MTBDD.  The =opleaf= callback is
+called for each terminal; it may modify the BDD node (via =*bdd=) and
+returns a Boolean indicating realizability.
+
+Call =bdd_mt_quantify_prepare= first to indicate which variables are
+existential.
+
+Returns 1 if there is a strategy for the existential player to force
+the MTBDD to reach a realizable terminal, regardless of the choices
+performed by the universal player.
+
+The MTBDD =r= is modified in place to contain the winning strategy (if
+it exists) or just some partial simplification.  A strategy is an
+MTBDD where each existential node has exactly one child that is
+=bddfalse= (indicating that the strategy is to take the other child).
+
+Additionally, branches where the universal player can reach =bddfalse=
+will be simplified to =bddfalse=, since those branches are losing from
+the point of view of the existential player.
+
+** =bdd_mt_apply1_synthesis_with_choice=
+
+#+BEGIN_SRC C++
+int bdd_mt_apply1_synthesis_with_choice(bdd* ptr_r,
+                                        int (*choice)(int),
+                                        int (*opleaf)(int* bdd, int term),
+                                        bddExtCache* cache, int ophash);
+#+END_SRC
+
+Like =bdd_mt_apply1_synthesis=, but with an additional =choice=
+callback that selects which branch to explore at existential nodes.
+This allows for implementing specific strategy selection policies.
+
+Function =choice()= is called on existential nodes, and should return
+the BDD number of the child to select.
+
+* Iterating Over MTBDDs
+
+Several iterator classes allow traversing MTBDDs in C++:
+
+** =paths_mt_of=
+
+Iterate over all paths that lead to a non-false leaf, returning pairs
+of (path condition, terminal).
+
+#+BEGIN_SRC C++
+  for (auto [path, terminal]: paths_mt_of(mtbdd))
+    if (terminal == bddtrue)
+      std::cout << path << " -> bddtrue\n";
+    else
+      std::cout << path << " -> " << bdd_get_terminal(terminal) << '\n';
+#+END_SRC
+
+** =all_paths_mt_of=
+
+Like =paths_mt_of=, but also includes paths leading to =bddfalse=.
+
+** =silent_paths_mt_of=
+
+Iterate over terminals only (without computing path conditions).
+Useful when you only need the set of terminals.  However, the
+terminals may be listed twice if they appear on multiple paths.
+
+#+BEGIN_SRC C++
+  for (bdd terminal: silent_paths_mt_of(mtbdd))
+    if (terminal == bddtrue)
+      std::cout << "bddtrue\n";
+    else
+      std::cout << bdd_get_terminal(terminal) << '\n';
+#+END_SRC
+
+** =leaves_of=
+
+Collect all distinct leaves (terminals and constants) of an MTBDD, or
+of a vector of MTBDDs.  These functions are linear in the (collective)
+size of the MTBDD(s), and will return each terminal only once,
+=bddfalse= included.
+
+#+BEGIN_SRC C++
+std::vector<bdd> leaves_of(const bdd& mtbdd);
+std::vector<bdd> leaves_of(const std::vector<bdd>& mtbdds);
+#+END_SRC
+
+* Computing SCCs: =bdd_mt_sccs=
+
+#+BEGIN_SRC C++
+std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
+                             int (*term_succ)(int),
+                             std::unordered_map<int, int>* nodes = nullptr);
+#+END_SRC
+
+Compute strongly connected components of a graph represented as
+MTBDDs.  Each BDD in =states= represents the successors of a state.
+The =term_succ= callback maps terminal values to state indices.
+
+Returns a vector where entry =i= contains the SCC number of state =i=.
+
+If =nodes= is given, this is filled with pairs =(BDD number, SCC
+number)= for all nodes in the MTBDD representation of =states=.
