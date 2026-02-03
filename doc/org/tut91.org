@@ -481,23 +481,38 @@ These functions can be seen as specialized variants of =bdd_mt_apply1=.
 
 * Quantification on MTBDDs
 
-MTBDD quantification combines existential and universal quantification
+MTBDD quantification allows existential or universal quantification
 with a user-defined terminal evaluation function.
+
+Unlike BuDDy's =bdd_exist(x, s)= and =bdd_forall(x, s)= that each
+quantify the variables of =s= that appear in =x=, the quantification
+over MTBDD is implemented as two separate functions.  First, you use
+=bdd_mt_quantify_prepare(s)= to set the variables that should be
+quantified away, and then you perform the quantification using
+=bdd_mt_quantify()= or some variant.
 
 ** =bdd_mt_quantify_prepare=
 
 #+BEGIN_SRC C++
 void bdd_mt_quantify_prepare(bdd varset);
+void bdd_mt_quantify_prepare(bdd output_vars, bdd quant_vars);
 #+END_SRC
 
-Prepare for quantification by specifying which variables should be
-quantified existentially.  The =varset= BDD is a conjunction of
-variables (as produced by =bdd_ithvar= anded together).  Variables in
-=varset= will be quantified existentially; other variables will be
-quantified universally.
+The one-argument version prepares for quantification by specifying
+which variables should be quantified.
+
+The two-argument overload is used for synthesis with universal
+quantification.  It distinguishes between output (existential)
+variables and variables to quantify away.
 
 This function must be called before =bdd_mt_quantify_to_bool=,
-=bdd_mt_quantify_to_trival=, or =bdd_mt_apply1_synthesis=.
+=bdd_mt_quantify_to_trival=, =bdd_mt_quantify=, or
+=bdd_mt_apply1_synthesis=.  Internally, it updates a global array that
+is as large as the number of BDD variables that have been declared to
+BuDDy.  This array will be overwritten every time a standard BDD
+quantification (like =bdd_forall=, =bdd_exist=, =bdd_appall=, etc.) is
+called, and it will be reset whenever a new BDD variable is declared, so
+make sure you call =bdd_mt_quantify_prepare= again when needed.
 
 ** =bdd_mt_quantify_to_bool=
 
@@ -509,10 +524,105 @@ int bdd_mt_quantify_to_bool(bdd r, int (*termop)(int),
 Quantify all variables in =r= and return a Boolean result (0 or 1).
 The =termop= callback evaluates each terminal to 0 or 1.
 
-Variables are quantified as specified with =bdd_mt_quantify_prepare=:
+The variables passed to any argument of =bdd_mt_quantify_prepare= are
+considered as existential variables, so their quantification will be
+the OR of their children.  Other variables will be quantified
+universally, so their quantification will be the AND of their children.
 
-- Existential variables: result is OR of children
-- Universal variables: result is AND of children
+** Example: A Very Small Two-Player Game
+
+In this example, the MTBDD encodes a game between two players =a= and
+=b= (two BDD variables).  Each path leads to an integer terminal.  The
+question is: regardless of the choice made by player =a=, can player
+=b= make a choice that reaches an odd number?
+
+This is expressed as $\forall a, \exists b, \mathrm{odd}(\mathit{game}(a,b))$:
+player =a= is universal, player =b= is existential.
+
+#+NAME: mtbdd-game
+#+BEGIN_SRC C++
+  bdd a = bdd_ithvar(0);  // player a (universal)
+  bdd b = bdd_ithvar(1);  // player b (existential)
+
+  // Game outcomes:
+  //   a=0, b=0 -> 4 (even)
+  //   a=0, b=1 -> 7 (odd)
+  //   a=1, b=0 -> 3 (odd)
+  //   a=1, b=1 -> 2 (even)
+  bdd game = bdd_ite(a,
+                     bdd_ite(b, bdd_terminal(2), bdd_terminal(3)),
+                     bdd_ite(b, bdd_terminal(7), bdd_terminal(4)));
+
+  std::cout << "Game MTBDD:\n";
+  for (auto [path, term]: paths_mt_of(game))
+    std::cout << "  " << path << " -> " << bdd_get_terminal(term)
+              << (bdd_get_terminal(term) % 2 ? " (odd)" : " (even)") << '\n';
+
+  bddExtCache cache;
+  bdd_extcache_init(&cache, 100, true);
+
+  // Player b is existential, player a is universal
+  bdd_mt_quantify_prepare(b);
+
+  // termop returns 1 if terminal is odd, 0 otherwise
+  int result = bdd_mt_quantify_to_bool(game,
+                                       [](int v) { return v & 1; },
+                                       &cache, 1);
+
+  std::cout << "\nQuestion: forall a, exists b, odd(game(a,b))?\n";
+  std::cout << "Answer: " << (result ? "YES" : "NO") << '\n';
+
+  // Let's swap the roles of the players
+  bdd_mt_quantify_prepare(a);
+
+  result = bdd_mt_quantify_to_bool(game,
+                                   [](int v) { return v & 1; },
+                                   &cache, 2);
+
+  std::cout << "\nQuestion: exists a, forall b, odd(game(a,b))?\n";
+  std::cout << "Answer: " << (result ? "YES" : "NO") << '\n';
+
+  bdd_extcache_done(&cache);
+#+END_SRC
+
+#+NAME: mtbdd-game-main
+#+BEGIN_SRC C++ :exports results :noweb strip-export
+  #include <iostream>
+  #include "bddx.h"
+
+  void example()
+  {
+    <<mtbdd-game>>
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(2);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS: mtbdd-game-main
+#+begin_example
+Game MTBDD:
+  <0:0, 1:0> -> 4 (even)
+  <0:0, 1:1> -> 7 (odd)
+  <0:1, 1:0> -> 3 (odd)
+  <0:1, 1:1> -> 2 (even)
+
+Question: forall a, exists b, odd(game(a,b))?
+Answer: YES
+
+Question: exists a, forall b, odd(game(a,b))?
+Answer: NO
+#+end_example
+
+The nature of the quantifiers is indicated by
+=bdd_mt_quantify_prepare=, but their order is the order of the BDD
+variables.
 
 ** =bdd_mt_quantify_to_trival=
 
@@ -535,15 +645,166 @@ and true are stable values that indicate that the vertex is in the
 attractor of player 0 or 1, and "unknown" values will be changed after
 some iterations.
 
+** =bdd_mt_quantify=
+
+#+BEGIN_SRC C++
+bdd bdd_mt_quantify(bdd r,
+                    int (*termop)(int),
+                    int (*leavesop)(int, int, int, int),
+                    bddExtCache* cache, int quanthash,
+                    int applyhash, int applyop);
+#+END_SRC
+
+Quantify variables in =r= and return the resulting BDD.  Call
+=bdd_mt_quantify_prepare= first to specify which variables should be
+quantified.  If the two-argument version of =bdd_mt_quantify_prepare= is used,
+only the second argument is used.
+
+Parameters:
+- =r=: Input MTBDD
+- =termop=: Callback applied to each terminal, allowing optional
+  renaming.  Receives a terminal value and returns the (possibly new)
+  terminal value.
+- =leavesop=: Callback passed to =bdd_mt_apply2_leaves= for combining
+  the low and high children at quantified variables (use a conjunction
+  to implement universal quantification, a disjunction to implement
+  existential quantification, or xor to implement unique quantification).
+- =cache=: External cache for memoization
+- =quanthash=: Unique identifier for the quantification operation (for
+  cache keying)
+- =applyhash=: Unique identifier for the apply operation (for cache
+  keying)
+- =applyop=: If ≥0, use BDD shortcuts (e.g., =bddop_or= for
+  existential quantification)
+
+Unlike =bdd_mt_quantify_to_bool= which returns an integer result after
+quantifying all variables, this function returns a BDD.  When used
+with the two-argument version of =bdd_mt_quantify_prepare=, only the
+variables in =quant_vars= are quantified away; the =output_vars= are
+preserved as existential variables in game-solving contexts.
+
+** Example: Bit Set Operations via Quantification
+
+In this example, we interpret the 32-bit terminal values as bit sets.
+Using quantification with OR computes unions, while quantification
+with AND computes intersections.
+
+#+NAME: mtbdd-bitset-quant
+#+BEGIN_SRC C++
+  bdd a = bdd_ithvar(0);
+  bdd b = bdd_ithvar(1);
+
+  bdd x = bdd_ite(a,
+                  bdd_ite(b, bdd_terminal(0b0011), bdd_terminal(0b0101)),
+                  bdd_ite(b, bdd_terminal(0b1001), bdd_terminal(0b1100)));
+
+  std::cout << "MTBDD x (bit sets):\n";
+  for (auto [path, term]: paths_mt_of(x))
+    std::cout << "  " << path << " -> 0b"
+              << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+  bddExtCache cache;
+  bdd_extcache_init(&cache, 100, true);
+
+  // leavesop for combining terminals: these receive bdd numbers and
+  // values, but in this example the MTBDD does not contain bddtrue or
+  // bddfalse, so we do not need the bdd numbers.
+  auto combine_or = [](int, int lval, int, int rval) {
+    return bdd_terminal_as_int(lval | rval);
+  };
+  auto combine_and = [](int, int lval, int, int rval) {
+    return bdd_terminal_as_int(lval & rval);
+  };
+  auto combine_xor = [](int, int lval, int, int rval) {
+    return bdd_terminal_as_int(lval ^ rval);
+  };
+  // We won't change the leaves.
+  auto term_id = [](int v) { return v; };
+
+  // Quantify variable 'b', building the union of its leaves
+  bdd_mt_quantify_prepare(b);
+  bdd union_b = bdd_mt_quantify(x, term_id, combine_or,
+                                &cache, 1, 2, bddop_or);
+
+  std::cout << "\nAfter existential quantification of b (union):\n";
+  for (auto [path, term]: paths_mt_of(union_b))
+    std::cout << "  " << path << " -> 0b"
+              << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+  // Quantify variable 'b' building the intersection of its leaves
+  bdd_mt_quantify_prepare(b);
+  bdd inter_b = bdd_mt_quantify(x, term_id, combine_and,
+                                &cache, 3, 4, bddop_and);
+
+  std::cout << "\nAfter universal quantification of b (intersection):\n";
+  for (auto [path, term]: paths_mt_of(inter_b))
+    std::cout << "  " << path << " -> 0b"
+              << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+  // Quantify variable 'b' building the xor of its leaves
+  bdd_mt_quantify_prepare(b);
+  bdd xor_b = bdd_mt_quantify(x, term_id, combine_xor,
+                                &cache, 5, 6, bddop_xor);
+
+  std::cout << "\nAfter unique quantification of b (xor):\n";
+  for (auto [path, term]: paths_mt_of(xor_b))
+    std::cout << "  " << path << " -> 0b"
+              << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+  bdd_extcache_done(&cache);
+#+END_SRC
+
+#+NAME: mtbdd-bitset-quant-main
+#+BEGIN_SRC C++ :exports results :noweb strip-export
+  #include <iostream>
+  #include <bitset>
+  #include "bddx.h"
+
+  void example()
+  {
+    <<mtbdd-bitset-quant>>
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(2);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS: mtbdd-bitset-quant-main
+#+begin_example
+MTBDD x (bit sets):
+  <0:0, 1:0> -> 0b1100
+  <0:0, 1:1> -> 0b1001
+  <0:1, 1:0> -> 0b0101
+  <0:1, 1:1> -> 0b0011
+
+After existential quantification of b (union):
+  <0:0> -> 0b1101
+  <0:1> -> 0b0111
+
+After universal quantification of b (intersection):
+  <0:0> -> 0b1000
+  <0:1> -> 0b0001
+
+After unique quantification of b (xor):
+  <0:0> -> 0b0101
+  <0:1> -> 0b0110
+#+end_example
+
 ** =bdd_mt_quantified_low_high=
 
 #+BEGIN_SRC C++
 std::tuple<bool, int, int> bdd_mt_quantified_low_high(int bdd);
 #+END_SRC
 
-For a node in an MTBDD, return whether the node's variable should be
-quantified existentially, and the low/high children with any
-quantified variables collapsed.
+For a node in an MTBDD, return whether the node's variable appears
+among the arguments of =bdd_mt_quantify_prepare=, and the low/high
+children with any quantified variables collapsed.
 
 Calling functions across shared libraries is expensive, so this
 returns three values at once to avoid making three different calls.
@@ -562,10 +823,11 @@ int bdd_mt_apply1_synthesis(bdd& r,
 
 Perform synthesis traversal on an MTBDD.  The =opleaf= callback is
 called for each terminal; it may modify the BDD node (via =*bdd=) and
-returns a Boolean indicating realizability.
+should return a Boolean indicating realizability.
 
 Call =bdd_mt_quantify_prepare= first to indicate which variables are
-existential.
+existential.  When using the two-argument version of this function,
+only the first argument will be considered.
 
 Returns 1 if there is a strategy for the existential player to force
 the MTBDD to reach a realizable terminal, regardless of the choices
