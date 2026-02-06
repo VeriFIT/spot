@@ -31,6 +31,7 @@ debian-stable-gcc:
       - ./spot-*/_build/sub/tests/*/*.log
       - ./*.log
       - ./*.tar.gz
+      - ./**/core.*
 
 # We build on Debian unstable because we want an up-to-date Automake.
 # (See issue #512.)  We do not run distcheck here to speedup this build
@@ -52,6 +53,7 @@ make-dist:
     when: always
     paths:
       - spot-*/_build/sub/tests/*/*.log
+      - ./**/core.*
       - ./*.log
       - ./*.tar.gz
       - VERSION
@@ -77,6 +79,7 @@ debian-unstable-gcc-coverage:
     when: always
     paths:
       - tests/*/*.log
+      - ./**/core.*
       - ./*.log
       - doc/spot.html/
       - doc/userdoc/
@@ -110,6 +113,7 @@ debian-unstable-gcc-pypy:
   artifacts:
     when: always
     paths:
+      - spot-*/**/core.*
       - spot-*/tests/*/*.log
       - spot-*/*.log
 
@@ -156,6 +160,7 @@ alpine-gcc:
     when: always
     paths:
       - ./**/*.log
+      - ./**/core.*
       - ./*.log
       - ./*.tar.gz
 
@@ -175,6 +180,7 @@ arch-clang:
     when: on_failure
     paths:
       - ./**/*.log
+      - ./**/core.*
       - ./*.log
 
 arch-gcc-glibcxxdebug:
@@ -201,6 +207,7 @@ arch-gcc-glibcxxdebug:
     when: on_failure
     paths:
       - ./**/*.log
+      - ./**/core.*
 
 mingw-shared:
   stage: build2
@@ -227,6 +234,7 @@ mingw-shared:
     when: on_failure
     paths:
       - ./**/*.log
+      - ./**/core.*
 
 mingw-static:
   stage: build2
@@ -259,6 +267,7 @@ mingw-static:
     when: always
     paths:
       - ./**/*.log
+      - ./**/core.*
 
 debpkg-stable:
   stage: build
@@ -475,6 +484,7 @@ raspbian:
     when: always
     paths:
       - ./**/*.log
+      - ./**/core.*
       - ./*.log
       - ./*.tar.gz
 
@@ -502,3 +512,4 @@ ubuntu-20-04:
     when: on_failure
     paths:
       - ./**/*.log
+      - ./**/core.*
