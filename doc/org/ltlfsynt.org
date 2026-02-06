@@ -293,9 +293,15 @@ The specification can be supplied in three ways:
 When receiving an LTLf formula with =-f= or =-F=, =ltlfilt= needs to
 know which atomic propositions are input or output.  This can be
 specified with options =--ins=, =--outs=, or with =--part-file=.  See
-[[file:ltlfsynt.org::#input-options][ltlfsynt's documentation of those options]].  Without any such option,
+[[file:ltlsynt.org::#input-options][=ltlsynt='s documentation of those options]].  Without any such option,
 =ltlfsynt= assumes that variables starting with =i= are inputs, and
 those starting with =o= are output.
+
+Additionally, =ltlfsynt= supports synthesis with /unobservable inputs/
+via the =--unobservable-ins= option.  Unobservable inputs are signals
+that the controller cannot observe but the environment can still use.
+See [[file:ltlsynt.org::#unobservable-inputs][=ltlsynt='s documentation of unobservable inputs]] for more details
+and examples.
 
 Similarly, the semantics also have to be specified using
 =--semantics=Mealy= (the default) or =--semantics=Moore=.  When

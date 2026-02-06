@@ -164,6 +164,50 @@ ltlsynt --tlsf arbiter.tlsf/n=3
 
 Again, please read [[file:tlsf.org][the TLSF page]] for more details.
 
+* Unobservable inputs
+   :PROPERTIES:
+   :CUSTOM_ID: unobservable-inputs
+   :END:
+
+In standard LTL synthesis, the controller can decide whaat to output
+based on the history of all input signals.  However, some
+applications require synthesis with /unobservable inputs/: input
+signals that the controller cannot observe, but that the environment
+can still use.
+
+These unobservable inputs can be specified using =--unobservable-ins=,
+which accepts a comma-separated list of atomic propositions or regexes
+(enclosed in slashes), similar to =--ins= and =--outs=.
+
+Additionally, =*.part= files can use the =.unobservables= keyword to
+list unobservable variables.
+
+If neither =--ins=, =--outs=, =--unobservable-ins=, nor =--part-file=
+is specified, =ltlsynt= uses a default heuristic: variables starting
+with =i= are considered inputs, variables starting with =o= are
+outputs, and variables starting with =u= are considered unobservable.
+
+Currently, synthesis with unobservable inputs requires passing
+=--algo=ds= or =--algo=sd=.
+
+#+NAME: ltlsyntunobs
+#+BEGIN_SRC sh :exports code
+  ltlsynt --algo=ds -f 'G(u <-> X!u) -> XF(u <-> o)' --hide-status --simplify --dot
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlsyntunobs.svg :var txt=ltlsyntunobs :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlsyntunobs.svg]]
+
+In the above example, the controller cannot observe =u=, but it must
+still produce an output =o= that eventually matches =u=.  The
+implication makes this realizable: if the environment ensures that =u=
+alternates at every step, then a controller that always
+output the same value of =o= will eventually match the value of =u=.
+
 * Output options
 
 By default, the controller is output in HOA format, but it can be
