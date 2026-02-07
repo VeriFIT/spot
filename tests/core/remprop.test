@@ -136,3 +136,37 @@ diff output expect
 
 autfilt output --used-ap=0..1 --unused-ap=0 > output2
 diff output output2
+
+# Issue #638.
+cat >output.hoa <<EOF
+HOA: v1
+States: 1
+Start: 0
+AP: 2 "o" "u"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc complete
+properties: deterministic
+controllable-AP: 0
+--BODY--
+State: 0
+[t] 0
+--END--
+EOF
+autfilt --remove-unused-ap output.hoa >output2.hoa
+cat >exp.hoa <<EOF
+HOA: v1
+States: 1
+Start: 0
+AP: 0
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc complete
+properties: deterministic very-weak
+controllable-AP:
+--BODY--
+State: 0
+[t] 0
+--END--
+EOF
+diff output2.hoa exp.hoa

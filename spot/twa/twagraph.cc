@@ -1355,7 +1355,15 @@ namespace spot
         if (all == bddtrue)    // All APs are used.
           return;
       }
-    auto d = get_dict();
+    if (auto* upper = get_named_prop<std::vector<bdd>>("upper-cond"))
+      {
+        for (bdd& b: *upper)
+          all = bdd_exist(all, bdd_support(b));
+        if (all == bddtrue)
+          return;
+      }
+    if (bdd* outs = get_named_prop<bdd>("synthesis-outputs"))
+      *outs = bdd_exist(*outs, all);
     while (all != bddtrue)
       {
         unregister_ap(bdd_var(all));
