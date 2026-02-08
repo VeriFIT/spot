@@ -124,4 +124,8 @@ run 1 ltlfsynt -f '(u & !o & XG(u|o)) | (!u & !o & X[!]F!o)'
 # Issue #637
 run 1 ltlfsynt -f '!(F(!i -> u) <-> (Fo R Gu))' --ins=i --unob=u
 
+# Issue #639
+run 1 ltlfsynt -f 'X(Xi xor Gi) <-> (Gi U (o & Fu))' \
+               -f 'Gi R !X!((i -> o) xor (o <-> XXu))'
+
 :

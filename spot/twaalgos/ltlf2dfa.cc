@@ -1342,10 +1342,12 @@ namespace spot
         return backprop.is_determined(it->second);
       }
 
-      bool root_winner(unsigned root_number) const
+      // 0/1 = winning by player 0/1, -1 = unknown
+      int root_winner(unsigned root_number) const
       {
         auto it = rootnum_to_backprop_state.find(root_number);
-        assert(it != rootnum_to_backprop_state.end());
+        if (it == rootnum_to_backprop_state.end())
+          return -1;
         return backprop.winner(it->second);
       }
 
@@ -1563,8 +1565,8 @@ namespace spot
           return 1;
         }
       term /= 2;
-      // remplace losing terminals by bddfalse
-      if (!global_backprop->root_winner(term))
+      // remplace losing or undetermined terminals by bddfalse
+      if (global_backprop->root_winner(term) <= 0)
         {
           *root_ptr = 0;
           return 0;
@@ -1589,8 +1591,8 @@ namespace spot
           *root_ptr = 1;
           return 1;
         }
-      // remplace losing terminals by bddfalse
-      if (!global_backprop->root_winner(term / 2))
+      // remplace losing or undetermined terminals by bddfalse
+      if (global_backprop->root_winner(term / 2) <= 0)
         {
           *root_ptr = 0;
           return 0;
@@ -1904,20 +1906,17 @@ namespace spot
 
     if (do_backprop)            // finalize backpropagation
       {
-        if (realizability)
+        if (backprop->root_winner(0) == 0) // unrealizable
           {
-            if (backprop->root_winner(0))
-              {
-                dfa->states.push_back(bddtrue);
-                dfa->names.push_back(formula::tt());
-                return dfa;
-              }
-            else
-              {
-                dfa->states.push_back(bddfalse);
-                dfa->names.push_back(formula::ff());
-                return dfa;
-              }
+            dfa->states.push_back(bddfalse);
+            dfa->names.push_back(formula::ff());
+            return dfa;
+          }
+        if (realizability)      // no strategy demanded
+          {
+            dfa->states.push_back(bddtrue);
+            dfa->names.push_back(formula::tt());
+            return dfa;
           }
         unsigned sz = states.size();
         for (unsigned i = 0; i < sz; ++i)
