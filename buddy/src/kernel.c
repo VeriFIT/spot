@@ -433,7 +433,7 @@ int bdd_setvarnum(int num)
    bddlevel2var[num] = num;
 
    bdd_pairs_resize(oldbddvarnum, bddvarnum);
-   bdd_operator_varresize();
+   bdd_operator_varresize(oldbddvarnum, bddvarnum);
 
    bdd_enable_reorder();
 

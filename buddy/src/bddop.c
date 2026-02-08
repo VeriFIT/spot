@@ -274,16 +274,23 @@ void bdd_operator_reset(int from_gc)
 }
 
 
-void bdd_operator_varresize(void)
+void bdd_operator_varresize(int oldnum, int newnum)
 {
-   if (quantvarset != NULL)
-      free(quantvarset);
-
-   if ((quantvarset=NEW(int,bddvarnum)) == NULL)
-      bdd_error(BDD_MEMORY);
-   else
-     memset(quantvarset, 0, sizeof(int)*bddvarnum);
-   quantvarsetID = 0;
+   if (quantvarset == NULL)
+     {
+       if ((quantvarset = NEW(int, newnum)) == NULL)
+         bdd_error(BDD_MEMORY);
+       else
+         memset(quantvarset, 0, sizeof(int) * newnum);
+       quantvarsetID = 0;
+       return;
+     }
+   // An MTBDD quantification could have a call back that adds a
+   // variable, so it is important to preserve the current contents of
+   // quantvarset when introducing new variables.
+   if ((quantvarset = (int*)realloc(quantvarset, sizeof(int) * newnum)) == NULL)
+     bdd_error(BDD_MEMORY);
+   memset(quantvarset + oldnum, 0, sizeof(int)*(newnum - oldnum));
 }
 
 
