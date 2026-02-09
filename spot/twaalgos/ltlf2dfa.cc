@@ -2535,16 +2535,11 @@ namespace spot
   mtdfa_ptr ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                                         const std::vector<std::string>& outvars,
                                         ltlf_synthesis_backprop backprop,
-                                        bool preprocess,
                                         bool realizability,
-                                        bool fuse_same_bdds,
-                                        bool simplify_terms,
-                                        bool detect_empty_univ)
+                                        ltlf_synthesis_options options)
   {
     return ltlf_to_mtdfa_for_synthesis(f, dict, outvars, nullptr,
-                                       backprop, preprocess, realizability,
-                                       fuse_same_bdds, simplify_terms,
-                                       detect_empty_univ);
+                                       backprop, realizability, options);
   }
 
   mtdfa_ptr ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
@@ -2552,34 +2547,37 @@ namespace spot
                                         const std::vector<std::string>*
                                         univquantvars,
                                         ltlf_synthesis_backprop backprop,
-                                        bool preprocess,
                                         bool realizability,
-                                        bool fuse_same_bdds,
-                                        bool simplify_terms,
-                                        bool detect_empty_univ)
+                                        ltlf_synthesis_options options)
   {
-    ltlf_translator trans(dict, simplify_terms);
+    ltlf_translator trans(dict, options.simplify_terms);
     switch (backprop)
       {
       case bfs_node_backprop:
-        return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+        return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
+                                   options.detect_empty_univ,
                                    &outvars, true, realizability,
-                                   preprocess, false, univquantvars);
+                                   options.one_step_preprocess, false,
+                                   univquantvars);
       case dfs_node_backprop:
-        return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+        return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
+                                   options.detect_empty_univ,
                                    &outvars, true, realizability,
-                                   preprocess, true, univquantvars);
+                                   options.one_step_preprocess, true,
+                                   univquantvars);
       case state_refine:
-        return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+        return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
+                                   options.detect_empty_univ,
                                    &outvars, false, realizability,
-                                   preprocess, true, univquantvars);
+                                   options.one_step_preprocess, true,
+                                   univquantvars);
       case dfs_strict_node_backprop:
         if (univquantvars)
           throw std::runtime_error
             ("ltlf_to_mtdfa_for_synthesis: universal quantification not"
              " implemented for dfs_strict_node_backprop");
         return trans.ltlf_synthesis_with_dfs(f, &outvars, realizability,
-                                             preprocess);
+                                             options.one_step_preprocess);
       }
     SPOT_UNREACHABLE();
     return nullptr;

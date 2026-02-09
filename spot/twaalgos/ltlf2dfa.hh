@@ -291,6 +291,33 @@ namespace spot
   };
 
   /// \ingroup mtdfa
+  /// \brief Fine-tuning options for LTLf synthesis
+  ///
+  /// These options can be passed to ltlf_to_mtdfa_for_synthesis() to
+  /// control the optimizations performed during the construction.
+  struct SPOT_API ltlf_synthesis_options
+  {
+    /// \brief Perform one-step preprocessing.
+    ///
+    /// When enabled, the formula for each step is first simplified in
+    /// an attempt to prove realizability or unrealizability in one step.
+    bool one_step_preprocess = true;
+
+    /// \brief Merge states with identical MTBDD representation.
+    bool fuse_same_bdds = true;
+
+    /// \brief Simplify formulas generated for states using cheap rewritings.
+    bool simplify_terms = true;
+
+    /// \brief Detect empty or universal languages after construction.
+    ///
+    /// If, after construction of the whole automaton, it was found
+    /// that all states were rejecting, or all states were accepting,
+    /// the automaton is reduced to a rejecting or accepting sink state.
+    bool detect_empty_univ = true;
+  };
+
+  /// \ingroup mtdfa
   /// \brief Solve (or start solving) LTLf synthesis
   ///
   /// This is similar to ltlf_to_mtdfa, but with the intent of solving
@@ -319,13 +346,9 @@ namespace spot
   /// it can reach, but the game still needs to be solved by other
   /// means.
   ///
-  /// If \a one_step_preprocess is set, the formula for each step is
-  /// first simplified in attempt to prove realizability or
-  /// unrealizability in one step.  This require translating two
-  /// different Boolean formulas to BDDs and then quantifying them.
-  ///
-  /// See ltlf_to_mtdfa for the purpose of \a fuse_same_bdds, \a
-  /// simplify_terms, \a detect_empty_univ.
+  /// The \a options structure contains fine-tuning options for the
+  /// construction.  See the documentation of ltlf_synthesis_options for
+  /// details.
   ///
   /// \cite duret.25.ciaa
   /// @{
@@ -334,22 +357,16 @@ namespace spot
                               const std::vector<std::string>& outvars,
                               ltlf_synthesis_backprop backprop
                               = dfs_node_backprop,
-                              bool one_step_preprocess = false,
                               bool realizability = false,
-                              bool fuse_same_bdds = true,
-                              bool simplify_terms = true,
-                              bool detect_empty_univ = true);
+                              ltlf_synthesis_options options = {});
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,
                               const std::vector<std::string>* univquantvars,
                               ltlf_synthesis_backprop backprop
                               = dfs_node_backprop,
-                              bool one_step_preprocess = false,
                               bool realizability = false,
-                              bool fuse_same_bdds = true,
-                              bool simplify_terms = true,
-                              bool detect_empty_univ = true);
+                              ltlf_synthesis_options options = {});
   /// @}
 
   /// \ingroup mtdfa

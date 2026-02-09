@@ -658,21 +658,25 @@ namespace
         switch (opt_trans)
           {
           case translation_direct_restricted:
-            if (opt_verbose)
-              *opt_verbose << indent
-                           << "starting restricted translation with"
-                           << (opt_one_step ? "" : "out")
-                           << " one-step preprocess\n";
-            a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
-                                                  unobs_aps.empty() ?
-                                                  nullptr : &unobs_aps,
-                                                  spot::state_refine,
-                                                  opt_one_step,
-                                                  false /* realizability */);
-            a->names.clear();
-            stop_trans(a);
-            minimize_maybe(a);
-            break;
+            {
+              if (opt_verbose)
+                *opt_verbose << indent
+                             << "starting restricted translation with"
+                             << (opt_one_step ? "" : "out")
+                             << " one-step preprocess\n";
+              spot::ltlf_synthesis_options opts;
+              opts.one_step_preprocess = opt_one_step;
+              a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
+                                                    unobs_aps.empty() ?
+                                                    nullptr : &unobs_aps,
+                                                    spot::state_refine,
+                                                    false /* realizability */,
+                                                    opts);
+              a->names.clear();
+              stop_trans(a);
+              minimize_maybe(a);
+              break;
+            }
           case translation_direct_full:
             if (opt_verbose)
               *opt_verbose << indent << "starting full translation\n";
@@ -727,11 +731,13 @@ namespace
               auto bp = (dfs_strict ? spot::dfs_strict_node_backprop
                          : (dfs ? spot::dfs_node_backprop
                             : spot::bfs_node_backprop));
+              spot::ltlf_synthesis_options opts;
+              opts.one_step_preprocess = opt_one_step;
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
                                                     unobs_aps.empty() ?
                                                     nullptr : &unobs_aps,
-                                                    bp, opt_one_step,
-                                                    opt_realizability);
+                                                    bp, opt_realizability,
+                                                    opts);
               a->names.clear();
               stop_trans(a);
               a_is_strategy_already = true;

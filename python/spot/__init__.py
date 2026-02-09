@@ -1142,9 +1142,24 @@ def ltlf_to_mtdfa_compose(formula, *args, dict=_bdd_dict):
     from spot.impl import ltlf_to_mtdfa_compose as todfa
     return todfa(formula, dict, *args)
 
-def ltlf_to_mtdfa_for_synthesis(formula, *args, dict=_bdd_dict):
+def ltlf_to_mtdfa_for_synthesis(formula, *args, dict=_bdd_dict,
+                                realizability=False,
+                                approach=dfs_node_backprop,
+                                one_step_preprocess=True,
+                                fuse_same_bdds=True,
+                                simplify_terms=True,
+                                detect_empty_univ=True):
     from spot.impl import ltlf_to_mtdfa_for_synthesis as todfa
-    return todfa(formula, dict, *args)
+    if type(approach) == str:
+        # convert the string to the corresponding enum value
+        approach = getattr(impl, approach)
+    from spot.impl import ltlf_synthesis_options
+    opts = ltlf_synthesis_options()
+    opts.one_step_preprocess = one_step_preprocess
+    opts.fuse_same_bdds = fuse_same_bdds
+    opts.simplify_terms = simplify_terms
+    opts.detect_empty_univ = detect_empty_univ
+    return todfa(formula, dict, *args, approach, realizability, opts)
 
 def obligation_to_mtdswa(formula, *args, dict=_bdd_dict):
     from spot.impl import obligation_to_mtdswa as otm
