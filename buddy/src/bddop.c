@@ -64,15 +64,15 @@
 #define CACHEID_COMMON      0x8
 #define CACHEID_SHORTDIST   0x9
 #define CACHEID_SHORTBDD    0xA
-// Do not go above 0xF here, CACHEID_RESTRICT will be combined with other
-// bits higher than that.
+/* Do not go above 0xF here, CACHEID_RESTRICT will be combined with
+   other bits higher than that. */
 
    /* Hash value modifiers for replace/compose */
 #define CACHEID_REPLACE      0x0
 #define CACHEID_COMPOSE      0x1
 #define CACHEID_VECCOMPOSE   0x2
-// Do not go above 0x3 here, those values will be combined with
-// other bits higher than that.
+/* Do not go above 0x3 here, those values will be combined with
+   other bits higher than that. */
 
    /* Hash value modifiers for quantification */
 #define CACHEID_EXIST        0x0
@@ -266,7 +266,7 @@ void bdd_operator_reset(int from_gc)
    BddCache_reset(&misccache);
    misccache_varnum = bddvarnum;
 
-   // reset all external caches
+   /* reset all external caches */
    for (bddExtCache* cache = external_caches.next_ext_cache;
         cache != &external_caches; cache = cache->next_ext_cache)
      if (!from_gc || cache->erase_on_gc)
@@ -285,9 +285,10 @@ void bdd_operator_varresize(int oldnum, int newnum)
        quantvarsetID = 0;
        return;
      }
-   // An MTBDD quantification could have a call back that adds a
-   // variable, so it is important to preserve the current contents of
-   // quantvarset when introducing new variables.
+   /* An MTBDD quantification could have a call back that adds a
+   ** variable, so it is important to preserve the current contents of
+   ** quantvarset when introducing new variables.
+   */
    if ((quantvarset = (int*)realloc(quantvarset, sizeof(int) * newnum)) == NULL)
      bdd_error(BDD_MEMORY);
    memset(quantvarset + oldnum, 0, sizeof(int)*(newnum - oldnum));
@@ -576,17 +577,17 @@ int bdd_first_minterm(mintermEnumerator* me)
 
 bdd bdd_next_minterm(mintermEnumerator* me)
 {
-  if (me->stacktop == me->stack) // end of iteration
+  if (me->stacktop == me->stack) /* end of iteration */
     return 0;
   int *vars = me->vars;
-  // switch polarity of variable of last possible branching
+  /* switch polarity of variable of last possible branching */
   int lastbranch = *--me->stacktop;
   BDD lastsub = *--me->stacktop;
   int v = ~vars[lastbranch];
   if (LEVEL(lastsub) == bddvar2level[v])
     lastsub = HIGH(lastsub);
   vars[lastbranch] = v;
-  // reset everything below to negative polarity
+  /* reset everything below to negative polarity */
   return reset_minterm(me, lastsub, lastbranch + 1);
 }
 
@@ -670,7 +671,7 @@ int bdd_first_path0(pathEnumerator* me)
 
 int bdd_next_path(pathEnumerator* me)
 {
-  // rewind the stack until we backtrack a LOW link
+  /* rewind the stack until we backtrack a LOW link */
   int* stack = me->stack;
   int* stacktop = me->stacktop;
   while (stack < stacktop)
@@ -687,14 +688,14 @@ int bdd_next_path(pathEnumerator* me)
           return reset_path(me);
         }
     }
-  // no next path
+  /* no next path */
   me->stacktop = stacktop;
   return 0;
 }
 
 int bdd_next_path0(pathEnumerator* me)
 {
-  // rewind the stack until we backtrack a LOW link
+  /* rewind the stack until we backtrack a LOW link */
   int* stack = me->stack;
   int* stacktop = me->stacktop;
   while (stack < stacktop)
@@ -708,14 +709,14 @@ int bdd_next_path0(pathEnumerator* me)
           return reset_path0(me);
         }
     }
-  // no next path
+  /* no next path */
   me->stacktop = stacktop;
   return 0;
 }
 
 bdd bdd_current_path(const pathEnumerator* me)
 {
-  // build the conjunction that correspond to nodes on the stack.
+  /* build the conjunction that correspond to nodes on the stack. */
   bdd res = BDDONE;
   int* stack = me->stack;
   int* stacktop = me->stacktop;
@@ -1051,7 +1052,6 @@ BDD bdd_apply(BDD l, BDD r, int op)
        break;                                   \
      }
 
-//__attribute__((optimize("no-tree-vectorize")))
 static BDD apply_rec(BDD l, BDD r)
 {
    LOCAL_REC_STACKS;
@@ -1605,7 +1605,7 @@ BDD bdd_mt_apply1_leaves(BDD r, int (*termop)(int, int),
 }
 
 
-// call quantify_prepare first
+/* call quantify_prepare first */
 int bdd_mt_apply1_synthesis(BDD* ptr_r,
                             int (*opleaf)(int*, int),
                             bddExtCache* cache, int ophash)
@@ -1632,21 +1632,22 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
                PUSHREF_(r);     /* bool for realizability */
                continue;
              }
-           // This is only executed in the right branch of
-           // the recursion.  If the left branch is known to be
-           // realizable and the variable is being worked on
-           // is existential, then we can replace the result of
-           // the right branch with false right a away.
-           //
-           // This optimization is currently disabled because checking
-           // for quantvarset[LEVEL(READINT_(2)) everytime seems to
-           // make this slower.
-           // if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
-           //   {
-           //     PUSHREF_(0);
-           //     PUSHREF_(0);
-           //     continue;
-           //   }
+           /* This is only executed in the right branch of
+           ** the recursion.  If the left branch is known to be
+           ** realizable and the variable is being worked on
+           ** is existential, then we can replace the result of
+           ** the right branch with false right a away.
+           **
+           ** This optimization is currently disabled because checking
+           ** for quantvarset[LEVEL(READINT_(2)) everytime seems to
+           ** make this slower.
+           ** if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
+           **   {
+           **     PUSHREF_(0);
+           **     PUSHREF_(0);
+           **     continue;
+           **   }
+           */
          work:;
            if (ISTERM(r))
              {
@@ -1716,11 +1717,11 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
                else
                  {
                    val &= rval;       /* universal quantification */
-                   // If any branch can lose, let's simplify
+                   /* If any branch can lose, let's simplify */
                    if (!val && (lres == 0 || rres == 0))
                      lres = rres = 0;
-                   // If one branch can goes to 1, replace
-                   // this node by the other child.
+                   /* If one branch can goes to 1, replace this node
+                      by the other child. */
                    else if (__unlikely(lres == 1))
                      {
                        res = rres;
@@ -1737,10 +1738,11 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
              }
            else
              {
-               // This unlikely case occurs when opleaf() changes one
-               // child (or both children) so that both children
-               // become equal.  In that case the current node can
-               // simply be removed.
+               /* This unlikely case occurs when opleaf() changes one
+               ** child (or both children) so that both children
+               ** become equal.  In that case the current node can
+               ** simply be removed.
+               */
                res = lres;
              }
          skip:
@@ -1765,8 +1767,159 @@ int bdd_mt_apply1_synthesis(BDD* ptr_r,
    return val;
 }
 
+/* call quantify_prepare first */
+int bdd_mt_apply1_terminating_synthesis(BDD* ptr_r,
+                                        int (*opleaf)(int*, int),
+                                        bddExtCache* cache, int ophash)
+{
+   LOCAL_REC_STACKS;
+   int index;
+   int r = *ptr_r;
 
-// call quantify_prepare first
+   if (ISCONST(r))
+     return r;
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           /* I: -1 r --- */
+           /* R: --- val r */
+           r = POPINT_();
+
+           if (ISCONST(r))
+             {
+               PUSHREF_(r);     /* BDD result*/
+               PUSHREF_(r);     /* bool for realizability */
+               continue;
+             }
+           /* This is only executed in the right branch of
+           ** the recursion.  If the left branch is known to be
+           ** realizable and the variable is being worked on
+           ** is existential, then we can replace the result of
+           ** the right branch with false right a away.
+           **
+           ** This optimization is currently disabled because checking
+           ** for quantvarset[LEVEL(READINT_(2)) everytime seems to
+           ** make this slower.
+           ** if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
+           **   {
+           **     PUSHREF_(0);
+           **     PUSHREF_(0);
+           **     continue;
+           **   }
+           */
+         work:;
+           if (ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int term = TERM(r);
+               bdd i = r;
+               int data = opleaf(&i, term);
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(i);
+               PUSHREF_(data);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, ophash), index);
+               if (entry1->arg1 == r && entry1->op == ophash)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                   PUSHREF_(entry1->arg2); /* data */
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, HIGH(r), -1);
+                   r = LOW(r);
+
+                   if (ISCONST(r))
+                     {
+                       PUSHREF_(r);     /* BDD result*/
+                       PUSHREF_(r);     /* boolean representing acceptance */
+                       continue;
+                     }
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: index r --- */
+           /* R: rval rres lval lres --- val res */
+           int rval = READREF_(1);
+           BDD rres = READREF_(2);
+           int lval = READREF_(3);
+           BDD lres = READREF_(4);
+           BDD r = POPINT_();
+           int val = lval;
+           BDD res;
+           if (__likely(lres != rres))
+             {
+               if (quantvarset[LEVEL(r)])
+                 {
+                   val |= rval;       /* existential quantification */
+                   if (val)           /* let's pick a unique winning path */
+                     {
+                       if (lval)
+                         rres = 0;
+                       else
+                         lres = 0;
+                     }
+                 }
+               else
+                 {
+                   val &= rval;       /* universal quantification */
+                   /* If any branch can lose, let's simplify */
+                   if (!val && (lres == 0 || rres == 0))
+                     lres = rres = 0;
+                   /* no optimization of bddtrue branches, because of
+                      terminating semantics */
+                 }
+               SYNC_REC_STACKS;
+               res = bdd_makenode(LEVEL(r), lres, rres);
+             }
+           else
+             {
+               /* This unlikely case occurs when opleaf() changes one
+               ** child (or both children) so that both children
+               ** become equal.  In that case the current node can
+               ** simply be removed.
+               */
+               res = lres;
+             }
+           POPREF_(4);
+           PUSHREF_(res);
+           PUSHREF_(val);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->op = ophash;
+           entry->res = res;
+           entry->arg2 = val;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   int val = READREF_(1);
+   BDD res = READREF_(2);
+   POPREF_(2);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   *ptr_r = res;
+   return val;
+}
+
+
+/* call quantify_prepare first */
 int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
                                         int (*choice)(int),
                                         int (*opleaf)(int*, int),
@@ -1794,21 +1947,22 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
                PUSHREF_(r);     /* bool for realizability */
                continue;
              }
-           // This is only executed in the right branch of
-           // the recursion.  If the left branch is known to be
-           // realizable and the variable is being worked on
-           // is existential, then we can replace the result of
-           // the right branch with false right a away.
-           //
-           // This optimization is currently disabled because checking
-           // for quantvarset[LEVEL(READINT_(2)) everytime seems to
-           // make this slower.
-           // if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
-           //   {
-           //     PUSHREF_(0);
-           //     PUSHREF_(0);
-           //     continue;
-           //   }
+           /* This is only executed in the right branch of
+           ** the recursion.  If the left branch is known to be
+           ** realizable and the variable is being worked on
+           ** is existential, then we can replace the result of
+           ** the right branch with false right a away.
+           **
+           ** This optimization is currently disabled because checking
+           ** for quantvarset[LEVEL(READINT_(2)) everytime seems to
+           ** make this slower.
+           ** if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
+           **   {
+           **     PUSHREF_(0);
+           **     PUSHREF_(0);
+           **     continue;
+           **   }
+           */
          work:;
            if (ISTERM(r))
              {
@@ -1845,7 +1999,7 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
                        int ch = choice(r);
                        if (ch == 0)
                          {
-                           low = high= bddfalse;
+                           low = high = bddfalse;
                          }
                        else if (low == ch)
                          {
@@ -1900,11 +2054,11 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
                else
                  {
                    val &= rval;       /* universal quantification */
-                     // If any branch can lose, let's simplify
+                   /* If any branch can lose, let's simplify */
                    if (!val && (lres == 0 || rres == 0))
                      lres = rres = 0;
-                   // If one branch can goes to 1, replace
-                   // this node by the other child.
+                   /* If one branch can goes to 1, replace this node
+                      by the other child. */
                    else if (__unlikely(lres == 1))
                      {
                        res = rres;
@@ -1921,13 +2075,189 @@ int bdd_mt_apply1_synthesis_with_choice(BDD* ptr_r,
              }
            else
              {
-               // This unlikely case occurs when opleaf() changes one
-               // child (or both children) so that both children
-               // become equal.  In that case the current node can
-               // simply be removed.
+               /* This unlikely case occurs when opleaf() changes one
+               ** child (or both children) so that both children
+               ** become equal.  In that case the current node can
+               ** simply be removed.
+               */
                res = lres;
              }
          skip:
+           POPREF_(4);
+           PUSHREF_(res);
+           PUSHREF_(val);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->op = ophash;
+           entry->res = res;
+           entry->arg2 = val;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   int val = READREF_(1);
+   BDD res = READREF_(2);
+   POPREF_(2);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   *ptr_r = res;
+   return val;
+}
+
+/* call quantify_prepare first */
+int bdd_mt_apply1_terminating_synthesis_with_choice(BDD* ptr_r,
+                                                    int (*choice)(int),
+                                                    int (*opleaf)(int*, int),
+                                                    bddExtCache* cache,
+                                                    int ophash)
+{
+   LOCAL_REC_STACKS;
+   int index;
+   int r = *ptr_r;
+
+   if (ISCONST(r))
+     return r;
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           /* I: -1 r --- */
+           /* R: --- val r */
+           r = POPINT_();
+
+           if (ISCONST(r))
+             {
+               PUSHREF_(r);     /* BDD result*/
+               PUSHREF_(r);     /* bool for realizability */
+               continue;
+             }
+           /* This is only executed in the right branch of
+           ** the recursion.  If the left branch is known to be
+           ** realizable and the variable is being worked on
+           ** is existential, then we can replace the result of
+           ** the right branch with false right a away.
+           **
+           ** This optimization is currently disabled because checking
+           ** for quantvarset[LEVEL(READINT_(2)) everytime seems to
+           ** make this slower.
+           ** if (READREF_(1) && quantvarset[LEVEL(READINT_(2))])
+           **   {
+           **     PUSHREF_(0);
+           **     PUSHREF_(0);
+           **     continue;
+           **   }
+           */
+         work:;
+           if (ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int term = TERM(r);
+               bdd i = r;
+               int data = opleaf(&i, term);
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(i);
+               PUSHREF_(data);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, ophash), index);
+               if (entry1->arg1 == r && entry1->op == ophash)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                   PUSHREF_(entry1->arg2); /* data */
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   int high = HIGH(r);
+                   int low = LOW(r);
+
+                   if (low && high && quantvarset[LEVEL(r)])
+                     {
+                       int ch = choice(r);
+                       if (ch == 0)
+                         {
+                           low = high = bddfalse;
+                         }
+                       else if (low == ch)
+                         {
+                           high = bddfalse;
+                         }
+                       else
+                         {
+                           assert(high == ch);
+                           low = bddfalse;
+                         }
+                     }
+
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, high, -1);
+                   r = low;
+
+                   if (ISCONST(r))
+                     {
+                       PUSHREF_(r);     /* BDD result*/
+                       PUSHREF_(r);     /* boolean representing acceptance */
+                       continue;
+                     }
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: index r --- */
+           /* R: rval rres lval lres --- val res */
+           int rval = READREF_(1);
+           BDD rres = READREF_(2);
+           int lval = READREF_(3);
+           BDD lres = READREF_(4);
+           BDD r = POPINT_();
+           int val = lval;
+           BDD res;
+           if (__likely(lres != rres))
+             {
+
+               if (quantvarset[LEVEL(r)])
+                 {
+                   val |= rval;       /* existential quantification */
+                   if (val)           /* let's pick a unique winning path */
+                     {
+                       if (lval)
+                         rres = 0;
+                       else
+                         lres = 0;
+                     }
+                 }
+               else
+                 {
+                   val &= rval;       /* universal quantification */
+                   /* If any branch can lose, let's simplify */
+                   if (!val && (lres == 0 || rres == 0))
+                     lres = rres = 0;
+                   /* no optimization of bddtrue branches, because of
+                      terminating semantics */
+                 }
+               SYNC_REC_STACKS;
+               res = bdd_makenode(LEVEL(r), lres, rres);
+             }
+           else
+             {
+               /* This unlikely case occurs when opleaf() changes one
+               ** child (or both children) so that both children
+               ** become equal.  In that case the current node can
+               ** simply be removed.
+               */
+               res = lres;
+             }
            POPREF_(4);
            PUSHREF_(res);
            PUSHREF_(val);
@@ -2065,13 +2395,14 @@ void bdd_mt_quantify_prepare2(BDD ovars, BDD qvars)
      quantvarset[LEVEL(n)] |= 2;
 }
 
-// This assumes that bdd_mt_quantify_prepare(BDD q) has been called
-// first, and quantify all variables in r in the order they appear in.
-// Variables from r that appear in q will be qunatified existentially,
-// and other variables will be quantified universally.  The result 0
-// (meaning bddfalse) or 1 (meaning bddtrue).  Function termop is
-// called for all terminal nodes and is given the terminal value (not
-// the BDD node number); it should return 0 or 1.
+/* This assumes that bdd_mt_quantify_prepare(BDD q) has been called
+** first, and quantify all variables in r in the order they appear in.
+** Variables from r that appear in q will be qunatified existentially,
+** and other variables will be quantified universally.  The result 0
+** (meaning bddfalse) or 1 (meaning bddtrue).  Function termop is
+** called for all terminal nodes and is given the terminal value (not
+** the BDD node number); it should return 0 or 1.
+*/
 int bdd_mt_quantify_to_bool(BDD r, int (*termop)(int),
                             bddExtCache* cache, int ophash)
 {
@@ -2150,23 +2481,24 @@ int bdd_mt_quantify_to_bool(BDD r, int (*termop)(int),
    return res;
 }
 
-// This assumes that bdd_mt_quantify_prepare(BDD q) has been called
-// first, and quantify all variables in r in the order they appear in.
-// Variables from r that appear in q will be qunatified existentially,
-// and other variables will be quantified universally.
-//
-// Unlike bdd_mt_quantify_to_bool, this return three possible values:
-// 0 (meaning false), 2 (meaning unknown), or 3 (meaning true).
-// Function termop is called on all terminal values, and should return
-// one of those three values.
-//
-// In additional to that ophash, and iteration are two values that are
-// combined with r to for the key in the result hashtable.  It is
-// assumed that the values returned by termop are only valid for a
-// given ophash, and additionally, the "unknown" results can only be
-// reused for the same pair of (ophash, iteration).  In other words, 0
-// (false) and 3 (true) are stable across iterations, but not 2
-// (unknown).
+/* This assumes that bdd_mt_quantify_prepare(BDD q) has been called
+** first, and quantify all variables in r in the order they appear in.
+** Variables from r that appear in q will be qunatified existentially,
+** and other variables will be quantified universally.
+**
+** Unlike bdd_mt_quantify_to_bool, this return three possible values:
+** 0 (meaning false), 2 (meaning unknown), or 3 (meaning true).
+** Function termop is called on all terminal values, and should return
+** one of those three values.
+**
+** In additional to that ophash, and iteration are two values that are
+** combined with r to for the key in the result hashtable.  It is
+** assumed that the values returned by termop are only valid for a
+** given ophash, and additionally, the "unknown" results can only be
+** reused for the same pair of (ophash, iteration).  In other words, 0
+** (false) and 3 (true) are stable across iterations, but not 2
+** (unknown).
+*/
 int bdd_mt_quantify_to_trival(BDD r, int (*termop)(int),
                               bddExtCache* cache,
                               int ophash, int iteration)
@@ -2199,8 +2531,8 @@ int bdd_mt_quantify_to_trival(BDD r, int (*termop)(int),
                bddExtCacheEntry *entry1 =
                  BddCache_index(cache, APPLY1HASH(r, ophash), index);
                if (entry1->arg1 == r && entry1->op == ophash &&
-                   // if res == 2 (meaning "unknown") we can only use
-                   // the cached value for the current iteration.
+                   /* if res == 2 (meaning "unknown") we can only use
+                      the cached value for the current iteration. */
                    (entry1->res != 2 || entry1->arg2 == iteration))
                  {
 #ifdef CACHESTATS
@@ -2250,11 +2582,12 @@ int bdd_mt_quantify_to_trival(BDD r, int (*termop)(int),
    return res;
 }
 
-// Call bdd_mt_quantify_prepare first.
-//
-// TERMOP is applied to any terminal, allowing optional renaming.
-// LEAVESOP is passed to the binary function that is applied to
-// each quantified variable.
+/* Call bdd_mt_quantify_prepare first.
+**
+** TERMOP is applied to any terminal, allowing optional renaming.
+** LEAVESOP is passed to the binary function that is applied to
+** each quantified variable.
+*/
 BDD bdd_mt_quantify(BDD r,
                     int (*termop)(int),
                     int (*leavesop)(int, int, int, int),
@@ -2725,9 +3058,9 @@ static BDD ite_rec(BDD f, BDD g, BDD h)
            POPREF_(2);
            PUSHREF_(res);
            BddCacheData* entry = itecache.table + index;
-           entry->i.a = POPINT_(); // f
-           entry->i.b = POPINT_(); // g
-           entry->i.c = POPINT_(); // h
+           entry->i.a = POPINT_(); /* f */
+           entry->i.b = POPINT_(); /* g */
+           entry->i.c = POPINT_(); /* h */
            entry->i.res = res;
          }
      }
@@ -4160,7 +4493,7 @@ BDD bdd_support(BDD r)
 
 static void support_rec(int r, int* support)
 {
-  // Reuse bddrefstack as temporary stack
+  /* Reuse bddrefstack as temporary stack */
   int* bot = bddrefstacktop;
   int* top = bot;
   goto work;
@@ -4752,8 +5085,8 @@ double bdd_satcount(BDD r)
 
    CHECKa(r, 0.0);
 
-   // Invalidate misccache if the number of variable changed since we
-   // last used it.
+   /* Invalidate misccache if the number of variable changed since we
+      last used it. */
    if (misccache_varnum != bddvarnum)
      {
        BddCache_reset(&misccache);
@@ -4843,8 +5176,8 @@ double bdd_satcountln(BDD r)
 
    CHECKa(r, 0.0);
 
-   // Invalidate misccache if the number of variable changed since we
-   // last used it.
+   /* Invalidate misccache if the number of variable changed since we
+      last used it. */
    if (misccache_varnum != bddvarnum)
      {
        BddCache_reset(&misccache);
@@ -5071,14 +5404,14 @@ static double bdd_pathcount_rec(BDD r)
 static int bdd_have_common_assignment_(BDD left, BDD right)
 {
 #ifndef NDEBUG
-  // arguments can't be constant
+  /* arguments can't be constant */
   if (ISCONST(left))
     return bdd_error(BDD_ILLBDD);
   if (ISCONST(right))
     return bdd_error(BDD_ILLBDD);
 #endif
 
-  // Always make "left" the smaller one to improve cache usage
+  /* Always make "left" the smaller one to improve cache usage */
   if (left > right)
     {
       BDD tmp = left;
@@ -5099,16 +5432,15 @@ static int bdd_have_common_assignment_(BDD left, BDD right)
    bddcachestats.opMiss++;
 #endif
 
-  // Do they share the top variable?
+   /* Do they share the top variable? */
   int vl = LEVEL(left);
   int vr = LEVEL(right);
 
-  // Try avoiding as many recursive calls as possible
+  /* Try avoiding as many recursive calls as possible */
   int res;
   if (vl < vr)
     {
-      // left has to "catch up"
-      // We know that right is not constant
+      /* LEFT has to "catch up". We know that RIGHT is not constant. */
       BDD l_left = LOW(left);
       BDD h_left = HIGH(left);
       res = ISONE(l_left) || (l_left == right)
@@ -5118,8 +5450,7 @@ static int bdd_have_common_assignment_(BDD left, BDD right)
     }
   else if (vr < vl)
     {
-      // right has to "catch up"
-      // We know that left is not constant
+      /* RIGHT has to "catch up".  We know that LEFT is not constant. */
       BDD l_right = LOW(right);
       BDD h_right = HIGH(right);
       res = ISONE(l_right) || (l_right == left)
@@ -5131,7 +5462,7 @@ static int bdd_have_common_assignment_(BDD left, BDD right)
     }
   else
     {
-      // They evolve jointly
+      /* They evolve jointly */
       BDD l_left = LOW(left);
       BDD h_left = HIGH(left);
       BDD l_right = LOW(right);
@@ -5164,16 +5495,15 @@ RETURN  {* 0 or 1 *}
 */
 int bdd_have_common_assignment(BDD left, BDD right)
 {
-  // If one of them is false -> false
+  /* If one of them is false -> false */
   if (ISZERO(left) || ISZERO(right))
     return 0;
 
-  // If one of them is true and the other is not false
-  // or if they are identical -> true
+  /* If one of them is true and the other is not false
+     or if they are identical -> true */
   if (ISONE(left) || ISONE(right) || left == right)
     return 1;
-  // Now both of them are not constant
-
+  /* Now both of them are not constant */
   return bdd_have_common_assignment_(left, right);
 }
 
@@ -5199,7 +5529,7 @@ int bdd_is_cube(BDD b)
       BDD l = LOW(b);
       BDD h = HIGH(b);
 
-      // Cube : high / low / do not care
+      /* Cube : high / low / do not care */
       if (!ISZERO(l) && !ISZERO(h))
         return 0;
 
@@ -5227,7 +5557,7 @@ static int varset2vartable(BDD r, int comp)
 
    quantvarsetcomp = comp;
 
-   // INT_MAX is used by bdd_mt_quantify_prepare
+   /* INT_MAX is used by bdd_mt_quantify_prepare */
    if (quantvarsetID >= INT_MAX - 1)
      {
        memset(quantvarset, 0, sizeof(int)*bddvarnum);
@@ -5262,8 +5592,8 @@ static int varset2svartable(BDD r)
       return bdd_error(BDD_VARSET);
 #endif
 
-   // INT_MAX is used by bdd_mt_quantify_prepare,
-   // and we cannot negate it anyway.
+   /* INT_MAX is used by bdd_mt_quantify_prepare,
+      and we cannot negate it anyway. */
    if (quantvarsetID >= INT_MAX - 1)
      {
        memset(quantvarset, 0, sizeof(int)*bddvarnum);
