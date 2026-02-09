@@ -303,6 +303,14 @@ namespace spot
     /// an attempt to prove realizability or unrealizability in one step.
     bool one_step_preprocess = true;
 
+    /// \brief Use terminating semantics when building a controller
+    ///
+    /// Build a controller that knows when to stop.  This
+    /// disables some minor optimizations of the game.
+    ///
+    /// This option is ignored when checking for realizability.
+    bool terminating_semantics = true;
+
     /// \brief Merge states with identical MTBDD representation.
     bool fuse_same_bdds = true;
 
@@ -488,13 +496,15 @@ namespace spot
                             bool one_step_preprocess = false,
                             bool bfs = true,
                             const std::vector<std::string>*
-                            univquantvars = nullptr);
+                            univquantvars = nullptr,
+                            bool terminating_semantics = true);
 
     mtdfa_ptr ltlf_synthesis_with_dfs(formula f,
                                       const std::vector<std::string>*
                                       outvars = nullptr,
                                       bool realizability = false,
-                                      bool ont_step_preprocess = false);
+                                      bool one_step_preprocess = false,
+                                      bool terminating_semantics = true);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;

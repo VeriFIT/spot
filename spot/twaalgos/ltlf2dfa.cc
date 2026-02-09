@@ -1619,7 +1619,8 @@ namespace spot
                                  bool preprocess,
                                  bool bfs,
                                  const std::vector<std::string>*
-                                 univquantvars)
+                                 univquantvars,
+                                 bool terminating_semantics)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
@@ -1633,6 +1634,9 @@ namespace spot
     if (do_backprop && outvars == nullptr)
       throw std::runtime_error
         ("ltlf_to_mtdfa: backpropagation requires outvars");
+
+    if (realizability)
+      terminating_semantics = false;
 
     std::unique_ptr<realizability_simplifier_base> realsimp;
     std::unique_ptr<backprop_bdd_encoder> backprop;
@@ -1661,8 +1665,12 @@ namespace spot
 
     auto restrict_bdd = [&](bdd& b) -> bool {
       quantify_prepare_maybe();
-      return bdd_mt_apply1_synthesis(b, strategy_map_true,
-                                     &cache_, hash_key_strat);
+      if (terminating_semantics)
+        return bdd_mt_apply1_terminating_synthesis(b, strategy_map_true,
+                                                   &cache_, hash_key_strat);
+      else
+        return bdd_mt_apply1_synthesis(b, strategy_map_true,
+                                       &cache_, hash_key_strat);
     };
 
     auto restrict_bdd_bool = [&](bdd& b, bool realizability) -> bool {
@@ -1919,11 +1927,16 @@ namespace spot
             return dfa;
           }
         unsigned sz = states.size();
-        for (unsigned i = 0; i < sz; ++i)
-          bdd_mt_apply1_synthesis_with_choice(states[i],
-                                              strategy_choice,
-                                              strategy_map_finalize,
-                                              &cache_, hash_key_finalstrat);
+        if (terminating_semantics)
+          for (unsigned i = 0; i < sz; ++i)
+            bdd_mt_apply1_terminating_synthesis_with_choice
+              (states[i], strategy_choice, strategy_map_finalize,
+               &cache_, hash_key_finalstrat);
+        else
+          for (unsigned i = 0; i < sz; ++i)
+            bdd_mt_apply1_synthesis_with_choice
+              (states[i], strategy_choice, strategy_map_finalize,
+               &cache_, hash_key_finalstrat);
         dfa->states = std::move(states);
         dfa->names = std::move(names);
         dict_->register_all_propositions_of(this, dfa);
@@ -1972,7 +1985,8 @@ namespace spot
                                            const std::vector<std::string>*
                                            outvars,
                                            bool realizability,
-                                           bool preprocess)
+                                           bool preprocess,
+                                           bool terminating_semantics)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
@@ -1986,6 +2000,9 @@ namespace spot
     // when todo.size() == size, we have processed
     // all successors of state and should backtrack;
     std::deque<std::pair<int, unsigned>> prev;
+
+    if (realizability)
+      terminating_semantics = false;
 
     terminal_to_state_map.clear();
 
@@ -2021,8 +2038,14 @@ namespace spot
     auto restrict_bdd_bool = [&](bdd& b, bool realizability) -> bool {
       quantify_prepare_maybe();
       if (!realizability)
-        return bdd_mt_apply1_synthesis(b, nullptr,
-                                       &cache_, hash_key_strat);
+        {
+          if (terminating_semantics)
+            return bdd_mt_apply1_terminating_synthesis(b, nullptr, &cache_,
+                                                       hash_key_strat);
+          else
+            return bdd_mt_apply1_synthesis(b, nullptr, &cache_,
+                                           hash_key_strat);
+        }
       return bdd_mt_quantify_to_bool(b, nullptr,
                                      &cache_, hash_key_strat_bool);
     };
@@ -2214,11 +2237,19 @@ namespace spot
           }
       }
     unsigned sz = states.size();
-    for (unsigned i = 0; i < sz; ++i)
-      bdd_mt_apply1_synthesis_with_choice(states[i],
-                                          strategy_choice,
-                                          strategy_map_finalize,
-                                          &cache_, hash_key_finalstrat);
+    if (terminating_semantics)
+      for (unsigned i = 0; i < sz; ++i)
+        bdd_mt_apply1_terminating_synthesis_with_choice(states[i],
+                                                        strategy_choice,
+                                                        strategy_map_finalize,
+                                                        &cache_,
+                                                        hash_key_finalstrat);
+    else
+      for (unsigned i = 0; i < sz; ++i)
+        bdd_mt_apply1_synthesis_with_choice(states[i],
+                                            strategy_choice,
+                                            strategy_map_finalize,
+                                            &cache_, hash_key_finalstrat);
     dfa->states = std::move(states);
     dfa->names = std::move(names);
     dict_->register_all_propositions_of(this, dfa);
@@ -2558,26 +2589,30 @@ namespace spot
                                    options.detect_empty_univ,
                                    &outvars, true, realizability,
                                    options.one_step_preprocess, false,
-                                   univquantvars);
+                                   univquantvars,
+                                   options.terminating_semantics);
       case dfs_node_backprop:
         return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
                                    options.detect_empty_univ,
                                    &outvars, true, realizability,
                                    options.one_step_preprocess, true,
-                                   univquantvars);
+                                   univquantvars,
+                                   options.terminating_semantics);
       case state_refine:
         return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
                                    options.detect_empty_univ,
                                    &outvars, false, realizability,
                                    options.one_step_preprocess, true,
-                                   univquantvars);
+                                   univquantvars,
+                                   options.terminating_semantics);
       case dfs_strict_node_backprop:
         if (univquantvars)
           throw std::runtime_error
             ("ltlf_to_mtdfa_for_synthesis: universal quantification not"
              " implemented for dfs_strict_node_backprop");
         return trans.ltlf_synthesis_with_dfs(f, &outvars, realizability,
-                                             options.one_step_preprocess);
+                                             options.one_step_preprocess,
+                                             options.terminating_semantics);
       }
     SPOT_UNREACHABLE();
     return nullptr;

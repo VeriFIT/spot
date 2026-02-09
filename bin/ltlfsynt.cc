@@ -52,6 +52,7 @@ enum
   OPT_HIDE,
   OPT_INPUT,
   OPT_MINIMIZE,
+  OPT_NON_TERMINATING,
   OPT_ONE_STEP,
   OPT_OUTPUT,
   OPT_PART_FILE,
@@ -91,6 +92,9 @@ static const argp_option options[] =
     { "semantics", OPT_SEMANTICS, "Moore|Mealy", 0,
       "Whether to work under Mealy (input-first) or Moore "
       "(output-first) semantics.  The default is Mealy.", 0 },
+    { "non-terminating", OPT_NON_TERMINATING, nullptr, 0,
+      "Use non-terminating semantics.  (Ignored if --realizability is given.)",
+      0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
     { "translation", OPT_TRANS,
@@ -226,6 +230,7 @@ static bool opt_minimize = false;
 static bool opt_minimize_set = false;
 static bool opt_one_step = true;
 static bool opt_simplify_ltl = true;
+static bool opt_terminating_semantics = true;
 
 static std::ostream* opt_verbose = nullptr;
 
@@ -381,6 +386,9 @@ parse_opt(int key, char *arg, struct argp_state *)
       opt_minimize = XARGMATCH("--minimize", arg,
                                minimize_args, minimize_values);
       opt_minimize_set = true;
+      break;
+    case OPT_NON_TERMINATING:
+      opt_terminating_semantics = false;
       break;
     case OPT_ONE_STEP:
       opt_one_step = XARGMATCH("--one-step", arg,
@@ -666,6 +674,7 @@ namespace
                              << " one-step preprocess\n";
               spot::ltlf_synthesis_options opts;
               opts.one_step_preprocess = opt_one_step;
+              opts.terminating_semantics = opt_terminating_semantics;
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
                                                     unobs_aps.empty() ?
                                                     nullptr : &unobs_aps,
@@ -733,6 +742,7 @@ namespace
                             : spot::bfs_node_backprop));
               spot::ltlf_synthesis_options opts;
               opts.one_step_preprocess = opt_one_step;
+              opts.terminating_semantics = opt_terminating_semantics;
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
                                                     unobs_aps.empty() ?
                                                     nullptr : &unobs_aps,

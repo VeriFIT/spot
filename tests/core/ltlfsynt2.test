@@ -121,7 +121,10 @@ test 4 = `autfilt --uniq out.hoa -c`
 
 # Issue #611
 f='(i0 & Gi1) <-> (o0 & X[2!]o1)'
-test 9 -eq `ltlfsynt -f "$f" --trans=restrict --dot=game|grep '^    B'|wc -l`
+R='--trans=restrict --dot=game'
+test 13 -eq `ltlfsynt -f "$f" $R | grep '^    B'|wc -l`
+test 9 -eq `ltlfsynt -f "$f" $R --non-terminating | grep '^    B'|wc -l`
+
 
 # Issue #610
 ltlfsynt -f '(Fo1&GF!o1) & (!o2&Fo2&GF!o2)' > out.txt
