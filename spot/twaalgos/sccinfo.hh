@@ -178,8 +178,8 @@ namespace spot
                     if (efilter_((*tv_)[t_], *i, efilter_data_)
                         == edge_filter_choice::keep)
                       return false;
-                    return true;
                   }
+                return true;
               }
             return false;
           }
