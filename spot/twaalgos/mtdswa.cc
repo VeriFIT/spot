@@ -1273,6 +1273,8 @@ namespace spot
         case op::NegClosureMarked:
         case op::OrRat:
         case op::Star:
+        case op::exists:
+        case op::forall:
           // These are not supported by the translator.
           throw
             std::runtime_error("obligation_is_accepting: unsupported operator");
@@ -1785,6 +1787,8 @@ namespace spot
       case op::OrRat:
       case op::Star:
       case op::UConcat:
+      case op::exists:
+      case op::forall:
         throw std::runtime_error("ltl_to_mtbdd: unsupported operator");
       case op::And:
         {

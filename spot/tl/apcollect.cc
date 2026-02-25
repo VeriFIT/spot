@@ -130,6 +130,10 @@ namespace spot
           for (formula c: f)
             self(c, polarity, self);
           return;
+        case op::exists:
+        case op::forall:
+          self(f[f.size() - 1], polarity, self);
+          return;
         }
     };
     rec(f, 1, rec);
@@ -209,6 +213,10 @@ namespace spot
           for (formula c: f)
             self(c, polarity, self);
           return;
+        case op::exists:
+        case op::forall:
+          self(f[f.size() - 1], polarity, self);
+          return;
         }
     };
     rec(f, 1, rec);
@@ -275,6 +283,10 @@ namespace spot
         case op::strong_X:
           for (formula c: f)
             self(c, polarity, self);
+          return;
+        case op::exists:
+        case op::forall:
+          self(f[f.size() - 1], polarity, self);
           return;
         }
     };
@@ -368,6 +380,10 @@ namespace spot
         case op::And:
           for (formula c: f)
             self(c, in_g, self);
+          return;
+        case op::exists:
+        case op::forall:
+          self(f[f.size() - 1], in_g, self);
           return;
         }
     };

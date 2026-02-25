@@ -103,6 +103,8 @@ namespace spot
       case op::OrRat:
       case op::AndRat:
       case op::first_match:
+      case op::exists:
+      case op::forall:
         SPOT_UNIMPLEMENTED();
       case op::ap:
         return bdd_ithvar(d->register_proposition(f, owner));

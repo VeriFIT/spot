@@ -76,6 +76,8 @@ namespace spot
       case op::Xor:
       case op::Implies:
       case op::Equiv:
+      case op::exists:
+      case op::forall:
         SPOT_UNIMPLEMENTED();
       }
 
@@ -183,6 +185,8 @@ namespace spot
       case op::FStar:
       case op::Concat:
       case op::Fusion:
+      case op::exists:
+      case op::forall:
         SPOT_UNIMPLEMENTED();
       }
 

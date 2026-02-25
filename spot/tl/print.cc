@@ -69,6 +69,8 @@ namespace spot
       KGotoBunop,
       KFirstMatch,
       KStrongX,
+      KExists,
+      KForall,
     };
 
     const char* spot_kw[] = {
@@ -110,6 +112,8 @@ namespace spot
       "[->",
       "first_match",
       "X[!]",
+      "\\exists ",
+      "\\forall ",
     };
 
     const char* spin_kw[] = {
@@ -151,6 +155,8 @@ namespace spot
       "[->",                    // not supported
       "first_match",            // not supported
       "!X!",
+      "\\exists ",              // not supported
+      "\\forall ",              // not supported
     };
 
     const char* wring_kw[] = {
@@ -191,7 +197,9 @@ namespace spot
       "[=",                     // not supported
       "[->",                    // not supported
       "first_match",            // not supported
-      "X[!]",                   // not supported, FIXME: we need a syntax
+      "X[!]",                   // not supported
+      "\\exists ",              // not supported
+      "\\forall ",              // not supported
     };
 
     const char* utf8_kw[] = {
@@ -233,6 +241,8 @@ namespace spot
       "[->",
       "first_match",
       "Ⓧ",
+      "∃",
+      "∀",
     };
 
     const char* latex_kw[] = {
@@ -274,6 +284,8 @@ namespace spot
       "\\SereGoto{",
       "\\FirstMatch",
       "\\StrongX ",
+      "\\exists ",
+      "\\forall ",
     };
 
     const char* sclatex_kw[] = {
@@ -319,6 +331,8 @@ namespace spot
       "^{\\to",
       "\\mathsf{first\\_match}",
       "\\mathsf{X^{[!]}}",
+      "\\exists ",
+      "\\forall ",
     };
 
     static bool
@@ -411,7 +425,9 @@ namespace spot
         top_level_ = false;
 
         auto s = f.size();
-        bool want_par = (full_parent_ || s > 1) && !top_level;
+        bool want_par = ((full_parent_ ||
+                          (s > 1 && !f.is(op::exists, op::forall))) &&
+                         !top_level);
         if (want_par)
           openp();
 
@@ -881,6 +897,33 @@ namespace spot
             visit(f[0]);
             os_ << ')';
             break;
+          case op::exists:
+          case op::forall:
+            {
+              emit(o == op::forall ? KForall : KExists);
+              unsigned sz = f.size();
+              const char** old_kw = kw_;
+              // we do not want to see a=1, b=1, etc. in
+              // the arguments of \exists and \forall.
+              if (kw_ == wring_kw)
+                kw_ = spot_kw;
+              // do not put parentheses around the quantified
+              // variables
+              bool old_full_parent = full_parent_;
+              full_parent_ = false;
+              for (unsigned i = 0; i < sz - 1; ++i)
+                {
+                  if (i > 0)
+                    os_ << ", ";
+                  visit(f[i]);
+                }
+              kw_ = old_kw;
+              full_parent_ = old_full_parent;
+              os_ << ": ";
+              visit(f[sz - 1]);
+              break;
+            }
+            break;
           }
         if (want_par)
           closep();
@@ -1160,6 +1203,8 @@ namespace spot
           case op::Star:
           case op::FStar:
           case op::first_match:
+          case op::exists:
+          case op::forall:
             SPOT_UNIMPLEMENTED();
           }
         for (auto c: f)

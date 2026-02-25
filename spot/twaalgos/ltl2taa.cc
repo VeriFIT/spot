@@ -124,6 +124,8 @@ namespace spot
           case op::AndRat:
           case op::OrRat:
           case op::first_match:
+          case op::exists:
+          case op::forall:
             SPOT_UNIMPLEMENTED();
 
           case op::U:

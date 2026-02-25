@@ -121,6 +121,8 @@ namespace spot
           case op::Fusion:
           case op::Or:
           case op::And:
+          case op::exists:
+          case op::forall:
             SPOT_UNREACHABLE();
           case op::AndRat:        // Can AndRat be handled better?
           case op::FStar:        // Can FStar be handled better?

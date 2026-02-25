@@ -336,6 +336,9 @@ using namespace spot;
 %token OP_W "weak until operator" OP_M "strong release operator"
 %token OP_F "sometimes operator" OP_G "always operator"
 %token OP_X "next operator" OP_STRONG_X "strong next operator"
+%token OP_EXISTS "exists operator"
+%token OP_FORALL "forall operator"
+%token COMMA ","
 %token OP_NOT "not operator"
 %token OP_XREP "X[.] operator"
 %token OP_FREP "F[.] operator" OP_GREP "G[.] operator"
@@ -358,7 +361,7 @@ using namespace spot;
 %token OP_ECONCAT_NONO "existential non-overlapping concat operator"
 %token OP_FIRST_MATCH "first_match"
 %token <std::string> ATOMIC_PROP "atomic proposition"
-%token OP_CONCAT "concat operator" OP_FUSION "fusion operator"
+%token OP_CONCAT "concat operator" OP_FUSION ":"
 %token CONST_TRUE "constant true" CONST_FALSE "constant false"
 %token END_OF_INPUT "end of formula"
 %token OP_POST_NEG "negative suffix" OP_POST_POS "positive suffix"
@@ -406,14 +409,26 @@ using namespace spot;
 
 %type <pnode> subformula atomprop booleanatom sere lbtformula
 %type <pnode> boolformula bracedsere parenthesedsubformula
+%type <pnode> quantifiedformula maybequantifiedformula
 %type <minmax_t> starargs fstarargs equalargs sqbracketargs gotoargs delayargs
 %type <unsigned> sqbkt_num
+%type <std::vector<const spot::fnode*>> aplist
 
 %printer { debug_stream() << $$; } <std::string>
 %printer { print_psl(debug_stream(), $$.tmp()); } <pnode>
 %printer { print_sere(debug_stream(), $$.tmp()); } sere bracedsere
 %printer { debug_stream() << $$; } <unsigned>
 %printer { debug_stream() << $$.min << ".." << $$.max; } <minmax_t>
+%printer {
+  debug_stream() << "[ ";
+  for (unsigned i = 0; i < $$.size(); ++i)
+    debug_stream() << $$[i]->ap_name() << ' ';
+  debug_stream() << ']';
+} <std::vector<const spot::fnode*>>
+%destructor {
+  for (unsigned i = 0; i < $$.size(); ++i)
+    $$[i]->destroy();
+} <std::vector<const spot::fnode*>>
 
 %%
 result:       START_LTL subformula END_OF_INPUT
@@ -427,6 +442,16 @@ result:       START_LTL subformula END_OF_INPUT
 		YYABORT;
 	      }
 	    | START_LTL subformula enderror
+	      {
+		result = formula($2);
+		YYACCEPT;
+	      }
+	    | START_LTL quantifiedformula END_OF_INPUT
+              {
+		result = formula($2);
+		YYACCEPT;
+	      }
+	    | START_LTL quantifiedformula enderror
 	      {
 		result = formula($2);
 		YYACCEPT;
@@ -983,6 +1008,32 @@ boolformula: booleanatom
               { $$ = fnode::unop(op::Not, $2); }
             | OP_NOT error
               { missing_right_op($$, @1, "not operator"); }
+
+aplist:  atomprop
+         { $$ = std::vector<const spot::fnode*>{ $1 }; }
+       | aplist atomprop
+         { $$ = $1; $$.push_back($2); }
+       | aplist COMMA atomprop
+         { $$ = $1; $$.push_back($3); }
+
+maybequantifiedformula: subformula | quantifiedformula
+
+
+exists_or_forall : OP_EXISTS | OP_FORALL
+
+quantifiedformula: OP_EXISTS aplist OP_FUSION maybequantifiedformula
+              { $$ = fnode::quantify(op::exists, $2, $4); }
+            | OP_FORALL aplist OP_FUSION maybequantifiedformula
+              { $$ = fnode::quantify(op::forall, $2, $4); }
+            | exists_or_forall error OP_FUSION maybequantifiedformula
+              { $$ = $4;
+                error_list.emplace_back(@1 + @3, "ignoring quantification");
+              }
+            | exists_or_forall error_opt END_OF_INPUT
+              {
+                $$ = fnode::ff();
+                error_list.emplace_back(@$, "syntax error in quantification");
+              }
 
 subformula: booleanatom
             | parenthesedsubformula

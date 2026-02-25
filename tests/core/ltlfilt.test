@@ -34,9 +34,9 @@ checkopt()
   diff -u exp out
 }
 
-# The empty lines in the file are meant, we want to make sure that
-# they are ignored.
-cat >formulas <<EOF
+# The empty lines in the file are there on purpose:
+# we want to make sure that they are ignored.
+cat >formulas <<\EOF
 GFa | FGb /* comment to ignore */
 F(GFa | /* tricky /* comment */)*/ Gb)
 
@@ -65,22 +65,22 @@ F(a & !Xa & Xb)
 {a* ##0 b*}|->c
 EOF
 
-checkopt --boolean <<EOF
+checkopt --boolean <<\EOF
 a & (b | c)
 0
 EOF
 
-checkopt --bsize-min=2 --bsize-max=4 <<EOF
+checkopt --bsize-min=2 --bsize-max=4 <<\EOF
 a U Fb
 Xa
 EOF
 
-checkopt --size-min=2 --size-max=4 <<EOF
+checkopt --size-min=2 --size-max=4 <<\EOF
 a U Fb
 Xa
 EOF
 
-checkopt --eventual <<EOF
+checkopt --eventual <<\EOF
 GFa | FGb
 F(GFa | Gb)
 F(b W GFa)
@@ -90,7 +90,7 @@ F(a & !Xa & Xb)
 (a & b) U !X[!]1
 EOF
 
-checkopt --universal <<EOF
+checkopt --universal <<\EOF
 GFa | FGb
 F(GFa | Gb)
 GFa | Gb
@@ -98,19 +98,19 @@ G(a & Xb)
 0
 EOF
 
-checkopt --eventual --universal <<EOF
+checkopt --eventual --universal <<\EOF
 GFa | FGb
 F(GFa | Gb)
 0
 EOF
 
-checkopt --suspendable <<EOF
+checkopt --suspendable <<\EOF
 GFa | FGb
 F(GFa | Gb)
 0
 EOF
 
-checkopt --stutter-invariant <<EOF
+checkopt --stutter-invariant <<\EOF
 GFa | FGb
 F(GFa | Gb)
 F(b W GFa)
@@ -131,11 +131,11 @@ a & (b | c)
 {a[*]:b[*]}[]-> c
 EOF
 
-checkopt -c --stutter-invariant <<EOF
+checkopt -c --stutter-invariant <<\EOF
 18
 EOF
 
-checkopt --syntactic-stutter-invariant <<EOF
+checkopt --syntactic-stutter-invariant <<\EOF
 GFa | FGb
 F(GFa | Gb)
 F(b W GFa)
@@ -152,7 +152,7 @@ a & (b | c)
 {a[*]:b[*]}[]-> c
 EOF
 
-checkopt --simplify <<EOF
+checkopt --simplify <<\EOF
 F(GFa | Gb)
 F(GFa | Gb)
 F(b W GFa)
@@ -179,7 +179,7 @@ a R (b W !a)
 (c W !b) W !a
 EOF
 
-checkopt --simplify --eventual --unique <<EOF
+checkopt --simplify --eventual --unique <<\EOF
 F(GFa | Gb)
 F(b W GFa)
 Fb
@@ -187,7 +187,7 @@ F(a & X(!a & b))
 0
 EOF
 
-checkopt --liveness <<EOF
+checkopt --liveness <<\EOF
 GFa | FGb
 F(GFa | Gb)
 F(b W GFa)
@@ -197,7 +197,7 @@ a U Fb
 F(a & !Xa & Xb)
 EOF
 
-checkopt --safety <<EOF
+checkopt --safety <<\EOF
 !({a;b[*];c}!)
 G(a & Xb)
 Xa
@@ -216,7 +216,7 @@ a & (b | c)
 {a[*]:b[*]}[]-> c
 EOF
 
-checkopt --obligation <<EOF
+checkopt --obligation <<\EOF
 !({a;b[*];c}!)
 !{a:b[*]:c}
 a U Fb
@@ -238,7 +238,7 @@ a & (b | c)
 {a[*]:b[*]}[]-> c
 EOF
 
-checkopt --guarantee <<EOF
+checkopt --guarantee <<\EOF
 !{a:b[*]:c}
 a U Fb
 Xa
@@ -248,7 +248,7 @@ a & (b | c)
 (a & b) U !X[!]1
 EOF
 
-checkopt -v --ltl <<EOF
+checkopt -v --ltl <<\EOF
 !({a;b[*];c}!)
 !{a:b[*]:c}
 {a[=2..3]}[]-> b
@@ -263,7 +263,7 @@ checkopt -v --ltl <<EOF
 {a[*]:b[*]}[]-> c
 EOF
 
-checkopt -v --ap=3 <<EOF
+checkopt -v --ap=3 <<\EOF
 GFa | FGb
 F(GFa | Gb)
 F(b W GFa)
@@ -285,7 +285,7 @@ F(a & !Xa & Xb)
 {a[*];{!a}[+];a[+]}[]-> b
 EOF
 
-checkopt --ap=2..3 <<EOF
+checkopt --ap=2..3 <<\EOF
 GFa | FGb
 F(GFa | Gb)
 F(b W GFa)
@@ -310,7 +310,7 @@ a & (b | c)
 {a[*]:b[*]}[]-> c
 EOF
 
-checkopt -v --stutter-invariant <<EOF
+checkopt -v --stutter-invariant <<\EOF
 !({a;b[*];c}!)
 G(a & Xb)
 Xa
@@ -319,13 +319,13 @@ Xa
 {a[*];{!c}[+];a[+]}[]-> b
 EOF
 
-checkopt --equivalent-to 'GFa | FGb' <<EOF
+checkopt --equivalent-to 'GFa | FGb' <<\EOF
 GFa | FGb
 F(GFa | Gb)
 F(b W GFa)
 EOF
 
-checkopt --ltl --from-ltlf=al <<EOF
+checkopt --ltl --from-ltlf=al <<\EOF
 al & (G(!al | F(a & al)) | F(al & G(!al | b))) & (al U G!al)
 al & F(al & (G(!al | F(a & al)) | G(!al | b))) & (al U G!al)
 al & F(al & ((!al | b) W G(!al | F(a & al)))) & (al U G!al)
@@ -340,7 +340,7 @@ a & al & (b | c) & (al U G!al)
 al & ((a & b) U (al & !Xal)) & (al U G!al)
 EOF
 
-checkopt --ltl --from-ltlf='!dead' <<EOF
+checkopt --ltl --from-ltlf='!dead' <<\EOF
 !dead & (G(dead | F(a & !dead)) | F(!dead & G(b | dead))) & (!dead U Gdead)
 !dead & F(!dead & (G(dead | F(a & !dead)) | G(b | dead))) & (!dead U Gdead)
 !dead & F(!dead & ((b | dead) W G(dead | F(a & !dead)))) & (!dead U Gdead)
@@ -355,7 +355,7 @@ a & !dead & (b | c) & (!dead U Gdead)
 !dead & ((a & b) U (!dead & !X!dead)) & (!dead U Gdead)
 EOF
 
-cat >in <<EOF
+cat >in <<\EOF
 a & Xb & c
 a & b & GF(a | c) & FG(a | c)
 b & GF(a | c) & FG(a | c)
@@ -373,9 +373,11 @@ F(a <-> b) -> (c xor d)
 ((a & !a) | (b & !b) | (c & e)) U d
 ((a & !b) | (!a & b)) U c
 ((a & !b) | (a->b)) U c
+
+\forall c: \exists a, b: a R b R c R d
 EOF
 
-cat >exp <<EOF
+cat >exp <<\EOF
 p0 & Xp1
 p0 & p1 & GF(p0 | p2) & FG(p0 | p2)
 p0 & GFp1 & FGp1
@@ -389,12 +391,13 @@ p0 | Gp1
 p0
 p0 U p1
 1 U p0
+\forall p0: \exists p1, p2: (p1 R (p2 R (p0 R p3)))
 EOF
 
 run 0 ltlfilt -u --nnf --relabel-bool=pnn in >out
 diff exp out
 
-cat >exp <<EOF
+cat >exp <<\EOF
 #define p0 (a && c)
 #define p1 (b)
 p0 && Xp1
@@ -437,12 +440,17 @@ p0
 p0 U p1
 #define p0 (c)
 true U p0
+#define p0 (c)
+#define p1 (a)
+#define p2 (b)
+#define p3 (d)
+\forall p0: \exists p1, p2: (p1 V (p2 V (p0 V p3)))
 EOF
 
 run 0 ltlfilt -s -u --nnf --relabel-bool=pnn --define in >out
 diff exp out
 
-cat >exp <<EOF
+cat >exp <<\EOF
 #define p0 (a)
 #define p1 (c)
 #define p2 (b)
@@ -529,12 +537,17 @@ p0 && []<>(p1 || p2) && ![]<>!(p1 || p2)
 #define p1 (b)
 #define p2 (c)
 ((p0 && !p1) || (p0 -> p1)) U p2
+#define p0 (c)
+#define p1 (a)
+#define p2 (b)
+#define p3 (d)
+\forall p0: \exists p1, p2: (p1 V (p2 V (p0 V p3)))
 EOF
 
 run 0 ltlfilt -s -u --relabel=pnn --define in >out
 diff exp out
 
-cat >exp <<EOF
+cat >exp <<\EOF
 #define i0 (a)
 #define i1 (b)
 #define o0 (c)
@@ -621,6 +634,11 @@ i1 && []<>(i0 || o0) && ![]<>!(i0 || o0)
 #define i1 (b)
 #define o0 (c)
 ((i0 && !i1) || (i0 -> i1)) U o0
+#define i0 (a)
+#define i1 (b)
+#define o0 (c)
+#define o1 (d)
+\forall o0: \exists i0, i1: (i0 V (i1 V (o0 V o1)))
 EOF
 
 run 0 ltlfilt -s -u --relabel=io --ins=a,b --define in >out
@@ -729,6 +747,11 @@ u0 && []<>(i0 || o0) && ![]<>!(i0 || o0)
 #define o0 (c)
 #define u0 (b)
 ((i0 && !u0) || (i0 -> u0)) U o0
+#define i0 (a)
+#define o0 (c)
+#define o1 (d)
+#define u0 (b)
+\forall o0: \exists i0, u0: (i0 V (u0 V (o0 V o1)))
 EOF
 run 0 ltlfilt -s -u --relabel=io --ins=a --unobs=b --define in >out
 diff exp out
@@ -778,6 +801,11 @@ p0 U p1
 p0 U !p0
 #define p0 ((a & !a) | (b & !b) | (c & !c))
 p0
+#define p0 (c)
+#define p1 (a)
+#define p2 (b)
+#define p3 (d)
+\forall p0: \exists p2, p1: (p1 R (p2 R (p0 R p3)))
 EOF
 
 run 0 ltlfilt -u --relabel-over=pnn --define in >out
@@ -867,13 +895,18 @@ cat >exp <<EOF
 #define p1 (b=1)
 #define p2 (c=1)
 ((p0=0) + (p1=1) + ((p0=1) * (p1=0))) U (p2=1)
+#define p0 (c=1)
+#define p1 (a=1)
+#define p2 (b=1)
+#define p3 (d=1)
+\forall p0: (\exists p1, p2: ((p1=1) R ((p2=1) R ((p0=1) R (p3=1)))))
 EOF
 run 0 ltlfilt -p --wring -u --nnf --relabel=pnn --define in >out
 diff exp out
 
 run 0 ltlfilt -0 in > out
 $PERL -i -pe 's/\0/@\n/g' out
-cat >exp <<EOF
+cat >exp <<\EOF
 a & c & Xb@
 a & b & GF(a | c) & FG(a | c)@
 b & GF(a | c) & FG(a | c)@
@@ -891,6 +924,7 @@ F(a <-> b) -> (c xor d)@
 ((a & !a) | (b & !b) | (c & e)) U d@
 ((a & !b) | (!a & b)) U c@
 ((a -> b) | (a & !b)) U c@
+\forall c: \exists a, b: (a R (b R (c R d)))@
 EOF
 diff exp out
 

@@ -77,6 +77,8 @@ namespace spot
   /// formula is `G(a -> b) & X(!b & c)`, then this will output
   /// the map `{a: 0b01, b: 0b11, c: 0b10}` where 0x01 means negative
   /// polarity, 0x10 is positive polarity, and 0x11 is both.
+  ///
+  /// If the formula is quantified, this ignores quantifiers.
   SPOT_API std::map<formula, unsigned char>
   collect_aps_with_polarities(formula f);
 
@@ -95,6 +97,8 @@ namespace spot
   /// returned vector is as large as the number of declared atomic
   /// propositions, independently of the propositions actually used by
   /// the formula.
+  ///
+  /// If the formula is quantified, this ignores quantifiers.
   /// @{
   SPOT_API std::vector<unsigned char>
   collect_apids_with_polarities(formula f);
@@ -107,6 +111,8 @@ namespace spot
   /// Looks for patterns like `...&G(...&(x->y)&...)&...` or
   /// other forms of constant implications, then build a graph
   /// of implications to compute equivalence classes of literals.
+  ///
+  /// If the formula is quantified, this ignores quantifiers.
   SPOT_API
   std::vector<std::vector<spot::formula>>
   collect_equivalent_literals(formula f);

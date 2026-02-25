@@ -288,6 +288,14 @@ namespace spot
                                 "constructed from arbitrary formulas");
   }
 
+  void
+  formula::report_message(const char* message)
+  {
+    throw std::runtime_error(message);
+  }
+
+
+
   std::string fnode::kindstr() const
   {
     switch (op_)
@@ -328,6 +336,8 @@ namespace spot
         C(FStar);
         C(first_match);
         C(strong_X);
+        C(exists);
+        C(forall);
 #undef C
       }
     SPOT_UNREACHABLE();
@@ -1627,6 +1637,119 @@ namespace spot
   }
 
   const fnode*
+  fnode::quantify(op quantifier, const fnode* ap, const fnode* f)
+  {
+    if (f->kind() != quantifier)
+      {
+        if (f->is_ff() || f->is_tt())
+          {
+            ap->destroy();
+            return f;
+          }
+        auto mem = ::operator new(sizeof(fnode) + sizeof(*children));
+        return unique(new(mem) fnode(quantifier, {ap, f}));
+      }
+    // f is already a quantification of the same kind, and alrady
+    // contains a list of APs to quantify followed by the formula.  we
+    // want to insert ap into the list of APs and keep the AP sorted
+    // by ap_id.
+    unsigned other_sz = f->size();
+    // find the position where ap should be inserted, and check if it
+    // is already there.
+    for (unsigned i = 0; i < other_sz - 1; ++i)
+      if (const fnode* c = f->nth(i); c->apid() >= ap->apid())
+        {
+          if (c->apid() == ap->apid())
+            {
+              // ap is already quantified, so we can simply reuse f.
+              ap->destroy();
+              return f->clone();
+            }
+          break;
+        }
+    vec v;
+    v.reserve(1 + other_sz);
+    unsigned i = 0;
+    for (; i < other_sz - 1; ++i)
+      if (const fnode* c = f->nth(i); c->apid() < ap->apid())
+        v.emplace_back(c->clone());
+      else
+        break;
+    for (; i < other_sz - 1; ++i)
+      if (const fnode* c = f->nth(i); c->apid() != ap->apid())
+        v.emplace_back(c->clone());
+    v.emplace_back(f->nth(other_sz - 1)->clone());
+    f->destroy();
+    auto mem = ::operator new(sizeof(fnode) + (v.size() - 1)*sizeof(*children));
+    return unique(new(mem) fnode(quantifier, v.begin(), v.end()));
+  }
+
+  const fnode*
+  fnode::quantify(op quantifier,
+                  vec aps,
+                  const fnode* f)
+  {
+    if (f->is_ff() || f->is_tt())
+      {
+        for (const fnode* ap: aps)
+          ap->destroy();
+        return f;
+      }
+    // first, sort aps
+    std::sort(aps.begin(), aps.end(),
+              [](const fnode* a, const fnode* b)
+              { return a->apid() < b->apid(); });
+    // if f is already a quantification of the same kind, we should merge
+    // the two lists of aps, and check if there are duplicates.
+    if (f->kind() == quantifier)
+      {
+        unsigned f_sz = f->size();
+        unsigned ap_sz = aps.size();
+        vec merged;
+        merged.reserve(ap_sz + f_sz);
+        unsigned i = 0;
+        unsigned j = 0;
+        while (i < ap_sz && j < f_sz - 1)
+          {
+            unsigned i_id = aps[i]->apid();
+            unsigned j_id = f->nth(j)->apid();
+            if (i_id < j_id)
+              {
+                merged.emplace_back(aps[i++]);
+              }
+            else if (i_id > j_id)
+              {
+                merged.emplace_back(f->nth(j++)->clone());
+              }
+            else                // duplicate AP, ignore
+              {
+                ++i;
+                ++j;
+              }
+          }
+        while (i < ap_sz)
+          merged.emplace_back(aps[i++]);
+        while (j < f_sz)        // includes the body of the quantification
+          merged.emplace_back(f->nth(j++)->clone());
+
+        f->destroy();
+        auto mem = ::operator new(sizeof(fnode) + (merged.size() - 1)
+                                  * sizeof(*children));
+        return unique(new(mem) fnode(quantifier, merged.begin(), merged.end()));
+      }
+    else
+      {
+        // f is not quantified, so we can simply create a new quantification
+        // with the list of aps and f as the body.
+        aps.emplace_back(f);
+        auto mem = ::operator new(sizeof(fnode) + (aps.size() - 1)
+                                  * sizeof(*children));
+        return unique(new(mem) fnode(quantifier, aps.begin(), aps.end()));
+      }
+  }
+
+
+  const fnode*
   fnode::ap(const std::string& name)
   {
     auto ires = m.name2ap.emplace(name, nullptr);
@@ -1715,6 +1838,7 @@ namespace spot
         is_.sigma2 = true;
         is_.pi2 = true;
         is_.delta2 = true;
+        is_.quantified = false;
         break;
       case op::eword:
         is_.boolean = false;
@@ -1741,6 +1865,7 @@ namespace spot
         is_.sigma2 = true;
         is_.pi2 = true;
         is_.delta2 = true;
+        is_.quantified = false;
         break;
       case op::ap:
         is_.boolean = true;
@@ -1781,6 +1906,7 @@ namespace spot
         is_.sigma2 = true;
         is_.pi2 = true;
         is_.delta2 = true;
+        is_.quantified = false;
         break;
       case op::Not:
         props = children[0]->props;
@@ -2339,6 +2465,11 @@ namespace spot
         is_.pi2 = false;
         is_.sigma2 = false;
         is_.delta2 = false;
+        break;
+      case op::exists:
+      case op::forall:
+        props = children[size_ - 1]->props;
+        is_.quantified = true;
         break;
       }
   }

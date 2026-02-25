@@ -186,6 +186,12 @@ for (x, msg) in [('a->', "missing right operand for \"implication operator\""),
                  ('("aa', "missing closing parenthesis"),
                  ('"(aa', "unclosed string"),
                  ('{aa', "missing closing brace"),
+                 ('∃,b', "unexpected \",\""),
+                 ('∃b:', "unexpected end of formula"),
+                 ('∃,b:a', "unexpected \",\""),
+                 ('∃,b:a', "ignoring quantification"),
+                 ('∃:a', "unexpected :"),
+                 ('∃:a', "ignoring quantification"),
                  ]:
     f9 = spot.parse_infix_psl(x, spot.default_environment.instance(),
                               False, True)

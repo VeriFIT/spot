@@ -114,6 +114,8 @@ namespace spot
       case op::Star:
       case op::FStar:
       case op::first_match:
+      case op::exists:
+      case op::forall:
         break;
       case op::F:
         //  F e = e    if e eventual

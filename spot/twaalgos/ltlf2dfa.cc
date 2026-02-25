@@ -1215,6 +1215,8 @@ namespace spot
       case op::OrRat:
       case op::Star:
       case op::UConcat:
+      case op::exists:
+      case op::forall:
         throw std::runtime_error("ltlf_to_mtbdd: unsupported operator");
       case op::And:
         {
@@ -2545,6 +2547,8 @@ namespace spot
       case op::OrRat:
       case op::Star:
       case op::UConcat:
+      case op::exists:
+      case op::forall:
         throw std::runtime_error("ltlf_to_mtdfa: unsupported operator");
       }
     SPOT_UNREACHABLE();

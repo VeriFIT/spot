@@ -223,6 +223,8 @@ eol2        (\n\r)+|(\r\n)+
 "0"|[fF][aA][lL][sS][eE]	BEGIN(0); return token::CONST_FALSE;
 
 
+","                             BEGIN(0); return token::COMMA;
+
   /* ~ comes from Goal, ! from everybody else */
 {NOT}				BEGIN(0); return token::OP_NOT;
 
@@ -347,6 +349,10 @@ eol2        (\n\r)+|(\r\n)+
 {CIRCLEX}                       BEGIN(0); return token::OP_STRONG_X;
 "W"				BEGIN(0); return token::OP_W;
 "M"				BEGIN(0); return token::OP_M;
+
+"∃"|"\\exists"                  BEGIN(0); return token::OP_EXISTS;
+"∀"|"\\forall"                  BEGIN(0); return token::OP_FORALL;
+
 
   /* The combining overline or macron (overbar) should normally
      occur only after a single letter, but we do not check that. */

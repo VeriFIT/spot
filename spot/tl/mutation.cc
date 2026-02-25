@@ -271,6 +271,9 @@ namespace spot
               else
                 return f.map(recurse);
             }
+          case op::exists:
+          case op::forall:
+            SPOT_UNIMPLEMENTED();
           }
         SPOT_UNREACHABLE();
       }

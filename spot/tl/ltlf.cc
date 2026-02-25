@@ -155,8 +155,12 @@ namespace spot
       case op::OrRat:
       case op::Star:
       case op::UConcat:
-        throw std::runtime_error
-          ("ltlf_one_step_sat_rewrite(): unsupported operator");
+        formula::report_message("ltlf_one_step_sat_rewrite(): "
+                                "unsupported operator");
+      case op::exists:
+      case op::forall:
+        formula::report_message("ltlf_one_step_sat_rewrite(): "
+                                "quantification unsupported");
       }
     c->emplace(g, f);
     return f;
@@ -321,8 +325,12 @@ namespace spot
       case op::OrRat:
       case op::Star:
       case op::UConcat:
-        throw std::runtime_error
-          ("ltlf_one_step_unsat_rewrite(): unsupported operator");
+        formula::report_message("ltlf_one_step_unsat_rewrite(): "
+                                "unsupported operator");
+      case op::exists:
+      case op::forall:
+        formula::report_message("ltlf_one_step_unsat_rewrite(): "
+                                "quantification unsupported");
       }
   done:
     cc.emplace(g, f);
@@ -543,7 +551,6 @@ namespace spot
           if (negated)
             std::swap(opos, oneg);
 
-
           if (opos == op::And)
             {
               // (a -> b1) & (a -> b2) & rest  =  (a -> (b1 & b2)) & rest
@@ -730,6 +737,20 @@ namespace spot
           formula rest = simplify(formula::multop(opos, unmodified_clauses));
           formula simp2 = formula::multop(oneg, largest_sub, simp);
           return formula::multop(opos, simp2, rest);
+        }
+      case op::exists:
+      case op::forall:
+        {
+          std::vector<formula> tmp;
+          unsigned sz = f.size();
+          tmp.reserve(sz - 1);
+          for (unsigned i = 0; i < sz - 1; ++i)
+            tmp.push_back(f[i]);
+          formula c = f[sz - 1];
+          formula d = simplify(c, negated);
+          if (d == c)
+            return f;
+          return formula::quantify(o, tmp, d);
         }
       }
     SPOT_UNREACHABLE();

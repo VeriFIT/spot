@@ -26,7 +26,7 @@
 
 set -e
 
-cat >input <<EOF
+cat >input <<\EOF
 0
 1
 true
@@ -81,6 +81,10 @@ p=0Uq=1
 (Gq=1*Fp=0)UXq=0
 ((p=1Mq=1)Wx+p=0)RXq=0
 ((p=1Vq=1)Rx+p=0)WXq=0
+((X(p2=0))U(X(p2=0)))+((Xp1=0)UFALSE)
+∃a,b: a U b U c
+∀a: a U b U c
+\forall a , b : \exists c d : a R b R c R d R e
 ((X(p2=0))U(X(p2=0)))+((Xp1=0)UFALSE)
 EOF
 

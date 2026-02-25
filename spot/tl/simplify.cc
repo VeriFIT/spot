@@ -656,6 +656,20 @@ namespace spot
                                         rec(f1, false), rec(f2, negated));
                 break;
               }
+            case op::exists:
+            case op::forall:
+              {
+                unsigned sz = f.size();
+                std::vector<formula> v;
+                for (unsigned i = 0; i < sz - 1; ++i)
+                  v.emplace_back(f[i]);
+                formula body = rec(f[sz - 1], negated);
+                op q = o;
+                if (negated)
+                  q = o == op::exists ? op::forall : op::exists;
+                result = formula::quantify(q, v, body);
+                break;
+              }
             case op::eword:
             case op::Not:
               SPOT_UNREACHABLE();
@@ -1784,6 +1798,16 @@ namespace spot
                     }
                 }
               return f;
+            }
+          case op::exists:
+          case op::forall:
+            {
+              unsigned sz = f.size();
+              std::vector<formula> v;
+              for (unsigned i = 0; i < sz - 1; ++i)
+                v.emplace_back(f[i]);
+              formula body = recurse(f[sz - 1]);
+              return formula::quantify(o, v, body);
             }
           }
         SPOT_UNREACHABLE();

@@ -118,6 +118,12 @@ namespace spot
           case op::Fusion:
             childnum = 1;                // Numbered children
             break;
+          case op::exists:
+          case op::forall:
+            // -1 will designate the body
+            childnum = -1 - f.size();
+
+            break;
           }
 
         for (auto c: f)
@@ -129,7 +135,7 @@ namespace spot
             os_ << "  " << src << " -> " << dst;
             if (childnum > 0)
               os_ << " [taillabel=\"" << childnum << "\"]";
-            if (childnum == -2)
+            if (childnum <= -2)
               os_ << " [taillabel=\"L\"]";
             else if (childnum == -1)
               os_ << " [taillabel=\"R\"]";

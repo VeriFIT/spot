@@ -600,6 +600,8 @@ namespace spot
           case op::Closure:
           case op::NegClosure:
           case op::NegClosureMarked:
+          case op::exists:
+          case op::forall:
             SPOT_UNREACHABLE();        // Because not rational operator
           case op::Not:
             {
@@ -1599,6 +1601,8 @@ namespace spot
           case op::AndNLM:
           case op::AndRat:
           case op::OrRat:
+          case op::exists:
+          case op::forall:
             SPOT_UNREACHABLE(); // Not an LTL operator
           }
         SPOT_UNREACHABLE();

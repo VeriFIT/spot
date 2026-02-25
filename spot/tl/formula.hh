@@ -66,6 +66,8 @@
 // SPOT_USES_STRONG_X was defined so we are keeping it just in case
 // someone depends on it.
 #  define SPOT_WANT_STRONG_X 1
+// This was defined in Spot 2.15 when exists/forall where introduced.
+#  define SPOT_HAS_QUANTIFIERS 1
 
 namespace spot
 {
@@ -140,6 +142,18 @@ namespace spot
     // The two options are not mutually exclusive.  Using both allows
     // you to use strong_X whenever it exists.
     strong_X,                  ///< strong Next
+    // The following two operators are new in Spot 2.15
+    // If you need to support an earlier version of Spot, you can
+    // use the SPOT_HAS_QUANTIFIERS variable.
+    //
+    //   #if SPOT_HAS_QUANTIFIERS
+    //      case op::exists:
+    //         /* do something */
+    //      case op::forall:
+    //         /* do something */
+    //   #endif
+    exists,                    ///< existential quantification of AP
+    forall,                    ///< universal quantification of AP
   };
 
 #ifndef SWIG
@@ -206,6 +220,15 @@ namespace spot
       /// \see formula::nested_unop_range
       static const fnode* nested_unop_range(op uo, op bo, unsigned min,
                                             unsigned max, const fnode* f);
+
+      /// \see formula::quantify
+      static const fnode* quantify(op quantifier,
+                                   const fnode* ap,
+                                   const fnode* f);
+      /// \see formula::quantify
+      static const fnode* quantify(op quantifier,
+                                   std::vector<const fnode*> aps,
+                                   const fnode* f);
 
       /// \see formula::kind
       op kind() const
@@ -586,6 +609,12 @@ namespace spot
         return is_.delta2;
       }
 
+      /// \see formula::is_quantified
+      bool is_quantified() const
+      {
+        return is_.quantified;
+      }
+
     private:
       static size_t bump_next_id();
       void setup_props(op o);
@@ -724,6 +753,7 @@ namespace spot
         bool sigma2:1; // Boolean comb. of (S) with X/F/U/M possibly applied.
         bool pi2:1;    // Boolean comb. of (G) with X/G/R/W possibly applied.
         bool delta2:1;                 // Boolean combination of (Σ₂) and (Π₂).
+        bool quantified:1;             // Use forall/exists
       };
       union
       {
@@ -988,6 +1018,13 @@ namespace spot
     /// to nullptr if the corresponding APID is invalid (because the
     /// corresponding atomic proposition is not referenced anymore).
     static std::vector<formula> apid_map();
+
+    /// \brief throw \a message if the formula is quantified
+    void throw_if_quantified(const char* message)
+    {
+      if (SPOT_UNLIKELY(is_quantified()))
+        report_message(message);
+    }
 
     /////////////////////////
     // Forwarded functions //
@@ -1475,6 +1512,74 @@ namespace spot
     SPOT_DEF_BUNOP(FStar);
     /// @}
 #undef SPOT_DEF_BUNOP
+
+    static formula quantify(op quantifier,
+                            formula&& ap,
+                            formula&& f)
+    {
+      return formula(fnode::quantify(quantifier,
+                                     ap.to_node_(),
+                                     f.to_node_()));
+    }
+
+    static formula quantify(op quantifier,
+                            const formula& ap,
+                            const formula& f)
+    {
+      return formula(fnode::quantify(quantifier,
+                                     ap.ptr_->clone(),
+                                     f.ptr_->clone()));
+    }
+
+    static formula quantify(op quantifier,
+                            const std::vector<formula>& aps,
+                            const formula& f)
+    {
+      std::vector<const fnode*> tmp;
+      tmp.reserve(aps.size() + 1);
+      for (auto a: aps)
+        if (a.ptr_)
+          tmp.emplace_back(a.to_node_());
+      return formula(fnode::quantify(quantifier, std::move(tmp),
+                                     f.ptr_->clone()));
+    }
+
+#ifndef SWIG
+    static formula quantify(op quantifier,
+                            std::vector<formula>&& aps,
+                            const formula& f)
+    {
+      std::vector<const fnode*> tmp;
+      tmp.reserve(aps.size() + 1);
+      for (auto a: aps)
+        if (a.ptr_)
+          tmp.emplace_back(a.to_node_());
+      return formula(fnode::quantify(quantifier, std::move(tmp),
+                                     f.ptr_->clone()));
+    }
+#endif // !SWIG
+
+#define SPOT_DEF_QUANTIFY(Name)                                         \
+    static formula Name(const std::vector<formula>& aps, const formula& f) \
+    {                                                                   \
+      return quantify(op::Name, aps, f);                                \
+    }                                                                   \
+                                                                        \
+    static formula Name(const formula& ap, const formula& f)            \
+    {                                                                   \
+      return quantify(op::Name, ap, f);                                 \
+    }
+
+    /// \brief Create formula for `exists ap : f`
+    /// @{
+    SPOT_DEF_QUANTIFY(exists);
+    /// @}
+
+    /// \brief Create formula for `forall ap : f`
+    /// @{
+    SPOT_DEF_QUANTIFY(forall);
+    /// @}
+#undef SPOT_DEF_QUANTIFY
 
     /// \brief Nested operator construction (syntactic sugar).
     ///
@@ -1985,6 +2090,8 @@ namespace spot
     ///
     /// \see spot::is_spin_ap()
     SPOT_DEF_PROP(has_spin_atomic_props);
+    /// \brief Whether a PSL/LTL formula has ∃/∀ quantifiers
+    SPOT_DEF_PROP(is_quantified);
 #undef SPOT_DEF_PROP
 
     /// \brief Clone this node after applying \a trans to its children.
@@ -2071,6 +2178,26 @@ namespace spot
             else
               return bunop(o, new_arg, min(), max());
           }
+        case op::exists:
+        case op::forall:
+          {
+            std::vector<formula> tmp;
+            unsigned sz = size();
+            tmp.reserve(sz - 1);
+            bool changed = false;
+            for (unsigned i = 0; i < sz - 1; ++i)
+              {
+                formula c = (*this)[i];
+                formula g = trans(c, std::forward<Args>(args)...);
+                changed |= c != g;
+                tmp.push_back(g);
+              }
+            formula c = (*this)[sz - 1];
+            formula g = trans(c, std::forward<Args>(args)...);
+            if (c == g && !changed)
+              return *this;
+            return quantify(o, std::move(tmp), g);
+          }
         }
       SPOT_UNREACHABLE();
     }
@@ -2092,8 +2219,9 @@ namespace spot
         f.traverse(func, std::forward<Args>(args)...);
     }
 
-  private:
 #ifndef SWIG
+    [[noreturn]] static void report_message(const char* message);
+  private:
     [[noreturn]] static void report_ap_invalid_arg();
 #endif
   };
