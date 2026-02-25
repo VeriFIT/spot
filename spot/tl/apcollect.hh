@@ -54,8 +54,8 @@ namespace spot
   /// formula, as a BDD.
   ///
   /// \param f the formula to inspect
-  /// \param a that automaton that should register the BDD variables used.
-  /// \return A conjunction the atomic propositions.
+  /// \param a the automaton that should register the BDD variables used.
+  /// \return A conjunction of the atomic propositions.
   SPOT_API bdd
   atomic_prop_collect_as_bdd(formula f, const twa_ptr& a);
 
@@ -75,8 +75,8 @@ namespace spot
   /// This function records each atomic proposition occurring in f
   /// along with the polarity of its occurrence.  For instance if the
   /// formula is `G(a -> b) & X(!b & c)`, then this will output
-  /// the map `{a: 0b01, b: 0b11, c: 0b10}` where 0x01 means negative
-  /// polarity, 0x10 is positive polarity, and 0x11 is both.
+  /// the map `{a: 0b01, b: 0b11, c: 0b10}` where 0b01 means negative
+  /// polarity, 0b10 is positive polarity, and 0b11 is both.
   ///
   /// If the formula is quantified, this ignores quantifiers.
   SPOT_API std::map<formula, unsigned char>
@@ -88,8 +88,8 @@ namespace spot
   /// along with the polarity of its occurrence.  For instance if the
   /// formula is `G(a -> b) & X(!b & c)`, and we assume that atomic
   /// propositions a, b, and c, use APID 0, 1, and 2, respectively
-  /// then this will output the vector `[0b01, 0b11, 0b10]` where 0x01
-  /// means negative polarity, 0x10 is positive polarity, and 0x11 is
+  /// then this will output the vector `[0b01, 0b11, 0b10]` where 0b01
+  /// means negative polarity, 0b10 is positive polarity, and 0b11 is
   /// both.
   ///
   /// This function is expected to be faster than
