@@ -31,6 +31,8 @@
 #include <spot/tl/print.hh>
 #include <spot/tl/snf.hh>
 #include <spot/tl/length.hh>
+#include <spot/tl/apcollect.hh>
+#include <spot/tl/relabel.hh>
 #include <spot/twa/formula2bdd.hh>
 #include <spot/misc/minato.hh>
 #include <cassert>
@@ -993,6 +995,68 @@ namespace spot
             return simplify_recursively(f, c_);
           };
 
+
+        // Deal with quantification first.
+        if (f.is_quantified() && f.is(op::exists, op::forall))
+          {
+            std::vector<unsigned char> polarities;
+            std::vector<formula> assignments;
+            assignments.resize(formula::apid_count(), nullptr);
+
+            auto rec = [&](formula g, auto self) -> formula
+            {
+              if (!g.is_quantified())
+                {
+                  g = recurse(g);
+                  polarities = collect_apids_with_polarities(g);
+                  return g;
+                }
+              // A variable can be removed from the quantification
+              // - if it is not present in the formula
+              // - if it has constant polarity below the quantifier
+              //   (in that case it should be replaced by a constant
+              //   in the formula).
+              unsigned sz = g.size();
+              formula body = self(g[sz - 1], self);
+              std::vector<formula> v;
+              v.reserve(sz - 1);
+              for (unsigned i = 0; i < sz - 1; ++i)
+                {
+                  formula h = g[i];
+                  unsigned id = h.apid();
+                  unsigned pol = polarities[id];
+                  if (pol == 0b00)
+                    {
+                      continue;
+                    }
+                  else if (pol == 0b11)
+                    {
+                      v.emplace_back(h);
+                    }
+                  else
+                    {
+                      bool is_positive = pol == 0b10;
+                      bool is_exists = (g.kind() == op::exists);
+                      assignments[id] = (is_positive == is_exists)
+                        ? formula::tt() : formula::ff();
+                    }
+                  // if the atomic proposition is kept (in v)
+                  // or will be replaced by a constant (in assignments)
+                  // then we can remove it from outer quantifiers.
+                  polarities[id] = 0;
+                }
+              return formula::quantify(g.kind(), v, body);
+            };
+
+            formula f2 = rec(f, rec);
+
+            if (!assignments.empty())
+              f2 = relabel_apply(f2, assignments);
+            if (f2 != f)
+              return recurse(f2);
+            return f2;
+          }
+
         f = f.map(recurse);
 
         switch (op o = f.kind())
@@ -1801,14 +1865,7 @@ namespace spot
             }
           case op::exists:
           case op::forall:
-            {
-              unsigned sz = f.size();
-              std::vector<formula> v;
-              for (unsigned i = 0; i < sz - 1; ++i)
-                v.emplace_back(f[i]);
-              formula body = recurse(f[sz - 1]);
-              return formula::quantify(o, v, body);
-            }
+            SPOT_UNREACHABLE();
           }
         SPOT_UNREACHABLE();
       }

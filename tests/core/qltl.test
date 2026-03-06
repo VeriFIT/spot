@@ -1,0 +1,52 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+# Check several options of ltlfilt
+
+. ./defs || exit 1
+
+set -e
+
+checkopt()
+{
+  cat >exp
+  run 0 ltlfilt "$@" formulas > out
+  diff -u exp out
+}
+
+cat >formulas <<\EOF
+\exists a: a U b
+\exists a, b: a U b
+\forall a: \exists b: a U b
+\forall a, b: a U b
+\exists c: a U b
+\exists a, c: a U b
+\forall a, e: \exists b, c: (a -> b) & (c xor d)
+EOF
+
+checkopt -r1 <<\EOF
+Fb
+1
+1
+0
+a U b
+Fb
+\exists c: ((c & !d) | (!c & d))
+EOF

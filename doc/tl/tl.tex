@@ -90,6 +90,8 @@
 \newcommand{\ANDALT}{\mathbin{\texttt{\&\&}}}
 \newcommand{\ANDALTT}{\mathbin{\texttt{/\char`\\}}}
 \newcommand{\FUSION}{\mathbin{\texttt{:}}}
+\newcommand{\COLON}{\mathbin{\texttt{:}}}
+\newcommand{\COMMA}{\mathbin{\texttt{,}}}
 \newcommand{\CONCAT}{\mathbin{\texttt{;}}}
 \newcommand{\DELAY}[1]{\mathbin{\texttt{\#\##1}}}
 \newcommand{\DELAYR}[1]{\mathbin{\texttt{\#\#[#1]}}}
@@ -107,6 +109,8 @@
 \newcommand{\FPLUS}{\texttt{[:+]}}
 \newcommand{\FIRSTMATCH}{\texttt{first\_match}}
 \newcommand{\eword}{\texttt{[*0]}}
+\DeclareMathOperator{\EXISTS}{\texttt{\textbackslash{}exists}}
+\DeclareMathOperator{\FORALL}{\texttt{\textbackslash{}forall}}
 
 \newcommand{\Esuffix}{\texttt{<>->}}
 \newcommand{\EsuffixMarked}{\texttt{<>+>}}
@@ -1002,6 +1006,63 @@ formula $b$, the following rewritings are systematically performed
 & \sere{\STAR{}} \Esuffix \1 &\equiv \1 \\
 \end{align*}
 
+\section{Quantifiers}
+
+Spot has some support for quantified formulas.  Quantifiers my only
+appear in front of a formulas.  Multiple atomic propositions may be
+quantified at once.
+
+\begin{center}
+\begin{tabular}{clll}
+              & \multicolumn{1}{c}{preferred} & \multicolumn{1}{c}{other supported} & \multicolumn{1}{c}{UTF8}\\
+   operation  & \multicolumn{1}{c}{syntax}    & \multicolumn{1}{c}{syntaxes} & \multicolumn{1}{c}{alternative}\\
+  \midrule
+   existential quantification & $\EXISTS a \COLON f$ && $\exists$ \uni{2203}\\
+              & $\EXISTS a_1\COMMA a_2\COMMA\ldots\COMMA a_n \COLON f$ & $\EXISTS a_1\, a_2\, \ldots\, a_n \COLON f$ \\
+  universal quantification & $\FORALL a \COLON f$ && $\forall$ \uni{2200}\\
+              & $\FORALL a_1\COMMA a_2\COMMA\ldots\COMMA a_n \COLON f$ & $\FORALL a_1\, a_2\, \ldots\, a_n \COLON f$\\
+\end{tabular}
+\end{center}
+
+\subsection{Semantics}
+
+For an infinite sequence $\sigma\in (\B^\AP)^\omega$, and
+$X\subseteq\AP$, let $\sigma_{\setminus X}\in (\B^{\AP\setminus X})^\omega$
+designate a sequence such that for all $a\in\AP\setminus X$ and all
+positions $i$, the two sequence agree: $\sigma(i)(a) = \sigma_{\setminus X}(i)(a)$.
+
+
+In the following semantics, we assume that $a$, $a_1$, $a_2$, \ldots
+$a_n$ are atomic propositions, and that $f$ is any PSL formula where
+these those atomic proposition may be occurring.
+
+
+\begin{align*}
+  \sigma\vDash \EXISTS a \COLON f &\iff \exists \sigma', (\sigma'=\sigma_{\setminus\{a\}})\land(\sigma' \vDash f) \\
+  \sigma\vDash \EXISTS a_1\COMMA\,a_2\COMMA\,\ldots,\,a_n \COLON f &\iff \exists \sigma', (\sigma'=\sigma_{\setminus\{a_1,a_2,\ldots, a_n\}})\land(\sigma' \vDash f) \\
+  \sigma\vDash \FORALL a \COLON f &\iff \forall \sigma', (\sigma'=\sigma_{\setminus\{a\}})\land(\sigma' \vDash f) \\
+  \sigma\vDash \FORALL a_1\COMMA\,a_2\COMMA\,\ldots\COMMA\,a_n \COLON f &\iff \forall \sigma', (\sigma'=\sigma_{\setminus\{a_1,a_2,\ldots, a_n\}})\land(\sigma' \vDash f) \\
+\end{align*}
+
+\subsection{Trivial Identities (Occur Automatically)}\label{sec:quant-trivial}
+
+Adjacent quantifiers of the same type are automatically fused,
+removing duplicate variables if any.
+
+\begin{align*}
+  \EXISTS a_1 \COLON \EXISTS a_2 \COLON f &\equiv \EXISTS a_1\COMMA\, a_2 \COLON f \\
+  \EXISTS \underbrace{a_1\COMMA\,a_2\COMMA\,\ldots}_A \COLON \EXISTS \underbrace{b_1\COMMA\,\ldots}_B \COLON f &\equiv
+  \EXISTS \underbrace{a_1\COMMA\,a_2\COMMA\,\ldots\COMMA\,b_1\COMMA\,\ldots}_{A \cup B} \COLON f \\
+  \FORALL a_1 \COLON \FORALL a_2 \COLON f &\equiv \FORALL a_1\COMMA\, a_2 \COLON f \\
+  \FORALL \underbrace{a_1\COMMA\,a_2\COMMA\,\ldots}_A \COLON \FORALL \underbrace{b_1\COMMA\,\ldots}_B \COLON f &\equiv
+  \FORALL \underbrace{a_1\COMMA\,a_2\COMMA\,\ldots\COMMA\,b_1\COMMA\,\ldots}_{A \cup B} \COLON f \\
+\end{align*}
+
+Additionally, and even if the parser does not support this, building a
+quantification over an empty set of variables will simply drop the
+quantifier.  (This comes handy when implementing some syntactic
+optimizations.)
+
 \chapter{Grammar}
 
 For simplicity, this grammar gives only one rule for each
@@ -1034,7 +1095,11 @@ operator, even if the operator has multiple synonyms (like \samp{|},
  \mid{}                     & \mathit{tformula}\,\msamp{\U}\,\mathit{tformula}       & \mid{} & \msamp{\GREP{\mvar{i}..\mvar{j}}}\,\mathit{tformula}                                                                                           \\
  \mid{}                     & \mathit{tformula}\,\msamp{\W}\,\mathit{tformula}       & \mid{} & \msamp{\StrongGREP{\mvar{i}..\mvar{j}}}\,\mathit{tformula}                                                                                     \\
  \mid{}                     & \mathit{tformula}\,\msamp{\R}\,\mathit{tformula}                                                                                                                                                                 \\
- \mid{}                     & \mathit{tformula}\,\msamp{\M}\,\mathit{tformula}
+  \mid{}                    & \mathit{tformula}\,\msamp{\M}\,\mathit{tformula}
+  \\
+ \mathit{aplist}   ::={}    & \mathit{atomic\_prop} & \mid{} & \mathit{aplist}\,\COMMA\,\mathit{atomic\_prop}
+  \\
+ \mathit{qformula} ::={}    & \mathit{tformula}                                      & \mid{} & \EXISTS \mathit{aplist} \COLON \mathit{qformula} & \mid{} & \FORALL \mathit{aplist} \COLON \mathit{qformula}
 \end{align*}
 
 \section{Operator precedence}
@@ -1417,7 +1482,7 @@ property.
            \mid{}& \X\varphi_R \mid \G\varphi_R \mid
                    \colorbox{yellow}{$\varphi_R\U\varphi_G$}\mid\varphi_R\R\varphi_R\mid
                    \varphi_R\W\varphi_R\mid\colorbox{yellow}{$\varphi_G\M\varphi_R$}\\
-           \mid{}& \sere{r}\Asuffix \varphi_R\mid \sere{r_F}\Esuffix \varphi_R \mid \colorbox{yellow}{$\sere{r_I}\Esuffix \varphi_G$}\\
+           \mid{}& \sere{r}\Asuffix \varphi_R\mid \sere{r_F}\Esuffix \varphi_R \mid \colorbox{yellow}{$\sere{r_I}\Esuffix \varphi_G$}
 \end{align*}
 
 
@@ -1904,6 +1969,50 @@ Here are the basic rewritings for the weak closure and its negation:
   \sere{r_1\OR r_2}&\equiV\sere{r_1}\OR\sere{r_2} &
   \nsere{r_1\OR r_2}&\equiV\nsere{r_1}\AND\nsere{r_2}
 \end{align*}
+
+\subsubsection{Basic simplifications for quantified formulas}
+
+Let $\varphi$ be a temporal formula, let $\varphi'$ be its negative
+normal form constructed as in section Section~\ref{sec:nnf}, and let
+$a\in \AP$ be a proposition.
+
+We define the polarity of $a$ in $\varphi$ as:
+\begin{description}
+\item[missing] if $a$ does not appear in $\varphi$, or if it is already
+  quantified in $\varphi$
+\item[positive] if $a$ appears in $\varphi$ without being quantified,
+  and never under a negation,
+\item[negative] if $a$ appears in $\varphi$ without being quantified,
+  and always under a negation,
+\item[both] if $a$ appears in $\varphi$ without being quantified, both
+  under a negation and not under a negation.
+\end{description}
+
+For instance in the formula $(a \IMPLIES b) \AND (c \XOR d)$, the
+atomic proposition $a$ has negative polarity, $b$ has positive polarity,
+$c$ and $d$ have both polarities, and $e$ has missing polarity.
+
+In what follow we assume that $f(m,p,n,b)$ is a temporal formulas over
+atomic propositions $m$, $p$, $n$, and $b$, and that this atomic
+propositions respectively have missing, positive, negative, and both
+polarity.
+
+The following basic simplifications are preformed:
+\begin{align*}
+  \EXISTS m\COMMA\,p\COMMA\,n\COMMA\,b \COLON f(m,p,n,b) &\equiv \EXISTS b \COLON f(m,\1,\0,b) \\
+  \FORALL m\COMMA\,p\COMMA\,n\COMMA\,b \COLON f(m,p,n,b) &\equiv \FORALL b \COLON f(m,\0,\1,b)
+\end{align*}
+In other words, atomic proposition that are either positive or negative can be replaced by a constant,
+missing atomic proposition can be dropped from the quantification list which should only retain atomic
+proposition with mixed polarity.
+
+Removing quantified atomic propositions like this might empty set of quantified propositions;
+in that case the quantified is simply dropped, as mentioned in Section~\ref{sec:quant-trivial}.
+
+
+For instance  $\FORALL a\COMMA e\COLON \EXISTS b, c\COLON (a \IMPLIES b) \AND (c \XOR d)$
+would be simplified to $\EXISTS c\COLON c \XOR d$.
+
 
 \subsection{Simplifications for Eventual and Universal Formulas}
 \label{sec:eventunivrew}

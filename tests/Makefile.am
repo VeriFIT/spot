@@ -284,6 +284,7 @@ TESTS_twa = \
   core/lbttparse.test \
   core/ltlf.test \
   core/mcs.test \
+  core/qltl.test \
   core/scc.test \
   core/sccdot.test \
   core/sccif.test \

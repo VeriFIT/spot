@@ -1689,6 +1689,8 @@ namespace spot
                   vec aps,
                   const fnode* f)
   {
+    if (aps.empty())
+      return f;
     if (f->is_ff() || f->is_tt())
       {
         for (const fnode* ap: aps)
