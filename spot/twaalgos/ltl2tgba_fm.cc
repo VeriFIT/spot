@@ -27,6 +27,7 @@
 #include <utility>
 #include <algorithm>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
+#include <spot/twaalgos/quantify.hh>
 #include <spot/twa/bddprint.hh>
 #include <spot/twaalgos/sccinfo.hh>
 #include <spot/priv/robin_hood.hh>
@@ -1699,8 +1700,10 @@ namespace spot
     {
     public:
       formula_canonicalizer(translate_dict& d,
-                            bool fair_loop_approx, bdd all_promises)
-        : fair_loop_approx_(fair_loop_approx),
+                            bool fair_loop_approx, bdd all_promises,
+                            quantifier_list&& ql)
+        : ql_(ql),
+          fair_loop_approx_(fair_loop_approx),
           all_promises_(all_promises),
           d_(d)
       {
@@ -1726,6 +1729,14 @@ namespace spot
         // Perform the actual translation.
         translate_dict::translated t = d_.ltl_to_bdd(f, !f.is_marked());
 
+        // Perform any quantification
+        for (auto& p: ql_)
+          {
+            if (p.first)
+              t.symbolic = bdd_forall(t.symbolic, p.second);
+            else
+              t.symbolic = bdd_exist(t.symbolic, p.second);
+          }
         // std::cerr << "-----" << std::endl;
         // std::cerr << "Formula: " << str_psl(f) << std::endl;
         // std::cerr << "Rational: " << t.has_rational << std::endl;
@@ -1834,6 +1845,7 @@ namespace spot
         <formula, translate_dict::translated> formula_to_bdd_map;
       formula_to_bdd_map f2b_;
 
+      quantifier_list ql_;
       possible_fair_loop_checker pflc_;
       bool fair_loop_approx_;
       bdd all_promises_;
@@ -1918,8 +1930,17 @@ namespace spot
 
     assert(dict == s->get_dict());
 
+
     twa_graph_ptr a = make_twa_graph(dict);
     auto namer = a->create_namer<formula>();
+
+    std::pair<quantifier_list, formula> q =
+      extract_quantifier_list(f2, dict, a);
+    f2 = q.second;
+    for (auto p: q.first)
+      if (SPOT_UNLIKELY(p.first))
+        throw std::runtime_error
+          ("ltl2tgba_fm: does not support universal quantification");
 
     // Even if the input is a persistence formula, the unambiguous option might
     // cause the resulting automaton not to be weak.  For instance formulas
@@ -1949,7 +1970,8 @@ namespace spot
                     return f.is_boolean();
                   });
 
-    formula_canonicalizer fc(d, fair_loop_approx, all_promises);
+    formula_canonicalizer fc(d, fair_loop_approx, all_promises,
+                             std::move(q.first));
 
     // These are used when atomic propositions are interpreted as
     // events.  There are two kinds of events: observable events are

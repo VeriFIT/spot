@@ -79,6 +79,7 @@ twaalgos_HEADERS = \
   postproc.hh \
   powerset.hh \
   product.hh \
+  quantify.hh \
   randomgraph.hh \
   randomize.hh \
   reachiter.hh \
@@ -162,6 +163,7 @@ libtwaalgos_la_SOURCES = \
   postproc.cc \
   powerset.cc \
   product.cc \
+  quantify.cc \
   randomgraph.cc \
   randomize.cc \
   reachiter.cc \

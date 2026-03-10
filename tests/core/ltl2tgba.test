@@ -225,6 +225,20 @@ for a in 'a1;a2' 'a1[*];a2[*]'; do
     done
 done
 
+ltlfilt --equivalent-to='{[*2][*]}[]->a' \
+  -f '\exists b : b & G(b xor Xb) & G(!b -> a)' \
+  -f '\exists b, c : G(b xor Xb) & b & G(b | (a & c))' \
+  -f '\exists b : b & G(b xor Xb) & G(b -> a)' > out
+cat >exp <<\EOF
+\exists b: (b & G(b xor Xb) & G(!b -> a))
+\exists b, c: (b & G(b xor Xb) & G(b | (a & c)))
+EOF
+diff out exp
+
+ltl2tgba -f 'F b' > out.1
+ltl2tgba -f '\exists a: a U b' > out.2
+diff out.1 out.2
+
 # test unknown dot options
 ltl2tgba --dot='~' a 2>stderr && exit 1
 grep 'ltl2tgba: unknown option.*~' stderr
