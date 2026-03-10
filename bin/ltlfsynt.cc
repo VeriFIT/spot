@@ -46,6 +46,7 @@ enum
   OPT_AIGER = 256,
   OPT_BACKPROP,
   OPT_COMPOSITION,
+  OPT_COMPUTE_STRATEGY_AND_QUIT,
   OPT_DECOMPOSE,
   OPT_GAME,
   OPT_GEQUIV,
@@ -165,6 +166,9 @@ static const argp_option options[] =
       "is enough of an indication.)", 0 },
     { "realizability", OPT_REALIZABILITY, nullptr, 0,
       "realizability only, do not compute a winning strategy", 0 },
+    { "compute-strategy-and-quit", OPT_COMPUTE_STRATEGY_AND_QUIT, nullptr,
+      OPTION_HIDDEN,
+      "quit once the strategy has been computed, without printing it", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
     { "verbose", OPT_VERBOSE, nullptr, 0, "verbose mode", 0 },
@@ -319,6 +323,7 @@ static const char* opt_aiger = nullptr;
 static dot_choice opt_dot = dot_none;
 static const char* opt_dot_arg = "";
 static bool opt_show_status = true;
+static bool opt_compute_strateagy_and_quit = false;
 
 static int
 parse_opt(int key, char *arg, struct argp_state *)
@@ -366,6 +371,9 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_COMPOSITION:
       opt_composition_by_ap = XARGMATCH("--composition", arg,
                                         composition_args, composition_values);
+      break;
+    case OPT_COMPUTE_STRATEGY_AND_QUIT:
+      opt_compute_strateagy_and_quit = true;
       break;
     case OPT_DECOMPOSE:
       opt_decompose_ltl = XARGMATCH("--decompose", arg,
@@ -837,6 +845,8 @@ namespace
                   std::cout << "UNREALIZABLE" << std::endl;
                 return 1;
               }
+            if (opt_compute_strateagy_and_quit)
+              continue;
             st.start();
             // Use a looping mealy machine: this is necessary
             // when decomposition is used (see issue #610).
@@ -854,7 +864,7 @@ namespace
       return 0;
     if (opt_show_status)
       std::cout << "REALIZABLE" << std::endl;
-    if (opt_realizability)
+    if (opt_realizability || opt_compute_strateagy_and_quit)
       return 0;
 
     if (!opt_aiger && (opt_dot == dot_strategy

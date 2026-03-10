@@ -148,3 +148,9 @@ State: 2
 --END--
 EOF
 diff expected.txt out.txt
+
+
+# The hidden --compute-strategy-and-quit option
+ltlfsynt -f '(Fo1&GF!o1) & (!o2&Fo2&GF!o2)' --realizability >out
+ltlfsynt -f '(Fo1&GF!o1) & (!o2&Fo2&GF!o2)' --compute-strategy-and-quit >out2
+diff out out2
