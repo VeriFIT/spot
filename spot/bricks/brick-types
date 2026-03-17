@@ -28,6 +28,7 @@
 #include "brick-assert"
 
 #include <memory>
+#include <cstddef>
 #include <cstring>
 #include <type_traits>
 #include <functional>
@@ -664,7 +665,7 @@ struct Union : Comparable {
   private:
     static constexpr size_t size = _impl::MaxSizeof< 1, Types... >::value;
     static constexpr size_t alignment = _impl::MaxAlign< 1, Types... >::value;
-    typename std::aligned_storage< size, alignment >::type storage;
+    alignas(alignment) std::byte storage[size];
     unsigned char _discriminator;
 
     template< unsigned char i, typename Needle, typename T, typename... Ts >
