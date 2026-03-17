@@ -25,6 +25,12 @@ AC_DEFUN([CF_GXX_WARNINGS],
 #include <regex>
 #include <unordered_map>
 
+// Using __COUNTER__ may cause clang++ to complain
+// that '__COUNTER__' is a C2y extension.
+#if defined __COUNTER__ && __COUNTER__ != __COUNTER__
+   auto c = __COUNTER__;
+#endif
+
 class key
 {
 };
@@ -105,16 +111,16 @@ int main(int argc, char *argv[[]])
 EOF
   cf_save_CXXFLAGS="$CXXFLAGS"
   ac_cv_prog_gxx_warn_flags="-W -Werror"
-dnl The following list has options of the form OPT:BAD:GOOD
-dnl if -OPT fails we try -OPT -BAD.  If -OPT succeeds we add -GOOD.
+dnl The following list has options of the form OPT:BAD1:BAD2:...:
+dnl if -OPT fails we try -OPT -BAD1, or -OPT -BAD2, etc.
   for cf_opt in \
-   Wall:Wno-maybe-uninitialized:\
+   Wall:Wno-maybe-uninitialized: \
    Wint-to-void-pointer-cast \
    Wzero-as-null-pointer-constant \
    Wcast-align \
    Wpointer-arith \
    Wwrite-strings \
-   Wcast-qual::DXTSTRINGDEFINES \
+   'Wcast-qual -DDXTSTRINGDEFINES' \
    Wdocumentation \
    Wmissing-declarations \
    Wnoexcept \
@@ -125,27 +131,27 @@ dnl if -OPT fails we try -OPT -BAD.  If -OPT succeeds we add -GOOD.
    Wduplicated-cond \
    Wnull-dereference \
    Wsuggest-override \
-   Wpedantic
+   Wpedantic:Wno-c2y-extensions:
   do
      fopt=${cf_opt%%:*}
      CXXFLAGS="$cf_save_CXXFLAGS $ac_cv_prog_gxx_warn_flags -$fopt"
      if AC_TRY_EVAL(ac_compile); then
        ac_cv_prog_gxx_warn_flags="$ac_cv_prog_gxx_warn_flags -$fopt"
-       case $cf_opt in
-        *:*:);;
-        *:*:*)ac_cv_prog_gxx_warn_flags="$ac_cv_prog_gxx_warn_flags -${cf_opt##*:}";;
-       esac
      else
        case $cf_opt in
-        *::*);;
-        *:*:*)
-          sopt=${cf_opt%:*}
-          sopt=${sopt#*:}
-          CXXFLAGS="$cf_save_CXXFLAGS $ac_cv_prog_gxx_warn_flags -$fopt -$sopt"
-          if AC_TRY_EVAL(ac_compile); then
-             ac_cv_prog_gxx_warn_flags="$ac_cv_prog_gxx_warn_flags -$fopt -$sopt"
-          fi;;
-        esac
+         *:*)
+           rest=${cf_opt#*:}
+           while test "x$rest" != x; do
+             sopt=${rest%%:*}
+             rest=${rest#*:}
+             CXXFLAGS="$cf_save_CXXFLAGS $ac_cv_prog_gxx_warn_flags -$fopt -$sopt"
+             if AC_TRY_EVAL(ac_compile); then
+               ac_cv_prog_gxx_warn_flags="$ac_cv_prog_gxx_warn_flags -$fopt -$sopt"
+               break
+             fi
+           done;;
+         *);;
+       esac
      fi
   done
   rm -f conftest*
