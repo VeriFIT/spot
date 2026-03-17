@@ -89,6 +89,17 @@ void test(std::vector<int>& v)
    v.insert(v.begin(), 12);
 }
 
+// Test for -Wcast-align false positive with alignas storage.
+// Some versions of GCC (e.g., GCC 10 on ARM) warn about casting
+// from unsigned char* to T* even when the storage is explicitly
+// aligned using alignas.  This is a false positive.
+struct alignas_test
+{
+  static constexpr size_t alignment = alignof(long);
+  alignas(alignment) unsigned char storage[[sizeof(long)]];
+  long& get() { return *reinterpret_cast<long*>(storage); }
+};
+
 int main(int argc, char *argv[[]])
 {
   // This string comparison is here to detect superfluous
@@ -106,6 +117,8 @@ int main(int argc, char *argv[[]])
   // We need -Wno-maybe-uninitialized in this case.
   std::regex r{"a"};
   (void)r;
+  alignas_test t;
+  t.get() = 42;
   return argv[[argc-1]] == nullptr;
 }
 EOF
