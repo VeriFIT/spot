@@ -501,6 +501,9 @@ read_stdout_of_command(char* const* args)
   std::string results;
   ssize_t bytes_read;
   char* buf = buffer.get();
+  // Some version of G++ will complain that buf is null when calling read().
+  // Let's help them.
+  SPOT_ASSUME(buf != nullptr);
   for (;;)
     {
       bytes_read = read(cout_pipe[0], buf, BUFFER_SIZE);
