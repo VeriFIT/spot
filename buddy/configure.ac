@@ -18,11 +18,11 @@ AC_PROG_YACC
 
 AC_PROG_CXX
 
-# Option to activate C++20
-AC_ARG_ENABLE([c++20],
-              [AS_HELP_STRING([--enable-c++20],
-                              [Compile in C++20 mode.])],
-              [enable_20=yes], [enable_20=no])
+# Option to activate C++23
+AC_ARG_ENABLE([c++23],
+              [AS_HELP_STRING([--enable-c++23],
+                              [Compile in C++23 mode.])],
+              [enable_23=yes], [enable_23=no])
 
 LT_INIT([win32-dll])
 AX_BSYMBOLIC
@@ -51,9 +51,9 @@ if test x$enable_warnings = xyes; then
   CF_GCC_WARNINGS
 fi
 
-# Turn on C++17 support
+# Turn on C++20 support
 AC_LANG(C++)
-m4_define([_AX_CXX_COMPILE_STDCXX_17_testbody],
+m4_define([_AX_CXX_COMPILE_STDCXX_20_testbody],
 [AC_LANG_SOURCE([#include <memory>
 #include <string>
 #include <chrono>  // used to fail in C++11 with some installation of clang
@@ -82,25 +82,25 @@ m4_define([_AX_CXX_COMPILE_STDCXX_17_testbody],
     auto [[x,y]] = aa;
 ])])
 
-if test x"${enable_20}" = xyes; then
+if test x"${enable_23}" = xyes; then
+  for f in -std=c++23 '-std=c++23 -stdlib=libc++' -std=c++2b
+  do
+    AX_CHECK_COMPILE_FLAG([$f], [CXXFLAGS="$CXXFLAGS $f" stdpass=true], [], [],
+                          [_AX_CXX_COMPILE_STDCXX_20_testbody])
+    ${stdpass-false} && break
+  done
+  if ! "${stdpass-false}"; then
+    AC_MSG_ERROR([unable to turn on C++23 mode with this compiler])
+  fi
+else
   for f in -std=c++20 '-std=c++20 -stdlib=libc++' -std=c++2a
   do
     AX_CHECK_COMPILE_FLAG([$f], [CXXFLAGS="$CXXFLAGS $f" stdpass=true], [], [],
-                          [_AX_CXX_COMPILE_STDCXX_17_testbody])
+                          [_AX_CXX_COMPILE_STDCXX_20_testbody])
     ${stdpass-false} && break
   done
   if ! "${stdpass-false}"; then
     AC_MSG_ERROR([unable to turn on C++20 mode with this compiler])
-  fi
-else
-  for f in -std=c++17 '-std=c++17 -stdlib=libc++' -std=c++1z
-  do
-    AX_CHECK_COMPILE_FLAG([$f], [CXXFLAGS="$CXXFLAGS $f" stdpass=true], [], [],
-                          [_AX_CXX_COMPILE_STDCXX_17_testbody])
-    ${stdpass-false} && break
-  done
-  if ! "${stdpass-false}"; then
-    AC_MSG_ERROR([unable to turn on C++17 mode with this compiler])
   fi
 fi
 
