@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #+TITLE: Code Examples
-#+DESCRIPTION: Directory of code examples for using Spot in C++17, Python, and shell.
+#+DESCRIPTION: Directory of code examples for using Spot in C++20, Python, and shell.
 #+INCLUDE: setup.org
 #+HTML_LINK_UP: index.html
 

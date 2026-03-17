@@ -43,11 +43,11 @@ adl_CHECK_BISON
 # Decrease verbosity when passing argument V=0
 AM_SILENT_RULES([no])
 
-# Option to activate C++20
-AC_ARG_ENABLE([c++20],
-              [AS_HELP_STRING([--enable-c++20],
-                              [Compile in C++20 mode.])],
-              [enable_20=$enableval], [enable_20=no])
+# Option to activate C++23
+AC_ARG_ENABLE([c++23],
+              [AS_HELP_STRING([--enable-c++23],
+                              [Compile in C++23 mode.])],
+              [enable_23=$enableval], [enable_23=no])
 
 AC_ARG_ENABLE([pthread],
               [AS_HELP_STRING([--enable-pthread],
@@ -110,8 +110,8 @@ esac
 CXXFLAGS="$CXXFLAGS -DSPOT_BUILD"
 
 
-# Turn on C++17 support
-m4_define([_AX_CXX_COMPILE_STDCXX_17_testbody],
+# Turn on C++20 support
+m4_define([_AX_CXX_COMPILE_STDCXX_20_testbody],
 [AC_LANG_SOURCE([#include <memory>
 #include <string>
 #include <chrono>  // used to fail in C++11 with some installation of clang
@@ -140,25 +140,25 @@ m4_define([_AX_CXX_COMPILE_STDCXX_17_testbody],
     auto [[x,y]] = aa;
 ])])
 
-if test x"${enable_20}" = xyes; then
+if test x"${enable_23}" = xyes; then
+  for f in -std=c++23 '-std=c++23 -stdlib=libc++' -std=c++2b
+  do
+    AX_CHECK_COMPILE_FLAG([$f], [CXXFLAGS="$CXXFLAGS $f" stdpass=true], [], [],
+                          [_AX_CXX_COMPILE_STDCXX_20_testbody])
+    ${stdpass-false} && break
+  done
+  if ! "${stdpass-false}"; then
+    AC_MSG_ERROR([unable to turn on C++23 mode with this compiler])
+  fi
+else
   for f in -std=c++20 '-std=c++20 -stdlib=libc++' -std=c++2a
   do
     AX_CHECK_COMPILE_FLAG([$f], [CXXFLAGS="$CXXFLAGS $f" stdpass=true], [], [],
-                          [_AX_CXX_COMPILE_STDCXX_17_testbody])
+                          [_AX_CXX_COMPILE_STDCXX_20_testbody])
     ${stdpass-false} && break
   done
   if ! "${stdpass-false}"; then
     AC_MSG_ERROR([unable to turn on C++20 mode with this compiler])
-  fi
-else
-  for f in -std=c++17 '-std=c++17 -stdlib=libc++' -std=c++1z
-  do
-    AX_CHECK_COMPILE_FLAG([$f], [CXXFLAGS="$CXXFLAGS $f" stdpass=true], [], [],
-                          [_AX_CXX_COMPILE_STDCXX_17_testbody])
-    ${stdpass-false} && break
-  done
-  if ! "${stdpass-false}"; then
-    AC_MSG_ERROR([unable to turn on C++17 mode with this compiler])
   fi
 fi
 

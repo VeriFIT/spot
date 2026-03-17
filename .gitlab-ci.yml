@@ -173,7 +173,7 @@ arch-clang:
   image: gitlab-registry.lre.epita.fr/spot/buildenv/arch
   script:
     - autoreconf -vfi
-    - ./configure --prefix ~/install_dir CC='clang -Qunused-arguments' CXX='clang++ -Qunused-arguments' --enable-devel --enable-c++20 --enable-doxygen
+    - ./configure --prefix ~/install_dir CC='clang -Qunused-arguments' CXX='clang++ -Qunused-arguments' --enable-devel --enable-c++23 --enable-doxygen
     - make
     - make distcheck
   artifacts:
@@ -200,9 +200,9 @@ arch-gcc-glibcxxdebug:
     - tar xvf spot-$VERSION.tar.gz
     - mkdir build-$VERSION
     - cd build-$VERSION
-    - ../spot-$VERSION/configure --enable-devel --enable-c++20 --enable-glibcxx-debug
+    - ../spot-$VERSION/configure --enable-devel --enable-c++23 --enable-glibcxx-debug
     - make
-    - make distcheck DISTCHECK_CONFIGURE_FLAGS='--enable-devel --enable-c++20 --enable-glibcxx-debug'
+    - make distcheck DISTCHECK_CONFIGURE_FLAGS='--enable-devel --enable-c++23 --enable-glibcxx-debug'
   artifacts:
     when: on_failure
     paths:

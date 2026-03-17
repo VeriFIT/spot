@@ -1011,7 +1011,7 @@ layers.
 
   - =libbddx= is a customized version of [[https://sourceforge.net/projects/buddy/][the BuDDy library]], for
     manipulating [[#bdd][BDDs]].
-  - =libspot= is the main library, containing a C++17 implementation of all the
+  - =libspot= is the main library, containing a C++20 implementation of all the
     data structures and algorithms.  This depends on =libddx=.
   - =libspotgen= is an auxiliary library that contains functions to
     generate families of automata, useful for benchmarking and testing
@@ -1023,7 +1023,7 @@ layers.
     SpinS or a patched version of DiVinE, but you have to install
     those third-party tools first.  See [[https://gitlab.lre.epita.fr/spot/spot/blob/next/tests/ltsmin/README][=tests/ltsmin/README=]]
     for details.
-  - In addition to the C++17 API, we also provide Python bindings for
+  - In addition to the C++20 API, we also provide Python bindings for
     =libspotgen=, =libspotltsmin=, =libbddx=, and most of =libspot=.
     These are available by importing =spot.gen=, =spot.ltsmin=, =bdd=,
     and =spot=.  Those Python bindings also includes some additional

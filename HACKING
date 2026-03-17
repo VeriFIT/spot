@@ -338,15 +338,15 @@ forget guards, and we do not forget to rename them when a file is
 copied into another one.
 
 
-C++17
+C++20
 -----
 
-  Spot uses some C++17 features, and therefore requires a C++17
-  compiler.  g++ 7.x or clang++ 5 should be enough.
+  Spot uses some C++20 features, and therefore requires a C++20
+  compiler.  g++ 10.x or clang++ 10 should be enough.
 
-  We currently avoid C++20 features until C++20 compiler are widely
+  We currently avoid C++23 features until C++23 compilers are widely
   available.  (FYI: we switched to C++11 in 2015, to C++14 in 2017,
-  and to C++17 in 2020.)
+  to C++17 in 2020, and to C++20 in 2026.)
 
 
 Encoding

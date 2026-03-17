@@ -1,5 +1,12 @@
 New in spot 2.14.5.dev  (not yet released)
 
+  Build:
+
+  - Spot is now built in C++20 mode, so you need at least GCC 10 or
+    Clang 10 to compile it.  There is also an --enable-c++23 option
+    to configure in case you want to force a build of Spot in C++23
+    mode.
+
   Documentation:
 
   - https://spot.lre.epita.fr/tut91.html is a new page that talks
