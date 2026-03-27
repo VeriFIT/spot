@@ -496,23 +496,28 @@ quantified away, and then you perform the quantification using
 #+BEGIN_SRC C++
 void bdd_mt_quantify_prepare(bdd varset);
 void bdd_mt_quantify_prepare(bdd output_vars, bdd quant_vars);
+void bdd_mt_quantify_prepare(bdd output_vars, bdd quant1_vars, bdd quant2_vars);
 #+END_SRC
 
 The one-argument version prepares for quantification by specifying
 which variables should be quantified.
 
-The two-argument overload is used for synthesis with universal
-quantification.  It distinguishes between output (existential)
-variables and variables to quantify away.
+The two-argument overload also marks =quant_vars= as variables to be
+quantified, but it additionally marks =output_vars= as a set of output
+variables.  This is typically used for synthesis with partial
+observation: in this context =quant_vars= are input variables that
+will be universally quantified, but the game solving algorithm also
+needs to distinguish output variables from input variables, even if they
+are not quantified in the MTBDD.
 
-This function must be called before =bdd_mt_quantify_to_bool=,
-=bdd_mt_quantify_to_trival=, =bdd_mt_quantify=, or
-=bdd_mt_apply1_synthesis=.  Internally, it updates a global array that
-is as large as the number of BDD variables that have been declared to
-BuDDy.  This array will be overwritten every time a standard BDD
-quantification (like =bdd_forall=, =bdd_exist=, =bdd_appall=, etc.) is
-called, and it will be reset whenever a new BDD variable is declared, so
-make sure you call =bdd_mt_quantify_prepare= again when needed.
+The three-argument overload is used with =bdd_mt_quantify2= to allow
+two types of quantifications to be performed in the same pass over the
+MTBDD.  Variables in =quant1_vars= will be quantified using a first
+type of quantification, variables in =quant2_vars= will use a second
+type.  Those quantifications will be performed bottom-up following
+variable order.  Again, =output_vars= is not used for quantification,
+but it is used to distinguish output variables from input variables
+during synthesis.
 
 ** =bdd_mt_quantify_to_bool=
 
@@ -796,6 +801,192 @@ After unique quantification of b (xor):
   <0:1> -> 0b0110
 #+end_example
 
+** =bdd_mt_quantify2=
+
+#+BEGIN_SRC C++
+bdd bdd_mt_quantify2(bdd r,
+                     int (*termop)(int),
+                     int (*leavesop1)(int, int, int, int),
+                     int (*leavesop2)(int, int, int, int),
+                     bddExtCache* cache, int quanthash,
+                     int applyhash1, int applyop1,
+                     int applyhash2, int applyop2);
+#+END_SRC
+
+Like =bdd_mt_quantify=, but performs two different quantifications
+depending on the variable.  Call the three-argument version of
+=bdd_mt_quantify_prepare= first to classify variables into output
+variables, =quant1_vars=, and =quant2_vars=.  Variables in
+=quant1_vars= will be quantified using =leavesop1= / =applyop1=, and
+variables in =quant2_vars= will use =leavesop2= / =applyop2=.
+
+Parameters:
+- =r=: Input MTBDD
+- =termop=: Callback applied to each terminal, allowing optional renaming
+- =leavesop1=: Callback for combining children at =quant1_vars= variables
+- =leavesop2=: Callback for combining children at =quant2_vars= variables
+- =cache=: External cache for memoization
+- =quanthash=: Unique identifier for the quantification (for cache keying)
+- =applyhash1=, =applyop1=: Cache key and BDD shortcut for =leavesop1=
+- =applyhash2=, =applyop2=: Cache key and BDD shortcut for =leavesop2=
+
+** Example: Dual Quantification
+
+In this example, we have three BDD variables: =a= (output), =b=
+(quantified existentially via OR), and =c= (quantified universally via
+AND).  The terminal values are bit sets, so the existential
+quantification computes the union while the universal quantification
+computes the intersection.
+
+We show how the =∃b∀c= quantification can be done using two calls to
+=bdd_mt_quantify()=, or how it can be done with a single call to
+=bdd_mt_quantify2()=.
+
+#+NAME: mtbdd-dual-quant
+#+BEGIN_SRC C++
+   bdd a = bdd_ithvar(0);  // output variable
+   bdd b = bdd_ithvar(1);  // quant1: existential (OR)
+   bdd c = bdd_ithvar(2);  // quant2: universal (AND)
+
+   bdd x = bdd_ite(a,
+                   bdd_ite(b,
+                           bdd_ite(c, bdd_terminal(0b0011),
+                                      bdd_terminal(0b0101)),
+                           bdd_ite(c, bdd_terminal(0b1001),
+                                      bdd_terminal(0b1100))),
+                   bdd_ite(b,
+                           bdd_ite(c, bdd_terminal(0b1010),
+                                      bdd_terminal(0b0110)),
+                           bdd_ite(c, bdd_terminal(0b1111),
+                                      bdd_terminal(0b0001))));
+
+   std::cout << "MTBDD x (bit sets):\n";
+   for (auto [path, term]: paths_mt_of(x))
+     std::cout << "  " << path << " -> 0b"
+               << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+   bddExtCache cache;
+   bdd_extcache_init(&cache, 100, true);
+
+   auto combine_or = [](int, int lval, int, int rval) {
+     return bdd_terminal_as_int(lval | rval);
+   };
+   auto combine_and = [](int, int lval, int, int rval) {
+     return bdd_terminal_as_int(lval & rval);
+   };
+   auto term_id = [](int v) { return v; };
+
+   // First, we demonstrate quantification in two steps
+   std::cout << "\n-- two calls to bdd_mt_quantify()\n\n";
+   // Quantify c universally (AND)
+   bdd_mt_quantify_prepare(c);
+   bdd result = bdd_mt_quantify(x, term_id, combine_and,
+                                &cache, 100, 1, bddop_and);
+   std::cout << "After ∀c:\n";
+   for (auto [path, term]: paths_mt_of(result))
+     std::cout << "  " << path << " -> 0b"
+               << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+   // Quantify b existentially (OR)
+   bdd_mt_quantify_prepare(b);
+   result = bdd_mt_quantify(result, term_id, combine_or,
+                            &cache, 101, 2, bddop_or);
+   std::cout << "\nAfter ∃b ∀c:\n";
+   for (auto [path, term]: paths_mt_of(result))
+     std::cout << "  " << path << " -> 0b"
+               << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+   // Now, combine both in a single step.  (This only works
+   // because the quantifications are following the variable order.)
+   std::cout << "\n-- one call to bdd_mt_quantify2()\n\n";
+   // 'a' is marked as 'output', but it is simply ignored by
+   // bdd_mt_quantify_prepare
+   bdd_mt_quantify_prepare(a, b, c);
+   result = bdd_mt_quantify2(x, term_id,
+                             combine_or, combine_and,
+                             &cache, 102,
+                             2, bddop_or,
+                             1, bddop_and);
+
+   std::cout << "After ∃b ∀c:\n";
+   for (auto [path, term]: paths_mt_of(result))
+     std::cout << "  " << path << " -> 0b"
+               << std::bitset<4>(bdd_get_terminal(term)) << '\n';
+
+   bdd_extcache_done(&cache);
+#+END_SRC
+
+#+NAME: mtbdd-dual-quant-main
+#+BEGIN_SRC C++ :exports results :noweb strip-export
+  #include <iostream>
+  #include <bitset>
+  #include "bddx.h"
+
+  void example()
+  {
+    <<mtbdd-dual-quant>>
+  }
+
+  int main()
+  {
+    bdd_init(1000, 100);
+    bdd_setvarnum(3);
+    example();
+    bdd_done();
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS: mtbdd-dual-quant-main
+#+begin_example
+MTBDD x (bit sets):
+  <0:0, 1:0, 2:0> -> 0b0001
+  <0:0, 1:0, 2:1> -> 0b1111
+  <0:0, 1:1, 2:0> -> 0b0110
+  <0:0, 1:1, 2:1> -> 0b1010
+  <0:1, 1:0, 2:0> -> 0b1100
+  <0:1, 1:0, 2:1> -> 0b1001
+  <0:1, 1:1, 2:0> -> 0b0101
+  <0:1, 1:1, 2:1> -> 0b0011
+
+-- two calls to bdd_mt_quantify()
+
+After ∀c:
+  <0:0, 1:0> -> 0b0001
+  <0:0, 1:1> -> 0b0010
+  <0:1, 1:0> -> 0b1000
+  <0:1, 1:1> -> 0b0001
+
+After ∃b ∀c:
+  <0:0> -> 0b0011
+  <0:1> -> 0b1001
+
+-- one call to bdd_mt_quantify2()
+
+After ∃b ∀c:
+  <0:0> -> 0b0011
+  <0:1> -> 0b1001
+#+end_example
+
+The quantification is bottom-up, so inner variables (=c=, variable 2)
+are processed first (AND), then outer variables (=b=, variable 1) are
+processed second (OR).
+
+Since =quant1_vars= and =quant2_vars= can contain multiple variables
+that need not be adjacent, =bdd_mt_quantify2()= allows executing
+arbitrary nesting of quantifiers as long as they follow the variable
+order.
+
+Also, please note how the hash keys 1, 2, 100, 101, and 102 are used
+in this code: the =combine_and=/=apply_and= operation is using hash
+key 1, while =combine_or=/=apply_or= is using hash key 2.  When these
+operations are performed inside =bdd_mt_quantify2()=, they can reuse
+results that were cached when they were applied during previous calls
+to =bdd_mt_quantify()=.  The top-level operations, i.e., the two calls
+to =bdd_mt_quantify()= and =bdd_mt_quantify2()= are distinct
+operations with different hash keys (100, 101, 102) so that they do
+not share their cached results.
+
 ** =bdd_mt_quantified_low_high=
 
 #+BEGIN_SRC C++
@@ -803,11 +994,17 @@ std::tuple<bool, int, int> bdd_mt_quantified_low_high(int bdd);
 #+END_SRC
 
 For a node in an MTBDD, return whether the node's variable appears
-among the arguments of =bdd_mt_quantify_prepare=, and the low/high
-children with any quantified variables collapsed.
+among the arguments of =bdd_mt_quantify_prepare=, as well as their
+low/high children.
 
-Calling functions across shared libraries is expensive, so this
-returns three values at once to avoid making three different calls.
+In MTBDD-based synthesis, this is used to interpret the MTBDD as a
+game.  =bdd_mt_quantify_prepare='s first argument is used to mark
+output variables.  Then =bdd_mt_quantified_low_high= will return the
+type of the current node as well as its successors.
+
+The successors can also be obtained with =bdd_low()= and =bdd_high()=,
+however calling functions across shared libraries is expensive.  So
+this interface groups three results behind a single call.
 
 * Synthesis Functions
 
