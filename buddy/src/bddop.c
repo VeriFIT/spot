@@ -2395,6 +2395,21 @@ void bdd_mt_quantify_prepare2(BDD ovars, BDD qvars)
      quantvarset[LEVEL(n)] |= 2;
 }
 
+void bdd_mt_quantify_prepare3(BDD ovars, BDD q1vars, BDD q2vars)
+{
+   /* make sure the next use of next use of quantvarset
+      by the regular quantify() resets this array. */
+   quantvarsetID = INT_MAX;
+   memset(quantvarset, 0, sizeof(int)*bddvarnum);
+
+   for (BDD n=ovars; n > 1; n=HIGH(n))
+     quantvarset[LEVEL(n)] = 1;
+   for (BDD n=q1vars; n > 1; n=HIGH(n))
+     quantvarset[LEVEL(n)] |= 2;
+   for (BDD n=q2vars; n > 1; n=HIGH(n))
+     quantvarset[LEVEL(n)] |= 4;
+}
+
 /* This assumes that bdd_mt_quantify_prepare(BDD q) has been called
 ** first, and quantify all variables in r in the order they appear in.
 ** Variables from r that appear in q will be qunatified existentially,
@@ -2660,6 +2675,119 @@ BDD bdd_mt_quantify(BDD r,
                                           cache, applyhash, applyop);
                /* Leavesop could create new variables, causing the
                   stacks to be resized.  Update them. */
+               UPDATE_LOCAL_REC_STACKS;
+             }
+           else if (__likely(rres != HIGH(r) || lres != LOW(r)))
+             {
+               SYNC_REC_STACKS;
+               res = bdd_makenode(lvl, lres, rres);
+             }
+           POPREF_(2);
+           PUSHREF_(res);
+           bddExtCacheEntry* entry = cache->table + index;
+           entry->arg1 = r;
+           entry->op = quanthash;
+           entry->res = res;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   BDD res = READREF_(1);
+   POPREF_(1);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+   return res;
+}
+
+
+/* Call bdd_mt_quantify_prepare first with three arguments.
+**
+** TERMOP is applied to any terminal, allowing optional renaming.
+** LEAVESOP1 is passed to the binary function that is applied to
+** each variable whose quantvarset has bit 1 (quant1_vars).
+** LEAVESOP2 is passed to the binary function that is applied to
+** each variable whose quantvarset has bit 2 (quant2_vars).
+*/
+BDD bdd_mt_quantify2(BDD r,
+                     int (*termop)(int),
+                     int (*leavesop1)(int, int, int, int),
+                     int (*leavesop2)(int, int, int, int),
+                     bddExtCache* cache,
+                     int quanthash,
+                     int applyhash1, int applyop1,
+                     int applyhash2, int applyop2)
+{
+   LOCAL_REC_STACKS;
+   int index;
+
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           r = POPINT_();
+         work:;
+           if (ISCONST(r))
+             RETURN(r);
+
+           /* I: r --- */
+           /* R: --- r */
+           if (ISTERM(r))
+             {
+               SYNC_REC_STACKS;
+               int oldt = TERM(r);
+               int newt = termop(oldt);
+               if (oldt != newt)
+                 r = bdd_terminal(newt);
+               UPDATE_LOCAL_REC_STACKS;
+               PUSHREF_(r);
+             }
+           else
+             {
+               bddExtCacheEntry *entry1 =
+                 BddCache_index(cache, APPLY1HASH(r, quanthash), index);
+               if (entry1->arg1 == r && entry1->op == quanthash)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   PUSHREF_(entry1->res);
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   /* I: -1 r ---  (-1 lr) -1 rr index r */
+                   PUSH4INT_(r, index, HIGH(r), -1);
+                   r = LOW(r);
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: -1 r --- */
+           /* R: rres lres --- res */
+           BDD rres = READREF_(1);
+           BDD lres = READREF_(2);
+           BDD r = POPINT_();
+           BDD res = r;
+           int lvl = LEVEL(r);
+           int qv = quantvarset[lvl];
+           if (qv & 4)
+             {
+               SYNC_REC_STACKS;
+               res = bdd_mt_apply2_leaves(lres, rres, leavesop2,
+                                          cache, applyhash2, applyop2);
+               UPDATE_LOCAL_REC_STACKS;
+             }
+           else if (qv & 2)
+             {
+               SYNC_REC_STACKS;
+               res = bdd_mt_apply2_leaves(lres, rres, leavesop1,
+                                          cache, applyhash1, applyop1);
                UPDATE_LOCAL_REC_STACKS;
              }
            else if (__likely(rres != HIGH(r) || lres != LOW(r)))

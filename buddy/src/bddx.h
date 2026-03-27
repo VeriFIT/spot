@@ -429,6 +429,7 @@ BUDDY_API BDD      bdd_terminal_to_const(BDD, BDD, BDD,
                                          bddExtCache*, int);
 BUDDY_API void     bdd_mt_quantify_prepare(BDD);
 BUDDY_API void     bdd_mt_quantify_prepare2(BDD, BDD);
+BUDDY_API void     bdd_mt_quantify_prepare3(BDD, BDD, BDD);
 BUDDY_API int      bdd_mt_quantify_to_bool(BDD, int (*)(int),
                                            bddExtCache*, int);
 BUDDY_API int      bdd_mt_quantify_to_trival(BDD, int (*)(int),
@@ -438,6 +439,13 @@ BUDDY_API BDD      bdd_mt_quantify(BDD r,
                                    int (*termop)(int),
                                    int (*leavesop)(int, int, int, int),
                                    bddExtCache*, int, int, int);
+
+BUDDY_API BDD      bdd_mt_quantify2(BDD r,
+                                    int (*termop)(int),
+                                    int (*leavesop1)(int, int, int, int),
+                                    int (*leavesop2)(int, int, int, int),
+                                    bddExtCache*,
+                                    int, int, int, int, int);
 
 BUDDY_API BDD      bdd_and(BDD, BDD);
 BUDDY_API BDD      bdd_or(BDD, BDD);
@@ -749,6 +757,8 @@ protected:
                                          bddExtCache*, int);
    friend void     bdd_mt_quantify_prepare(const bdd&);
    friend void     bdd_mt_quantify_prepare(const bdd&, const bdd&);
+   friend void     bdd_mt_quantify_prepare(const bdd&, const bdd&,
+                                           const bdd&);
    friend int      bdd_mt_quantify_to_bool(const bdd&,
                                            int (*)(int), bddExtCache*, int);
    friend int      bdd_mt_quantify_to_trival(const bdd&,
@@ -758,6 +768,12 @@ protected:
                                    int (*termop)(int),
                                    int (*leavesop)(int, int, int, int),
                                    bddExtCache*, int, int, int);
+   friend bdd      bdd_mt_quantify2(const bdd& r,
+                                    int (*termop)(int),
+                                    int (*leavesop1)(int, int, int, int),
+                                    int (*leavesop2)(int, int, int, int),
+                                    bddExtCache*,
+                                    int, int, int, int, int);
 
    friend bdd      bdd_and(const bdd &, const bdd &);
    friend bdd      bdd_or(const bdd &, const bdd &);
@@ -1112,6 +1128,15 @@ inline void bdd_mt_quantify_prepare(const bdd& output_vars,
   bdd_mt_quantify_prepare2(output_vars.root, quant_vars.root);
 }
 
+// used for dual quantification (two different quantification types)
+inline void bdd_mt_quantify_prepare(const bdd& output_vars,
+                                    const bdd& quant1_vars,
+                                    const bdd& quant2_vars)
+{
+  bdd_mt_quantify_prepare3(output_vars.root,
+                           quant1_vars.root, quant2_vars.root);
+}
+
 BUDDY_API std::tuple<bool, int, int> bdd_mt_quantified_low_high(int);
 
 inline int bdd_mt_quantify_to_bool(const bdd& r,
@@ -1137,6 +1162,20 @@ inline bdd bdd_mt_quantify(const bdd& r,
 {
   return bdd_mt_quantify(r.root, termop, leavesop,
                          cache, quanthash, applyhash, applyop);
+}
+
+inline bdd bdd_mt_quantify2(const bdd& r,
+                            int (*termop)(int),
+                            int (*leavesop1)(int, int, int, int),
+                            int (*leavesop2)(int, int, int, int),
+                            bddExtCache* cache, int quanthash,
+                            int applyhash1, int applyop1,
+                            int applyhash2, int applyop2)
+{
+  return bdd_mt_quantify2(r.root, termop, leavesop1, leavesop2,
+                          cache, quanthash,
+                          applyhash1, applyop1,
+                          applyhash2, applyop2);
 }
 
 
