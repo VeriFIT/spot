@@ -472,6 +472,7 @@ namespace
     spot::formula f = original_f;
 
     spot::bdd_dict_preorder dict;
+    std::vector<spot::formula> unobs_vec;
     {
       // For Mealy semantics, inputs should appear first in the
       // MTBDDs.  For Moore semantics, outputs should be first.
@@ -479,24 +480,46 @@ namespace
       // register them in the order they are found in the formula,
       // this ways variables that are used together are more
       // likely to be close in the order.
-      std::unordered_set<spot::formula> come_first;
-      if (mealy_semantics)
-        for (const std::string& s: input_aps)
-          come_first.insert(spot::formula::ap(s));
-      else
-        for (const std::string& s: output_aps)
-          come_first.insert(spot::formula::ap(s));
+      std::vector<unsigned char> come_first;
+      come_first.resize(spot::formula::apid_count(), 0U);
+
+      unsigned val = mealy_semantics ? 1 : 2;
+      for (const std::string& s: input_aps)
+        come_first[spot::formula::ap(s).apid()] = val;
+      val = 3 - val;
+      for (const std::string& s: output_aps)
+        come_first[spot::formula::ap(s).apid()] = val;
+
+      unobs_vec.reserve(unobs_aps.size());
+      for (const std::string& s: unobs_aps)
+        {
+          spot::formula ap = spot::formula::ap(s);
+          come_first[ap.apid()] = 3;
+          unobs_vec.push_back(ap);
+        }
 
       f.traverse([&](const spot::formula& f) {
-        if (f.is(spot::op::ap) && (come_first.find(f) != come_first.end()))
+        if (!f.is(spot::op::ap))
+          return false;
+        if (come_first[f.apid()] == 1)
           dict.register_proposition(f);
         return false;
       });
-      // Unobservable input can be put anywhere, since they won't be
-      // part of the game, so currently we don't pre-register them.
-      // However the ltlf_to_mtdfa_for_synthesis() function will later
-      // register them at the bottom, where they are easier to
-      // quantify away.
+      // ltlf_to_mtdfa_for_synthesis() will register output variables,
+      // and then all quantified variables.  If Moore semantics are
+      // used we have already registered quantified variables, but if
+      // quantified variables are used, let's register input variables
+      // too, so that quantified variables are put below.
+      if (!mealy_semantics && (!unobs_aps.empty() || f.is_quantified()))
+        {
+          f.traverse([&](const spot::formula& f) {
+            if (!f.is(spot::op::ap))
+              return false;
+            if (come_first[f.apid()] == 2)
+              dict.register_proposition(f);
+            return false;
+          });
+        }
     }
 
     // union of inputs_aps and unobs_aps, only filled if the
@@ -671,6 +694,10 @@ namespace
         st.start();
         spot::mtdfa_ptr a;
         bool a_is_strategy_already = false;
+
+        if (!unobs_vec.empty())
+          *sub_f = spot::formula::forall(unobs_vec, *sub_f);
+
         switch (opt_trans)
           {
           case translation_direct_restricted:
@@ -684,8 +711,6 @@ namespace
               opts.one_step_preprocess = opt_one_step;
               opts.terminating_semantics = opt_terminating_semantics;
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
-                                                    unobs_aps.empty() ?
-                                                    nullptr : &unobs_aps,
                                                     spot::state_refine,
                                                     false /* realizability */,
                                                     opts);
@@ -752,8 +777,6 @@ namespace
               opts.one_step_preprocess = opt_one_step;
               opts.terminating_semantics = opt_terminating_semantics;
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
-                                                    unobs_aps.empty() ?
-                                                    nullptr : &unobs_aps,
                                                     bp, opt_realizability,
                                                     opts);
               a->names.clear();

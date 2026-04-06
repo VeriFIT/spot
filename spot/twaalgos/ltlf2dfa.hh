@@ -335,8 +335,7 @@ namespace spot
   ///
   /// The set of output variables should be specified with \a outvars.
   ///
-  /// If \a univquantvars is supplied, all variables listed there will
-  /// be universally quantified.
+  /// The LTLf formula may be quantified.
   ///
   /// If \a backprop is set to `bdd_node_backprop`,
   /// `dfs_node_backprop`, or `dfs_strict_node_backprop`, then a
@@ -359,7 +358,6 @@ namespace spot
   /// details.
   ///
   /// \cite duret.25.ciaa
-  /// @{
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,
@@ -367,15 +365,6 @@ namespace spot
                               = dfs_node_backprop,
                               bool realizability = false,
                               ltlf_synthesis_options options = {});
-  SPOT_API mtdfa_ptr
-  ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
-                              const std::vector<std::string>& outvars,
-                              const std::vector<std::string>* univquantvars,
-                              ltlf_synthesis_backprop backprop
-                              = dfs_node_backprop,
-                              bool realizability = false,
-                              ltlf_synthesis_options options = {});
-  /// @}
 
   /// \ingroup mtdfa
   /// \brief Convert an LTLf formula into a MTDFA, with a compositional
@@ -495,8 +484,6 @@ namespace spot
                             bool realizability = false,
                             bool one_step_preprocess = false,
                             bool bfs = true,
-                            const std::vector<std::string>*
-                            univquantvars = nullptr,
                             bool terminating_semantics = true);
 
     mtdfa_ptr ltlf_synthesis_with_dfs(formula f,

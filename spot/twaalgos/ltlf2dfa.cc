@@ -30,6 +30,7 @@
 #include <spot/twaalgos/isdet.hh>
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/print.hh>
+#include <spot/tl/simplify.hh>
 #include <spot/priv/robin_hood.hh>
 #include <spot/misc/bitvect.hh>
 #include <spot/graph/adjlist.hh>
@@ -47,7 +48,7 @@ constexpr int hash_key_rename = 7;
 constexpr int hash_key_strat = 8;
 constexpr int hash_key_strat_bool = 9;
 constexpr int hash_key_finalstrat = 10;
-constexpr int hash_key_univ_quantify = 11;
+constexpr int hash_key_quantify = 11;
 
 namespace spot
 {
@@ -1620,8 +1621,6 @@ namespace spot
                                  bool realizability,
                                  bool preprocess,
                                  bool bfs,
-                                 const std::vector<std::string>*
-                                 univquantvars,
                                  bool terminating_semantics)
   {
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
@@ -1645,7 +1644,8 @@ namespace spot
     if (do_backprop)
       backprop.reset(global_backprop = new backprop_bdd_encoder());
 
-    bdd univvars = bddtrue;     // used if univquantvars was passed
+    bdd forallvars = bddtrue;
+    bdd existsvars = bddtrue;
 
     bdd bddoutvars = bddtrue;      // used if outvars was passed;
     // this is the number of variables we had the last time
@@ -1660,7 +1660,7 @@ namespace spot
       // variables changed.
       if (int vn = bdd_varnum(); vn != varnum)
         {
-          bdd_mt_quantify_prepare(bddoutvars, univvars);
+          bdd_mt_quantify_prepare(bddoutvars, forallvars, existsvars);
           varnum = vn;
         }
     };
@@ -1684,11 +1684,15 @@ namespace spot
                                      &cache_, hash_key_strat_bool);
     };
 
-    // Keep track of atomic propositions used in he automaton.
+    bool is_quantified = false;
+
+    // Keep track of atomic propositions used in the automaton.
     // Actually, the automaton might use fewer atomic propositions
     // than what appears in the formula, but we do not pay attention
     // to that.
     {
+      f = normalize_quantifiers(f);
+
       atomic_prop_set* a = atomic_prop_collect(f);
       dfa->aps.reserve(a->size());
 
@@ -1700,56 +1704,82 @@ namespace spot
               realsimp.reset(new realizability_simplifier_base(*outvars,
                                                                false, o));
             }
-          // We need to register the output variables already so we can
-          // call bdd_mt_quantify_prepare.  Let's do it in the order in
-          // which they will be discovered in the formula.
-          std::unordered_set<spot::formula> outputs;
+          // We need to register (unquantified) output variables
+          // already so we can call bdd_mt_quantify_prepare.  Let's do
+          // it in the order in which they will be discovered in the
+          // formula.
+          std::vector<unsigned char> quantified = collect_quantified_apids(f);
+          std::vector<unsigned char> outputs;
+          outputs.resize(formula::apid_count(), 0U);
           for (const std::string& s: *outvars)
-            outputs.insert(spot::formula::ap(s));
-          f.traverse([&](const spot::formula& f)
+            outputs[spot::formula::ap(s).apid()] = 1U;
+
+          f.traverse([&](const spot::formula& g)
           {
-            if (f.is(spot::op::ap) && outputs.find(f) != outputs.end()
-                && a->erase(f))
+            if (!g.is(spot::op::ap))
+              return false;
+            unsigned id = g.apid();
+            if (outputs[id] && !quantified[id] && a->erase(g))
               {
-                dfa->aps.push_back(f);
-                int i = dict_->register_proposition(f, dfa);
+                dfa->aps.push_back(g);
+                int i = dict_->register_proposition(g, dfa);
                 bddoutvars &= bdd_ithvar(i);
               }
             return false;
           });
           dfa->set_controllable_variables(bddoutvars);
         }
-      if (univquantvars)
+      // Declare quantified variables in the order of the quantifiers
+      // But inside each block, register the variables in the order
+      // they are found in the formula.
+      if (f.is_quantified())
         {
-          std::unordered_set<spot::formula> univ;
-          for (const std::string& s: *univquantvars)
-            univ.insert(spot::formula::ap(s));
-          f.traverse([&](const spot::formula& f)
-          {
-            if (f.is(spot::op::ap) && univ.find(f) != univ.end()
-                && a->erase(f))
+          is_quantified = true;
+          std::vector<unsigned char> inblock;
+          while (f.is(op::exists, op::forall))
+            {
+              bool is_exists = f.is(op::exists);
+
+              inblock.clear();
+              inblock.resize(formula::apid_count(), 0U);
+              unsigned last = f.size() - 1;
+              for (unsigned i = 0; i < last; ++i)
+                inblock[f[i].apid()] = 1;
+
+              f.traverse([&](const spot::formula& g)
               {
-                int i = dict_->register_proposition(f, dfa);
-                univvars &= bdd_ithvar(i);
-              }
-            return false;
-          });
-          if (univvars == bddtrue)
-            univquantvars = nullptr;
+                if (!g.is(spot::op::ap))
+                  return false;
+                unsigned id = g.apid();
+                if (inblock[id] && a->erase(g))
+                  {
+                    bdd bi = bdd_ithvar(dict_->register_proposition(g, dfa));
+                    if (is_exists)
+                      existsvars &= bi;
+                    else
+                      forallvars &= bi;
+                  }
+                return false;
+              });
+              f = f[last];
+            }
         }
-      // Anything left in a are output
+      // Anything left in a are input
       dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
       delete a;
     }
 
     auto trans_succ = [&](formula g) -> bdd {
       bdd b = ltlf_to_mtbdd(g);
-      if (univquantvars)
+      if (is_quantified)
         {
           quantify_prepare_maybe();
-          b = bdd_mt_quantify(b, term_id, term_combine_and, &cache_,
-                              hash_key_univ_quantify, hash_key_and,
-                              bddop_and);
+          b = bdd_mt_quantify2(b, term_id,
+                               term_combine_and, term_combine_or,
+                               &cache_,
+                               hash_key_quantify,
+                               hash_key_and, bddop_and,
+                               hash_key_or, bddop_or);
         }
       return b;
     };
@@ -1942,7 +1972,9 @@ namespace spot
         dfa->states = std::move(states);
         dfa->names = std::move(names);
         dict_->register_all_propositions_of(this, dfa);
-        for (bdd b = univvars; b != bddtrue; b = bdd_high(b))
+        for (bdd b = forallvars; b != bddtrue; b = bdd_high(b))
+          dict_->unregister_variable(bdd_var(b), dfa);
+        for (bdd b = existsvars; b != bddtrue; b = bdd_high(b))
           dict_->unregister_variable(bdd_var(b), dfa);
         return dfa;
       }
@@ -1977,7 +2009,9 @@ namespace spot
     dfa->states = std::move(states);
     dfa->names = std::move(names);
     dict_->register_all_propositions_of(this, dfa);
-    for (bdd b = univvars; b != bddtrue; b = bdd_high(b))
+    for (bdd b = forallvars; b != bddtrue; b = bdd_high(b))
+      dict_->unregister_variable(bdd_var(b), dfa);
+    for (bdd b = existsvars; b != bddtrue; b = bdd_high(b))
       dict_->unregister_variable(bdd_var(b), dfa);
     return dfa;
   }
@@ -2573,18 +2607,6 @@ namespace spot
                                         bool realizability,
                                         ltlf_synthesis_options options)
   {
-    return ltlf_to_mtdfa_for_synthesis(f, dict, outvars, nullptr,
-                                       backprop, realizability, options);
-  }
-
-  mtdfa_ptr ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
-                                        const std::vector<std::string>& outvars,
-                                        const std::vector<std::string>*
-                                        univquantvars,
-                                        ltlf_synthesis_backprop backprop,
-                                        bool realizability,
-                                        ltlf_synthesis_options options)
-  {
     ltlf_translator trans(dict, options.simplify_terms);
     switch (backprop)
       {
@@ -2593,27 +2615,20 @@ namespace spot
                                    options.detect_empty_univ,
                                    &outvars, true, realizability,
                                    options.one_step_preprocess, false,
-                                   univquantvars,
                                    options.terminating_semantics);
       case dfs_node_backprop:
         return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
                                    options.detect_empty_univ,
                                    &outvars, true, realizability,
                                    options.one_step_preprocess, true,
-                                   univquantvars,
                                    options.terminating_semantics);
       case state_refine:
         return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
                                    options.detect_empty_univ,
                                    &outvars, false, realizability,
                                    options.one_step_preprocess, true,
-                                   univquantvars,
                                    options.terminating_semantics);
       case dfs_strict_node_backprop:
-        if (univquantvars)
-          throw std::runtime_error
-            ("ltlf_to_mtdfa_for_synthesis: universal quantification not"
-             " implemented for dfs_strict_node_backprop");
         return trans.ltlf_synthesis_with_dfs(f, &outvars, realizability,
                                              options.one_step_preprocess,
                                              options.terminating_semantics);
