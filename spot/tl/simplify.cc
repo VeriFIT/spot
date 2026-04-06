@@ -4279,4 +4279,67 @@ namespace spot
     std::swap(c, cache_);
     delete c;
   }
+
+
+  formula normalize_quantifiers(formula f)
+  {
+    if (!f.is(op::exists, op::forall))
+      return f;
+
+    std::vector<unsigned char> polarities;
+    std::vector<formula> assignments;
+    assignments.resize(formula::apid_count(), nullptr);
+
+    auto rec = [&](formula g, auto self) -> formula
+    {
+      if (!g.is_quantified())
+        {
+          polarities = collect_apids_with_polarities(g);
+          return g;
+        }
+      // A variable can be removed from the quantification
+      // - if it is not present in the formula
+      // - if it has constant polarity below the quantifier
+      //   (in that case it should be replaced by a constant
+      //   in the formula).
+      unsigned sz = g.size();
+      formula body = self(g[sz - 1], self);
+      std::vector<formula> v;
+      v.reserve(sz - 1);
+      for (unsigned i = 0; i < sz - 1; ++i)
+        {
+          formula h = g[i];
+          unsigned id = h.apid();
+          unsigned pol = polarities[id];
+          if (pol == 0b00)
+            {
+              continue;
+            }
+          else if (pol == 0b11)
+            {
+              v.emplace_back(h);
+            }
+          else
+            {
+              bool is_positive = pol == 0b10;
+              bool is_exists = (g.kind() == op::exists);
+              assignments[id] = (is_positive == is_exists)
+                ? formula::tt() : formula::ff();
+            }
+          // if the atomic proposition is kept (in v)
+          // or will be replaced by a constant (in assignments)
+          // then we can remove it from outer quantifiers.
+          polarities[id] = 0;
+        }
+      return formula::quantify(g.kind(), v, body);
+    };
+
+    formula f2 = rec(f, rec);
+    if (!assignments.empty())
+      f2 = relabel_apply(f2, assignments);
+    if (f2 != f)
+      return normalize_quantifiers(f2);
+    else
+      return f;
+  }
 }

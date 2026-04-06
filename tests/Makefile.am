@@ -467,6 +467,7 @@ TESTS_python = \
   python/prodexpt.py \
   python/_product_weak.ipynb \
   python/_product_susp.ipynb \
+  python/qltl.py \
   python/randgen.py \
   python/relabel.py \
   python/remfin.py \

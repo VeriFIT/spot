@@ -209,4 +209,13 @@ namespace spot
     tl_simplifier(const tl_simplifier&) = delete;
     void operator=(const tl_simplifier&) = delete;
   };
+
+
+  /// \brief Remove unnecessary quantified variables
+  ///
+  /// If a quantified variable does not appear in the body of the
+  /// formula, simply remove it from the list of quantified variables.
+  /// If a quantified variable always has the same polarity in the
+  /// formula, it can be replaced by the appropriate constant.
+  SPOT_API formula normalize_quantifiers(formula);
 }
