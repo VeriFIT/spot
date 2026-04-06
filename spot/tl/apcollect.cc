@@ -724,4 +724,34 @@ namespace spot
                           & bdd_support(add));
   }
 
+
+  std::vector<unsigned char>
+  collect_quantified_apids(formula f)
+  {
+    std::vector<unsigned char> res;
+    collect_quantified_apids(f, res);
+    return res;
+  }
+
+  void
+  collect_quantified_apids(formula f, std::vector<unsigned char>& v)
+  {
+    v.clear();
+    v.resize(formula::apid_count(), 0U);
+
+    f.traverse([&](const formula& f)
+    {
+      if (!f.is_quantified())
+        return true;
+      if (f.is(op::exists, op::forall))
+        {
+          unsigned val = f.is(op::exists) ? 1 : 2;
+          unsigned last = f.size() - 1;
+          for (unsigned i = 0; i < last; ++i)
+            v[f[i].apid()] |= val;
+        }
+      return false;
+    });
+
+  }
 }

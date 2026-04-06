@@ -185,5 +185,23 @@ namespace spot
     formula f_;
   };
 
+
+  /// \brief Collect quantified APs occurring in f
+  ///
+  /// This returns or updates a vector indexed by APIDs.  An APID that
+  /// is not quantified in \a f will have value 0.  If it is
+  /// existentially quantified it will have value 1.  If it is
+  /// universally quantified it will have value 2.  (If it is both
+  /// existentially and universally quantified, it will have value 3.
+  /// In this case, consider using normalize_quantifiers() to remove
+  /// the superfluous quantification.)
+  ///
+  /// @{
+  SPOT_API std::vector<unsigned char>
+  collect_quantified_apids(formula f);
+  SPOT_API void
+  collect_quantified_apids(formula f, std::vector<unsigned char>& v);
+  /// @}
+
   /// @}
 }

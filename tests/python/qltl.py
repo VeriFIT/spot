@@ -20,6 +20,17 @@ import spot
 from unittest import TestCase
 tc = TestCase()
 
+# Quick test for collect_quantified_apids
+# We do these first, because the upcoming tests might
+# reorder variables depending on when garbage collection occurs.
+f = spot.formula("∃ a: ∀ c, d: ∃c: a U b U c U d")
+v = spot.collect_quantified_apids(f)
+tc.assertEqual(str(v), "(1, 3, 2, 0)")
+tc.assertEqual(str(spot.formula.apid_map()), '["a", "c", "d", "b"]')
+g = spot.normalize_quantifiers(f)
+v = spot.collect_quantified_apids(g)
+tc.assertEqual(str(v), "(0, 0, 0, 0)")
+
 def test(f1, f2):
     f1 = spot.formula(f1)
     f2 = spot.formula(f2)

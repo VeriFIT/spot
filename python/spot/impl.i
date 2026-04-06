@@ -557,6 +557,7 @@ namespace std {
   %template(vectorformula) vector<spot::formula>;
   %template(vectorcolors) vector<spot::acc_cond::mark_t>;
   %template(vectorunsigned) vector<unsigned>;
+  %template(vectorunsignedchar) vector<unsigned char>;
   %template(vectorvectorunsigned) vector<vector<unsigned>>;
   %template(vectorpairunsigned) vector<pair<unsigned, unsigned>>;
   %template(vectoracccond) vector<spot::acc_cond>;
