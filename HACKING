@@ -313,6 +313,104 @@ use, you probably want to compile everything with clang, as shown above.
 
 
 
+Development workflow
+====================
+
+(Some of the details below, like git-push hooks and CI/CD runners,
+are specific to Spot's GitLab instance at
+https://gitlab.lre.epita.fr/spot/spot and may not apply if you are
+working from a fork or a tarball.)
+
+ChangeLog
+---------
+
+Spot's release tarball includes a ChangeLog that describes all changes
+in the style used by the GNU project:
+https://www.gnu.org/prep/standards/html_node/Style-of-Change-Logs.html
+
+Spot generates this ChangeLog file from git's log, so you just need
+to use this syntax in your commit messages.
+
+There is also a separate ChangeLog file for BuDDy, so if you have to
+modify BuDDy, be sure to do that in a separate commit whose commit
+message starts with [buddy] and where the filenames in the log entry
+are relative to the root of BuDDy's directory.
+
+When pushing to a personal branch (with a slash in its name), "git
+push" will warn you if files you have modified do not match the files
+listed in the commit messages, so you can force-push a fix.  When
+pushing to a non-personal branch (no slash, like "master", "next",
+"stable") this warning becomes an error.
+
+
+Commits
+-------
+
+As much as possible, try to split large features into multiple
+incremental small commits that can be understood in isolation.
+
+If you are building a new feature A that will require feature B,
+make a commit that implements, tests, and documents B before starting
+to work on a commit that implements A.
+
+
+Rebase and fixups
+-----------------
+
+Once you have committed feature B, and started working on feature A,
+it is possible that you discover that B was incorrectly done.  Just
+use "git commit --fixup" and later "git rebase --autosquash" to
+update the earlier commit about B.
+
+As long as you are working on a personal branch, just rewrite the
+history to pretend you got it right from the start.
+
+Ideally, once the branch is feature-full, it should consist of a
+series of incremental features each in their own commit, that will be
+forward-merged.  (I.e., not an actual merge; we still prefer to get a
+linear history.)
+
+This is of course a best effort.  If you discover that what you wrote
+10 commits ago needs to be redone differently, and that doing so would
+break many intermediate commits, then just fix this in a new commit.
+
+
+CI/CD & coverage
+----------------
+
+It's best to run "make check -j$(nproc)" on your computer and fix
+any errors before pushing, because the CI builds use some computers
+that are shared by other projects in the lab.
+
+The CI builds will test the code in different configurations,
+different compilers, and architectures, so they may fail even if the
+tests pass on your computer.  For instance, if your code does
+something like f(g(), h()), the order in which g() and h() are
+evaluated is architecture dependent.  Intel does it one way, Arm the
+other.  If g() and h() have side-effects (e.g., BDD operations,
+formula constructors...) the different order can be felt in the test
+suite.  Best to avoid those patterns.
+
+One of the CI builds computes a coverage report.  You can use it to
+check any newly added code, and see if there are obvious test cases
+that are missing.  See also "Running coverage tests" above.
+
+
+Test cases
+----------
+
+Tests as shell scripts or Python scripts should be preferred over
+C++ tests.  C++ test cases require compilation, which slows down the
+test suite.
+
+Jupyter notebooks are slow to run, and painful to update when we
+change the code, so they are best limited to test cases that can
+double as documentation.
+
+See "Coding conventions for Python Tests" below for more details about
+writing Python tests and notebooks.
+
+
 C++ Coding conventions
 ======================
 
