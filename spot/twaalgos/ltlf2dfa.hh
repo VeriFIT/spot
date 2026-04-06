@@ -285,9 +285,8 @@ namespace spot
 
   enum ltlf_synthesis_backprop {
     state_refine,         ///< no backpropagation, just local refinement
-    bfs_node_backprop,    ///< on-the-fly
-    dfs_node_backprop,    ///< on-the-fly, DFS that stops on visited nodes
-    dfs_strict_node_backprop, ///< on-the-fly, DFS that stops on visited states
+    bfs_node_backprop,    ///< on-the-fly, BFS
+    dfs_node_backprop,    ///< on-the-fly, DFS
   };
 
   /// \ingroup mtdfa
@@ -337,16 +336,16 @@ namespace spot
   ///
   /// The LTLf formula may be quantified.
   ///
-  /// If \a backprop is set to `bdd_node_backprop`,
-  /// `dfs_node_backprop`, or `dfs_strict_node_backprop`, then a
-  /// backpropagation graph it constructed while the automaton for \a
-  /// f is explored.  This may help to abort the construction earlier,
-  /// and it is enough to solve the game and return a strategy.  That
-  /// strategy is returned if \a realizability is set to `false` (if a
-  /// strategy does not exist, a DFA that has a single dbdfalse state
-  /// is returned.  When \a realizability is `true`, then the
-  /// returned MTDFA will just have a single state that is bddtrue
-  /// (realizable) or bddfalse (unrealizable).
+  /// If \a backprop is set to `bfs_node_backprop`, or
+  /// `dfs_node_backprop`, then a backpropagation graph is constructed
+  /// while the automaton for \a f is explored.  This may help to
+  /// abort the construction earlier, and it is enough to solve the
+  /// game and return a strategy.  That strategy is returned if \a
+  /// realizability is set to `false` (if a strategy does not exist, a
+  /// DFA that has a single bddfalse state is returned.  When \a
+  /// realizability is `true`, then the returned MTDFA will just have
+  /// a single state that is bddtrue (realizable) or bddfalse
+  /// (unrealizable).
   ///
   /// When \a backprop is set to `state_refine`, each state is locally
   /// simplified according to the accepting terminals/bddtrue/bddfalse
@@ -485,13 +484,6 @@ namespace spot
                             bool one_step_preprocess = false,
                             bool bfs = true,
                             bool terminating_semantics = true);
-
-    mtdfa_ptr ltlf_synthesis_with_dfs(formula f,
-                                      const std::vector<std::string>*
-                                      outvars = nullptr,
-                                      bool realizability = false,
-                                      bool one_step_preprocess = false,
-                                      bool terminating_semantics = true);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;

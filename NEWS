@@ -55,6 +55,10 @@ New in spot 2.14.5.dev  (not yet released)
     --relabel=io option (renamed unobservable variables will start
     with u), or to write part files with --save-part-file.
 
+  - ltlfsynt --translation=dfs-strict-on-the-fly is not supported
+    anymore.  This required specific code that was slower than
+    --translation=dfs-on-the-fly.
+
   Library:
 
   - There is a new class called spot::mtdswa to represent

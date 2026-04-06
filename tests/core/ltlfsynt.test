@@ -139,11 +139,11 @@ cut -f2 -d' ' <expected >expected.Mealy
 for sem in Moore Mealy; do
   for sim in yes no; do
   for dec in yes no; do
-  for tra in restr full comp dfs bfs dfs-strict; do
+  for tra in restr full comp dfs bfs; do
     bpvalues="states nodes trival"
     osvalues="yes no";
     case $tra in
-        bfs | dfs | dfs-strict) bpvalues=nodes;;
+        bfs | dfs) bpvalues=nodes;;
         restr | full | comp) osvalues=no;;
     esac
     for min in yes no; do
