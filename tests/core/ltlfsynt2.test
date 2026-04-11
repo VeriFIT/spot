@@ -142,7 +142,7 @@ controllable-AP: 0 1
 State: 0
 [!0&1] 1
 State: 1
-[0&!1] 2
+[0] 2
 State: 2
 [!0&!1] 2
 --END--

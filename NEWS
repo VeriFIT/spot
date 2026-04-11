@@ -117,6 +117,10 @@ New in spot 2.14.5.dev  (not yet released)
 
   - Let ltlfilt's --save-part-file work even if -q is used.  (Issue #632.)
 
+  - ltlfsynt --decompose was found to be bogus in tricky cases.  It is
+    disabled (i.e., defaults to "no") in this release, until we find a
+    fix.  (Issue #610)
+
   - A poorly defined hash function used in tgba_determinize() could
     cause that function to throw a "robin_hood::map overflow"
     exception.  (Issue #631.)

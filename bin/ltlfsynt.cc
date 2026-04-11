@@ -118,7 +118,8 @@ static const argp_option options[] =
       0 },
     { "decompose", OPT_DECOMPOSE, "yes|no", 0,
       "whether to decompose the specification as multiple output-disjoint "
-      "problems to solve independently (enabled by default)", 0 },
+      "problems to solve independently (disabled by default, because it "
+      "is bogus)", 0 },
     { "backprop", OPT_BACKPROP, "nodes|states|trival-states", 0,
       "whether backpropagation should be done at the node or state level "
       "(nodes by default)", 0 },
@@ -308,7 +309,7 @@ static const dot_choice dot_values[] =
   };
 ARGMATCH_VERIFY(dot_args, dot_values);
 
-static bool opt_decompose_ltl = true;
+static bool opt_decompose_ltl = false;
 static polarity_choice opt_polarity = pol_yes;
 static polarity_choice opt_gequiv = pol_yes;
 static bool opt_realizability = false;
