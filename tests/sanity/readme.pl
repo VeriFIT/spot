@@ -53,6 +53,7 @@ while (<FD>)
   # We consider Third party software?
   # last if (/^Third party software$/);
   next unless (m{^(\s*)(\S+/)\s+});
+  next if m|^https?://|;
   my $level = length($1) / 3;
   my $name = $2;
 
