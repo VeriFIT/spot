@@ -1,11 +1,28 @@
 New in spot 2.14.5.dev  (not yet released)
 
-  Build:
+  Potential backward-incompatible changes:
 
   - Spot is now built in C++20 mode, so you need at least GCC 10 or
     Clang 10 to compile it.  There is also an --enable-c++23 option
     to configure in case you want to force a build of Spot in C++23
     mode.
+
+  - Two new operators \forall and \exists have been added to the LTL
+    syntax in order to support QLTL and QLTLf in the future.  (See
+    below for the limited support at present.)  If you have code
+    working on the AST of formulas, it is likely that you will have to
+    update it to account for the new op::exists and op::forall
+    operators.
+
+  - The 'ltl2tgta' tool, that was used to build "testing automata"
+    and print them in dot format, has been removed.
+
+  - All the code supporting (generalized) testing automata has been
+    removed.  This code was initially introduced in Spot 1.0, and
+    received only minimal updates for Spot 2.0; it was poorly
+    tested/covered.
+    Maintaining it in Spot does not seem worth the human effort and
+    CI/CD resources it takes.
 
   Documentation:
 
@@ -20,18 +37,36 @@ New in spot 2.14.5.dev  (not yet released)
     about spot::mtdswa below.  The improved translation path can be
     disabled in ltl2tgba and ltlsynt by passing option -xnew-oblig=0.
 
+    This builds upon some new translation presented in a paper
+    titled "Fast obligation translation and synthesis" to appear
+    at CAV'26.
+
   - ltlsynt has a new option --obligation-synthesis=no that can be
     used to disable MTBDD-based synthesis when the specification is
-    an obligation.
+    an obligation.   (See the aforementioned CAV'26 paper)
 
-  - The 'ltl2tgta' tool, that was used to build "testing automata"
-    and print them in dot format, has been removed.
+  - ltlsynt and ltlfsynt just learned an option --unobservable-ins to
+    specify a list of input propositions that may appear in the
+    specification, but that should not be observed by the controller.
+
+    This builds upon some technique presented in a paper titled
+    "On-the-fly LTLf synthesis under partial observability", to appear
+    at KR'26.
+
+  - ltlfilt learned the --unobservable-ins option too.  This can be
+    useful to relabel input/output/unobservable variables using the
+    --relabel=io option (renamed unobservable variables will start
+    with u), or to write part files with --save-part-file.
+
+  - ltlfsynt --translation=dfs-strict-on-the-fly is not supported
+    anymore.  This required specific code that was slower than
+    --translation=dfs-on-the-fly.
 
   - ltlfilt learned a --satisfiable option to keep only satisfiable
     formulas.  See the comments on ltl_satisfiable() below.
 
   - genltl's --kr-nlogn=N and --kr-n=N options, introduced in Spot
-    2.3.1 generate LTL formulas that can only be recognized by a DBA
+    2.3.1, generate LTL formulas that can only be recognized by a DBA
     of doubly-exponential size.  Those formulas actually describe
     obligation properties, but they are not syntactic obligations.
     The new --kr-nlogn-delta1=N and --kr-n-delta1=N options generate
@@ -48,17 +83,6 @@ New in spot 2.14.5.dev  (not yet released)
     postprocessing options like --small or --deterministic are given,
     they will also be applied during this loop.
 
-  - ltlfsynt, ltlsynt, and ltlfilt learned the --unobservable-ins
-    option.  For ltlfsynt and ltlsynt, this is used to perform
-    synthesis with unobservable inputs.  For ltlfilt, this can be
-    useful to relabel input/output/unobservable variables using the
-    --relabel=io option (renamed unobservable variables will start
-    with u), or to write part files with --save-part-file.
-
-  - ltlfsynt --translation=dfs-strict-on-the-fly is not supported
-    anymore.  This required specific code that was slower than
-    --translation=dfs-on-the-fly.
-
   Library:
 
   - There is a new class called spot::mtdswa to represent
@@ -67,25 +91,25 @@ New in spot 2.14.5.dev  (not yet released)
     covering the next three points as well.
 
   - spot::obligation_to_mtdswa() is a new function to translate
-    syntactic-obligations to weak spot::mtdswa.
+    syntactic-obligations to a weak spot::mtdswa.
 
   - spot::loding_weak_ranking() and spot::minimize_mtdswa()
     are new functions that can be used together to minimize
     a weak spot::mtdswa.
 
   - spot::obligation_synthesis() is a new function to synthesize
-    syntactic-obligations specification using MTBDDs.
+    syntactic-obligation specifications using MTBDDs.
 
   - scc_filter() will now preserve and update any "original-states"
     or "degen-levels" property present in the original automaton.
 
   - formula::multop() and its variants (formula::And(),
-    formula::Concat(), etc.) now accept a two operands variant instead
-    of a vector.   For instance, instead of  formula::And({x, y})
+    formula::Concat(), etc.) now accept a two-operand variant instead
+    of a vector.   For instance, instead of formula::And({x, y})
     it is now possible to write formula::And(x, y).  A vector still
-    has to be constructed internally, however the two-argument
+    has to be constructed internally; however, the two-argument
     syntax is a bit more efficient at inlining arguments when one of
-    the argument is using the same n-ary operator.
+    the arguments uses the same n-ary operator.
 
   - atomic propositions are now assigned a unique 0-based identifier,
     so that mapping atomic proposition to arbitrary data can easily be
@@ -97,7 +121,7 @@ New in spot 2.14.5.dev  (not yet released)
 
   - ltlf_one_step_sat_rewrite and ltlf_one_step_unsat_rewrite now use
     a cache internally.  The ltlf_one_step_sat_rewrite_cached and
-    ltlf_one_step_unsat_rewrite_cached class makes it possible to
+    ltlf_one_step_unsat_rewrite_cached classes make it possible to
     reuse the same cache between calls.  This is now used by LTLf
     synthesis functions to speed up one-step (un)realizability checks.
 
@@ -107,11 +131,36 @@ New in spot 2.14.5.dev  (not yet released)
     is then checked for emptiness.  It can be improved later.
     (Issue #623.)
 
-  - all the code supporting (generalized) testing automata has been
-    removed.  This code was initially introduced in Spot 1.0, and some
-    minimal update for Spot 2.0, was poorly tested/covered.
-    Maintaining it in Spot does not seem worth the human effort and
-    CI/CD resources it takes.
+  - Preliminary support for \forall and \exists:
+
+    - A formula such as '\forall a, c: a U (b W c)' is stored
+      as a formula of type op::forall with children [a, c, a U (b W c)].
+      I.e., the last child is the quantified formula, and previous children
+      are the atomic proposition to quantify.  \exists is handled
+      similarly.
+    - The parser will allow these quantification operators at the
+      top-level of a formula, or right below another quantification
+      operator.
+    - spot::collect_aps_with_polarities() and
+      spot::collect_equivalent_literals() were taught to ignore the
+      quantifiers when processing formulas.
+    - spot::print_dot(), spot::print_psl(), and other print functions
+      learned to print these new operators.
+    - spot::normalize_quantifier() is used to remove quantification
+      over variables that are missing from the body.  It also removes
+      variables that have a constant polarity.
+    - the spot::tl_simplifier uses spot::normalize_quantifier()
+      For instance:
+         % ltlfilt --simplify=1 -f '\forall a, c: a U b W c'
+         Gb
+    - spot::ltl_to_tgba_fm() now supports existentially quantified LTL
+      formulas (producing non-deterministic TGBA).  The quantification
+      is performed during the translation, not a posteriori.  Universal
+      quantification is _not_ supported.
+    - spot::obligation_synthesis() and spot::ltlf_to_mtdfa_for_synthesis()
+      support both quantifiers, even nested.  In particular, universal
+      quantification is used to implement synthesis with partial
+      observability.
 
   Bug fixes:
 
@@ -121,13 +170,13 @@ New in spot 2.14.5.dev  (not yet released)
     disabled (i.e., defaults to "no") in this release, until we find a
     fix.  (Issue #610)
 
-  - A poorly defined hash function used in tgba_determinize() could
-    cause that function to throw a "robin_hood::map overflow"
-    exception.  (Issue #631.)
-
   - The decomposition in the context of LTL synthesis contained an error in the
     splitting of implications. The correction did not impact any cases in the
     Syntcomp or any of the tests.
+
+  - A poorly defined hash function used in tgba_determinize() could
+    cause that function to throw a "robin_hood::map overflow"
+    exception.  (Issue #631.)
 
 New in spot 2.14.5  (2025-01-11)
 
