@@ -666,6 +666,7 @@ namespace
             has_oblig = true;
             break;
           }
+    std::vector<spot::formula> unobs_vec;
     if (has_oblig)
       {
         // For Mealy semantics, inputs should appear first in the
@@ -674,24 +675,47 @@ namespace
         // register them in the order they are found in the formula,
         // this ways variables that are used together are more
         // likely to be close in the order.
-        std::unordered_set<spot::formula> come_first;
-        if (opt_semantics != semantics_moore) // Default or Mealy
-          for (const std::string& s: input_aps)
-            come_first.insert(spot::formula::ap(s));
-        else
-          for (const std::string& s: output_aps)
-            come_first.insert(spot::formula::ap(s));
+        std::vector<unsigned char> come_first;
+        come_first.resize(spot::formula::apid_count(), 0U);
+
+        unsigned val = (opt_semantics != semantics_moore) ? 1 : 2;
+        for (const std::string& s: input_aps)
+          come_first[spot::formula::ap(s).apid()] = val;
+        val = 3 - val;
+        for (const std::string& s: output_aps)
+          come_first[spot::formula::ap(s).apid()] = val;
+
+        unobs_vec.reserve(unobs_aps.size());
+        for (const std::string& s: unobs_aps)
+          {
+            spot::formula ap = spot::formula::ap(s);
+            come_first[ap.apid()] = 3;
+            unobs_vec.push_back(ap);
+          }
 
         f.traverse([&](const spot::formula& f) {
-          if (f.is(spot::op::ap) && (come_first.find(f) != come_first.end()))
+          if (!f.is(spot::op::ap))
+            return false;
+          if (come_first[f.apid()] == 1)
             preorder.register_proposition(f);
           return false;
         });
-        // Unobservable input can be put anywhere, since they won't be
-        // part of the game, so currently we don't pre-register them.
-        // However the ltlf_to_mtdfa_for_synthesis() function will later
-        // register them at the bottom, where they are easier to
-        // quantify away.
+        // obligation_synthesis() will register output variables, and
+        // then all quantified variables.  If Moore semantics are used
+        // we have already registered output variables, but if
+        // quantified variables are used, let's register input
+        // variables too, so that quantified variables are put below.
+        if (opt_semantics == semantics_moore
+            && (!unobs_aps.empty() || f.is_quantified()))
+          {
+            f.traverse([&](const spot::formula& f) {
+              if (!f.is(spot::op::ap))
+                return false;
+              if (come_first[f.apid()] == 2)
+                preorder.register_proposition(f);
+              return false;
+            });
+          }
       }
 
     //gi->dict->dump(std::cerr);
@@ -747,9 +771,11 @@ namespace
               auto& bv = gi->bv;
               if (bv)
                 sw.start();
+              if (!unobs_vec.empty())
+                *sub_f = spot::formula::forall(unobs_vec, *sub_f);
               spot::mtdswa_ptr aut =
                 spot::obligation_synthesis(*sub_f, gi->dict, *sub_o,
-                                           &unobs_aps, opt_real);
+                                           opt_real);
               if (bv)
                 {
                   auto delta = sw.stop();
