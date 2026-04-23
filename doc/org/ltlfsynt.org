@@ -109,7 +109,7 @@ ltlfsynt --semantics=Mealy -F counter2.ltlf
 #+begin_example
 REALIZABLE
 HOA: v1
-States: 5
+States: 4
 Start: 0
 AP: 7 "init0" "init1" "inc" "ob0" "ob1" "oc1" "oc0"
 acc-name: all
@@ -118,20 +118,18 @@ properties: trans-labels explicit-labels state-acc deterministic
 controllable-AP: 3 4 5 6
 --BODY--
 State: 0
-[!0&!1&!2&!3&!4&!5&!6 | !0&!1&2&!3&!4&!5&6 | !0&1&!2&!3&4&!5&!6 | 0&!1&!2&3&!4&!5&!6 | 0&1&!2&3&4&!5&!6] 1
-[!0&1&2&!3&4&!5&6] 2
-[0&!1&2&3&!4&5&6] 3
-[0&1&2&3&4&5&6] 4
+[!0&!1&!2&!3&!4&!5&!6 | !0&!1&2&!3&!4&!5&6 | !0&1&!2&!3&4&!5&!6 | 0&!1&!2&3&!4&!5&!6 | 0&1&!2&3&4&!5&!6] 0
+[!0&1&2&!3&4&!5&6] 1
+[0&!1&2&3&!4&5&6] 2
+[0&1&2&3&4&5&6] 3
 State: 1
-[!2&!6 | 2&6] 1
-State: 2
 [!2&3&4&!5&!6] 1
-[2&3&4&5&6] 4
+[2&3&4&5&6] 3
+State: 2
+[2&!3&4&!5&6] 1
+[!2&!3&4&!5&!6] 2
 State: 3
-[!2&!3&4&!5&!6] 1
-[2&!3&4&!5&6] 2
-State: 4
-[!2&!3&!4&!5&!6 | 2&!3&!4&!5&6] 1
+[!2&!3&!4&!5&!6 | 2&!3&!4&!5&6] 3
 --END--
 #+end_example
 
@@ -159,24 +157,15 @@ Remember that unlike [[file:ltlsynt.org][=ltlsynt=,]] we are working with finite
 here.  The controller will read a sequence of input assignments of
 infinite size, but that sequence should have at least one position
 such that the combination of inputs and outputs up to that point
-satisfy the specification.  Once the specification has been satisfied,
-the controller is free to output anything.  This is why the values of
-=ob0=, =ob1=, =oc1= are not specified on the transition leaving the
-rightmost state: that state is reached either when the counter wrapped
-to zero, or when the input signals do not satisfy our assumption
-(=G(!inc -> X[!]inc)=), so at that point the specification has been
-satisfied, and the output variable can be chosen freely.
-
-The reason we still force the value of =oc0= to be equal to that of
-=inc= on the last state is because of an optimization in =ltlfsynt=:
-since the specification contains =G(inc <-> oc0)=, the formula can be
-simplified by replacing all occurrences of =oc0= by =inc=.  =ltlfsynt=
-does this to reduce the number of variables it has to deal with, and
-only adds the =oc0= variable back at the very end, before presenting
-results.
+satisfy the specification, at which point the controller may be
+assumed to have terminated its work.  This termination necessarily
+occurs after a finite number of steps, so the controller may not loop.
+In the above strategy, a self-loop should be understood as follows:
+when a self-loop is taken for the first time, the specification has
+been satisfied and the controller terminates.
 
 The controller may be output as an And-Inverter-Graph in [[http://fmv.jku.at/aiger/][AIGER format]]
-using the =--aiger= option:
+using the =--aiger= option.
 
 #+BEGIN_SRC sh :exports both
   ltlfsynt --semantics=Mealy -F counter2.ltlf --aiger
@@ -513,6 +502,61 @@ experimental.
 ** AIG encoding
 
 =ltlfsynt= shares its AIG encoder with =ltlsynt=, so see [[file:ltlsynt.org::AIG][=ltlsynt='s --aiger option]].
+
+* Synthesis with partial observability
+
+The option ~--unobservable-ins=...~ can be used to activate a mode
+where =ltlfsynt= looks for a controller where the listed propositions
+are considered as unobservable outputs.  In other words, the generated
+controller should not depend on this variable.
+
+Consider the following specification that requests that if =u= holds in
+the last step then =i<->o= should hold at one step, else =i|o= should
+hold at one step.  If both =i= and =u= are declared as (observable)
+inputs, this is realizable by a controller that satisfies the formula in
+one step.  (Remember that the controller stops after executing its
+first self-loop.)
+
+#+BEGIN_SRC sh :exports code
+  f='((GFu)->F(i<->o))&((GF!u)->F(i|o))'
+  ltlfsynt --semantics=Mealy -f "$f" --ins=i,u --hide --dot=strategy
+#+END_SRC
+
+#+NAME: ltlfsyntunobs1
+#+BEGIN_SRC sh :exports none
+  f='((GFu)->F(i<->o))&((GF!u)->F(i|o))'
+  ltlfsynt --semantics=Mealy -f "$f" --ins=i,u --hide --dot=strategy:.
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlfsyntunobs1.svg :var txt=ltlfsyntunobs1 :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlfsyntunobs1.svg]]
+
+If =u= is unobservable, we need a more complex controller that can
+stop after one or two steps depending on the initial value of =i=.
+
+#+BEGIN_SRC sh :exports code
+  ltlfsynt --semantics=Mealy -f "$f" --ins=i --unobservable-ins=u --hide --dot=strategy
+#+END_SRC
+
+#+NAME: ltlfsyntunobs2
+#+BEGIN_SRC sh :exports none
+  f='((GFu)->F(i<->o))&((GF!u)->F(i|o))'
+  ltlfsynt --semantics=Mealy -f "$f" --ins=i --unobservable-ins=u --hide --dot=strategy:.
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlfsyntunobs2.svg :var txt=ltlfsyntunobs2 :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlfsyntunobs2.svg]]
+
+(Of course that more complex controller is also a valid controller if
+=u= is observable.)
 
 #+BEGIN_SRC sh :results silent :exports results
 rm -f counter2.ltlf

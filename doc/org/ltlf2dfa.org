@@ -14,7 +14,6 @@ acceptance.
    :CUSTOM_ID: MTDFA
    :END:
 
-
 Internally, the translation builds a DFA that is stored as an array of
 Multi-Terminal BDDs.  Such a structure is called MTDFA in Spot (for
 Multi-Terminal DFA).  It can be presented as follows:
@@ -93,6 +92,78 @@ ltlf2dfa --keep-names 'a M b' --dot=.A
 
 #+RESULTS:
 [[file:ltlf2dfa4.svg]]
+
+
+* Support for Quantified LTLf
+
+This tool can translate LTLf formulas that are quantified at the top-level.
+
+Compare:
+
+#+NAME: ltlf2dfa8a
+#+BEGIN_SRC sh :exports code
+ltlf2dfa --keep-names '((GFu)->F(i<->o))&((GF!u)->F(i|o))' --dot=.A
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlf2dfa8a.svg :var txt=ltlf2dfa8a :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlf2dfa8a.svg]]
+
+With:
+
+#+NAME: ltlf2dfa8b
+#+BEGIN_SRC sh :exports code
+ltlf2dfa --keep-names '\forall u: ((GFu)->F(i<->o))&((GF!u)->F(i|o))' --dot=.A
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlf2dfa8b.svg :var txt=ltlf2dfa8b :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlf2dfa8.svg]]
+
+
+
+The following example requests that accepted words have even length
+(=even= implies =X(!even)= so the automaton could stop, but =!even=
+implies =X[!]even= so the automaton may not stop), and that =a= should
+hold at each even step (=a= is free on odd steps).  The variable
+=even= is used to keep track of the parity of the steps during the
+construction, but it does not appear in the resulting automaton
+because it has been quantified away.
+
+#+NAME: ltlf2dfa8c
+#+BEGIN_SRC sh :exports code
+ltlf2dfa --keep-names '\exists even: !even & G(even <-> X(!even)) & G(even -> a)'  --dot=.A
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlf2dfa8c.svg :var txt=ltlf2dfa8c :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlf2dfa8c.svg]]
+
+
+Quantifiers may also be nested, as long as they all appear at the
+top-level.  For instance here is a convoluted way to build a DFA that
+accepts words where =r= holds exactly once.
+
+#+NAME: ltlf2dfa8d
+#+BEGIN_SRC sh :exports code
+ltlf2dfa --keep-names '\exists p: \forall q: F(p) & (F(p&q)->G(p->q)) & G(r<->p)' --dot=.A
+#+END_SRC
+
+#+BEGIN_SRC dot :file ltlf2dfa8d.svg :var txt=ltlf2dfa8d :exports results
+  $txt
+#+END_SRC
+
+#+RESULTS:
+[[file:ltlf2dfa8d.svg]]
 
 
 * Output format issues
@@ -305,7 +376,8 @@ The =--translation= option can be used to select between two translation algorit
 
 - With =--translation=direct=, the entire formula is translated
   directly.  The resulting MTDFA can only be minimized after the
-  translation.
+  translation.  This is the only approach that supports /quantified/
+  LTLf formulas.
 - With =--translation=compositional=, the formula is split according
   to the Boolean operators that appear above temporal operators.
   Maximal subformulas whose top-level operator is temporal are
@@ -314,6 +386,9 @@ The =--translation= option can be used to select between two translation algorit
   gives the opportunity to minimize the intermediate MTDFAs before
   they get combined.
 
+By default, =--translation=auto= will use the compositional approach
+for unquantified LTLf formulas, and the direct approach for quantified
+LTLf formulas.
 
 Pass =--minimize=no= to turn off MTDFA minimization.
 
