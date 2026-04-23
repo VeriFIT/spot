@@ -192,7 +192,7 @@ Currently, synthesis with unobservable inputs requires passing
 
 #+NAME: ltlsyntunobs
 #+BEGIN_SRC sh :exports code
-  ltlsynt --algo=ds -f 'G(u <-> X!u) -> XF(u <-> o)' --hide-status --simplify --dot
+  ltlsynt --algo=ds -f 'G(u <-> X!u) -> XF(u <-> o)' --hide-status --dot
 #+END_SRC
 
 #+BEGIN_SRC dot :file ltlsyntunobs.svg :var txt=ltlsyntunobs :exports results
