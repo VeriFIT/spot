@@ -58,9 +58,11 @@ static const argp_option options[] =
     { "negate", OPT_NEGATE, nullptr, 0, "negate each formula", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Processing options:", 10 },
-    { "translation", OPT_TRANS, "direct|compositional", 0,
+    { "translation", OPT_TRANS, "direct|compositional|auto", 0,
       "Whether to translate the formula directly as a whole, or to "
-      "assemble translations from subformulas.  Default is compositional.",
+      "assemble translations from subformulas.  In the default 'auto' mode,"
+      "compositional is used for unquantified formulas, otherwise the direct "
+      "translation is used.",
       0 },
     { "keep-names", OPT_KEEP_NAMES, nullptr, 0,
       "Keep the names of formulas that label states in the output automaton.",
@@ -115,18 +117,24 @@ static const char argp_program_doc[] = "\
 Convert LTLf formulas to transition-based deterministic finite automata.\n\n\
 If multiple formulas are supplied, several automata will be output.";
 
-enum translation_type { translation_direct, translation_compositional };
+enum translation_type { translation_direct,
+                        translation_compositional,
+                        translation_auto };
 
 static const char* const translation_args[] =
   {
-    "direct", "compositional", "compose", nullptr
+    "direct",
+    "compositional", "compose",
+    "auto", nullptr
   };
 static translation_type translation_values[] =
   {
-    translation_direct, translation_compositional, translation_compositional,
+    translation_direct,
+    translation_compositional, translation_compositional,
+    translation_auto,
   };
 ARGMATCH_VERIFY(translation_args, translation_values);
-static translation_type opt_trans = translation_compositional;
+static translation_type opt_trans = translation_auto;
 
 static const char* const minimize_args[] =
   {
@@ -282,9 +290,10 @@ namespace
         }
 
       spot::mtdfa_ptr a;
-      if (opt_trans == translation_direct)
+      if ((opt_trans == translation_direct)
+          || (opt_trans == translation_auto && f.is_quantified()))
         {
-          a = spot::ltlf_to_mtdfa(f, dict);
+          a = spot::ltlf_to_mtdfa(f, dict, true, true, true, opt_keep_names);
           if (!opt_keep_names)
             a->names.clear();
           if (opt_minimize)
@@ -292,6 +301,11 @@ namespace
         }
       else
         {
+          if (SPOT_UNLIKELY(f.is_quantified()))
+            error_at_line(2, 0, filename, linenum,
+                          "--translation=compositional does not support "
+                          "quantified formulas");
+
           a = spot::ltlf_to_mtdfa_compose(f, dict,
                                           opt_minimize,
                                           opt_composition_by_ap,

@@ -273,14 +273,26 @@ namespace spot
   ///   state (\a detect_empty_univ)
   ///
   /// States will be labeled using LTLf formulas, this is required by
-  /// the construction.
+  /// the construction.  This function is also able to translate
+  /// quantified LTLf formulas, but to do so, the code first strips
+  /// the quantifiers from the translated formula, and just apply the
+  /// quantification at all steps of the translation.  By default,
+  /// the resulting automaton will be labeled by unquantified LTLf
+  /// formula, which can be a bit misleading.
+  ///
+  /// - if \a preserve_quantifiers_in_names is set, the formulas that
+  ///   name state will preserve the original quantifiers (an be
+  ///   simplified to omit unnecessary quantifications).  Adding those
+  ///   quantifiers back has a small overhead (each formula has to be
+  ///   reconstructed), so it is disabled by default.
   ///
   /// \cite duret.25.ciaa
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                 bool fuse_same_bdds = true,
                 bool simplify_terms = true,
-                bool detect_empty_univ = true);
+                bool detect_empty_univ = true,
+                bool preserve_quantifiers_in_names = false);
 
 
   enum ltlf_synthesis_backprop {
@@ -483,7 +495,8 @@ namespace spot
                             bool realizability = false,
                             bool one_step_preprocess = false,
                             bool bfs = true,
-                            bool terminating_semantics = true);
+                            bool terminating_semantics = true,
+                            bool preserve_quantifiers_in_names = false);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;

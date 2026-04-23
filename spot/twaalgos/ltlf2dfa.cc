@@ -1608,6 +1608,20 @@ namespace spot
     {
       return x;
     }
+
+    static formula copy_quantifiers(formula from, formula to)
+    {
+      if (!from.is_quantified())
+        return to;
+      std::vector<formula> vars;
+      unsigned fsz = from.size();
+      vars.reserve(fsz - 1);
+      for (unsigned i = 0; i < fsz - 1; ++i)
+        vars.push_back(from[i]);
+      return formula::quantify(from.kind(),
+                               std::move(vars),
+                               copy_quantifiers(from[fsz - 1], to));
+    }
   }
 
   // This is the main translation function.  It has grown to do a bit
@@ -1621,8 +1635,10 @@ namespace spot
                                  bool realizability,
                                  bool preprocess,
                                  bool bfs,
-                                 bool terminating_semantics)
+                                 bool terminating_semantics,
+                                 bool preserve_quantifiers_in_names)
   {
+    formula orig_f = nullptr;
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
     std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
     std::unordered_map<formula, int> formula_to_state;
@@ -1734,6 +1750,8 @@ namespace spot
       // they are found in the formula.
       if (f.is_quantified())
         {
+          if (preserve_quantifiers_in_names)
+            orig_f = f;
           is_quantified = true;
           std::vector<unsigned char> inblock;
           while (f.is(op::exists, op::forall))
@@ -1768,6 +1786,18 @@ namespace spot
       dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
       delete a;
     }
+
+    auto fixup_names = [&]() -> std::vector<formula>
+      {
+        // If the formula was quantified, the quantifiers have been
+        // removed before the translation (but applied during
+        // translation), and we need to add them back to the names of
+        // the states.
+        if (orig_f)
+          for (formula& name: names)
+            name = normalize_quantifiers(copy_quantifiers(orig_f, name));
+        return std::move(names);
+      };
 
     auto trans_succ = [&](formula g) -> bdd {
       bdd b = ltlf_to_mtbdd(g);
@@ -1970,7 +2000,7 @@ namespace spot
               (states[i], strategy_choice, strategy_map_finalize,
                &cache_, hash_key_finalstrat);
         dfa->states = std::move(states);
-        dfa->names = std::move(names);
+        dfa->names = fixup_names();
         dict_->register_all_propositions_of(this, dfa);
         for (bdd b = forallvars; b != bddtrue; b = bdd_high(b))
           dict_->unregister_variable(bdd_var(b), dfa);
@@ -2007,7 +2037,7 @@ namespace spot
                                 &cache_, hash_key_rename);
 
     dfa->states = std::move(states);
-    dfa->names = std::move(names);
+    dfa->names = fixup_names();
     dict_->register_all_propositions_of(this, dfa);
     for (bdd b = forallvars; b != bddtrue; b = bdd_high(b))
       dict_->unregister_variable(bdd_var(b), dfa);
@@ -2307,7 +2337,7 @@ namespace spot
       case op::UConcat:
       case op::exists:
       case op::forall:
-        throw std::runtime_error("ltlf_to_mtdfa: unsupported operator");
+        throw std::runtime_error("ltlf_to_mtdfa_compose: unsupported operator");
       }
     SPOT_UNREACHABLE();
     return nullptr;
@@ -2319,10 +2349,13 @@ namespace spot
 
   mtdfa_ptr ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                           bool fuse_same_bdds, bool simplify_terms,
-                          bool detect_empty_univ)
+                          bool detect_empty_univ,
+                          bool preserve_quantifiers_in_names)
   {
     ltlf_translator trans(dict, simplify_terms);
-    return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ);
+    return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
+                               nullptr, false, false, false, true, true,
+                               preserve_quantifiers_in_names);
   }
 
   mtdfa_ptr ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,

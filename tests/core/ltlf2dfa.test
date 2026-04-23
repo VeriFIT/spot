@@ -150,6 +150,32 @@ sed '/State:/s/ ".*$//' exp.hoa > exp2.hoa
 ltlf2dfa --composition=size >out.hoa <in
 diff out.hoa exp2.hoa
 
+
+ltlf2dfa -f '\forall a: (a U b) | (b U !a)' --keep-names > out.hoa
+cat >exp.hoa <<\EOF
+HOA: v1
+name: "\\forall a: ((a U b) | (b U !a))"
+States: 3
+Start: 0
+AP: 1 "b"
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+properties: trans-labels explicit-labels trans-acc deterministic
+--BODY--
+State: 0 "\forall a: ((a U b) | (b U !a))"
+[!0] 1
+[0] 2 {0}
+State: 1 "b"
+[0] 2 {0}
+State: 2 "1"
+[t] 2 {0}
+--END--
+EOF
+diff out.hoa exp.hoa
+
+ltlf2dfa -f '\forall a: (a U b) | (b U !a)' --trans=compo 2>err && exit 2
+grep 'does not support' err
+
 # We also use different minimization/simplify/translation algorithms,
 # but because the formulas are very simple, the result is expected to
 # be identical.
