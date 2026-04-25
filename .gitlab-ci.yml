@@ -446,6 +446,8 @@ publish-stable:
     - curl -X POST "https://archive.softwareheritage.org/api/1/origin/save/git/url/https://gitlab.lre.epita.fr/spot/spot/"
     - curl "https://web.archive.org/save/https://www.lrde.epita.fr/dload/spot/$tgz"
     - curl "https://web.archive.org/save/https://www.lre.epita.fr/dload/spot/$tgz"
+    - curl "https://web.archive.org/save/https://www.lrde.epita.fr/dload/spot/"
+    - curl "https://web.archive.org/save/https://www.lre.epita.fr/dload/spot/"
 
 publish-unstable:
   only:
