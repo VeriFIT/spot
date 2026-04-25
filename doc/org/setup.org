@@ -1,11 +1,11 @@
 #+OPTIONS: num:nil toc:2 html-postamble:nil ^:nil
 #+EMAIL: spot@lrde.epita.fr
 #+HTML_LINK_HOME: index.html
-#+MACRO: LASTDATE 2026-04-24
+#+MACRO: LASTDATE 2026-04-25
 
 #+NAME: SPOT_VERSION
 #+BEGIN_SRC python :exports none :results value :wrap org
-return "2.15"
+return "2.15.1"
 #+END_SRC
 
 #+NAME: TARBALL_LINK
