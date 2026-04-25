@@ -458,6 +458,10 @@ namespace spot
             bool want_complete = pref_ & Complete;
             aut = mtdwa->as_twa(true, false, want_complete);
             aut->prop_weak(true);
+
+            if (r.is_syntactic_stutter_invariant())
+              aut->prop_stutter_invariant(true);
+
             // Unless we need a Büchi or colored automaton, if the
             // weak automaton has all its edges marked as accepting,
             // we can reduce the acceptance to t.

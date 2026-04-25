@@ -314,3 +314,6 @@ ltl2tgba: option 'sccfilter' was not used (possible typo?)
 ltl2tgba: failed to parse --options near 'sccfilter=x'
 EOF
 diff experror output
+
+# X-free formulas should produce stutter-invariant automata
+ltl2tgba -BD -f 'Fa -> Fb' | grep stutter-invariant

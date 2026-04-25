@@ -5,6 +5,10 @@ New in spot 2.15.0.dev  (not yet released)
   - Fix compilation error due to std::result_of being removed from
     C++20.  (Issue #643.)
 
+  - The new path to translate syntactic obligation to deterministic
+    Büchi automata forgot to mark automata generated from X-free
+    formulas as stutter-invariant.
+
 New in spot 2.15  (2026-04-24)
 
   Backward-incompatible changes:
