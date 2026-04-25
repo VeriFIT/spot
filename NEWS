@@ -1,6 +1,9 @@
 New in spot 2.15.0.dev  (not yet released)
 
-  Nothing yet.
+  Bugs fixes:
+
+  - Fix compilation error due to std::result_of being removed from
+    C++20.  (Issue #643.)
 
 New in spot 2.15  (2026-04-24)
 
