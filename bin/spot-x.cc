@@ -106,7 +106,7 @@ will compute an independent degeneralization order for each SCC it \
 processes.  This is currently disabled by default.") },
     { DOC("degen-lskip", "If non-zero (the default), the degeneralization \
 algorithm will skip as many levels as possible for each transition.  This \
-is enabled by default as it very often reduce the number of resulting \
+is enabled by default as it very often reduces the number of resulting \
 states.  A consequence of skipping levels is that the degeneralized \
 automaton tends to have smaller cycles around the accepting states.  \
 Disabling skipping will produce automata with large cycles, and often \
@@ -193,7 +193,7 @@ transition-pruning is disabled, it is just an upper bound otherwise.") },
     { DOC("relabel-bool", "If set to a positive integer N, a formula \
 with N atomic propositions or more will have its Boolean subformulas \
 abstracted as atomic propositions during the translation to automaton. \
-This relabeling can speeds the translation if a few Boolean subformulas \
+This relabeling can speed the translation if a few Boolean subformulas \
 use many atomic propositions.  This relabeling make sure \
 the subexpressions that are replaced do not share atomic propositions.  \
 By default N=4.  Setting this value to 0 will disable the rewriting.") },
@@ -262,10 +262,11 @@ some of these are useless.  Setting sat-acc automatically \
 sets sat-minimize to 1 if not set differently.") },
     { DOC("state-based",
           "Set to 1 to instruct the SAT-minimization procedure to produce \
-an automaton where all outgoing transition of a state have the same acceptance \
-sets.  By default, this is only enabled when options -B or -S are used.") },
+an automaton where all outgoing transitions of a state have the same \
+acceptance sets.  By default, this is only enabled when options -B or -S are \
+used.") },
     { DOC("simul-method",
-          "Chose which simulation based reduction to use: 1 force the \
+          "Choose which simulation based reduction to use: 1 force the \
 signature-based BDD implementation, 2 force matrix-based and 0, the default, \
 is a heuristic which chooses which implementation to use.") },
     { nullptr, 0, nullptr, 0, nullptr, 0 }

@@ -96,7 +96,7 @@ static const argp_option options[] =
       "seed for the random number generator (0)", 0 },
     { "states", 'Q', "RANGE", 0, "number of states to output (10)", 0 },
     { "state-based-acceptance", 'S', nullptr, 0,
-      "used state-based acceptance", 0 },
+      "use state-based acceptance", 0 },
     { "sbacc", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     RANGE_DOC,
     { nullptr, 0, nullptr, 0, "ACCEPTANCE may be either a RANGE (in which case "

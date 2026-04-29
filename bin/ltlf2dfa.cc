@@ -362,7 +362,7 @@ namespace
                     << " (" << ((bs.cachesize+32)/64) << "KB * 6 = "
                     << ((bs.cachesize*6+32)/64) << "KB)\n"
                     << "BuDDy hashsize: " << bs.hashsize
-            // a has entry is 4 bytes, so 256 entries is 1KB
+            // a hash entry is 4 bytes, so 256 entries is 1KB
                     << " (" << ((bs.hashsize+128)/256) << "KB)\n"
                     << "BuDDy gbcnum: " << bs.gbcnum << '\n';
         }

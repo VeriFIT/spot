@@ -68,7 +68,7 @@ Build 5 random positive Boolean combination of GFa and GFb:\n"
   "  % ltlmix -f GFa -f GFb --boolean-prio=not=0,xor=0,implies=0,equiv=0 -n5";
 
 static const argp_option options[] = {
-    // Keep this alphabetically sorted (expect for aliases).
+    // Keep this alphabetically sorted (except for aliases).
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Generation parameters:", 2 },
     { "allow-dups", OPT_DUPS, nullptr, 0,

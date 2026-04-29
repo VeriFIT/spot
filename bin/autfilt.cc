@@ -424,7 +424,7 @@ static const argp_option options[] =
     { "to-finite", OPT_TO_FINITE, "alive", OPTION_ARG_OPTIONAL,
       "Convert an automaton with \"alive\" and \"!alive\" propositions "
       "into a Büchi automaton interpretable as a finite automaton.  "
-      "States with a outgoing \"!alive\" edge are marked as accepting.", 0 },
+      "States with an outgoing \"!alive\" edge are marked as accepting.", 0 },
     { "given-automaton", OPT_GIVEN_AUTOMATON, "FILENAME", 0,
       "simplify input automata assuming they are only used in the context "
       "where the property expressed by automaton FILENAME hold", 0 },
@@ -440,7 +440,7 @@ static const argp_option options[] =
       "(stutter-restrict) build a stutter-invariant results by removing "
       "words outside the given knowledge, "
       "(auto-small) and (auto-si) apply minato and stutter-relax in a loop, "
-      "returning the smallest results they have seen, focussing on "
+      "returning the smallest results they have seen, focusing on "
       "stutter-invarant results in the case of auto-si", 0 },
     { "given-fixpoint", OPT_GIVEN_FIXPOINT, nullptr, 0,
       "If multiple knowledges have been given with --given-formula or "
@@ -472,7 +472,7 @@ static const argp_option options[] =
       "otherwise.  If any option among --low, --medium, or --high is given, "
       "then the simplification goal defaults to --small unless specified "
       "otherwise.  If none of those options are specified, then autfilt "
-      "acts as is --any --low were given: these actually disable the "
+      "acts as if --any --low were given: these actually disable the "
       "simplification routines.", 22 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },

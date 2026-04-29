@@ -26,7 +26,7 @@ std::optional<std::vector<std::string>> all_output_aps;
 std::optional<std::vector<std::string>> all_input_aps;
 std::optional<std::vector<std::string>> all_unobs_aps;
 
-// Store refirst, separate the filters that are regular expressions from
+// First, separate the filters that are regular expressions from
 // the others.  Compile the regular expressions while we are at it.
 std::vector<std::regex> regex_in;
 std::vector<std::regex> regex_unobs;

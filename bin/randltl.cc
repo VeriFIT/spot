@@ -68,7 +68,7 @@ enum {
 
 static const argp_option options[] =
   {
-    // Keep this alphabetically sorted (expect for aliases).
+    // Keep this alphabetically sorted (except for aliases).
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Type of formula to generate:", 1 },
     { "boolean", 'B', nullptr, 0, "generate Boolean formulas", 0 },

@@ -176,7 +176,7 @@ int exec_with_timeout(const char* cmd);
 
 // Run a command (whose args[0], args[1], etc. are given by args), and
 // return its captured stdout.  Stderr is not captured.  Will abort
-// with an error message if the command is not found, or if it exit
+// with an error message if the command is not found, or if it exits
 // with a non-zero status code.
 std::string read_stdout_of_command(char* const* args);
 std::string read_stdout_of_command(std::vector<char*> args,

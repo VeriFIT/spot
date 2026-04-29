@@ -58,7 +58,7 @@ to_unsigned (const char *s, const char* where)
   unsigned res = lres;
   if (res != lres || errno == ERANGE)
     error(2, 0,
-          "value '%s' is too large for a unsigned int (in argument of %s).",
+          "value '%s' is too large for an unsigned int (in argument of %s).",
           s, where);
   return res;
 }

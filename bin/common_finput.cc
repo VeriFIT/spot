@@ -150,7 +150,7 @@ job_processor::process_stream(std::istream& is,
       ++linenum;
     }
 
-  // Each line of the file and send them to process_string,
+  // Read each line of the file and send it to process_string,
   // optionally extracting a column of a CSV file.
   while (!abort_run && std::getline(is, line))
     if (!line.empty())
@@ -209,7 +209,7 @@ job_processor::process_stream(std::istream& is,
             // double-quotes; ② if a field contains a double-quote
             // then it should be double quoted, and the occurrences
             // of double-quotes should be doubled.  Therefore a CSV file
-            // may no contain a line such as:
+            // may not contain a line such as:
             //    foo,bar"ba""z",12
             // Tools have different interpretation of such a line.
             // For instance Python's pandas.read_csv() function will
@@ -254,7 +254,7 @@ job_processor::process_stream(std::istream& is,
             if (!*str)
               {
                 if (colnum != col_to_read)
-                  // Skip this line as it has no enough columns.
+                  // Skip this line as it does not have enough columns.
                   continue;
                 else
                   // The target columns ends at the end of the line.

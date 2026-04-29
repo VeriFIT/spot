@@ -102,7 +102,7 @@ static const argp_option options[] =
       "full|compositional|restricted|bfs-on-the-fly|dfs-on-the-fly", 0,
       "The type of translation to use: (full) is a direct translation to MTDFA,"
       " (compositional) breaks the specification on Boolean operators and"
-      " builds the MTDFA by compositing minimized subautomata, (restrict) is"
+      " builds the MTDFA by composing minimized subautomata, (restrict) is"
       " a direct translation but that is restricted to the only part useful "
       "to synthesis, (dfs-on-the-fly) is the on-the-fly version of "
       "\"restrict\" that follow a DFS order, solving the game as the "
@@ -112,7 +112,7 @@ static const argp_option options[] =
       "Minimize the automaton (disabled by default except for the compositional"
       " translation). Has no effect on on-the-fly translations.", 0 },
     { "composition", OPT_COMPOSITION, "size|ap", 0,
-      "If the translation is set to \"compositional\" this option specify how"
+      "If the translation is set to \"compositional\" this option specifies how"
       " to order n-ary compositions: by increasing size, or trying to group"
       " operands based on their APs (the default).",
       0 },

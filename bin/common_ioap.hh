@@ -41,7 +41,7 @@ void split_aps(const std::string& arg, std::vector<std::string>& where);
 // fill regex_in, regex_out, regex_unobs and identifier_map.
 void process_io_options();
 
-// Store refirst, separate the filters that are regular expressions from
+// First, separate the filters that are regular expressions from
 // the others.  Compile the regular expressions while we are at it.
 extern std::vector<std::regex> regex_in;
 extern std::vector<std::regex> regex_out;

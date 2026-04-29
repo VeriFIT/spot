@@ -39,7 +39,7 @@ static const char argp_program_doc[] =
 static const argp_option options[] =
   {
     /**************************************************/
-    // Keep this alphabetically sorted (expect for aliases).
+    // Keep this alphabetically sorted (except for aliases).
     { nullptr, 0, nullptr, 0, "Pattern selection:", 1},
     { "ks-nca", gen::AUT_KS_NCA, "RANGE", 0,
       "A co-Büchi automaton with 2N+1 states for which any equivalent "
