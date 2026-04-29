@@ -1514,6 +1514,24 @@ namespace
   }
 
 
+  bool
+  given_minato_here(spot::twa_graph_ptr& aut)
+  {
+    bool has_changed = false;
+    bool changed = false;
+    do
+      for (spot::const_twa_graph_ptr knowledge: opt->given_automata)
+        {
+          aut = spot::update_bounds_given_here(aut, knowledge,
+                                               &changed);
+          has_changed |= changed;
+        }
+    while (changed && opt_given_fixpoint);
+    if (has_changed)
+      aut = spot::bounds_simplify_here(aut, &has_changed);
+    return has_changed;
+  }
+
   struct autfilt_processor: hoa_processor
   {
   private:
@@ -1715,6 +1733,11 @@ namespace
         aut = opt->rem_ap.strip(aut);
 
       spot::twa_graph_ptr given_best = nullptr;
+      unsigned long long given_best_trans = 0ULL;
+      if (opt_given_strat & GIVEN_LOOP)
+        // Assume the current aut is the best we have for now, and we
+        // will try to apply stutter_relax and minato to improve this.
+        given_best = aut;
       if (!opt->given_automata.empty())
         {
         given_loop:
@@ -1730,15 +1753,7 @@ namespace
           else if (opt_given_strat & GIVEN_STUTTER_RESTRICT)
             si = spot::stutterize_given(aut, opt->given_automata, false);
           if (opt_given_strat & GIVEN_MINATO)
-            {
-              bool changed = false;
-              do
-                for (spot::const_twa_graph_ptr knowledge: opt->given_automata)
-                  aut = spot::update_bounds_given_here(aut, knowledge,
-                                                       &changed);
-              while (changed && opt_given_fixpoint);
-              aut = spot::bounds_simplify_here(aut);
-            }
+            given_minato_here(aut);
 
           if (opt_given_strat & GIVEN_LOOP)
             {
@@ -1750,6 +1765,7 @@ namespace
                   }
                 if (opt_given_strat & GIVEN_WANT_SI)
                   {
+                    spot::check_stutter_invariance(candidate);
                     if (given_best->prop_stutter_invariant().is_true() &&
                         !candidate->prop_stutter_invariant().is_true())
                       return false;
@@ -1757,6 +1773,7 @@ namespace
                         candidate->prop_stutter_invariant().is_true())
                       {
                         given_best = candidate;
+                        given_best_trans = 0ULL;
                         return true;
                       }
                   }
@@ -1773,6 +1790,17 @@ namespace
                         candidate->prop_universal().is_true()))
                   {
                     given_best = candidate;
+                    given_best_trans = 0ULL;
+                    return true;
+                  }
+                if (given_best_trans == 0)
+                  given_best_trans = count_all_transitions(given_best);
+                unsigned long long cand_trans =
+                  count_all_transitions(candidate);
+                if (given_best_trans > cand_trans)
+                  {
+                    given_best = candidate;
+                    given_best_trans = cand_trans;
                     return true;
                   }
                 return false;
