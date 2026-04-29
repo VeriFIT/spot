@@ -441,7 +441,7 @@ static const argp_option options[] =
       "words outside the given knowledge, "
       "(auto-small) and (auto-si) apply minato and stutter-relax in a loop, "
       "returning the smallest results they have seen, focussing on "
-      "stuttter-invarant results in the case of auto-si", 0 },
+      "stutter-invarant results in the case of auto-si", 0 },
     { "given-fixpoint", OPT_GIVEN_FIXPOINT, nullptr, 0,
       "If multiple knowledges have been given with --given-formula or "
       "--given-automaton repeat their application until we reach a fixpoint.",
