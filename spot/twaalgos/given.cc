@@ -25,6 +25,7 @@
 #include "spot/twaalgos/stutter.hh"
 #include "spot/twaalgos/complement.hh"
 #include "spot/misc/minato.hh"
+#include "spot/twaalgos/hoa.hh"
 
 namespace spot
 {
@@ -56,7 +57,8 @@ namespace spot
     scc_info si(prod, scc_info_options::TRACK_SUCCS);
     unsigned prod_ns = prod->num_states();
 
-    bool changed_ = false; // did we modify the automaton?
+    bool changed_high = false; // did we modify the upper bound?
+    bool changed_low = false; // did we modify the lower bound?
 
     // If aut is incompatible with the knowledge, simply set all
     // lowerbounds to false.
@@ -66,10 +68,10 @@ namespace spot
           if (e.cond != bddfalse)
             {
               e.cond = bddfalse;
-              changed_ = true;
+              changed_low = true;
             }
         if (changed)
-          *changed = changed_;
+          *changed = changed_low;
         return aut;
       }
 
@@ -120,27 +122,30 @@ namespace spot
         if (e.cond != low)
           {
             e.cond = low;
-            changed_ = true;
+            changed_low = true;
           }
         if (up != high)
           {
             (*upper)[en] = high;
-            changed_ = true;
+            changed_high = true;
           }
       }
-    aut->prop_keep({
-        true,  // sbacc
-        false, // inweak/weak/terminal
-        false, // det/semidet/unambig
-        true,  // det (of lowerbound) is improved
-        false, // complete
-        false, // stutter
-      });
+    if (changed_low)
+      aut->prop_keep({
+          true,  // sbacc
+          false, // inweak/weak/terminal
+          false, // det/semidet/unambig
+          true,  // det (of lowerbound) is improved
+          false, // complete
+          false, // stutter
+        });
+    if (changed)
+      *changed = changed_low | changed_high;
     return aut;
   }
 
 
-  twa_graph_ptr bounds_simplify_here(twa_graph_ptr& aut)
+  twa_graph_ptr bounds_simplify_here(twa_graph_ptr& aut, bool* changedptr)
   {
     std::vector<bdd>* upper =
       aut->get_named_prop<std::vector<bdd>>("upper-cond");
@@ -148,10 +153,15 @@ namespace spot
       throw std::runtime_error
         ("bounds_simplify_here(): property upper-cond not set");
 
+    bool changed = false;
+    bool has_dead = false;
     for (auto& e: aut->edges())
       {
         if (e.cond == bddfalse)
-          continue;
+          {
+            has_dead = true;
+            continue;
+          }
         unsigned en = aut->edge_number(e);
         bdd max_cond = (*upper)[en];
         if (e.cond == max_cond)
@@ -161,18 +171,28 @@ namespace spot
         bdd cube = bddfalse;
         while ((cube = isop.next()) != bddfalse)
           res |= cube;
-        e.cond = res;
+        if (res != e.cond)
+          {
+            e.cond = res;
+            changed = true;
+          }
       }
     aut->set_named_prop("upper-cond", nullptr);
-    aut->purge_dead_states();
-    aut->prop_keep({
-        true,  // sbacc
-        false, // inweak/weak/terminal
-        false, // det/semidet/unambig
-        false,
-        false, // complete
-        false, // stutter
-      });
+    if (changed | has_dead)
+      aut->purge_dead_states();
+    if (changed)
+      {
+        aut->prop_keep({
+            true,  // sbacc
+            false, // inweak/weak/terminal
+            false, // det/semidet/unambig
+            false,
+            false, // complete
+            false, // stutter
+          });
+      }
+    if (changedptr)
+      *changedptr = changed;
     return aut;
   }
 
@@ -182,39 +202,37 @@ namespace spot
   {
     if (aut->prop_stutter_invariant().is_true())
       return aut;
-    twa_graph_ptr stut = sl2_inplace(closure(aut));
+    bool b1;
+    bool b2;
+    twa_graph_ptr stut = sl2_inplace(closure(aut, &b1), &b2);
     stut->prop_stutter_invariant(true);
-    // FIXME: detect whether sl2(closure(aut)) modified the automaton.
-    // If not, return stut.
-    if (aut->num_states() != stut->num_states()
-        || aut->num_edges() != stut->num_edges())
+    if (!b1 && !b2)
+      return stut;
+    if (relax)
       {
-        if (relax)
-          {
-            // If the part added to aut to make it stuttering is
-            // outside of some fact, then it's ok to keep it.
-            twa_graph_ptr added = product(stut, complement(aut));
-            for (const_twa_graph_ptr& fact: facts)
-              if (!added->intersects(fact))
-                return stut;
-            // TODO: It would be nice to have a n-ary intersection test here.
-            // add->intersects(fact1*fact2*...*factn) is a stronger
-            // test than the above loop.
-          }
-        else
-          {
-            twa_graph_ptr neg = complement(aut);
-            // ss is the stutter-sensitive part of aut.
-            twa_graph_ptr ss =
-              product(aut, sl2_inplace(closure(product(stut, neg))));
-            for (const_twa_graph_ptr& fact: facts)
-              if (!ss->intersects(fact))
-                {
-                  twa_graph_ptr p = product(aut, complement(ss));
-                  p->prop_stutter_invariant(true);
-                  return p;
-                }
-          }
+        // If the part added to aut to make it stuttering is
+        // outside of some fact, then it's ok to keep it.
+        twa_graph_ptr added = product(stut, complement(aut));
+        for (const_twa_graph_ptr& fact: facts)
+          if (!added->intersects(fact))
+            return stut;
+        // TODO: It would be nice to have a n-ary intersection test here.
+        // add->intersects(fact1*fact2*...*factn) is a stronger
+        // test than the above loop.
+      }
+    else
+      {
+        twa_graph_ptr neg = complement(aut);
+        // ss is the stutter-sensitive part of aut.
+        twa_graph_ptr ss =
+          product(aut, sl2_inplace(closure(product(stut, neg))));
+        for (const_twa_graph_ptr& fact: facts)
+          if (!ss->intersects(fact))
+            {
+              twa_graph_ptr p = product(aut, complement(ss));
+              p->prop_stutter_invariant(true);
+              return p;
+            }
       }
     return aut;
   }
@@ -244,10 +262,11 @@ namespace spot
     return update_bounds_given_here(res, fact);
   }
 
-  twa_graph_ptr bounds_simplify(const_twa_graph_ptr& aut)
+  twa_graph_ptr bounds_simplify(const_twa_graph_ptr& aut,
+                                bool* changedptr)
   {
     auto res = make_twa_graph(aut, twa::prop_set::all());
     res->copy_named_properties_of(aut);
-    return bounds_simplify_here(res);
+    return bounds_simplify_here(res, changedptr);
   }
 }

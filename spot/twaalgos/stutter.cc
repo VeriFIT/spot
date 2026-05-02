@@ -338,7 +338,7 @@ namespace spot
   }
 
   twa_graph_ptr
-  sl2_inplace(twa_graph_ptr a)
+  sl2_inplace(twa_graph_ptr a, bool* changedptr)
   {
     // We are going to create self-loop labeled by {},
     // and those should not be accepting.  If they are,
@@ -420,25 +420,32 @@ namespace spot
               }
           }
       }
+    bool changed = false;
     if (num_states != a->num_states())
-      a->prop_keep({true,         // state_based
-                    false,        // inherently_weak
-                    false, false, // deterministic
-                    true,         // complete
-                    false,        // stutter inv.
-                   });
+      {
+        changed = true;
+        a->prop_keep({true,         // state_based
+                      false,        // inherently_weak
+                      false, false, // deterministic
+                      true,         // complete
+                      false,        // stutter inv.
+                     });
+      }
     a->merge_edges();
+    if (changedptr)
+      *changedptr = changed;
     return a;
   }
 
   twa_graph_ptr
-  sl2(const_twa_graph_ptr a)
+  sl2(const_twa_graph_ptr a, bool* changedptr)
   {
-    return sl2_inplace(make_twa_graph(a, twa::prop_set::all()));
+    return sl2_inplace(make_twa_graph(a, twa::prop_set::all()),
+                       changedptr);
   }
 
   twa_graph_ptr
-  closure_inplace(twa_graph_ptr a)
+  closure_inplace(twa_graph_ptr a, bool* changedptr)
   {
     // In the fin-less version of the closure, we can merge edges that
     // have the same src, letter, and destination by taking the union
@@ -455,6 +462,7 @@ namespace spot
     unsigned n = a->num_states();
     std::vector<unsigned> todo;
     std::vector<std::vector<unsigned> > dst2trans(n);
+    bool changed = false;
 
     for (unsigned state = 0; state < n; ++state)
       {
@@ -486,6 +494,7 @@ namespace spot
                             if (!bdd_implies(cond, ts.cond))
                               {
                                 ts.cond |= cond;
+                                changed = true;
                                 if (std::find(todo.begin(), todo.end(), t)
                                     == todo.end())
                                   todo.emplace_back(t);
@@ -499,6 +508,7 @@ namespace spot
                             if (ts.acc != acc)
                               {
                                 ts.acc = acc;
+                                changed = true;
                                 if (std::find(todo.begin(), todo.end(), t)
                                     == todo.end())
                                   todo.emplace_back(t);
@@ -515,6 +525,7 @@ namespace spot
                         auto i = a->new_edge(state, dst, cond, acc);
                         dst2trans[dst].emplace_back(i);
                         todo.emplace_back(i);
+                        changed = true;
                       }
                   }
               }
@@ -522,13 +533,16 @@ namespace spot
         for (auto& it: dst2trans)
           it.clear();
       }
+    if (changedptr)
+      *changedptr = changed;
     return a;
   }
 
   twa_graph_ptr
-  closure(const_twa_graph_ptr a)
+  closure(const_twa_graph_ptr a, bool* changedptr)
   {
-    return closure_inplace(make_twa_graph(a, twa::prop_set::all()));
+    return closure_inplace(make_twa_graph(a, twa::prop_set::all()),
+                           changedptr);
   }
 
   namespace
@@ -562,16 +576,17 @@ namespace spot
                             const_twa_graph_ptr aut_nf, bool own_nf,
                             int algo)
     {
-      auto cl = [](const_twa_graph_ptr a, bool own) {
+      auto cl = [](const_twa_graph_ptr a, bool own, bool* ch = nullptr) {
         if (own)
           return closure_inplace(std::const_pointer_cast<twa_graph>
-                                 (std::move(a)));
-        return closure(std::move(a));
+                                 (std::move(a)), ch);
+        return closure(std::move(a), ch);
       };
-      auto sl_2 = [](const_twa_graph_ptr a, bool own) {
+      auto sl_2 = [](const_twa_graph_ptr a, bool own, bool* ch = nullptr) {
         if (own)
-          return sl2_inplace(std::const_pointer_cast<twa_graph>(std::move(a)));
-        return sl2(std::move(a));
+          return sl2_inplace(std::const_pointer_cast<twa_graph>(std::move(a)),
+                             ch);
+        return sl2(std::move(a), ch);
       };
 
       switch (algo)
@@ -586,21 +601,46 @@ namespace spot
           return product(closure_inplace(sl(std::move(aut_f))),
                          std::move(aut_nf))->is_empty();
         case 4: // sl2(aut_f) x sl2(aut_nf)
-          return product(sl_2(std::move(aut_f), own_f),
-                         sl_2(std::move(aut_nf), own_nf))
-            ->is_empty();
+          {
+            bool c1;
+            twa_graph_ptr a1 = sl_2(std::move(aut_f), own_f, &c1);
+            bool c2;
+            twa_graph_ptr a2 = sl_2(std::move(aut_nf), own_nf, &c2);
+            if (!c1 && !c2)
+              return true;
+            return product(std::move(a1), std::move(a2))->is_empty();
+          }
         case 5: // sl2(cl(aut_f)) x aut_nf
-          return product(sl2_inplace(cl(std::move(aut_f), own_f)),
-                         std::move(aut_nf))->is_empty();
+          {
+            bool c1;
+            twa_graph_ptr a1 = cl(std::move(aut_f), own_f, &c1);
+            bool c2;
+            twa_graph_ptr a2 = sl2_inplace(std::move(a1), &c2);
+            if (!c1 && !c2)
+              return true;
+            return product(std::move(a2), std::move(aut_nf))->is_empty();
+          }
         case 6: // (cl(sl2(aut_f)) x aut_nf
-          return product(closure_inplace(sl_2(std::move(aut_f), own_f)),
-                         std::move(aut_nf))->is_empty();
+          {
+            bool c1;
+            twa_graph_ptr a1 = sl_2(std::move(aut_f), own_f, &c1);
+            bool c2;
+            twa_graph_ptr a2 = closure_inplace(std::move(a1), &c2);
+            return product(std::move(a2), std::move(aut_nf))->is_empty();
+          }
         case 7: // on-the-fly sl(aut_f) x sl(aut_nf)
           return otf_product(make_tgbasl(std::move(aut_f)),
                              make_tgbasl(std::move(aut_nf)))->is_empty();
         case 8: // cl(aut_f) x cl(aut_nf)
-          return product(cl(std::move(aut_f), own_f),
-                         cl(std::move(aut_nf), own_nf))->is_empty();
+          {
+            bool c1;
+            twa_graph_ptr a1 = cl(std::move(aut_f), own_f, &c1);
+            bool c2;
+            twa_graph_ptr a2 = cl(std::move(aut_nf), own_nf, &c2);
+            if (!c1 && !c2)
+              return true;
+            return product(std::move(a1), std::move(a2))->is_empty();
+          }
         default:
           throw std::runtime_error("is_stutter_invariant(): "
                                    "invalid algorithm number");

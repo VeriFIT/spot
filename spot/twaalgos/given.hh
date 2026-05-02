@@ -66,12 +66,15 @@ namespace spot
   /// for each transition, between the bounds computed
   /// by update_bounds_given().
   ///
+  /// If \a changedptr is given, the pointed Boolean will be set to
+  /// indicate whether any label was changed on the automaton.
+  ///
   /// \cite duret.25.pn
   /// @{
   SPOT_API twa_graph_ptr
-  bounds_simplify_here(twa_graph_ptr& aut);
+  bounds_simplify_here(twa_graph_ptr& aut, bool* changedptr = nullptr);
   SPOT_API twa_graph_ptr
-  bounds_simplify(const_twa_graph_ptr& aut);
+  bounds_simplify(const_twa_graph_ptr& aut, bool* changedptr = nullptr);
   /// @}
 
   /// \ingroup twa_algorithms

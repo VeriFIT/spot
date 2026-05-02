@@ -43,11 +43,14 @@ namespace spot
   ///
   /// The inplace version of the function modifies the input
   /// automaton.
+  ///
+  /// If \a changedptr is given, it the Boolean it points to will
+  /// indicate if the automaton was changed.
   SPOT_API twa_graph_ptr
-  sl2_inplace(twa_graph_ptr aut);
+  sl2_inplace(twa_graph_ptr aut, bool* changedptr = nullptr);
 
   SPOT_API twa_graph_ptr
-  sl2(const_twa_graph_ptr aut);
+  sl2(const_twa_graph_ptr aut, bool* changedptr = nullptr);
   /// @}
 
   /// @{
@@ -62,11 +65,14 @@ namespace spot
   ///
   /// The inplace version of the function modifies the input
   /// automaton.
+  ///
+  /// If \a changedptr is given, it the Boolean it points to will
+  /// indicate if the automaton was changed.
   SPOT_API twa_graph_ptr
-  closure_inplace(twa_graph_ptr aut);
+  closure_inplace(twa_graph_ptr aut, bool* changedptr = nullptr);
 
   SPOT_API twa_graph_ptr
-  closure(const_twa_graph_ptr aut);
+  closure(const_twa_graph_ptr aut, bool* changedptr = nullptr);
   /// @}
 
   /// \ingroup stutter_inv
