@@ -73,7 +73,7 @@ override_dh_auto_install: fix-js
 	done
 # Reconfigure to build static libraries.  We can't build them
 # alongside dynamic libraries, otherwise they will be stuffed with
-# LTO stuff that is just two big to distribute.  And we cannot use
+# LTO stuff that is just too big to distribute.  And we cannot use
 # the profile generated with LTO on, so we simply build without it.
 #
 # Since this is a last rebuild, we also construct the Doxygen doc.

@@ -12,7 +12,7 @@ Section: science
 Recommends: graphviz
 Suggests: libspot-dev, spot-doc, python3-spot
 Depends: ${shlibs:Depends}, ${misc:Depends}, libspot0 (>= ${source:Version}), libspot0 (<< ${source:Version}.1~), libspotgen0 (>= ${source:Version}), libspotgen0 (<< ${source:Version}.1~)
-Description: model checking and omega-automata manipulation library
+Description: model checking and omega-automata manipulation tools
  Tools to manipulate omega-automata as well as
  linear-time temporal logic (LTL & PSL).
 
