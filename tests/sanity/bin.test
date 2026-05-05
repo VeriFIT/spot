@@ -103,6 +103,12 @@ do
                 echo "$binary is not listed in spot.spec.in";
                 exit_status=2
             fi
+            if ! grep -q \
+              "chrpath --delete \$RPM_BUILD_ROOT%{_bindir}/$binary\$" \
+              $top_srcdir/spot.spec.in; then
+                echo "$binary is missing from chrpath section of spot.spec.in"
+                exit_status=2
+            fi
 
     esac
 

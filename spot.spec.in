@@ -1,7 +1,7 @@
 Name:           spot
 Version:        @VERSION@
 Release:        @GITPATCH@%{?dist}
-Summary:        C++17 library for LTL, omega-automata manipulation, model checking
+Summary:        C++20 library for LTL, omega-automata manipulation, model checking
 
 License:        GPLv3
 URL:            https://spot.lre.epita.fr
@@ -173,8 +173,11 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/genltl
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltl2tgba
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlcross
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltldo
+chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlf2dfa
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlfilt
+chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlfsynt
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlgrind
+chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlmix
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/ltlsynt
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/randaut
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/randltl
