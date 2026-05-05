@@ -30,7 +30,7 @@ namespace spot
   kripke_succ_iterator::cond() const
   {
     // Do not assert(!done()) here.  It is OK to call
-    // this function on a state without successor.
+    // this function on a state without successors.
     return cond_;
   }
 
@@ -38,7 +38,7 @@ namespace spot
   kripke_succ_iterator::acc() const
   {
     // Do not assert(!done()) here.  It is OK to call
-    // this function on a state without successor.
+    // this function on a state without successors.
     return {};
   }
 

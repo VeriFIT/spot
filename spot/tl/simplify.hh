@@ -120,7 +120,7 @@ namespace spot
 #ifndef SWIG
     /// The simplifier options.
     ///
-    /// Those should can still be changed before the first formula is
+    /// Those can still be changed before the first formula is
     /// simplified.
     tl_simplifier_options& options();
 #endif
@@ -161,7 +161,7 @@ namespace spot
     /// \brief Check whether \a f implies \a g.
     ///
     /// This operation is costlier than syntactic_implication()
-    /// because it requires two translation, one product and one
+    /// because it requires two translations, one product and one
     /// emptiness check.
     bool implication(formula f, formula g);
 

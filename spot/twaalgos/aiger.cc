@@ -390,7 +390,7 @@ namespace spot
     (void) n_del;
   }
 
-  // Get propositions that are commun to all
+  // Get propositions that are common to all
   // possible products so that they can be anded at the end
   bdd aig::accum_common_(const bdd& b) const
   {
@@ -487,7 +487,7 @@ namespace spot
         // Copy the gates
         std::copy(and_gates_.begin()+sf.second, and_gates_.end(),
                   gates.begin());
-        trace << "Safed " << gates.size() << '\n';
+        trace << "Saved " << gates.size() << '\n';
       }
     // 1. Delete all literals
     // max_var_old was used before

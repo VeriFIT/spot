@@ -38,7 +38,7 @@ namespace spot
   /// state-based acceptance, this function returns the input
   /// unmodified, not a copy.
   ///
-  /// Trues states (any state with an accepting self-loop labeled by
+  /// True states (any state with an accepting self-loop labeled by
   /// true) are merged in the process.
   ///
   /// The output will have a named property called "original-states"

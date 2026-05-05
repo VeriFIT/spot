@@ -3463,7 +3463,7 @@ namespace spot
                         {
                           // If some of the EventUniv formulas start
                           // with an F, Gather them all under the
-                          // same F.  Striping any leading F.
+                          // same F.  Stripping any leading F.
                           for (auto& f: *s.res_EventUniv)
                             if (f.is(op::F))
                               {
@@ -4016,7 +4016,7 @@ namespace spot
           break;
         }
     // First two lines of the table.
-    // (Don't check equality, it has already be done.)
+    // (Don't check equality, it has already been done.)
     if (!g.is_boolean())
       switch (g.kind())
         {

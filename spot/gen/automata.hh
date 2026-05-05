@@ -57,7 +57,7 @@ namespace spot
       AUT_L_NBA,
       /// \brief DSA hard to convert to DRA.
       ///
-      /// Build a deterministic Streett automaton 4n states, and n
+      /// Build a deterministic Streett automaton with 4n states, and n
       /// acceptance pairs, such that an equivalent deterministic Rabin
       /// automaton would require at least n! states.
       ///
@@ -104,7 +104,7 @@ namespace spot
       /// no self-loop and are accepting.
       ///
       /// This version uses log(n) atomic propositions to
-      /// encore the n letters as minterms.
+      /// encode the n letters as minterms.
       AUT_CYCLE_LOG_NBA,
       /// \brief cycles of n letters repeated n times
       ///
@@ -113,7 +113,7 @@ namespace spot
       /// (i%n)th letter.  Only the states that are multiple of n have
       /// no self-loop and are accepting.
       ///
-      /// This version uses one-hot encoding of letters, i.e, n atomic
+      /// This version uses one-hot encoding of letters, i.e., n atomic
       /// propositions are used, but only one is positive (except on
       /// true self-loops).
       AUT_CYCLE_ONEHOT_NBA,

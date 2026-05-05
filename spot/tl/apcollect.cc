@@ -298,7 +298,7 @@ namespace spot
   collect_equivalent_literals(formula f)
   {
     std::map<spot::formula, unsigned> l2s;
-    // represent the implication graph as a twa_graph so we cab reuse
+    // represent the implication graph as a twa_graph so we can reuse
     // scc_info.  Literals can be converted to states using the l2s
     // map.
     twa_graph_ptr igraph = make_twa_graph(make_bdd_dict());

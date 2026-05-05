@@ -68,7 +68,7 @@ namespace spot
     unsigned sz1 = aut1->num_states();
     unsigned sz2 = aut2->num_states();
 
-    // State are labeled with strings, but we know those strings to
+    // States are labeled with strings, but we know those strings to
     // represent LTL formulas, so convert those.
     std::vector<formula> state_formulas;
     state_formulas.reserve(sz2);

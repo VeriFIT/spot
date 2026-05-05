@@ -194,7 +194,7 @@
 
 %code {
 /* parsetl.hh and parsedecl.hh include each other recursively.
-   We mut ensure that YYSTYPE is declared (by the above %union)
+   We must ensure that YYSTYPE is declared (by the above %union)
    before parsedecl.hh uses it. */
 #include <spot/parsetl/parsedecl.hh>
 using namespace spot;

@@ -84,7 +84,7 @@ namespace spot
   /// open file descriptor, as created by create_open_tmpfile().
   ///
   /// Use the open_temporary_file::close() method if you want to close
-  /// that descriptor; do no call the POSIX close() function directly.
+  /// that descriptor; do not call the POSIX close() function directly.
   class SPOT_API open_temporary_file final: public temporary_file
   {
   public:

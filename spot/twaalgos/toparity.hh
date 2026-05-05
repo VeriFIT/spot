@@ -162,7 +162,7 @@ namespace spot
 
   /// \ingroup twa_acc_transform
   /// \brief Turn a Rabin-like or Streett-like automaton into a parity automaton
-  /// based on the index appearence record (IAR)
+  /// based on the index appearance record (IAR)
   ///
   /// This is an implementation of \cite kretinsky.17.tacas .
   /// If the input automaton has n states and k pairs, the output automaton has
@@ -176,7 +176,7 @@ namespace spot
   /// automaton has max odd (resp. min even) acceptance condition.
   ///
   /// Throws an std::runtime_error if the input is neither Rabin-like nor
-  /// Street-like.
+  /// Streett-like.
   ///
   /// It is better to use to_parity() instead, as it will use better
   /// strategies when possible, and has additional optimizations.

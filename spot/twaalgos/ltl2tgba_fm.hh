@@ -35,13 +35,13 @@ namespace spot
   ///
   /// \param f The formula to translate into an automaton.
   ///
-  /// \param dict The spot::bdd_dict the constructed automata should use.
+  /// \param dict The spot::bdd_dict the constructed automaton should use.
   ///
   /// \param exprop When set, the algorithm will consider all properties
   /// combinations possible on each state, in an attempt to reduce
   /// the non-determinism.  The automaton will have the same size as
   /// without this option, but because the transitions will be more
-  /// deterministic, the product automaton will be smaller (or, at worse,
+  /// deterministic, the product automaton will be smaller (or, at worst,
   /// equal).
   ///
   /// \param symb_merge When false, states with the same symbolic
@@ -74,7 +74,7 @@ namespace spot
   /// constructed automaton would become larger than specified by the
   /// output_aborter.
   ///
-  /// \param label_with_ltl keep one LTL formula equivalent the
+  /// \param label_with_ltl keep one LTL formula equivalent to the
   /// language recognized by each state, and use that to name each
   /// state.
   ///

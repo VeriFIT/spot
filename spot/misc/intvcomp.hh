@@ -54,9 +54,9 @@ namespace spot
 
   /// \brief Compress an int array of size \a n into a int array.
   ///
-  /// The destination array should be at least \a dest_size large An
+  /// The destination array should be at least \a dest_size large.  An
   /// assert will be triggered if \a dest_size is too small.  On
-  /// return, \a dest_size will be set to the actually number of int
+  /// return, \a dest_size will be set to the actual number of int
   /// filled in \a dest
   SPOT_API void
   int_array_array_compress(const int* array, size_t n,

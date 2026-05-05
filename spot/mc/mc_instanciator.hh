@@ -38,9 +38,9 @@ namespace spot
 {
 
   /// \ingroup model_checking
-  /// \brief This class allows to ensure (at compile time) if
-  /// a given parameter can be considered as a modelchecking algorithm
-  /// (i.e., usable by instantiate)
+  /// \brief This class allows one to ensure (at compile time) if
+  /// a given parameter can be considered as a model-checking algorithm
+  /// (i.e., usable by instantiate).
   template <typename T>
   class SPOT_API is_a_mc_algorithm
   {
@@ -48,7 +48,7 @@ namespace spot
     using yes = std::true_type;
     using no = std::false_type;
 
-    // Hardly waiting C++ concepts...
+    // Eagerly awaiting C++ concepts...
     template<typename U> static auto test_mc_algo(U u)
       -> decltype(
        // Check the kripke
@@ -73,7 +73,7 @@ namespace spot
   public:
 
     /// \brief Checking this value will ensure, at compile time, that the
-    /// Kripke specialisation respects the required interface.
+    /// Kripke specialization respects the required interface.
     static constexpr bool value =
       std::is_same< decltype(test_mc_algo<T>(nullptr)), yes>::value;
   };
@@ -92,7 +92,7 @@ namespace spot
     typename algo_name::shared_map map;
     std::vector<algo_name*> swarmed(nbth);
 
-    // The shared structure requires sometime one instance per thread
+    // The shared structure requires sometimes one instance per thread
     using struct_name = typename algo_name::shared_struct;
     std::vector<struct_name*> ss(nbth);
 
@@ -173,7 +173,7 @@ namespace spot
             // Enumerate cases where a trace can be extracted
             // Here we use a switch so that adding new algorithm
             // with new return status will trigger an error that
-            // should the be fixed here.
+            // should then be fixed here.
             switch (result.value[i])
               {
                 // A (partial?) trace has been computed

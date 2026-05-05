@@ -112,7 +112,7 @@ namespace spot
       }
 
       // F(p_0 | XG(p_1 | XG(p_2 | ... XG(p_n))))
-      // This the dual of the above
+      // This is the dual of the above
       static formula
       FXG_or_n(std::string name, int n)
       {
@@ -1536,7 +1536,7 @@ namespace spot
 
       // system starts playing
       std::vector<formula> init = {And_(t_sys, Not_(t_env))};
-      // when its your turn you have to select a one heap
+      // when it's your turn you have to select one heap
       std::vector<formula> rules_s = {Implies_(t_sys, one_sel_sys)};
       std::vector<formula> rules_e = {Implies_(t_env, one_sel_env)};
       for (int h = 0; h < n; ++h)

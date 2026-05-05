@@ -238,7 +238,7 @@ namespace spot
         }
       else
         {
-          os << "the following options where not used (possible typos?):";
+          os << "the following options were not used (possible typos?):";
           for (auto opt: unused_)
             os << "\n\t- '" << opt << '\'';
         }

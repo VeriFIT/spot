@@ -38,7 +38,7 @@ namespace spot
   ///
   /// The \a alive argument can be used to change the name of the
   /// atomic property used to introduce.  Additionally if \a alive is
-  /// a string starting with and exclamation mark, e.g.,
+  /// a string starting with an exclamation mark, e.g.,
   /// <code>!dead</code> then the atomic property will be built from
   /// the rest of the string, and its negation will be used in the
   /// transformation.  Using <code>!dead</code> rather than

@@ -53,7 +53,7 @@ namespace spot
   maximum_cardinality_search(const const_twa_graph_ptr& a,
                              mcs_tie_break tie = MCS_TIE_ANY);
 
-  /// \brief Reorder the state of \a a according to the order
+  /// \brief Reorder the states of \a a according to the order
   /// computed by maximum_cardinality_search().
   ///
   /// This works in place and return the same automaton.

@@ -243,7 +243,7 @@ namespace spot
     // Edge iterator
     //////////////////////////////////////////////////
 
-    // This holds a graph and a edge number that is the start of
+    // This holds a graph and an edge number that is the start of
     // a list, and it iterates over all the edge_storage_t elements
     // of that list.
 
@@ -654,7 +654,7 @@ namespace spot
         max_trans = max_states * 2;
       edges_.reserve(max_trans + 1);
       // Edge number 0 is not used, because we use this index
-      // to mark the absence of a edge.
+      // to mark the absence of an edge.
       edges_.resize(1);
       // This causes edge 0 to be considered as dead.
       edges_[0].next_succ = 0;
@@ -680,7 +680,7 @@ namespace spot
       return dests_.empty();
     }
 
-    /// \brief Create a new states
+    /// \brief Create a new state
     ///
     /// All arguments are forwarded to the State_Data constructor.
     ///
@@ -710,7 +710,7 @@ namespace spot
     }
 
     /// @{
-    /// \brief return a reference to the storage of a state
+    /// \brief Return a reference to the storage of a state
     ///
     /// The storage includes any of the user-supplied State_Data, plus
     /// some custom fields needed to find the outgoing transitions.
@@ -728,7 +728,7 @@ namespace spot
     ///@}
 
     ///@{
-    /// \brief return the State_Data associated to a state
+    /// \brief Return the State_Data associated to a state
     ///
     /// This does not use State_Data& as return type, because
     /// State_Data might be void.
@@ -746,7 +746,7 @@ namespace spot
     ///@}
 
     ///@{
-    /// \brief return a reference to the storage of an edge
+    /// \brief Return a reference to the storage of an edge
     ///
     /// The storage includes any of the user-supplied Edge_Data, plus
     /// some custom fields needed to find the next transitions.
@@ -764,7 +764,7 @@ namespace spot
     ///@}
 
     ///@{
-    /// \brief return the Edge_Data of an edge.
+    /// \brief Return the Edge_Data of an edge.
     ///
     /// This does not use Edge_Data& as return type, because
     /// Edge_Data might be void.
@@ -1009,7 +1009,7 @@ namespace spot
     }
 
     /// @{
-    /// \brief Tests whether an edge has been erased.
+    /// \brief Test whether an edge has been erased.
     ///
     /// \see is_valid_edge
     bool is_dead_edge(unsigned t) const
@@ -1261,7 +1261,7 @@ namespace spot
     }
 
     /// \brief Sort all edges by src first, then, within edges of the same
-    /// source use the predicate
+    /// source, use the predicate
     ///
     /// This will invalidate all iterators, and also destroy edge
     /// chains.  Call chain_edges_() immediately afterwards unless you
@@ -1289,8 +1289,8 @@ namespace spot
             new_edges.push_back(e);
         }
       idx_list[ns] = new_edges.size();
-      // New edge sorted by source
-      // If we have few edge or only one threads
+      // New edges sorted by source
+      // If we have few edges or only one thread
       // Benchmark few?
       auto bne = new_edges.begin();
 #ifndef SPOT_ENABLE_PTHREAD
@@ -1310,9 +1310,9 @@ namespace spot
           static std::vector<std::thread> tv;
           SPOT_ASSERT(tv.empty());
           tv.resize(nthreads);
-          // FIXME: Due to the way these thread advance into the state
-          // vector, they access very close memory location.  It would
-          // seems more cache friendly to have threads work on blocks
+          // FIXME: Due to the way these threads advance into the state
+          // vector, they access very close memory locations.  It would
+          // seem more cache friendly to have threads work on blocks
           // of continuous states.
           for (unsigned id = 0; id < nthreads; ++id)
             tv[id] = std::thread(
@@ -1448,7 +1448,7 @@ namespace spot
     /// This method is used to remove some states that have been
     /// previously detected to be unreachable in order to "defragment"
     /// the state vector.  When a state is removed, all its outgoing
-    /// transition are removed as well.  Removing reachable states
+    /// transitions are removed as well.  Removing reachable states
     /// should NOT be attempted, because the incoming edges will be
     /// dangling.
     ///

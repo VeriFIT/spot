@@ -23,7 +23,7 @@
 /// \defgroup tl Temporal Logic
 ///
 /// Spot supports the future-time fragment of LTL, and the linear-time
-/// fragment of and PSL formulas.  The former is included in the
+/// fragment of PSL formulas.  The former is included in the
 /// latter.  Both types of formulas are represented by instances of
 /// the spot::formula class.
 
@@ -110,7 +110,7 @@ namespace spot
     Fusion,                    ///< Fusion
     // star-like operators
     Star,                      ///< Star
-    FStar,                     ///< Fustion Star
+    FStar,                     ///< Fusion Star
     first_match,               ///< first_match(sere)
     // strong_X was introduced in Spot 2.9, but was hidden from the
     // public API by default in order not to break existing code.
@@ -823,7 +823,7 @@ namespace spot
           return l < r;
         // Because the id() assigned to each formula is the
         // number of formulas constructed so far, it is very unlikely
-        // that we will ever reach a case were two different formulas
+        // that we will ever reach a case where two different formulas
         // have the same hash.  This will happen only ever with have
         // produced 256**sizeof(size_t) formulas (i.e. max_count has
         // looped back to 0 and started over).  In that case we can
@@ -1583,10 +1583,10 @@ namespace spot
 
     /// \brief Nested operator construction (syntactic sugar).
     ///
-    /// Build between min and max nested uo, and chose between the
+    /// Build between min and max nested uo, and choose between the
     /// different numbers with bo.
     ///
-    /// For instance nested_unup_range(op::X, op::Or, 2, 4, a) returns
+    /// For instance nested_unop_range(op::X, op::Or, 2, 4, a) returns
     /// XX(a | X(a | Xa)).
     ///
     /// For `max==unbounded()`, \a uo is repeated \a min times, and
@@ -2035,11 +2035,11 @@ namespace spot
     SPOT_DEF_PROP(is_universal);
     /// \brief Whether a PSL/LTL formula is syntactic safety property.
     ///
-    /// Is class is also called Π₁.
+    /// This class is also called Π₁.
     SPOT_DEF_PROP(is_syntactic_safety);
     /// \brief Whether a PSL/LTL formula is syntactic guarantee property.
     ///
-    /// Is class is also called Σ₁.
+    /// This class is also called Σ₁.
     SPOT_DEF_PROP(is_syntactic_guarantee);
     /// \brief Whether a PSL/LTL formula is in the Δ₁ syntactic fragment
     ///
@@ -2057,8 +2057,8 @@ namespace spot
     SPOT_DEF_PROP(is_pi2);
     /// \brief Whether a PSL/LTL formula is syntactic recurrence property.
     ///
-    /// This class is a proper syntactic superset of Σ₂ syntactically,
-    /// expressive power.
+    /// This class is a proper syntactic superset of Σ₂, but has the
+    /// same expressive power.
     SPOT_DEF_PROP(is_syntactic_recurrence);
     /// \brief Whether a PSL/LTL formula is syntactic persistence property.
     ///

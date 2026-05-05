@@ -44,7 +44,7 @@ namespace spot
     typedef std::chrono::steady_clock clock;
     clock::time_point start_;
   public:
-    /// Marks the start if the measurement
+    /// Marks the start of the measurement
     void start()
     {
       start_ = clock::now();
@@ -75,7 +75,7 @@ namespace spot
     clock_t cstime;
   };
 
-  /// A timekeeper that accumulate interval of time in a more detailed way.
+  /// A timekeeper that accumulates intervals of time in a more detailed way.
   /// For instance, you can get the time spent with or without children
   /// processes.
   class timer
@@ -277,7 +277,7 @@ namespace spot
 
     /// \brief Whether there is no timer in the map.
     ///
-    /// If empty() return true, then either no timer where ever
+    /// If empty() returns true, then either no timer were ever
     /// started, or all started timers were canceled without
     /// completing any measure.
     bool
@@ -312,7 +312,7 @@ namespace spot
       cputimer.start();
     }
     // sw.stop() --> It always returns the duration since the last call to
-    // start(). Therefore, it wont't stop timing, moreover, it can be called
+    // start(). Therefore, it won't stop timing, moreover, it can be called
     // multiple times.
     void stop()
     {

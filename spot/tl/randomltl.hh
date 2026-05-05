@@ -140,7 +140,7 @@ namespace spot
   /// \brief Generate random LTL formulas.
   ///
   /// This class recursively constructs LTL formulas of a given
-  /// size.  The formulas will use the use atomic propositions from
+  /// size.  The formulas will use atomic propositions from
   /// the set of propositions passed to the constructor, in addition
   /// to the constant and all LTL operators supported by Spot.
   ///
@@ -183,7 +183,7 @@ namespace spot
     /// selected.  Also, each atomic proposition has as much chance
     /// as each constant (i.e., true and false) to be picked.
     ///
-    /// These priorities can be changed use the parse_options method.
+    /// These priorities can be changed using the parse_options method.
     ///
     /// If a set of subformulas is passed to the constructor, the generator
     /// will build a Boolean formulas using patterns as atoms.  Atomic
@@ -206,7 +206,7 @@ namespace spot
   /// \brief Generate random Boolean formulas.
   ///
   /// This class recursively constructs Boolean formulas of a given size.
-  /// The formulas will use the use atomic propositions from the
+  /// The formulas will use atomic propositions from the
   /// set of propositions passed to the constructor, in addition to the
   /// constant and all Boolean operators supported by Spot.
   ///
@@ -239,7 +239,7 @@ namespace spot
     /// selected.  Also, each atomic proposition has as much chance
     /// as each constant (i.e., true and false) to be picked.
     ///
-    /// These priorities can be changed use the parse_options method.
+    /// These priorities can be changed using the parse_options method.
     ///
     /// If a set of \a subformulas is passed to the constructor, the
     /// generator will build a Boolean formulas using patterns as
@@ -255,7 +255,7 @@ namespace spot
   /// \brief Generate random SERE.
   ///
   /// This class recursively constructs SERE of a given size.
-  /// The formulas will use the use atomic propositions from the
+  /// The formulas will use atomic propositions from the
   /// set of propositions passed to the constructor, in addition to the
   /// constant and all SERE operators supported by Spot.
   ///
@@ -284,7 +284,7 @@ namespace spot
     /// Where "boolfrom" designates a Boolean formula generated
     /// by random_boolean.
     ///
-    /// These priorities can be changed use the parse_options method.
+    /// These priorities can be changed using the parse_options method.
     ///
     /// In addition, you can set the properties of the Boolean
     /// formula generator used to build Boolean subformulas using
@@ -298,7 +298,7 @@ namespace spot
   /// \brief Generate random PSL formulas.
   ///
   /// This class recursively constructs PSL formulas of a given size.
-  /// The formulas will use the use atomic propositions from the
+  /// The formulas will use atomic propositions from the
   /// set of propositions passed to the constructor, in addition to the
   /// constant and all PSL operators supported by Spot.
   class SPOT_API random_psl: public random_ltl
@@ -341,7 +341,7 @@ namespace spot
     /// selected.  Also, each atomic proposition has as much chance
     /// as each constant (i.e., true and false) to be picked.
     ///
-    /// These priorities can be changed use the parse_options method.
+    /// These priorities can be changed using the parse_options method.
     ///
     /// In addition, you can set the properties of the SERE generator
     /// used to build SERE subformulas using the parse_options method

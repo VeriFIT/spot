@@ -24,7 +24,7 @@
 namespace spot
 {
   /// \ingroup twa_misc
-  /// \brief transform edges into transitions
+  /// \brief Transform edges into transitions
   ///
   /// Create a new version of the automaton where all edges are split
   /// so that they are all labeled by a conjunction of all atomic
@@ -169,7 +169,7 @@ namespace spot
     /// \brief Separate an automaton
     ///
     /// This variant replaces each edge labeled by L by an edge
-    /// for each label of the basis that is implies L.  This
+    /// for each label of the basis that implies L.  This
     /// faster than separate_compat when all edges of aut have
     /// been declared in the basis.
     twa_graph_ptr separate_implying(const const_twa_graph_ptr& aut);
@@ -224,7 +224,7 @@ namespace spot
   };
 
   /// \ingroup twa_misc
-  /// \brief Make edge labels disjoints
+  /// \brief Make edge labels disjoint
   ///
   /// Create a new version of the automaton where all edges are split
   /// in such a way that two labels are either equal or disjoint.
@@ -234,6 +234,6 @@ namespace spot
   ///
   /// Using split_edges() also creates an automaton with separated labels,
   /// but the separation will be much finer since it will result in a much
-  /// involves all atomic proposition.
+  /// involves all atomic propositions.
   SPOT_API twa_graph_ptr separate_edges(const const_twa_graph_ptr& aut);
 }

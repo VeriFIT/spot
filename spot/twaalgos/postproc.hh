@@ -52,7 +52,7 @@ namespace spot
   /// A higher level enables more costly post-processings.  For instance
   /// pref=Small,level=High will try two different post-processings
   /// (one with minimize_obligation(), and one with
-  /// iterated_simulations()) an keep the smallest result.
+  /// iterated_simulations()) and keep the smallest result.
   /// pref=Small,level=Medium will only try the iterated_simulations()
   /// when minimized_obligation failed to produce an automaton smaller
   /// than its input.  pref=Small,level=Low will only run
@@ -127,10 +127,10 @@ namespace spot
     ///
     /// \c CoBuchi requests a Co-Büchi automaton equivalent to
     /// the input, when possible, or a Co-Büchi automaton that
-    /// recognize a larger language otherwise.
+    /// recognizes a larger language otherwise.
     ///
     /// \c BA is a historical type that means Buchi and additionally
-    /// set state-based acceptance (this should normally be set
+    /// sets state-based acceptance (this should normally be set
     /// with `set_pref(SBAcc)`).
     ///
     /// If set_type() is not called, the default \c output_type is \c
@@ -180,7 +180,7 @@ namespace spot
     /// SBAcc, to request a complete automaton, and an automaton with
     /// state-based acceptance.  Automata with parity acceptance may
     /// also be required to be \c Colored, ensuring that each
-    /// transition (or state) belong to exactly one acceptance set.
+    /// transition (or state) belongs to exactly one acceptance set.
     ///
     /// Note 1: the \c Unambiguous option is not actually supported by
     /// spot::postprocessor; it is only honored by spot::translator.

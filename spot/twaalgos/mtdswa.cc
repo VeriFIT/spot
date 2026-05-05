@@ -1915,7 +1915,7 @@ namespace spot
       // created for all nodes, including terminals.  The terminal
       // corresponding to the root is created as well.
       //
-      // For the purpose of debuging, a name may be passed.  It will
+      // For the purpose of debugging, a name may be passed.  It will
       // be attached to the root.
       //
       // As a side effect, the function will record the root numbers stored
@@ -1927,8 +1927,8 @@ namespace spot
       // "recursion" whenever it finds a node that has already been
       // encoded into the game.  If it is true, it will continue the
       // recursion even through nodes that have already been encoded,
-      // provided they correspond to underterminate vertices.  Doing
-      // so allows to collect all undeterminate successors even if
+      // provided they correspond to undetermined vertices.  Doing
+      // so allows to collect all undetermined successors even if
       // they were already encoded.  This is necessary for our DFS
       // construction.
       template<bool recompute_succ = false>
@@ -2102,7 +2102,7 @@ namespace spot
     {
       //if (!global_backprop->root_is_determined(term))
       //  std::cerr << term << " NOT DETERMINED!\n";
-      // remplace losing terminals by bddfalse
+      // replace losing terminals by bddfalse
       if (!global_backprop->root_winner(term))
         {
           *root_ptr = 0;
@@ -2447,7 +2447,7 @@ namespace spot
                       s = live_states.back();
                       live_states.pop_back();
                       // if realizability is not set, make sure we mark all the
-                      // SCC as accepting, otherwise we will have undeterminate
+                      // SCC as accepting, otherwise we will have undetermined
                       // nodes below accepting terminals in the SCC and we
                       // won't be able to extract a strategy.
                       if (backprop.root_winner_set_if_unknown(s, is_acc)

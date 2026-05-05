@@ -217,7 +217,7 @@ namespace spot
                         return And_(first, second);
                       if (mutation_counter_-- == 0)
                         {
-                          // Negate the two argument sequentially (in this
+                          // Negate the two arguments sequentially (in this
                           // case right before left, otherwise different
                           // compilers will make different choices.
                           auto right = formula::Not(second);

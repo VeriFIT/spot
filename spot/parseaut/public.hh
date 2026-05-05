@@ -108,7 +108,7 @@ namespace spot
   /// \brief Parse a stream of automata
   ///
   /// This object should be constructed for a given stream (a file, a
-  /// file descriptor, or a raw buffer), and then it parse() method
+  /// file descriptor, or a raw buffer), and then its parse() method
   /// may be called in a loop to parse each automaton in the stream.
   ///
   /// Several input formats are supported, and automatically

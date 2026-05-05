@@ -23,7 +23,7 @@
 namespace spot
 {
   /// \ingroup twa_reduction
-  /// \brief Attempt to synthetize an equivalent deterministic TωA
+  /// \brief Attempt to synthesize an equivalent deterministic TωA
   /// with a SAT solver.
   ///
   /// \param a the input TωA.  It should be a deterministic TωA.
@@ -43,7 +43,7 @@ namespace spot
   /// \param colored if true, force all transitions to belong to
   /// exactly one acceptance set.
   ///
-  /// This functions attempts to find a TωA with \a target_acc_number
+  /// This function attempts to find a TωA with \a target_acc_number
   /// acceptance sets and target_state_number states that is
   /// equivalent to \a a.  If no such TωA is found, a null pointer is
   /// returned.
@@ -88,7 +88,7 @@ namespace spot
   ///
   /// It acts like dtwa_sat_synthetize() and obtains a first minimized
   /// automaton. Then, incrementally, it encodes and solves the deletion of one
-  /// state as many time as param value.
+  /// state as many times as param value.
   /// If param >= 0, this process is fully repeated until the minimal automaton
   /// is found. Otherwise, it continues to delete states one by one
   /// incrementally until the minimal automaton is found.
@@ -130,7 +130,7 @@ namespace spot
   /// These options are given as a comma-separated list of
   /// assignments of the form:
   ///
-  ///   states = 10      // synthetize automaton with fixed number of states
+  ///   states = 10      // synthesize automaton with fixed number of states
   ///   max-states = 20  // minimize starting from this upper bound
   ///   acc = "generalized-Buchi 2"
   ///   acc = "Rabin 3"

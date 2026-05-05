@@ -22,7 +22,7 @@
 
 namespace spot
 {
-  /// \brief restrict labels from "dead-end edges"
+  /// \brief Restrict labels from "dead-end edges"
   ///
   /// A dead-end edge is an edge between two states S and D such
   /// that D has only itself as successor.  I.e., once a run goes
@@ -47,7 +47,7 @@ namespace spot
   ///
   /// Computing UsefulLab(D,D) is the tricky part, as many subset of
   /// selfloops can be considered.  For instance, setting
-  /// UsefulLab(D,D) := Lab(D,D) clearly interesect all accepting
+  /// UsefulLab(D,D) := Lab(D,D) clearly intersects all accepting
   /// cycles, but it is very coarse.  Currently the code uses two
   /// smaller definitions for UsefulLab(D,D):
   ///

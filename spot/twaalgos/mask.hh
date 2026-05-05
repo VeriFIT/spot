@@ -187,7 +187,7 @@ namespace spot
 
   /// \brief Keep only the states as specified by \a to_keep.
   ///
-  /// Each index in the vector \a to_keep specifies wether or not to
+  /// Each index in the vector \a to_keep specifies whether or not to
   /// keep the transition that exit this state.  The initial state
   /// will be set to \a init.
   ///
@@ -202,7 +202,7 @@ namespace spot
 
   /// \brief Keep only the states specified by \a to_keep that are accessible.
   ///
-  /// Each index in the vector \a to_keep specifies wether or not to
+  /// Each index in the vector \a to_keep specifies whether or not to
   /// keep the transition that exit this state.  The initial state
   /// will be set to \a init.  Only states that are accessible from \a
   /// init via states in \a to_keep will be preserved.

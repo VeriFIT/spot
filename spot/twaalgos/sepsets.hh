@@ -23,15 +23,15 @@
 namespace spot
 {
   /// \ingroup twa_acc_transform
-  /// \brief Whether the Inf and Fin numbers are disjoints
+  /// \brief Whether the Inf and Fin numbers are disjoint
   SPOT_API bool
   has_separate_sets(const const_twa_graph_ptr& aut);
 
   /// \ingroup twa_acc_transform
   /// \brief Separate the Fin and Inf sets used by an automaton
   ///
-  /// This makes sure that the numbers used a Fin and Inf are
-  /// disjoints.
+  /// This makes sure that the numbers used as Fin and Inf are
+  /// disjoint.
   SPOT_API twa_graph_ptr
   separate_sets_here(const twa_graph_ptr& aut);
 }

@@ -169,7 +169,7 @@ namespace spot
   ///
   /// The resulting automaton will accept words that are either in
   /// both input languages, or not in both languages. (The XNOR gate
-  /// it the logical complement of XOR.  XNOR is also known as logical
+  /// it is the logical complement of XOR.  XNOR is also known as logical
   /// equivalence.)  The output will have an acceptance condition that
   /// is the XNOR of the acceptance conditions of the two input
   /// automata.  In case both the operands are weak, the acceptance

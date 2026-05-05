@@ -1,7 +1,7 @@
-// Note: this file was comped from A Bison parser, made by GNU Bison
+// Note: this file was copied from a Bison parser, made by GNU Bison
 // 2.7.12-4996.  It is shared by all the parsers in Spot.  Unfortunately,
 // at the time of writing there is no Bison option to generate this
-// file an update it.
+// file and update it.
 
 /* Positions for Bison parsers in C++
 

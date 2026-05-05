@@ -70,7 +70,7 @@ namespace spot
   /// - deterministic inputs are passed to dualize()
   /// - very weak automata are also dualized, and then
   ///   passed to remove_alternation() to obtain a TGBA
-  /// - any other type of input is determized before
+  /// - any other type of input is determinized before
   ///   complementation.
   ///
   /// If an output_aborter is supplied, it is used to

@@ -340,7 +340,7 @@ namespace spot
     {
       // Bare words cannot be empty, start with the letter of a
       // unary operator, or be the name of an existing constant or
-      // operator.  Also they should start with an letter.
+      // operator.  Also they should start with a letter.
       if (!*str
           || *str == 'F'
           || *str == 'G'

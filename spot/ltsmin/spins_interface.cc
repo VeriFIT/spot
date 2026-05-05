@@ -140,7 +140,7 @@ namespace spot
 
     auto sym = [&](auto* dst, const char* name)
       {
-        // Work around -Wpendantic complaining that pointer-to-objects
+        // Work around -Wpedantic complaining that pointer-to-objects
         // should not be converted to pointer-to-functions (we have to
         // assume they can for POSIX).
         *reinterpret_cast<void**>(dst) = lt_dlsym(h, name);

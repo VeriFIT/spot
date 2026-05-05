@@ -53,7 +53,7 @@ namespace spot
     /// \}
 
     /// Called by add_state or next_states implementations to filter
-    /// states.  Default implementation always return true.
+    /// states.  Default implementation always returns true.
     virtual bool want_state(const state* s) const;
 
     /// Called by run() before starting its iteration.
@@ -121,7 +121,7 @@ namespace spot
     virtual void run();
 
     /// Called by add_state or next_states implementations to filter
-    /// states.  Default implementation always return true.
+    /// states.  Default implementation always returns true.
     virtual bool want_state(const state* s) const;
 
     /// Called by run() before starting its iteration.

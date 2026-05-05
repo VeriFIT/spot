@@ -36,15 +36,15 @@ namespace spot
   /// An SCC is inherently weak if either its cycles are all
   /// accepting, or they are all non-accepting.
   ///
-  /// Note the terminal SCCs are also inherently weak with that
+  /// Note that terminal SCCs are also inherently weak with that
   /// definition.
   SPOT_API bool
   is_inherently_weak_scc(scc_info& map, unsigned scc);
 
   /// \brief Whether the SCC number \a scc in \a map is weak.
   ///
-  /// An SCC is weak if its non-accepting, or if all its transition
-  /// are fully accepting (i.e., the belong to all acceptance sets).
+  /// An SCC is weak if it is non-accepting, or if all its transitions
+  /// are fully accepting (i.e., they belong to all acceptance sets).
   ///
   /// Note that terminal SCCs are also weak with that definition.
   SPOT_API bool
@@ -52,10 +52,10 @@ namespace spot
 
   /// \brief Whether the SCC number \a scc in \a map is complete.
   ///
-  /// An SCC is complete iff for all states and all label there exists
+  /// An SCC is complete iff for all states and all labels there exists
   /// a transition that stays into this SCC.  For this function,
-  /// universal transitions are considered in the SCC if all there
-  /// destination are into the SCC.
+  /// universal transitions are considered in the SCC if all their
+  /// destinations are into the SCC.
   SPOT_API bool
   is_complete_scc(scc_info& map, unsigned scc);
 

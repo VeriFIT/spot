@@ -86,9 +86,7 @@ namespace spot
   };
 
   /// \ingroup tl_hier
-  /// \brief Return true if \a f has the recurrence property.
-  ///
-  /// Actually, it calls is_persistence() with the negation of \a f.
+  /// \brief Return true if \a f represents an obligation property.
   ///
   /// \param f the formula to check.
   /// \param aut the corresponding automaton (not required).

@@ -44,7 +44,7 @@ namespace spot
     /// This is actually the list of atomic propositions that appeared
     /// in the formulas/automata that were used to build this
     /// automaton.  The automaton itself may use fewer atomic
-    /// propositions, for instance in cases some of them canceled each other.
+    /// propositions, for instance in case some of them cancel each other.
     ///
     /// This vector is sorted by formula ID, to make it easy to merge
     /// with another sorted vector.
@@ -64,7 +64,7 @@ namespace spot
     // for each element (A, B) put state A in cluster B
     std::unordered_map<int, int> highlight_groups;
 
-    /// \brief get the bdd_dict associated to this automaton
+    /// \brief Get the bdd_dict associated to this automaton
     bdd_dict_ptr get_dict() const
     {
       return dict_;
@@ -90,12 +90,12 @@ namespace spot
     /// Add opts="s" to show SCCs.
     std::ostream& print_dot(std::ostream& os, const char* opts = nullptr) const;
 
-    /// \brief convert to twa
+    /// \brief Convert to twa
     twa_graph_ptr as_twa(bool state_based = false,
                          bool labels = true,
                          bool complete = false) const;
 
-    /// \brief convert bddtrue/bddfalse nodes to actual states
+    /// \brief Convert bddtrue/bddfalse nodes to actual states
     ///
     /// This modifies the automaton in place so that it does not use the
     /// bddtrue and bddfalse constants.  Those will be replaced by accepting
@@ -111,7 +111,7 @@ namespace spot
     /// named as formula::tt() or formula::ff().
     void sinks_as_states();
 
-    /// \brief converse sink states to bddtrue/bddfalse constants
+    /// \brief Convert sink states to bddtrue/bddfalse constants
     ///
     /// This modifies the automaton in place so that any sink state
     /// is turned into bddtrue or bddfalse depending on its acceptance.
@@ -120,13 +120,13 @@ namespace spot
     /// will be renumbered, unless \a keep_all_states is set.
     void sinks_as_constants(bool keep_all_states = false);
 
-    /// \brief declare a list of controllable variables
+    /// \brief Declare a list of controllable variables
     ///
-    /// Doing so affect the way the automaton is printed in dot
+    /// Doing so affects the way the automaton is printed in dot
     /// format, but this is also a prerequisite for interpreting
     /// the automaton as a game.
     ///
-    /// This function is expected to be after you have built the
+    /// This function is expected to be called after you have built the
     /// automaton, in some way (causing atomic propositions to be
     /// registered).  If \a ignore_non_registered_ap is set, variable
     /// listed as output but not registered by the automaton will be
@@ -154,24 +154,24 @@ namespace spot
   typedef std::shared_ptr<const mtdswa> const_mtdswa_ptr;
 
   /// \ingroup mtdswa
-  /// \brief convert deterministic TwA to MTDSwA
+  /// \brief Convert deterministic TwA to MTDSwA
   SPOT_API mtdswa_ptr dtwa_to_mtdswa(const twa_graph_ptr& aut);
 
   /// \ingroup mtdswa
-  /// \brief find the SCC of each state
+  /// \brief Find the SCC of each state
   ///
   /// This builds a vector as large as the number of states in \a aut,
-  /// and giving the SCC number each state belongs too.  SCC are
+  /// and giving the SCC number each state belongs to.  SCC are
   /// numbered in topological order (the SCC of the initial state has
   /// the highest number, and SCC with number 0 is a terminal/leaf
   /// SCC).
   SPOT_API std::vector<int> scc_vector(const mtdswa_ptr& aut);
 
   /// \ingroup mtdswa
-  /// \brief preprocess a weak MTDSwA before minimization
+  /// \brief Preprocess a weak MTDSwA before minimization
   ///
-  /// This implement's Löding's ranking function \cite loding.01.ipl
-  /// that can be used to decide which transient states (i.e., state
+  /// This implements Löding's ranking function \cite loding.01.ipl
+  /// that can be used to decide which transient states (i.e., states
   /// that are not part of any cycles) should be marked as accepting
   /// or rejecting in order to guarantee minimality after the
   /// automaton is minimized like a DFA.
@@ -198,7 +198,7 @@ namespace spot
   ///
   /// This is called minimization because it implements a variant of
   /// Moore's partition-refinement algorithms (that is normally used
-  /// to minimize DFAs).   However for general deterministic ω-automata,
+  /// to minimize DFAs).  However for general deterministic ω-automata,
   /// this does not guarantee minimality.
   ///
   /// One exception is weak deterministic ω-automata, which can be minimized
@@ -215,7 +215,7 @@ namespace spot
   /// ```
   ///
   /// By default, the initial partition is based on the colors that
-  /// label each states.  If you know a better one, you can pass it as
+  /// label each state.  If you know a better one, you can pass it as
   /// \a initial_partition.
   ///
   /// @{

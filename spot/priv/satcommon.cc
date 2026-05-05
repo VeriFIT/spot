@@ -88,7 +88,7 @@ namespace spot
     // Update satdict.nvars.
     // max_p_ - 1 was added after noticing that in some cases in dtbasat, the
     // last variable is not used and some sat solver can complain about the
-    // wong number of variable in cnf mode. No worries, if it turns out to be
+    // wrong number of variables in cnf mode.  No worries, if it turns out to be
     // used somewhere, it will be taken into account.
     min_t = dtbasat_ ? max_p_ - 1 : max_p_;
     assert(min_t != min_t_);

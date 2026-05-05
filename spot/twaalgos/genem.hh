@@ -75,7 +75,7 @@ namespace spot
   /// The search is restricted to a set of edges of the given SCC
   /// for which \a keep (a bitvect indexed by edge numbers) is true.
   ///
-  /// Returns false iff no accepting loop where found.
+  /// Returns false iff no accepting loop was found.
   SPOT_API bool
   maximal_accepting_loops_for_scc(const scc_info& si, unsigned scc,
                                   const acc_cond& forced_acc,
@@ -87,14 +87,14 @@ namespace spot
   /// \ingroup emptiness_check_algorithms
   ///
   /// Select the version of the generic-emptiness check to use, this
-  /// is mainly for benchmarking purpose.
+  /// is mainly for benchmarking purposes.
   ///
   /// We currently have three versions:
-  /// - "spot28" is similar to the algorithm described our ATVA'19 paper
+  /// - "spot28" is similar to the algorithm described in our ATVA'19 paper
   ///   \cite baier.19.atva , however it has an implementation bug
-  ///   that cause superfluous recursive calls to be performed (the
-  ///   result is still correct.
-  /// - "atva19" is similar to the algorithm described our ATVA'19 paper
+  ///   that causes superfluous recursive calls to be performed (the
+  ///   result is still correct).
+  /// - "atva19" is similar to the algorithm described in our ATVA'19 paper
   ///   \cite baier.19.atva , with the above bug fixed.
   /// - "spot29" improves upon the worst case of atva19.  This is
   ///   the default.

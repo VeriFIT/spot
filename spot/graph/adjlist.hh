@@ -81,7 +81,7 @@ namespace spot
         max_trans = max_states * 2;
       edges_.reserve(max_trans + 1);
       // Add a dummy edge at index 0 to simplify later comparisons.
-      // when next_index == 0, there is no successor.
+      // When next_index == 0, there is no successor.
       edges_.push_back({-1U, 0U});
     }
 

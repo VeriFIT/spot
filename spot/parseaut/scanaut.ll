@@ -308,7 +308,7 @@ startaut    {eols}("HOA:"|"never"|"DSA"|"DRA"|{pgameinit})
      If we only tokenize it as a stream of INTs, the parser will have
      a very hard time recognizing what is a state from what is a
      transitions.  As a consequence we abuse the start conditions to
-     maintain a state an return integers with different semantic types
+     maintain a state and return integers with different semantic types
      depending on the purpose of those integers. */
 <in_LBTT_HEADER>{
   [0-9]+[st]*           {
@@ -480,7 +480,7 @@ startaut    {eols}("HOA:"|"never"|"DSA"|"DRA"|{pgameinit})
   <<EOF>>		{
                           error_list.push_back(
 			    spot::parse_aut_error(*yylloc,
- 			      "missing closing parenthese"));
+ 			      "missing closing parenthesis"));
                           yylval->str->append(yyextra->parent_level, ')');
                           BEGIN(in_NEVER);
 			  spot::trim(*yylval->str);

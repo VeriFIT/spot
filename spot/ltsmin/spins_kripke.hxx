@@ -107,7 +107,7 @@ namespace spot
     tid_ = p.tid;
     cond_ = p.cond;
     current_ = 0;
-    // Constant time since int* is is_trivially_destructible
+    // Constant time since int* is trivially destructible
     successors_.clear();
     setup_iterator(p.s, p.d, p.manager, p.inner, p.cond, p.compress,
                    p.selfloopize, p.cubeset, p.dead_idx);
@@ -408,11 +408,11 @@ namespace spot
              cspins_iterator>::match_aps(std::vector<std::string>& aps,
                                          std::string dead_prop)
   {
-    // Keep trace of errors
+    // Keep track of errors
     int errors = 0;
     std::ostringstream err;
 
-    // First we capture state name of each processes.
+    // First we capture state names of each process.
     int type_count = d_->get_type_count();
     typedef std::map<std::string, int> enum_map_t;
     std::vector<enum_map_t> enum_map(type_count);
@@ -425,7 +425,7 @@ namespace spot
           enum_map[i].emplace(d_->get_type_value_name(i, j), j);
       }
 
-    // Then we extract the basic atomics propositions from the Kripke
+    // Then we extract the basic atomic propositions from the Kripke.
     std::vector<std::string> k_aps;
     int state_size = d_->get_state_size();
     for (int i = 0; i < state_size; ++i)
@@ -632,7 +632,7 @@ namespace spot
           }
         else
           {
-            // We are is the right part, so  if it is a process state
+            // We are in the right part, so  if it is a process state
             // we do not know how to interpret (xxx == P.state1). Abort
             std::size_t found_dot = right.find_first_of('.');
             if (std::string::npos != found_dot)

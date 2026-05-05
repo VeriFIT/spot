@@ -200,7 +200,7 @@ namespace spot
     {
       if (SPOT_UNLIKELY(s >= num_states()))
         throw std::invalid_argument
-          ("set_init_state() called with nonexisiting state");
+          ("set_init_state() called with nonexistent state");
       init_number_ = s;
     }
 
@@ -217,8 +217,7 @@ namespace spot
       return state_from_number(get_init_state_number());
     }
 
-    /// \brief Allow to get an iterator on the state we passed in
-    /// parameter.
+    /// \brief Return an iterator on the state passed as a parameter.
     virtual kripke_graph_succ_iterator<graph_t>*
     succ_iter(const spot::state* st) const override
     {

@@ -26,14 +26,14 @@ namespace spot
   /// \ingroup tl_rewriting
   /// \brief Convert an LTL formula to Δ₂
   ///
-  /// This implement LTL rewriting rules as given by
+  /// This implements LTL rewriting rules as given by
   /// \cite esparza.24.acm
   ///
   /// Only LTL operators are supported, PSL operators
   /// will be left untouched.
   ///
   /// If \a tls is given, it will be used to simplify formulas and
-  /// puts formulas in negative normal form.  If \a tls is not
+  /// Puts formulas in negative normal form.  If \a tls is not
   /// given, a temporary simplifier will be created.
   ///
   /// No transformation is attempted if the input is already Δ₂.

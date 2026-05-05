@@ -341,7 +341,7 @@ namespace spot
         return *this != m && this->subset(m);
       }
 
-      /// \brief Number of bits sets.
+      /// \brief Number of bits set.
       unsigned count() const
       {
         return id.count();
@@ -402,7 +402,7 @@ namespace spot
 #endif
       }
 
-      /// \brief Remove n bits that where set.
+      /// \brief Remove n bits that were set.
       ///
       /// If there are less than n bits set, the output is empty.
       mark_t& remove_some(unsigned n)
@@ -590,7 +590,7 @@ namespace spot
       /// \brief Is this the "false" acceptance condition?
       ///
       /// This corresponds to "f" in the HOA format.  Under this
-      /// acceptance condition, no runs is accepting.  Obviously, this
+      /// acceptance condition, no run is accepting.  Obviously, this
       /// has very few practical application, except as neutral
       /// element in some construction.
       bool is_f() const
@@ -604,7 +604,7 @@ namespace spot
       /// \brief Construct the "false" acceptance condition.
       ///
       /// This corresponds to "f" in the HOA format.  Under this
-      /// acceptance condition, no runs is accepting.  Obviously, this
+      /// acceptance condition, no run is accepting.  Obviously, this
       /// has very few practical application, except as neutral
       /// element in some construction.
       static acc_code f()
@@ -1790,7 +1790,7 @@ namespace spot
     /// of `Fin` term in each pair.  Otherwise, \a pairs is emptied.
     bool is_generalized_streett(std::vector<unsigned>& pairs) const;
 
-    /// \brief check is the acceptance condition matches one of the
+    /// \brief Check if the acceptance condition matches one of the
     /// four type of parity acceptance defined in the HOA format.
     ///
     /// On success, this return true and sets \a max, and \a odd to
@@ -1802,7 +1802,7 @@ namespace spot
     bool is_parity(bool& max, bool& odd, bool equiv = false) const;
 
 
-    /// \brief check is the acceptance condition matches one of the
+    /// \brief Check if the acceptance condition matches one of the
     /// four type of parity acceptance defined in the HOA format.
     bool is_parity() const
     {
@@ -2017,7 +2017,7 @@ namespace spot
     /// there exist one marked transition in the SCC), and is
     /// included in all sets in \a always_present (i.e., all
     /// transitions are marked with \a always_present), this returns
-    /// one tree possible results:
+    /// one of three possible results:
     /// - trival::yes() the SCC is necessarily accepting,
     /// - trival::no() the SCC is necessarily rejecting,
     /// - trival::maybe() the SCC could contain an accepting cycle.

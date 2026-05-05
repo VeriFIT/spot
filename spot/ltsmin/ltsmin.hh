@@ -78,9 +78,9 @@ namespace spot
                       formula dead = formula::tt(),
                       int compress = 0) const;
 
-    // \brief The same as above but returns a kripkecube, i.e. a kripke
+    // \brief The same as above but returns a kripkecube, i.e., a kripke
     // that can be used in parallel. Moreover, it supports more elaborate
-    // atomic propositions such as "P.a == P.c"
+    // atomic propositions such as "P.a == P.c".
     ltsmin_kripkecube_ptr kripkecube(std::vector<std::string> to_observe,
                                      formula dead = formula::tt(),
                                      int compress = 0,

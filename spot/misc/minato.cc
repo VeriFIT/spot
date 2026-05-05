@@ -32,7 +32,7 @@ namespace spot
     : ret_(bddfalse)
   {
     // If INPUT has the form a&b&c&(binary function) we want to
-    // compute the ISOP of the only binary and prepend a&b&c latter.
+    // compute the ISOP of the only binary and prepend a&b&c later.
     //
     // Calling bdd_satprefix (it returns a&b&c and modify input to
     // point to function) this way is an optimization to the

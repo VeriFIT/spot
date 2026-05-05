@@ -38,7 +38,7 @@ namespace spot
   /// when it can be done without changing the automaton structure.
   ///
   /// If \a aut is a Rabin-like automaton that is not Büchi-realizable,
-  /// this returns a Büchi automaton equivalent to \a aut that use
+  /// this returns a Büchi automaton equivalent to \a aut that uses
   /// exactly the same transition structure (the order of edges is
   /// even preserved).  In particular, determinism is preserved.
   ///

@@ -63,13 +63,13 @@ namespace spot
     }
   };
 
-  /// \brief Interface with satsolver's litterals.
+  /// \brief Interface with satsolver's literals.
   ///
   /// This class was created to fill the need to optimize memory storage in
   /// SAT-minimization.
   ///
   /// All this relies on the fact that almost everything about the automaton
-  /// candidate is known in advance and most of the time, litteral's numbers
+  /// candidate is known in advance and most of the time, literal's numbers
   /// are just incremented continually (they are continuous...).
   ///
   /// This class allows to handle variables by only manipulating indices.

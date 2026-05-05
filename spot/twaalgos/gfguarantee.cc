@@ -195,8 +195,8 @@ namespace spot
           unsigned new_init = -1U;
           // We do two the rewrite in two passes.  The first one
           // replays histories to detect the new source the edges
-          // should synchronize with.  The second pass do the actual
-          // rewrite.  We used to have single loop, but replaying
+          // should synchronize with.  The second pass does the actual
+          // rewrite.  We used to have a single loop, but replaying
           // history on edges that have been modified results in
           // different automata depending on the edge order.
           std::unique_ptr<unsigned[]> redirect_src;
@@ -445,7 +445,7 @@ namespace spot
             aut->new_edge(accstate, e.dst, e.cond, {0});
           // This is not mandatory, but starting on the accepting
           // state helps getting shorter accepting words and may
-          // reader the original initial state unreachable, saving one
+          // render the original initial state unreachable, saving one
           // state.
           aut->set_init_state(accstate);
         }

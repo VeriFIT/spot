@@ -84,7 +84,7 @@ namespace spot
                   }
               }
             // Now if sinkable==true, it means that there is either no
-            // outgoing transition, or just a self-loop.  In the later
+            // outgoing transition, or just a self-loop.  In the latter
             // case we have to check that the acceptance mark of that
             // self-loop is non-accepting.  In the former case
             // "loopmark" was already set to an unsatisfiable mark, so

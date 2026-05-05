@@ -29,7 +29,7 @@ namespace spot
   /// This is based on \cite tauriainen.06.tr .
   ///
   /// \param f The formula to translate into an automaton.
-  /// \param dict The spot::bdd_dict the constructed automata should use.
+  /// \param dict The spot::bdd_dict the constructed automaton should use.
   /// \param refined_rules If this parameter is set, refined rules are used.
   /// \return A spot::taa that recognizes the language of \a f.
   SPOT_API taa_tgba_formula_ptr

@@ -26,7 +26,7 @@ namespace spot
   /// \ingroup twa_io
   /// \brief Print reachable states in LBTT's format.
   ///
-  /// \param g The automata to print.
+  /// \param g The automaton to print.
   /// \param os Where to print.
   /// \param opt if "t", force transition-based acceptance, otherwise,
   //  default to state-based acceptance when the automaton is marked so.

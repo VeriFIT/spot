@@ -49,7 +49,7 @@ namespace spot
     /// \brief Constructor
     ///
     /// The set of operators to remove should be passed as a string
-    /// which in which each letter denote an operator (using LBT's
+    /// in which each letter denotes an operator (using LBT's
     /// convention).
     unabbreviator(const char* opt = default_unabbrev_string);
     formula run(formula in);
@@ -60,7 +60,7 @@ namespace spot
   /// logical operators.
   ///
   /// The set of operators to remove should be passed as a string
-  /// which in which each letter denote an operator (using LBT's
+  /// in which each letter denotes an operator (using LBT's
   /// convention).
   SPOT_API formula
   unabbreviate(formula in, const char* opt= default_unabbrev_string);

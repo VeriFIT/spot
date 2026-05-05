@@ -22,7 +22,7 @@
 
 namespace spot
 {
-  /// \brief distribute X at the top-level of a formula
+  /// \brief Distribute X at the top-level of a formula
   ///
   /// Convert a formula like X(a | X(b | X(c & Xd)))
   /// into X(a) | XX(b) | (XXX(c) & XXXXd)

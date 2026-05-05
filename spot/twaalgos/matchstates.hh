@@ -26,7 +26,7 @@
 namespace spot
 {
   /// \ingroup twa_algorithms
-  /// \brief match the state of \a aut1 with the states of \a aut2.
+  /// \brief Match the states of \a aut1 with the states of \a aut2.
   ///
   /// Return a vector `V` such that for each state `x` of
   /// \a aut1, `V[x]` contains the set of states `y` such that
@@ -40,7 +40,7 @@ namespace spot
                const const_twa_graph_ptr& aut2);
 
   /// \ingroup twa_algorithms
-  /// \brief match the states of \a aut with formulas "reachable" from
+  /// \brief Match the states of \a aut with formulas "reachable" from
   /// \a f.
   ///
   /// The returned vector V assigns each state `x` of \a aut to a
@@ -60,7 +60,7 @@ namespace spot
 
   /// \ingroup twa_algorithms
   ///
-  /// \brief label the state of \a aut with the result of
+  /// \brief Label the states of \a aut with the result of
   /// `match_states(aut,f)`.
   SPOT_API void
   match_states_decorate(twa_graph_ptr& aut, formula f);

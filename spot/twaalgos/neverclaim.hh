@@ -31,7 +31,7 @@ namespace spot
   /// \param g The (state-based degeneralized) automaton to output.
   ///          There should be only one acceptance condition, and
   ///          all the transitions of a state should be either all accepting
-  ///          or all unaccepting.  If your automaton does not satisfies
+  ///          or all unaccepting.  If your automaton does not satisfy
   ///          these requirements, call degeneralize() first.
   /// \param opt a string of option: 'c' to comment each state
   SPOT_API std::ostream&

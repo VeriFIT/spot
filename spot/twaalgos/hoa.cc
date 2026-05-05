@@ -698,7 +698,7 @@ namespace spot
     else if (v1_1)
       prop(" !complete");
     // The definition of "deterministic" was changed between HOA v1
-    // (were it meant "universal") and HOA v1.1 were it means
+    // (where it meant "universal") and HOA v1.1 where it means
     // ("universal" and "existential").
     if (!v1_1)
       {

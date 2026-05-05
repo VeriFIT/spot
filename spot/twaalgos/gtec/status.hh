@@ -27,7 +27,7 @@ namespace spot
   /// \brief The status of the emptiness-check on success.
   ///
   /// This contains everything needed to construct a counter-example:
-  /// the automata, the stack of SCCs traversed by the counter-example,
+  /// the automaton, the stack of SCCs traversed by the counter-example,
   /// and the heap of visited states with their indexes.
   class SPOT_API couvreur99_check_status
   {

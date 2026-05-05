@@ -23,7 +23,7 @@
 namespace spot
 {
   /// \ingroup twa_reduction
-  /// \brief Attempt to synthetize an equivalent deterministic TBA
+  /// \brief Attempt to synthesize an equivalent deterministic TBA
   /// with a SAT solver.
   ///
   /// \param a the input TGA.  It should have only one acceptance
@@ -72,7 +72,7 @@ namespace spot
   ///
   /// This acts like dtba_sat_synthetize() and obtains a first minimized
   /// automaton. Then, incrementally, it encodes the deletion of one state
-  /// and solves it as many time as param value.
+  /// and solves it as many times as param value.
   /// If param >= 0, this process is fully repeated until the minimal automaton
   /// is found. Otherwise, it continues to delete states one by one
   /// incrementally until the minimal automaton is found.

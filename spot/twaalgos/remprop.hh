@@ -42,7 +42,7 @@ namespace spot
 
   /// \brief Interpret the "live" part of an automaton as finite automaton.
   ///
-  /// This functions assumes that there is a property "alive" is
+  /// This function assumes that there is a property "alive" is
   /// that either true or false on all transitions, and that can only
   /// switch from true to false.
   ///

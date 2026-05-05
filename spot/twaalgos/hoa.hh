@@ -136,7 +136,7 @@ namespace spot
     ///   other aliases.
     ///
     /// - Otherwise \a label is split in irredundant-sum-of-products
-    ///   and each clause is encoded as a conjunctions of (possibly
+    ///   and each clause is encoded as a conjunction of (possibly
     ///   negated) aliases using only those that are cubes.  Any
     ///   remaining literal is encoded with the ap_printer() function
     ///   passed to the constructor.
@@ -146,7 +146,7 @@ namespace spot
     /// position \a aliases_start.  As this vector is stored in the
     /// opposite order of how aliases should be stored in the HOA
     /// output, adjusting \a aliases_start is helpful to encode an
-    /// aliases using only previously defined aliases (i.e., aliases
+    /// alias using only previously defined aliases (i.e., aliases
     /// that appear later in the sequence returned by aliases()).
     std::string
     encode_label(bdd label, unsigned aliases_start = 0);
@@ -169,7 +169,7 @@ namespace spot
   /// \ingroup twa_io
   /// \brief Create an alias basis
   ///
-  /// This use spot::edge_separator to build a set of alias that can
+  /// This uses spot::edge_separator to build a set of alias that can
   /// be used as a basis for all labels of the automaton.
   ///
   /// Such a basis can be used to shorten the size of an output file

@@ -147,7 +147,7 @@ namespace spot
     // Fix the acceptance of the resulting automaton
     res->acc() = twacube->acc();
 
-    // Grep bdd id for each atomic propositions
+    // Get the BDD id for each atomic proposition.
     std::vector<int> bdds_ref;
     for (auto& ap : twacube->ap())
       bdds_ref.push_back(res->register_ap(ap));
@@ -170,7 +170,7 @@ namespace spot
               cond &= bdd_ithvar(bdds_ref[j]);
             else if (cs.is_false_var(theg.edge_data(i).cube_, j))
               cond &= bdd_nithvar(bdds_ref[j]);
-            // otherwise it 's a free variable do nothing
+            // Otherwise it's a free variable, do nothing.
           }
 
         res->new_edge(theg.edge_storage(i).src, theg.edge_storage(i).dst,

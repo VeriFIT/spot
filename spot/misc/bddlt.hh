@@ -41,7 +41,7 @@ namespace spot
   /// \ingroup misc_tools
   /// \brief Comparison functor for BDDs.
   ///
-  /// This comparison function actually check for BDD variables, so as
+  /// This comparison function actually checks for BDD variables, so as
   /// long as the variable order is the same, the output of this
   /// comparison will be stable and independent on previous BDD
   /// operations.

@@ -509,7 +509,7 @@ namespace spot
         res->copy_ap_of(a_);
         res->copy_acceptance_of(a_);
 
-        // We have two ways of "spliting" a signature to create the
+        // We have two ways of "splitting" a signature to create the
         // outgoing edges.  One is to iterate over 2^AP, then collect
         // the destinations.  The second is to first create a coarser
         // basis for the original set of labels, and then iterate on

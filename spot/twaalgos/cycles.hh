@@ -39,7 +39,7 @@ namespace spot
   /// that form a cycle and that visit a state at most once.  We may
   /// have two cycles that visit the same states in the same order if
   /// some pair of states are connected by several transitions.  Also
-  /// A cycle may visit only one state if it is a self-loop.
+  /// a cycle may visit only one state if it is a self-loop.
   ///
   /// We represent a cycle by a sequence of succ_iterator objects
   /// positioned on the transition contributing to the cycle.  These

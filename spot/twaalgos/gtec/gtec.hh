@@ -28,7 +28,7 @@ namespace spot
   /// \addtogroup emptiness_check_algorithms
   /// @{
 
-  /// \brief Check whether the language of an automate is empty.
+  /// \brief Check whether the language of an automaton is empty.
   ///
   /// This is based on \cite couvreur.99.fm .
   ///
@@ -72,7 +72,7 @@ namespace spot
   ///
   /// check() returns 0 iff the automaton's language is empty.  It
   /// returns an instance of emptiness_check_result.  If the automaton
-  /// accept a word.  (Use emptiness_check_result::accepting_run() to
+  /// accepts a word.  (Use emptiness_check_result::accepting_run() to
   /// extract an accepting run.)
   ///
   /// There are two variants of this algorithm: spot::couvreur99_check and
@@ -109,7 +109,7 @@ namespace spot
   /// successors of the root recursively) for deletion.  This is a
   /// choice between memory and speed.
   ///
-  /// \li \c "group" : this options is used only by spot::couvreur99_check_shy.
+  /// \li \c "group" : this option is used only by spot::couvreur99_check_shy.
   /// If non null (the default), the successors of all the
   /// states that belong to the same SCC will be considered when
   /// choosing a successor.  Otherwise, only the successor of the

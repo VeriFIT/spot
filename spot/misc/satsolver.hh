@@ -35,7 +35,7 @@ namespace spot
   /// \brief Interface with a given sat solver.
   ///
   /// When created, it checks if SPOT_SATSOLVER env var is set. If so,
-  /// its value is parsed and saved internally. The env variable musb be set
+  /// its value is parsed and saved internally. The env variable must be set
   /// like this: "<satsolver> [its_options] %I > %O"
   /// where %I and %O are replaced by input and output files.
   ///

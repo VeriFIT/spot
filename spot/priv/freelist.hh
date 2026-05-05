@@ -60,7 +60,7 @@ namespace spot
     /// Dump the list to \a os for debugging.
     std::ostream& dump_free_list(std::ostream& os) const;
 
-    /// Extend the list by inserting a new pos-lenght pair.
+    /// Extend the list by inserting a new pos-length pair.
     void insert(int base, int n);
 
     /// Remove \a n consecutive entries from the list, starting at \a base.
@@ -71,12 +71,12 @@ namespace spot
 
   protected:
 
-    /// Allocate \a n integer.
+    /// \brief Allocate \a n integers.
     ///
     /// This function is called by register_n() when the free list is
     /// empty or if \a n consecutive integers could not be found.  It
     /// should allocate more integers, possibly changing the list, and
-    /// return the first integer on a range of n consecutive integer
+    /// return the first integer on a range of n consecutive integers
     /// requested by the user.
     virtual int extend(int n) = 0;
 

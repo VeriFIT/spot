@@ -32,7 +32,7 @@ namespace spot
   /// an iterator over the (possible) successors of a state.
   ///
   /// Do not delete by hand any states and/or iterator that
-  /// are provided by this template class. Specialisations
+  /// are provided by this template class. Specializations
   /// will handle it.
   template<typename State, typename SuccIterator>
   class SPOT_API kripkecube:
@@ -56,7 +56,7 @@ namespace spot
     /// method allows to reuse old iterators.
     void recycle(SuccIterator*, unsigned tid);
 
-    /// \brief This method allow to deallocate a given state.
+    /// \brief This method allows to deallocate a given state.
     const std::vector<std::string> ap();
   };
 
@@ -64,8 +64,8 @@ namespace spot
 
   /// \ingroup kripke
   /// \brief This class allows to ensure (at compile time) if
-  /// a given parameter is of type kripkecube. It also check
-  /// if the iterator has the good interface.
+  /// a given parameter is of type kripkecube. It also checks
+  /// if the iterator has the right interface.
   template <typename T, typename State, typename SuccIter>
   class SPOT_API is_a_kripkecube_ptr
   {
@@ -73,7 +73,7 @@ namespace spot
     using yes = std::true_type;
     using no = std::false_type;
 
-    // Hardly waiting C++ concepts...
+    // Eagerly awaiting C++ concepts...
     template<typename U, typename V> static auto test_kripke(U u, V v)
       -> decltype(
        // Check the kripke
@@ -161,7 +161,7 @@ namespace spot
   /// any acceptance condition.
   ///
   /// A programmer that develops an instance of Kripke structure needs
-  /// just provide an implementation for the following methods:
+  /// to just provide an implementation for the following methods:
   ///
   ///   - kripke::get_init_state()
   ///   - kripke::succ_iter()

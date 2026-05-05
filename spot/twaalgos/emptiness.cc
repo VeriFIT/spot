@@ -428,7 +428,7 @@ namespace spot
       }
 
     // Compute the prefix: it's the shortest path from the initial
-    // state of the automata to any state of the cycle.
+    // state of the automaton to any state of the cycle.
 
     // Register all states from the cycle as target of the BFS.
     for (twa_run::steps::const_iterator i = res->cycle.begin();

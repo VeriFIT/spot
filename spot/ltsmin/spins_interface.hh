@@ -38,9 +38,9 @@ namespace spot
 
   /// \ingroup ltsmin_interface
   /// \brief Implementation of the PINS interface. This class
-  /// is a wrapper that, given a file, will compile it w.r.t
+  /// is a wrapper that, given a file, will compile it w.r.t.
   /// the PINS interface. The class can then be manipulated
-  /// transparently whatever the input format considered.
+  /// transparently, regardless of the input format.
   class SPOT_API spins_interface
   {
   public:
@@ -49,7 +49,7 @@ namespace spot
     ~spins_interface();
 
     // The various functions that can be called once the object
-    // has been instanciated.
+    // has been instantiated.
     void (*get_initial_state)(void *to);
     int (*have_property)();
     int (*get_successors)(void* m, int *in, TransitionCB, void *arg);

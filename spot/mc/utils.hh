@@ -25,7 +25,7 @@
 namespace spot
 {
   /// \ingroup model_checking
-  /// \brief convert a (cube) model  into a twa.
+  /// \brief Convert a (cube) model  into a twa.
   /// Note that this algorithm cannot be run in parallel but could.
   template<typename State, typename SuccIterator,
            typename StateHash, typename StateEqual>
@@ -163,7 +163,7 @@ namespace spot
   };
 
   /// \ingroup model_checking
-  /// \brief convert a (cube) product automaton into a twa
+  /// \brief Convert a (cube) product automaton into a twa
   /// Note that this algorithm cannot be run in parallel.
   template<typename State, typename SuccIterator,
            typename StateHash, typename StateEqual>

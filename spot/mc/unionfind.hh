@@ -29,7 +29,7 @@ namespace spot
   /// union-find, dedicated for emptiness checks below, see ec.hh. The
   /// key of this union-find is int. Moreover, we suppose that only
   /// consecutive int are inserted. This union-find includes most of
-  /// the classical optimisations (IPC, LR, PC, MS).
+  /// the classical optimizations (IPC, LR, PC, MS).
   class SPOT_API int_unionfind final
   {
   private:

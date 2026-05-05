@@ -88,7 +88,7 @@ namespace spot
   /// The \a merge argument can be set to false to prevent merging of
   /// transitions.
   ///
-  /// If ab \a aborter is given, abort the construction whenever it
+  /// If an \a aborter is given, abort the construction whenever it
   /// would build an automaton that is too large, and return nullptr.
   ///
   /// If a vector of accepting sinks is given, all power-state that

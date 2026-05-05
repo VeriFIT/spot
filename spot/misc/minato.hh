@@ -28,7 +28,7 @@ namespace spot
   /// \brief Generate an irredundant sum-of-products (ISOP) form of a
   /// BDD function.
   ///
-  /// This algorithm implements a derecursived version the Minato-Morreale
+  /// This algorithm implements a derecursived version of the Minato-Morreale
   /// algorithm. \cite minato.92.sasimi
   class SPOT_API minato_isop
   {
@@ -42,7 +42,7 @@ namespace spot
     minato_isop(bdd input, bdd vars);
     /// \brief Constructor.
     ///
-    /// This version allow some flexibility in computing the ISOP.
+    /// This version allows some flexibility in computing the ISOP.
     /// the result must be within \a input_min and \a input_max.
     /// \arg input_min The minimum BDD function to translate in ISOP.
     /// \arg input_max The maximum BDD function to translate in ISOP.

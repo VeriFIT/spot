@@ -120,7 +120,7 @@ namespace spot
   /// are disjunctions of Fin(.) terms (e.g., Fin(1)|Fin(2)) will
   /// be degeneralized as well.
   ///
-  /// If this functions is called with a value of \a todegen that does
+  /// If this function is called with a value of \a todegen that does
   /// not match a conjunction of Inf(.), or a disjunction of Fin(.),
   /// an std::runtime_error exception is thrown.
   ///

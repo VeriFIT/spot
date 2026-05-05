@@ -24,7 +24,7 @@ namespace spot
 {
   /// \brief Randomize a TGBA
   ///
-  /// Make a random permutation of the state, and of the edges
+  /// Make a random permutation of the states, and of the edges
   /// leaving this state.
   ///
   /// This function preserves state names, and highlighted states,

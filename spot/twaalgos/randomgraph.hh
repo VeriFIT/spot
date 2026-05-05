@@ -35,7 +35,7 @@ namespace spot
   ///          states.  All states have at least one outgoing transition,
   ///          so \a d is considered only when adding the remaining transition.
   ///          A density of 1 means all states will be connected to each other.
-  /// \param ap The list of atomic property that should label the transition.
+  /// \param ap The list of atomic properties that should label the transitions.
   /// \param dict The bdd_dict to used for this automata.
   /// \param n_accs The number of acceptance sets to use.
   ///          If this number is non null, then there is no guarantee
@@ -50,7 +50,7 @@ namespace spot
   /// \param colored build an automaton in which each transition (or state)
   ///          belongs to a single acceptance set.
   ///
-  /// This algorithms is adapted from the one in Fig 6.2 page 48 of
+  /// This algorithm is adapted from the one in Fig 6.2 page 48 of
   /// \cite tauriainen.00.tr .
   ///
   /// Although the intent is similar, there are some differences

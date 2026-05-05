@@ -61,7 +61,7 @@ extern "C" int strverscmp(const char *s1, const char *s2);
     typedef std::map<int, bdd> map_t;
 
     /* Cache parsed formulae.  Labels on arcs are frequently identical
-       and it would be a waste of time to parse them to formula
+       and it would be a waste of time to parse them as formulas
        over and over, and to register all their atomic_propositions in
        the bdd_dict.  Keep the bdd result around so we can reuse
        it.  */
@@ -105,12 +105,12 @@ extern "C" int strverscmp(const char *s1, const char *s2);
       std::vector<bdd>::const_iterator cur_guard;
       // If "Alias: ..." occurs before "AP: ..." in the HOA format we
       // are in trouble because the parser would like to turn each
-      // alias into a BDD, yet the atomic proposition have not been
+      // alias into a BDD, yet the atomic propositions have not been
       // declared yet.  We solve that by using arbitrary BDD variables
       // numbers (in fact we use the same number given in the Alias:
       // definition) and keeping track of the highest variable number
       // we have seen (unknown_ap_max).  Once AP: is encountered,
-      // we can remap everything.  If AP: is never encountered an
+      // we can remap everything.  If AP: is never encountered and
       // unknown_ap_max is non-negative, then we can signal an error.
       int unknown_ap_max = -1;
       spot::location unknown_ap_max_location;
@@ -365,7 +365,7 @@ extern "C" int strverscmp(const char *s1, const char *s2);
 
 %%
 aut: aut-1     { res.h->loc = @$; YYACCEPT; }
-/* Not how we do not accept garbage before LINEDIRECTIVE. This is because
+/* Note how we do not accept garbage before LINEDIRECTIVE. This is because
    all error will be relative to the specified filename, so that filename
    must not be changed after any error was reported. */
    | LINEDIRECTIVE { res.h->filename = *$1; } aut
@@ -1327,7 +1327,7 @@ body: states
         if (res.existential.is_true() && !det_warned && !tolerant)
           if (auto p = res.prop_is_true("univ-branch"))
             {
-              error(@1, "automaton is has no universal branching...");
+              error(@1, "automaton has no universal branching...");
               error(p.loc, "... despite 'properties: univ-branch'\n"
                     "note: If this is an issue you cannot fix, you may disable "
                     "this diagnostic\n      by defining the SPOT_HOA_TOLERANT "
@@ -2297,7 +2297,7 @@ lbtt: lbtt-header lbtt-body ENDAUT
 	    // We have seen numbers larger that the total number of
 	    // states in the automaton.  Usually this happens when the
 	    // states are numbered from 1 instead of 0, but the LBTT
-	    // documentation actually allow any number to be used.
+	    // documentation actually allows any number to be used.
 	    // What we have done is to map all input state numbers 0
 	    // <= .. < n to the digraph states with the same number,
 	    // and any time we saw a number larger than n, we mapped
@@ -2656,7 +2656,7 @@ static void fix_initial_state(result_& r)
       if (r.opts.want_kripke)
 	{
 	  r.h->errors.emplace_front(r.start.front().first,
-				    "Kripke structure only support "
+				    "Kripke structure only supports "
 				    "a single initial state");
 	  return;
 	}
@@ -2701,7 +2701,7 @@ static void fix_initial_state(result_& r)
         // that we elected as the future initial state was the only
         // incomplete state of the automaton.  Similarly this could
         // also turn a non-deterministic automaton into a
-        // deterministic one, but we don't have to deal with this are
+        // deterministic one, but we don't have to deal with this as
         // automata with multiple initial states have prop_universal()
         // set to maybe() already in prevision of what this function
         // will do.
@@ -2755,7 +2755,7 @@ static void fix_initial_state(result_& r)
           // In the alternating case, we merge outgoing transition of
           // the universal destination of conjunct initial states.
           // (Note that this loop would work for the non-alternating
-          // case too, but it is more expansive, so we avoid it if we
+          // case too, but it is more expensive, so we avoid it if we
           // can.)
           spot::outedge_combiner combiner(aut);
           bdd comb_or = bddfalse;

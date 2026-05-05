@@ -40,7 +40,7 @@ namespace spot
 
   /// \ingroup containment
   /// \brief Returns a boolean value indicating
-  /// whether the language of \a left includes in the language of \a right.
+  /// whether the language of \a left includes the language of \a right.
   ///
   /// This implements a FORQ-based language containment algorithm
   /// to check whether L(left)⊇L(right). \cite doveri.22.cav

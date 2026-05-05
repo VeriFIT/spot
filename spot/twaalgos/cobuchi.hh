@@ -60,7 +60,7 @@ namespace spot
   /// and is described in section 3.1 of \cite boker.2011.fossacs .
   ///
   /// This implementation is quite different from the described algorithm. It
-  /// is made to work with automaton with Street-like acceptance (including
+  /// is made to work with automaton with Streett-like acceptance (including
   /// Büchi).
   ///
   /// \a aut The automaton to convert.
@@ -98,7 +98,7 @@ namespace spot
 
   /// \brief Converts a nondet Streett-like aut. to a det. co-Büchi aut.
   ///
-  /// This function calls first nsa_to_nca() in order to retrieve som
+  /// This function calls first nsa_to_nca() in order to retrieve some
   /// information and then runs a breakpoint construction. The algorithm is
   /// described in section 4 of \cite boker.2011.fossacs .
   ///
@@ -109,7 +109,7 @@ namespace spot
 
   /// \brief Converts an aut. with acceptance in DNF to a det. co-Büchi aut.
   ///
-  /// This function calls first nra_to_nca() in order to retrieve som
+  /// This function calls first nra_to_nca() in order to retrieve some
   /// information and then runs a breakpoint construction. The algorithm is
   /// described in section 4 of \cite boker.2011.fossacs .
   ///

@@ -29,7 +29,7 @@ namespace spot
   namespace
   {
     // E°  if bounded=false
-    // E^□ if nounded=true
+    // E^□ if bounded=true
     template<bool bounded>
     class snf_visitor final
     {

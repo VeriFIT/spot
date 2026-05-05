@@ -88,7 +88,7 @@ namespace spot
     /// Return (and maybe allocate) a BDD variable designating formula
     /// \a f.  The \a for_me argument should point to the object using
     /// this BDD variable, this is used for reference counting.  It is
-    /// perfectly safe to call this function several time with the same
+    /// perfectly safe to call this function several times with the same
     /// arguments.
     ///
     /// \return The variable number.  Use bdd_ithvar() or bdd_nithvar()
@@ -103,7 +103,7 @@ namespace spot
     }
     /// @}
 
-    /// \brief whether a proposition has already been registered
+    /// \brief Whether a proposition has already been registered
     ///
     /// If \a f has been registered for \a me, this returns
     /// a non-negative value that is the BDD variable number.
@@ -133,7 +133,7 @@ namespace spot
     /// acceptance set associated to formula \a f.  The \a for_me
     /// argument should point to the object using this BDD variable,
     /// this is used for reference counting.  It is perfectly safe to
-    /// call this function several time with the same arguments.
+    /// call this function several times with the same arguments.
     ///
     /// \return The variable number.  Use bdd_ithvar() or bdd_nithvar()
     ///   to convert this to a BDD.
@@ -229,7 +229,7 @@ namespace spot
 
     /// \brief Release all variables used by an object.
     ///
-    /// Usually called in the destructor if \a me.
+    /// Usually called in the destructor of \a me.
     void unregister_all_my_variables(const void* me);
 
     /// \brief Release a variable used by \a me.

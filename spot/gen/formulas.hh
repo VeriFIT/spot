@@ -55,7 +55,7 @@ namespace spot
       /// 12 formulas from Etessami and Holzmann.
       /// \cite etessami.00.concur
       LTL_EH_PATTERNS,
-      /// Familly sent by Edmond Irani Liu
+      /// Family sent by Edmond Irani Liu
       LTL_EIL_GSI,
       /// `F(p0 | XG(p1 | XG(p2 | ... XG(pn))))`
       LTL_FXG_OR,
@@ -151,10 +151,10 @@ namespace spot
       /// n-bit counter with carry
       /// \cite rozier.07.spin
       LTL_RV_COUNTER_CARRY,
-      /// linear-size formular for an n-bit counter with carry
+      /// linear-size formula for an n-bit counter with carry
       /// \cite rozier.07.spin
       LTL_RV_COUNTER_CARRY_LINEAR,
-      /// linear-size formular for an n-bit counter
+      /// linear-size formula for an n-bit counter
       /// \cite rozier.07.spin
       LTL_RV_COUNTER_LINEAR,
       /// 27 formulas from Somenzi and Bloem
@@ -169,7 +169,7 @@ namespace spot
       /// `(GFa1|FGb1)&...&(GFan|FGbn)`
       /// \cite sickert.16.cav
       LTL_SEJK_K,
-      /// 3 formulas from Sikert et al.
+      /// 3 formulas from Sickert et al.
       /// \cite sickert.16.cav
       LTL_SEJK_PATTERNS,
       /// `G(p -> (q | Xq | ... | XX...Xq)`

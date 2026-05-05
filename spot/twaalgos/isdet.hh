@@ -58,7 +58,7 @@ namespace spot
   /// \brief Highlight nondeterministic states
   ///
   /// A state is nondeterministic if it has two outgoing edges whose
-  /// labels are not incompatibles.
+  /// labels are not incompatible.
   ///
   /// \param aut the automaton to process
   /// \param color the color to give to nondeterministic states.
@@ -90,7 +90,7 @@ namespace spot
   /// \brief Return true iff \a aut is complete.
   ///
   /// An automaton is complete if its translation relation is total,
-  /// i.e., each state as a successor for any possible configuration.
+  /// i.e., each state has a successor for any possible configuration.
   SPOT_API bool
   is_complete(const const_twa_graph_ptr& aut);
 

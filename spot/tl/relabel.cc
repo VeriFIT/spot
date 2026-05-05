@@ -319,7 +319,7 @@ namespace spot
   // On the above example, when processing the cut-point
   // ((a|b)&c&d) we group its children that are cut-points
   // (a|b)&c and rename this group as p0.   Then d gets
-  // his own name p1, and when processing (!d&e&f) we group
+  // its own name p1, and when processing (!d&e&f) we group
   // e&f because they are both cut-points, are rename them p1.
   // The result is (p0 & p1) U (!p1 & p2).
   //
@@ -328,7 +328,7 @@ namespace spot
   // {a,b,c,d} are Boolean subformulas.  The construction, as we have
   // presented it, would interconnect all of {a,b,c,d}, preventing c&d
   // from being relabeled together.  To help with that, we count the
-  // number of time of each subformula is used (or how many parents
+  // number of times each subformula is used (or how many parents
   // its has in the syntax DAG), and use that to split (a&b&c&d) into
   // (a&b)&(c&d), separating subformulas that are used only once.  The
   // counting is done by sub_formula_collect(), and the split by

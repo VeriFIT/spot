@@ -927,7 +927,7 @@ namespace spot
     else if (dead != spot::formula::tt())
       dead_ap = dead.ap_name();
 
-    // Is dead proposition is already in to_observe?
+    // Is the dead proposition already in to_observe?
     bool add_dead = true;
     for (auto it: to_observe)
       if (it.compare(dead_ap))

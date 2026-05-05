@@ -35,7 +35,7 @@ namespace spot
   /// This procedure is based on an algorithm by Roman Redziejowski
   /// \cite redziejowski.12.fi .  Redziejowski's algorithm is similar
   /// to Piterman's improvement of Safra's algorithm, except it is
-  /// presented on transition-based acceptance and use simpler
+  /// presented on transition-based acceptance and uses simpler
   /// notations.  We implement three additional optimizations (they
   /// can be individually disabled) based on
   ///

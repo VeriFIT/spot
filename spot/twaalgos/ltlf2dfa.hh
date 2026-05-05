@@ -56,9 +56,9 @@ namespace spot
 
       /// \brief number of atomic propositions
       ///
-      /// This are the number of atomic proposition used in the original
-      /// formula.  The proposition actually used in the automaton may be
-      /// less.
+      /// This is the number of atomic propositions used in the original
+      /// formula.  The propositions actually used in the automaton may be
+      /// fewer.
       unsigned aps;
 
       /// \brief Number of internal nodes (or decision nodes)
@@ -94,10 +94,10 @@ namespace spot
     };
 
   /// \ingroup mtdfa
-  /// \brief a DFA represented using shared multi-terminal BDDs
+  /// \brief A DFA represented using shared multi-terminal BDDs
   ///
-  /// Such a DFA is represented by a vector a BDDs: one BDD per state.
-  /// Each BDD encodes set of outgoing transitions of a state.  The
+  /// Such a DFA is represented by a vector of BDDs: one BDD per state.
+  /// Each BDD encodes the set of outgoing transitions of a state.  The
   /// of the transitions encoded naturally using BDD decision variables,
   /// and the destination state is stored as a "terminal" node.
   ///
@@ -116,7 +116,7 @@ namespace spot
   struct SPOT_API mtdfa: public std::enable_shared_from_this<mtdfa>
   {
     public:
-    /// \brief create an empty mtdfa
+    /// \brief Create an empty mtdfa
     ///
     /// The \a dict is used to record how BDD variables map to atomic
     /// propositions.
@@ -137,13 +137,13 @@ namespace spot
     /// This is actually the list of atomic propositions that appeared
     /// in the formulas/automata that were used to build this
     /// automaton.  The automaton itself may use fewer atomic
-    /// propositions, for instance in cases some of them canceled each other.
+    /// propositions, for instance in case some of them cancel each other.
     ///
     /// This vector is sorted by formula ID, to make it easy to merge
     /// with another sorted vector.
     std::vector<formula> aps;
 
-    /// \brief the number of MTBDDs roots
+    /// \brief The number of MTBDDs roots
     ///
     /// This is the size of the `states` array.  It does not account
     /// for any bddfalse or bddtrue state.
@@ -173,7 +173,7 @@ namespace spot
     ///
     /// By default states will be named according to the formulas
     /// given in the `names` array, if available.  Set \a labels to
-    /// `false` (or clear `names`) if you prefer states to by
+    /// `false` (or clear `names`) if you prefer states to be
     /// numbered.
     std::ostream& print_dot(std::ostream& os,
                             int index = -1,
@@ -198,7 +198,7 @@ namespace spot
     /// available.  Set \a labels to `false` if you do not want that.
     twa_graph_ptr as_twa(bool state_based = false, bool labels = true) const;
 
-    /// \brief compute some statistics about the automaton
+    /// \brief Compute some statistics about the automaton
     ///
     /// If \a nodes and \a paths are false, this only fetches
     /// statistics that are available in constant time.
@@ -213,19 +213,19 @@ namespace spot
     /// exponential in the number of atomic propositions.
     mtdfa_stats get_stats(bool nodes, bool paths) const;
 
-    /// \brief get the bdd_dict associated to this automaton
+    /// \brief Get the bdd_dict associated to this automaton
     bdd_dict_ptr get_dict() const
     {
       return dict_;
     }
 
-    /// \brief declare a list of controllable variables
+    /// \brief Declare a list of controllable variables
     ///
     /// Doing so affect the way the automaton is printed in dot
     /// format, but this is also a prerequisite for interpreting
     /// the automaton as a game.
     ///
-    /// This function is expected to be after you have built the
+    /// This function is expected to be called after you have built the
     /// automaton, in some way (causing atomic propositions to be
     /// registered).  If \a ignore_non_registered_ap is set, variable
     /// listed as output but not registered by the automaton will be
@@ -281,7 +281,7 @@ namespace spot
   /// formula, which can be a bit misleading.
   ///
   /// - if \a preserve_quantifiers_in_names is set, the formulas that
-  ///   name state will preserve the original quantifiers (an be
+  ///   name state will preserve the original quantifiers (and be
   ///   simplified to omit unnecessary quantifications).  Adding those
   ///   quantifiers back has a small overhead (each formula has to be
   ///   reconstructed), so it is disabled by default.
@@ -394,7 +394,7 @@ namespace spot
   /// When combining multiple automata with AND or OR, there is some
   /// flexibility in the order in which this is done.  When \a
   /// order_for_aps is `false`, a heap of automata to combine is used:
-  /// the two smallest automata are combined and their result it put
+  /// the two smallest automata are combined and their result is put
   /// back in the heap.  When \a order_for_aps is `true`, the automata
   /// are also ordered by size, but the smallest automaton is combined
   /// with the next smallest automaton that share an atomic
@@ -423,15 +423,15 @@ namespace spot
   /// MTDFA data structure make this particularly easy to implement.
   ///
   /// Each state is assigned to an equivalence class.  Initially, all
-  /// state are in the same class.  At each iteration, the original
+  /// states are in the same class.  At each iteration, the original
   /// state array of MTBDD has its terminal relabeled according to the
   /// class of their state, preserving only the acceptance bit.  After
-  /// this relabeling, the set of equivalence classes is adjusted to
-  /// that state are in the same class iff they have the MTBDD
+  /// this relabeling, the set of equivalence classes is adjusted so
+  /// that states are in the same class iff they have the same MTBDD
   /// encoding.
   ///
   /// Each iteration is linear in the number of nodes of the entire
-  /// MTBDD array, and the number of iteration is at most linear in
+  /// MTBDD array, and the number of iterations is at most linear in
   /// the number of states.
   SPOT_API mtdfa_ptr minimize_mtdfa(const mtdfa_ptr& dfa);
 
@@ -446,7 +446,7 @@ namespace spot
   /// \ingroup mtdfa
   /// \brief Combine two MTDFAs to build the exclusive sum of their languages
   ///
-  /// The results will recognize words that are their by only one of
+  /// The results will recognize words that are there only in one of
   /// \a dfa1 or \a dfa2.  If the resulting automaton has an empty language,
   /// then the two input automata were equivalent.
   SPOT_API mtdfa_ptr product_xor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2);
@@ -455,7 +455,7 @@ namespace spot
   /// \brief Combine two MTDFAs to keep words that are handled
   /// similarly in both operands.
   ///
-  /// The results will recognize words that are their recognized by \a
+  /// The results will recognize words that are recognized by \a
   /// dfa1 and \a dfa2, or that are rejected by both.
   SPOT_API mtdfa_ptr product_xnor(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2);
 
@@ -565,7 +565,7 @@ namespace spot
   /// compute the winning status of states that are reachable from the
   /// initial state without crossing any accepting terminal.
   ///
-  /// In the trival version, the returned vector indicates whether
+  /// In the trivial version, the returned vector indicates whether
   /// the environment can force the game to reach false (false),
   /// the controller can force the game to reach an accepting state (true),
   /// or no player can force the game to reach its target (maybe).
@@ -598,7 +598,7 @@ namespace spot
   /// \ingroup mtdfa
   /// \brief Build a backprop_graph from \a dfa
   ///
-  /// This creates a backprop_graph based in the game interpretation
+  /// This creates a backprop_graph based on the game interpretation
   /// of \a dfa.
   ///
   /// Set \a early_stop to `false` if you want to build the entire
@@ -624,10 +624,10 @@ namespace spot
   /// cannot be won by the controller, the strategy returned is bddfalse.
   ///
   /// The \a backprop_node argument controls the algorithm used to
-  /// solve the game.  If is `true`, a `backprop_graph` is constructed
+  /// solve the game.  If it is `true`, a `backprop_graph` is constructed
   /// from the MTDFA, mapping each MTBDD node to a node of the graph.
   /// This allows a linear-time resolution.  If `false`, the game is
-  /// solved by refining the MTDFA in-place; this use some kind of
+  /// solved by refining the MTDFA in-place; this uses some kind of
   /// state-based back propagation that does not have linear
   /// complexity.
   SPOT_API mtdfa_ptr

@@ -25,7 +25,7 @@
 namespace spot
 {
   /// \ingroup model_checking
-  /// \brief Find the first couple of iterator (from a given pair of
+  /// \brief Find the first couple of iterators (from a given pair of
   /// iterators) that intersect. This method can be used in any
   /// DFS/BFS-like exploration algorithm. The \a parameter indicates
   /// whether the state has just been visited since the underlying job
@@ -53,9 +53,9 @@ namespace spot
                    it_kripke->condition()))
       return;
 
-    // Otherwise we have to compute the next valid successor (if it exits).
+    // Otherwise we have to compute the next valid successor (if it exists).
     // This requires two loops. The most inner one is for the twacube since
-    // its costless
+    // it's costless
     if (it_prop->done())
       it_prop->reset();
     else

@@ -99,7 +99,7 @@ namespace spot
   /// This class implements a Zielonka Tree, using
   /// conventions similar to those in \cite casares.21.icalp
   ///
-  /// The differences is that this tree is built from Emerson-Lei
+  /// The difference is that this tree is built from Emerson-Lei
   /// acceptance conditions, and can be "walked through" with multiple
   /// colors at once.
   class SPOT_API zielonka_tree
@@ -111,7 +111,7 @@ namespace spot
 
     /// \brief The number of branches in the Zielonka tree.
     ///
-    /// Branch are designated by the node number of their
+    /// Branches are designated by the node number of their
     /// leaves.
     unsigned num_branches() const
     {
@@ -120,7 +120,7 @@ namespace spot
 
     /// \brief The number of one branch in the tree.
     ///
-    /// This returns the branch whose leave is the smallest one.
+    /// This returns the branch whose leaf is the smallest one.
     unsigned first_branch() const
     {
       return one_branch_;
@@ -132,7 +132,7 @@ namespace spot
     /// a pair (new branch, level), as needed in definition 3.3 of
     /// \cite casares.21.icalp (or definition 3.7 in the full version).
     ///
-    /// The level correspond to the priority of a minimum parity acceptance
+    /// The level corresponds to the priority of a minimum parity acceptance
     /// condition, with the parity odd/even as specified by is_even().
     ///
     /// This implementation is slightly different from the original
@@ -169,7 +169,7 @@ namespace spot
 
     /// \brief Whether the Zielonka tree has Rabin shape.
     ///
-    /// The tree has Rabin shape of all accepting (round) nodes have
+    /// The tree has Rabin shape if all accepting (round) nodes have
     /// at most one child.
     bool has_rabin_shape() const
     {
@@ -178,7 +178,7 @@ namespace spot
 
     /// \brief Whether the Zielonka tree has Streett shape.
     ///
-    /// The tree has Streett shape of all rejecting (square) nodes have
+    /// The tree has Streett shape if all rejecting (square) nodes have
     /// at most one child.
     bool has_streett_shape() const
     {
@@ -187,7 +187,7 @@ namespace spot
 
     /// \brief Whether the Zielonka tree has parity shape.
     ///
-    /// The tree has parity shape of all nodes have at most one child.
+    /// The tree has parity shape if all nodes have at most one child.
     bool has_parity_shape() const
     {
       return has_streett_shape_ && has_rabin_shape_;
@@ -291,13 +291,13 @@ namespace spot
   /// This class implements an Alternating Cycle Decomposition
   /// similar to what is described in \cite casares.21.icalp
   ///
-  /// The differences is that this ACD is built from Emerson-Lei
+  /// The difference is that this ACD is built from Emerson-Lei
   /// acceptance conditions, and can be "walked through" with multiple
   /// colors at once.
   class SPOT_API acd
   {
   public:
-    /// \brief Build a Alternating Cycle Decomposition an SCC decomposition
+    /// \brief Build an Alternating Cycle Decomposition an SCC decomposition
     acd(const scc_info& si, acd_options opt = acd_options::NONE);
     acd(const const_twa_graph_ptr& aut, acd_options opt = acd_options::NONE);
 
@@ -309,7 +309,7 @@ namespace spot
     /// a pair (new branch, level), as needed in definition 4.6 of
     /// \cite casares.21.icalp (or definition 4.20 in the full version).
     ///
-    /// The level correspond to the priority of a minimum parity acceptance
+    /// The level corresponds to the priority of a minimum parity acceptance
     /// condition, with the parity odd/even as specified by is_even().
     std::pair<unsigned, unsigned>
     step(unsigned branch, unsigned edge) const;
@@ -318,7 +318,7 @@ namespace spot
     ///
     /// Given a \a node number, and an edge, this returns
     /// the new node to associate to the destination state.  This
-    /// node is not necessarily a leave, and its level should be
+    /// node is not necessarily a leaf, and its level should be
     /// the level for the output state.
     unsigned state_step(unsigned node, unsigned edge) const;
 
@@ -388,9 +388,9 @@ namespace spot
     /// option CHECK_STREETT or CHECK_PARITY for this function to work.
     bool has_streett_shape() const;
 
-    /// \brief Whether the ACD has Streett shape.
+    /// \brief Whether the ACD has parity shape.
     ///
-    /// The ACD has Streett shape if all nodes have no
+    /// The ACD has parity shape if all nodes have no
     /// children with a state in common.  The acd should be built with
     /// option CHECK_PARITY for this function to work.
     bool has_parity_shape() const;
@@ -421,7 +421,7 @@ namespace spot
     // some bit vectors representing the edges and states of that
     // node.  Those bit vectors are as large as the original
     // automaton, and they are shared among nodes from the different
-    // trees of the ACD forest (since each tree correspond to a
+    // trees of the ACD forest (since each tree corresponds to a
     // different SCC, they cannot share state or edges).
     struct acd_node
     {

@@ -77,7 +77,7 @@ namespace spot
 
     /// \ingroup graph_data_structures
     /// \brief Give an alternate name to a state.
-    /// \return true iff the newname state was already existing
+    /// \return true iff the newname state already existed
     /// (in this case the existing newname state will be merged
     /// with state s: the newname will be unreachable and without
     /// successors.)

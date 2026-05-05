@@ -51,7 +51,7 @@ namespace spot
   /// serve as memory, and gates and negations connecting them.
   /// AIG circuits can be used to represent controllers, which is currently
   /// their sole purpose within spot.
-  /// AIGs produce a output sequence based on the following rules:
+  /// AIGs produce an output sequence based on the following rules:
   /// 1) All latches are initialized to 0
   /// 2) The next input is read.
   /// 3) The output and the state of the latches for the next turn
@@ -88,8 +88,8 @@ namespace spot
 
     /// \brief Mark the beginning of a test translation
     ///
-    /// Sometimes different encodings produces more or less gates.
-    /// To improve performances, one can "safe" the current status
+    /// Sometimes different encodings produce more or less gates.
+    /// To improve performances, one can "save" the current status
     ///  and revert changes afterwards if needed
     using safe_point = std::pair<unsigned, unsigned>;
     using safe_stash =
@@ -136,7 +136,7 @@ namespace spot
 
   public:
 
-    /// \brief Safe the current state of the circuit
+    /// \brief Save the current state of the circuit
     /// \note This does not make a copy, so rolling back to
     ///       an older safe point invalidates all newer safepoints.
     ///       Also only concerns the gates, output and next_latch variables
@@ -174,7 +174,7 @@ namespace spot
       return outputs_;
     }
 
-    /// \brief return the variable associated to output \a num
+    /// \brief Return the variable associated to output \a num
     ///
     /// This will be equal to -1U if aig::set_output() hasn't been called.
     unsigned output(unsigned num) const

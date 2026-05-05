@@ -62,7 +62,7 @@ namespace spot
   // the number of BDD nodes allocated so far (those cache may be
   // reset and reallocated when the garbage collection is triggered),
   // or we can use operation caches that are specifically allocated
-  // for one operation.  In the later case, we need a good estimate of
+  // for one operation.  In the latter case, we need a good estimate of
   // the MTBDD that will be constructed by the operation, so create a
   // cache of similar size.
   //
@@ -220,7 +220,7 @@ namespace spot
               signatures.push_back(sig);
             v.push_back(i);
           }
-        // Now we add the "fake" states for bddtrue amd bddfalse.
+        // Now we add the "fake" states for bddtrue and bddfalse.
         // We do this after all other states, because we are not sure
         // if those will correspond to real states in the automaton.
         {
@@ -284,7 +284,7 @@ namespace spot
     // Unless we have states equivalent to false/true, the BDDs in
     // SIGNATURES are actually our new MTBDD representation.
     //
-    // If we have state equivalent to true & false, we just have get
+    // If we have states equivalent to true & false, we just have to get
     // rid of the terms we introduced to replace bddtrue/bddfalse.  Be
     // careful that bddtrue/bddfalse only replace (tt,⊤)/(ff,⊥).  We
     // still need state of (tt,⊥) or (ff,⊤) if those appear in the
@@ -294,7 +294,7 @@ namespace spot
     // per class for display.
     bool want_names = dfa->names.size() == n;
     std::vector<formula> names;
-    // Our automaton will SZ states, minus any bddfalse/bddtrue state.
+    // Our automaton will have SZ states, minus any bddfalse/bddtrue state.
     unsigned sz = signatures.size();
     if (want_names)
       names.reserve(sz);
@@ -1378,7 +1378,7 @@ namespace spot
       // created for all nodes, including terminals.  The terminal
       // corresponding to the root is created as well.
       //
-      // For the purpose of debuging, a name may be passed.  It will
+      // For the purpose of debugging, a name may be passed.  It will
       // be attached to the root.
       //
       // As a side effect, the function will record the root numbers stored
@@ -1390,8 +1390,8 @@ namespace spot
       // "recursion" whenever it finds a node that has already been
       // encoded into the game.  If it is true, it will continue the
       // recursion even through nodes that have already been encoded,
-      // provided they correspond to underterminate vertices.  Doing
-      // so allows to collect all undeterminate successors even if
+      // provided they correspond to undetermined vertices.  Doing
+      // so allows to collect all undetermined successors even if
       // they were already encoded.  This is necessary for our DFS
       // construction.
       template<bool recompute_succ = false>
@@ -1568,7 +1568,7 @@ namespace spot
           return 1;
         }
       term /= 2;
-      // remplace losing or undetermined terminals by bddfalse
+      // replace losing or undetermined terminals by bddfalse
       if (global_backprop->root_winner(term) <= 0)
         {
           *root_ptr = 0;
@@ -1594,7 +1594,7 @@ namespace spot
           *root_ptr = 1;
           return 1;
         }
-      // remplace losing or undetermined terminals by bddfalse
+      // replace losing or undetermined terminals by bddfalse
       if (global_backprop->root_winner(term / 2) <= 0)
         {
           *root_ptr = 0;

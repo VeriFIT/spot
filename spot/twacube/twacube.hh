@@ -85,7 +85,7 @@ namespace spot
       ++idx_;
     }
 
-    /// \brief Returns a boolean indicating wether all the transitions
+    /// \brief Returns a boolean indicating whether all the transitions
     /// have been iterated.
     inline bool done() const
     {
@@ -93,7 +93,7 @@ namespace spot
     }
 
     /// \brief Returns the current transition according to a specific
-    /// \a seed. The \a  seed is traditionally the thread identifier.
+    /// \a seed.  The \a seed is traditionally the thread identifier.
     inline unsigned current(unsigned seed = 0) const
     {
       // no-swarming : since twacube are dedicated for parallelism, i.e.
@@ -131,7 +131,7 @@ namespace spot
     /// \brief Returns the acceptance condition associated to the automaton.
     acc_cond& acc();
 
-    /// \brief Returns the names of the atomic properties.
+    /// \brief Returns the names of the atomic propositions.
     std::vector<std::string> ap() const;
 
     /// \brief This method creates a new state.
@@ -146,14 +146,14 @@ namespace spot
     /// \brief Accessor for a state from its id.
     cstate* state_from_int(unsigned i);
 
-    /// \brief create a transition between state \a src and state \a dst,
+    /// \brief Create a transition between state \a src and state \a dst,
     /// using \a cube as the labelling cube and \a mark as the acceptance mark.
     void create_transition(unsigned src,
                            const cube& cube,
                            const acc_cond::mark_t& mark,
                            unsigned dst);
 
-    /// \brief Accessor the cube's manipulator.
+    /// \brief Accessor for the cube's manipulator.
     const cubeset& get_cubeset() const;
 
     /// \brief Check if all the successors of a state are located contiguously
@@ -194,7 +194,7 @@ namespace spot
       return theg_.edge_data(ci->current(seed));
     }
 
-    ///< \brief Returns the successor of state \a i.
+    /// \brief Returns the successor of state \a i.
     std::shared_ptr<trans_index> succ(unsigned i) const
     {
       return std::make_shared<trans_index>(i, theg_);

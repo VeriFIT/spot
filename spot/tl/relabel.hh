@@ -57,7 +57,7 @@ namespace spot
   /// The relabel_bse() version will make sure that the replaced
   /// subexpressions do not share atomic propositions.  For instance
   /// `(a & b & c) U (!c & d & e)` will be simply be relabeled as
-  /// `(p0 & p1) U (!p1 & p2)`, were `p1` replaces `c` and the rest
+  /// `(p0 & p1) U (!p1 & p2)`, where `p1` replaces `c` and the rest
   /// is obvious.
   ///
   /// @{

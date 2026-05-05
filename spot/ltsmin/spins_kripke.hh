@@ -29,12 +29,12 @@
 #include <spot/twacube/cube.hh>
 
 /// This file aggregates all classes and typedefs necessary
-/// to build a kripke that is thread safe
+/// to build a kripke that is thread safe.
 namespace spot
 {
   /// \ingroup ltsmin_interface
   /// \brief A Spins state is represented as an array of integer
-  /// Note that this array has two reserved slots (position 0 an 1).
+  /// Note that this array has two reserved slots (position 0 and 1).
   ///
   /// At position 0 we store the hash associated to the state to avoid
   /// multiple computations.
@@ -65,14 +65,14 @@ namespace spot
 
   /// \ingroup ltsmin_interface
   /// \brief The management of states (i.e. allocation/deallocation) can
-  /// be painless since every time we have to consider wether the state will
+  /// be painless since every time we have to consider whether the state will
   /// be compressed or not. This class aims to simplify this management.
   class cspins_state_manager final
   {
   public:
     /// \brief Build a manager for a state of \a state_size variables
     /// and indicate wether compression should be used:
-    ///  - 1 for handle large models
+    ///  - 1 for handling large models
     ///  - 2 (faster) assume all values in [0 .. 2^28-1]
     cspins_state_manager(unsigned int state_size, int compress);
 
@@ -82,14 +82,14 @@ namespace spot
     /// \brief Builder for a state from a raw description given in \a dst
     ///
     /// \a cmp is the area we can use to compute the compressed
-    ///    representatation of dst.
+    ///    representation of dst.
     /// \a cmpsize the size of the previous area
     cspins_state alloc_setup(int* dst, int* cmp, size_t cmpsize);
 
     /// \brief Helper to decompress a state
     void decompress(cspins_state s, int* uncompressed, unsigned size) const;
 
-    /// \brief Help the manager to reclam the memory of a state
+    /// \brief Help the manager to reclaim the memory of a state
     void  dealloc(cspins_state s);
 
     /// \brief The size of a state
@@ -105,7 +105,7 @@ namespace spot
   };
 
   // \brief This structure is used as a parameter during callback when
-  // generating states from the shared librarie produced by LTSmin.
+  // generating states from the shared library produced by LTSmin.
   struct inner_callback_parameters
   {
     cspins_state_manager* manager;   // The state manager
@@ -172,7 +172,7 @@ namespace spot
   };
 
 
-  // A specialisation of the template class kripke that is thread safe.
+  // A specialization of the template class kripke that is thread safe.
   template<>
   class kripkecube<cspins_state, cspins_iterator> final
   {
@@ -230,8 +230,8 @@ namespace spot
     unsigned get_threads();
 
   private:
-    /// \brief Parse the set of atomic proposition to have a more
-    /// efficient data strucure for computation
+    /// \brief Parse the set of atomic propositions to have a more
+    /// efficient data structure for computation
     void match_aps(std::vector<std::string>& aps, std::string dead_prop);
 
     /// \brief Compute the cube associated to each state. The cube

@@ -89,7 +89,8 @@ namespace spot
   /// it is a TBA).
   ///
   /// During the visit of \a a, the returned checker does not store explicitly
-  /// the traversed states but uses the bit-state hashing technic presented in:
+  /// the traversed states but uses the bit-state hashing technique
+  /// presented in:
   /// \cite Holzmann.91.book.
   ///
   /// Consequently, the detection of an acceptance cycle is not ensured.
@@ -107,7 +108,7 @@ namespace spot
 
   /// \brief Wrapper for the two magic_search implementations.
   ///
-  /// This wrapper calls explicit_magic_search_search() or
+  /// This wrapper calls explicit_magic_search() or
   /// bit_state_hashing_magic_search() according to the \c "bsh" option
   /// in the \c option_map.  If \c "bsh" is set and non null, its value
   /// is used as the size of the hash map.

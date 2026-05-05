@@ -32,7 +32,7 @@ namespace spot
   free_list::register_n(int n)
   {
     // Browse the free list until we find N consecutive variables.  We
-    // try not to fragment the list my allocating the variables in the
+    // try not to fragment the list by allocating the variables in the
     // smallest free range we find.
     free_list_type::iterator best = fl.end();
     free_list_type::iterator cur;
@@ -116,7 +116,7 @@ namespace spot
         //  -------------------------------------------
         //  result       [......[  [......[  [.......[
         //
-        // cur->first is already set, be cur->second has yet to be.
+        // cur->first is already set, but cur->second has yet to be.
         end = std::max(cend, end);
         cur->second = end - cur->first;
         // Since we have extended the current range, maybe the next

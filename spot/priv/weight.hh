@@ -32,16 +32,16 @@ namespace spot
   class weight
   {
   public:
-    /// Construct a empty vector (all counters set to zero).
+    /// Construct an empty vector (all counters set to zero).
     weight(const acc_cond& acc);
     /// Increment by one the counters of each acceptance condition in \a a.
     weight& add(acc_cond::mark_t a);
     /// Decrement by one the counters of each acceptance condition in \a a.
     weight& sub(acc_cond::mark_t a);
     /// Return the set of each acceptance condition such that its counter is
-    /// strictly greatest than the corresponding counter in w.
+    /// strictly greater than the corresponding counter in w.
     ///
-    /// \pre For each acceptance condition, its counter is greatest or equal to
+    /// \pre For each acceptance condition, its counter is greater or equal to
     /// the corresponding counter in w.
     acc_cond::mark_t diff(const acc_cond& acc, const weight& w) const;
     friend std::ostream& operator<<(std::ostream& os,

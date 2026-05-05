@@ -1099,7 +1099,7 @@ namespace spot
 
     // The rewrite rules used here are adapted from Jean-Michel
     // Couvreur's FM'99 paper, augmented to support rational operators
-    // (from PSL), and a view other optimization.  See the
+    // (from PSL), and a few other optimizations.  See the
     // Duret-Lutz's paper "LTL Translation Improvements in Spot 1.0"
     // (IJCCBS 2014), for the optimization.  The PSL stuff is
     // unpublished yet.

@@ -289,7 +289,7 @@ namespace spot
   /// an \c unordered_map whose keys are of type \c shared_state.
   ///
   /// For instance here is how one could declare
-  /// a map of \c shared_state
+  /// a map of \c shared_state.
   /// \code
   ///   // Remember how many times each state has been visited.
   ///   std::unordered_map<shared_state, int,

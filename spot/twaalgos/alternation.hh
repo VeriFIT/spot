@@ -25,13 +25,13 @@
 namespace spot
 {
   /// \ingroup twa_algorithms
-  /// \brief Helper class combine outgoing edges in alternating
+  /// \brief Helper class to combine outgoing edges in alternating
   /// automata
   ///
-  /// The idea is that you can call the operator() on some state to get an
+  /// The idea is that you can call the operator() on some state to get a
   /// BDD representation of its outgoing edges (labels and
   /// destinations, but not acceptance marks).  The BDD representation
-  /// of different states can combined using & or | to build a new
+  /// of different states can be combined using & or | to build a new
   /// representation of some outgoing edges that can be attached to
   /// some state with new_dests.  The use of BDDs helps removing
   /// superfluous edges.
@@ -65,7 +65,7 @@ namespace spot
   ///
   /// Acceptance marks are dropped.
   ///
-  /// The results is very likely to be alternating.
+  /// The result is very likely to be alternating.
   /// @{
   template<class I>
   SPOT_API
@@ -73,7 +73,7 @@ namespace spot
   {
     if (begin == end)
       throw std::runtime_error
-        ("state_and() expects an non-empty list of states");
+        ("state_and() expects a non-empty list of states");
     outedge_combiner combiner(aut);
     bdd combination = bddtrue;
     while (begin != end)

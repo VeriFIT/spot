@@ -122,10 +122,10 @@ namespace spot
       throw std::runtime_error
         ("tgba_powerset(): too many atomic propositions (or states)");
 
-    // we have two ways of "spliting" the labels when determinizing.
+    // we have two ways of "splitting" the labels when determinizing.
     // One is to iterate over 2^AP, the second is to partition the set
     // of edges labels.  We don't have a very clean rule to chose. The
-    // former is expansive when we have a lot of AP.  The latter is
+    // former is expensive when we have a lot of AP.  The latter is
     // good when we have few distinct labels.  With too many different
     // labels that may have nonempty intersections, the
     // partition-based approach can consume a lot of memory.

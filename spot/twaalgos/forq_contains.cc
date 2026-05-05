@@ -217,7 +217,7 @@ namespace spot::forq
   };
 
   // State_entry's hash and equality operator should only depend on the actual
-  // word, since the actual set is what's used to compare it, and is auxillary
+  // word, since the actual set is what's used to compare it, and is auxiliary
   template<typename T>
   struct state_entry {
     T set;

@@ -111,7 +111,7 @@ namespace spot
         more -= varnum - lvarnum;
         lvarnum = varnum;
       }
-    // If we still need more variable, do allocate them.
+    // If we still need more variables, do allocate them.
     if (more > 0)
       {
         bdd_extvarnum(more);
@@ -148,7 +148,7 @@ namespace spot
       }
     else
       {
-        // Otherwise, allocate as much variables as we need.
+        // Otherwise, allocate as many variables as we need.
         int res = lvarnum;
         extvarnum(n);
         return res;

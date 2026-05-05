@@ -41,7 +41,7 @@ namespace spot
   /// spot::make_emptiness_check_instantiator().  The latter function
   /// allows user-options to influence the choice of the
   /// emptiness-check algorithm used, and the intermediate
-  /// instantiator object can be used to query to properties of the
+  /// instantiator object can be used to query the properties of the
   /// emptiness check selected.
   ///
   /// All emptiness-check algorithms follow the same interface.
@@ -52,7 +52,7 @@ namespace spot
   /// If spot::emptiness_check::check() returns 0, then the automaton
   /// was found empty.  Otherwise the automaton accepts some run.
   /// (Beware that some algorithms---those using bit-state
-  /// hashing---may found the automaton to be empty even if it is not
+  /// hashing---may find the automaton to be empty even if it is not
   /// actually empty.)
   ///
   /// When spot::emptiness_check::check() does not return 0, it
@@ -63,7 +63,7 @@ namespace spot
   /// extra computation.  Most emptiness-check algorithms are able to
   /// return such an accepting run, however this is not mandatory and
   /// spot::emptiness_check_result::accepting_run() can return 0 (this
-  /// does not means by anyway that no accepting run exist).
+  /// does not mean in any way that no accepting run exists).
   ///
   /// The acceptance run returned by
   /// spot::emptiness_check_result::accepting_run(), if any, is of
@@ -74,7 +74,7 @@ namespace spot
 
   /// \brief The result of an emptiness check.
   ///
-  /// Instances of these class should not last longer than the
+  /// Instances of this class should not last longer than the
   /// instances of emptiness_check that produced them as they
   /// may reference data internal to the check.
   class SPOT_API emptiness_check_result
@@ -91,7 +91,7 @@ namespace spot
     {
     }
 
-    /// \brief Return a run accepted by the automata passed to
+    /// \brief Return a run accepted by the automaton passed to
     /// the emptiness check.
     ///
     /// This method might actually compute the acceptance run.  (Not
@@ -396,7 +396,7 @@ namespace spot
     twa_run(const twa_run& run);
     twa_run& operator=(const twa_run& run);
 
-    /// \brief Raise an exception of the cycle is empty.
+    /// \brief Raise an exception if the cycle is empty.
     ///
     /// It is OK for a twa_run to have an empty cycle while the run is
     /// being filled by some procedure.  But after that, we expect
@@ -411,7 +411,7 @@ namespace spot
     /// but is no longer than this one.
     ///
     /// This is done by trying to find a fragment of the accepting
-    /// single that is accepting, and trying to close a cycle around
+    /// cycle that is accepting, and trying to close a cycle around
     /// this fragment with fewer edges than in the original cycle.
     /// (This step works best in Fin-less automata.)  And then trying
     /// to find a shorter prefix leading to any state of the cycle.
@@ -438,7 +438,7 @@ namespace spot
     ///
     /// \param os the stream on which the replay should be traced
     /// \param debug if set the output will be more verbose and extra
-    ///              debugging informations will be output on failure
+    ///              debugging information will be output on failure
     /// \return true iff the run could be completed
     bool replay(std::ostream& os, bool debug = false) const;
 

@@ -59,7 +59,7 @@ namespace spot
   /// safe to call this function.
   ///
   /// The construction is inspired by the following paper, however we
-  /// guarantee that the output language is a subsets of the original
+  /// guarantee that the output language is a subset of the original
   /// language while they don't. \cite dax.07.atva
   ///
   /// If an \a output_aborter is given, the determinization is aborted
@@ -115,7 +115,7 @@ namespace spot
   /// skipped in all cases captured by
   /// minimize_obligation_guaranteed_to_work().  Setting this allows
   /// to skip the correctness checks in more cases, if you know that
-  /// the input is an obligation properties.
+  /// the input is an obligation property.
   SPOT_API twa_graph_ptr
   minimize_obligation(const const_twa_graph_ptr& aut_f,
                       formula f = nullptr,

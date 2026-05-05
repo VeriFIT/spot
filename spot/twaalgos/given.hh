@@ -23,11 +23,11 @@
 namespace spot
 {
   /// \ingroup twa_algorithms
-  /// \brief build "bounded automata" from knowledge
+  /// \brief Build "bounded automata" from knowledge
   ///
   /// In a model checking context, if \a aut represents the negation
   /// of a property that one wants to check on some system S, and we
-  /// know (by any mean) that the behaviors of S always satisfies some
+  /// know (by any means) that the behaviors of S always satisfy some
   /// \a fact (expressed as an automaton, or LTL formula), we can construct
   /// a new automaton `aut2` that intersects S iff \a aut intersects S.
   ///
@@ -82,7 +82,7 @@ namespace spot
   ///
   /// In a model checking context, if \a aut represents the negation
   /// of a property that one wants to check on some system S, and we
-  /// know (by any mean) that the behaviors of S always satisfies some
+  /// know (by any means) that the behaviors of S always satisfy some
   /// \a fact (expressed as an automaton, or LTL formula), we can construct
   /// a new automaton `aut2` that intersects S iff \a aut intersects S.
   ///

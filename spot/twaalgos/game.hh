@@ -39,8 +39,8 @@ namespace spot
   /// \brief Transform an automaton into a parity game by propagating
   /// players
   ///
-  /// This propagate state players, assuming the initial state belong
-  /// to \a first_player, and alternating players on each transitions.
+  /// This propagates state players, assuming the initial state belongs
+  /// to \a first_player, and alternating players on each transition.
   /// If an odd cycle is detected, a runtime_exception is raised.
   ///
   /// If \a complete0 is set, ensure that states of player 0 are
@@ -58,7 +58,7 @@ namespace spot
 
 
   /// \ingroup games
-  /// \brief solve a parity-game
+  /// \brief Solve a parity game.
   ///
   /// The arena is a deterministic max odd parity automaton with a
   /// "state-player" property.
@@ -91,8 +91,8 @@ namespace spot
   ///
   /// Player 1 tries to satisfy the acceptance condition, while player
   /// 0 tries to prevent that.   The only way for player 0 to win is
-  /// to find a way to move the play toward a state without successor.
-  /// If there no state without successors, then the game is necessarily
+  /// to find a way to move the play toward a state without successors.
+  /// If there is no state without successors, then the game is necessarily
   /// winning for player 1.
   ///
   /// Returns the player winning in the initial state, and sets
@@ -107,7 +107,7 @@ namespace spot
   /// t, or to solve_parity_game() if it is a parity acceptance.  Note that
   /// parity acceptance include Büchi, co-Büchi, Rabin 1, and Streett 1.
   ///
-  /// Currently unable to solve game with other acceptance conditions
+  /// Currently unable to solve a game with other acceptance conditions
   /// that are not parity.
   ///
   /// Return the winning player for the initial state, and sets

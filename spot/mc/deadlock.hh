@@ -35,7 +35,7 @@
 namespace spot
 {
   /// \ingroup model_checking
-  /// \brief This class aims to explore a model to detect wether it
+  /// \brief This class aims to explore a model to detect whether it
   /// contains a deadlock. This deadlock detection performs a DFS traversal
   /// sharing information shared among multiple threads.
   /// If Deadlock equals std::true_type performs deadlock algorithm,
@@ -48,7 +48,7 @@ namespace spot
     /// \brief Describes the status of a state
     enum st_status
       {
-        UNKNOWN = 1,    // First time this state is discoverd by this thread
+        UNKNOWN = 1,    // First time this state is discovered by this thread
         OPEN = 2,       // The state is currently processed by this thread
         CLOSED = 4,     // All the successors of this state have been visited
       };
@@ -190,7 +190,7 @@ namespace spot
       if (!b)
         p_.deallocate(ref);
 
-      // The state has been mark dead by another thread
+      // The state has been marked dead by another thread
       for (unsigned i = 0; !b && i < nb_th_; ++i)
         if ((*it)->colors[i] == static_cast<int>(CLOSED))
           return false;
@@ -298,7 +298,7 @@ namespace spot
     fixed_size_pool<pool_type::Unsafe> p_pair_;  ///< \brief State Allocator
     bool deadlock_ = false;                ///< \brief Deadlock detected?
     std::atomic<bool>& stop_;              ///< \brief Stop-the-world boolean
-    /// \brief Stack that grows according to the todo stack. It avoid multiple
+    /// \brief Stack that grows according to the todo stack.  It avoids multiple
     /// concurrent access to the shared map.
     std::vector<int*> refs_;
     bool finisher_ = false;

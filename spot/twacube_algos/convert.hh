@@ -34,13 +34,14 @@ namespace spot
   SPOT_API spot::cube satone_to_cube(bdd one, cubeset& cubeset,
                                      std::unordered_map<int, int>& binder);
 
-  /// \brief Transform a \a cube cube into bdd using the map
-  /// that bind cube indexes to bdd indexes.
+  /// \brief Transform a \a cube cube into a BDD using the map
+  /// that binds cube indexes to BDD indexes.
   SPOT_API bdd cube_to_bdd(spot::cube cube, const cubeset& cubeset,
                            std::unordered_map<int, int>& reverse_binder);
 
-  /// \brief Extract the atomic propositions from the automaton. This method
-  /// also fill the binder, i.e. the mapping between BDD indexes to cube indexes
+  /// \brief Extract the atomic propositions from the automaton.  This method
+  /// also fills the binder, i.e., the mapping between BDD indexes and cube
+  /// indexes.
   SPOT_API std::vector<std::string>*
   extract_aps(spot::const_twa_graph_ptr aut,
               std::unordered_map<int, int>& ap_binder);
@@ -56,7 +57,7 @@ namespace spot
   twacube_to_twa(spot::twacube_ptr twacube,
                  spot::bdd_dict_ptr d = nullptr);
 
-  /// \brief Check wether a twacube and a twa are equivalent
+  /// \brief Check whether a twacube and a twa are equivalent.
   SPOT_API bool are_equivalent(const spot::twacube_ptr twacube,
                                const spot::const_twa_graph_ptr twa);
 }

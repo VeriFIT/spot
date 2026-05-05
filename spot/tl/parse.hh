@@ -204,9 +204,9 @@ namespace spot
   /// \brief Fix location of diagnostics assuming the input is utf8.
   ///
   /// The different parser functions return a parse_error_list that
-  /// contain locations specified at the byte level.  Although these
-  /// parser recognize some utf8 characters they only work byte by
-  /// byte and will report positions by counting byte.
+  /// contains locations specified at the byte level.  Although these
+  /// parsers recognize some utf8 characters, they only work byte by
+  /// byte and will report positions by counting bytes.
   ///
   /// This function fixes the positions returned by the parser to
   /// look correct when the string is interpreted as a utf8-encoded
@@ -220,7 +220,7 @@ namespace spot
   /// called inside if needed.  You may need this function only if you
   /// want to write your own error reporting code.
   ///
-  /// \param input_string The string that were parsed.
+  /// \param input_string The string that was parsed.
   /// \param error_list The error list filled by spot::parse
   ///        or spot::parse_sere while parsing \a input_string.
   SPOT_API

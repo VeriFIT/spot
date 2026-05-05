@@ -211,7 +211,7 @@ namespace spot
     unsigned tend = orig_size;
 
     // When two transitions have the same (src,colors,dst),
-    // we can marge their conds.
+    // we can merge their conds.
     auto merge_conds_and_remove_false = [&]()
     {
       typedef graph_t::edge_storage_t tr_t;
@@ -270,7 +270,7 @@ namespace spot
         }
     };
 
-    // When two transitions have the same (src,cond,dst), we can marge
+    // When two transitions have the same (src,cond,dst), we can merge
     // their colors.  This only works for Fin-less acceptance.
     //
     // FIXME: We could should also merge edges when using
@@ -601,7 +601,7 @@ namespace spot
             ++idx1;
             ++idx2;
           }
-        // All edges have bee paired
+        // All edges have been paired
         return true;
       };
 
@@ -1487,7 +1487,7 @@ namespace spot
               break;
             default:
               throw std::runtime_error
-                ("dump_storage_as_dow(): unsupported option '"s + opt[-1] +"'");
+                ("dump_storage_as_dot(): unsupported option '"s + opt[-1] +"'");
             }
       }
 

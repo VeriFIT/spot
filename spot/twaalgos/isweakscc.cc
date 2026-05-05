@@ -48,7 +48,7 @@ namespace spot
      // Weak SCCs are inherently weak.
     if (is_weak_scc(map, scc))
       return true;
-    // If we reach this place, we now the SCC has an accepting cycle.
+    // If we reach this place, we know the SCC has an accepting cycle.
     // The question is now to find whether is also contains a
     // rejecting cycle.
     return !scc_has_rejecting_cycle(map, scc);

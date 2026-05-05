@@ -70,7 +70,7 @@ namespace spot
   /// \brief Convert GF(φ) into a (D)BA if φ is a guarantee property.
   ///
   /// This is similar to gf_guarantee_to_ba_maybe() except it raises
-  /// an exception of the input formula is not of the supported form.
+  /// an exception if the input formula is not of the supported form.
   SPOT_API twa_graph_ptr
   gf_guarantee_to_ba(formula gf, const bdd_dict_ptr& dict,
                      bool deterministic = true, bool state_based = false);
@@ -91,7 +91,7 @@ namespace spot
   /// \brief Convert FG(φ) into a DCA if φ is a safety property.
   ///
   /// This is similar to fg_safety_to_dba_maybe() except it raises
-  /// an exception of the input formula is not of the supported form.
+  /// an exception if the input formula is not of the supported form.
   SPOT_API twa_graph_ptr
   fg_safety_to_dca(formula fg, const bdd_dict_ptr& dict,
                       bool state_based = false);

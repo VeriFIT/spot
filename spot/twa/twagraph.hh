@@ -86,7 +86,7 @@ namespace spot
   /// \ingroup twa_representation
   /// \brief Data attached to edges of a twa_graph
   ///
-  /// Each edge of the graph has to additional data that are \a cond
+  /// Each edge of the graph has two additional data that are \a cond
   /// (a BDD representing the Boolean formula labeling the edge), and
   /// \a acc a set of acceptance marks representing the membership of
   /// the each to each acceptance set.

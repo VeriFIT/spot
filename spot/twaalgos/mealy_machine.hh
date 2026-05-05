@@ -88,9 +88,9 @@ namespace spot
 
 
   /// \ingroup mealy
-  /// \brief split a separated mealy machine
+  /// \brief Split a separated mealy machine
   ///
-  /// In a separated mealy machine, every transitions as a label of
+  /// In a separated mealy machine, every transition has a label of
   /// the form `(in)&(out)`.  This function will turn each transition
   /// into a pair of consecutive transitions labeled by `in` and
   /// `out`, and turn the mealy machine into a game (what we call a
@@ -107,7 +107,7 @@ namespace spot
   /// @}
 
   /// \ingroup mealy
-  /// \brief the inverse of split_separated_mealy
+  /// \brief The inverse of split_separated_mealy
   ///
   /// Take a split mealy machine \a m, and build a separated mealy machine.
   ///
@@ -118,9 +118,9 @@ namespace spot
   unsplit_mealy(const const_twa_graph_ptr& m);
 
   /// \ingroup mealy
-  /// \brief reduce an (in)completely specified mealy machine
+  /// \brief Reduce an (in)completely specified mealy machine
   ///
-  /// This is a bisimulation based reduction, that optionally use
+  /// This is a bisimulation based reduction, that optionally uses
   /// inclusion between signatures to force some output when there is
   /// a choice in order to favor more reductions.  Only infinite
   /// traces are considered.  See \cite renkin.22.forte for details.
@@ -171,8 +171,8 @@ namespace spot
   ///
   /// \note Enabling \a premin will remove finite traces.
   /// \note If si.opt contains an option "satlogcsv" detailed results will be
-  /// stored in this file. If it contains "satlogdimacs" all sat problems will
-  /// stored.
+  /// stored in this file.  If it contains "satlogdimacs" all sat problems will
+  /// be stored.
   /// \see is_split_mealy_specialization
 
   SPOT_API twa_graph_ptr

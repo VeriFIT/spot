@@ -986,7 +986,7 @@ namespace spot
   }
 
   // Work around the interdiction to use SPOT _ API in *.cc file.
-  // We those explicit template instantiations to have public visibility,
+  // We use those explicit template instantiations to have public visibility,
   // but older versions of gcc will not pickup the visibility from their
   // template declaration.
   #define SPOT__API SPOT##_API
@@ -1179,7 +1179,7 @@ namespace spot
     if (SPOT_UNLIKELY(min >= unbounded()))
       report_repetition_overflow(min);
     // We are testing strict ">", because unbounded() is a legitimate
-    // input for max.  We just cannot tell if it was really indented
+    // input for max.  We just cannot tell if it was really intended
     // as "unbounded".
     if (SPOT_UNLIKELY(max > unbounded()))
       report_repetition_overflow(max);
@@ -2208,7 +2208,7 @@ namespace spot
         is_.syntactic_recurrence = // Recurrence U Guarantee
           children[0]->is_syntactic_recurrence()
           && children[1]->is_syntactic_guarantee();
-        // is_.syntactic_persistence = Persistence U Persistance
+        // is_.syntactic_persistence = Persistence U Persistence
         is_.delta1 = is_.syntactic_guarantee;
         // is_.sigma2 = Σ₂ U Σ₂
         is_.pi2 = is_.syntactic_guarantee;
@@ -2231,7 +2231,7 @@ namespace spot
           children[0]->is_syntactic_safety()
           && children[1]->is_syntactic_obligation();
         // is_.syntactic_recurrence = Recurrence W Recurrence
-        is_.syntactic_persistence = // Safety W Persistance
+        is_.syntactic_persistence = // Safety W Persistence
           children[0]->is_syntactic_safety()
           && children[1]->is_syntactic_persistence();
         is_.delta1 = is_.syntactic_safety;
@@ -2284,7 +2284,7 @@ namespace spot
         is_.syntactic_recurrence = // Guarantee M Recurrence
           children[0]->is_syntactic_guarantee()
           && children[1]->is_syntactic_recurrence();
-        // is_.syntactic_persistence = Persistence M Persistance
+        // is_.syntactic_persistence = Persistence M Persistence
         is_.delta1 = is_.syntactic_guarantee;
         // is_.sigma2 = Σ₂ M Σ₂
         is_.pi2 = is_.syntactic_guarantee;
@@ -2485,7 +2485,7 @@ namespace spot
     if (SPOT_UNLIKELY(min >= unbounded()))
       report_repetition_overflow(min);
     // We are testing strict ">", because unbounded() is a legitimate
-    // input for max.  We just cannot tell if it was really indented
+    // input for max.  We just cannot tell if it was really intended
     // as "unbounded".
     if (SPOT_UNLIKELY(max > unbounded()))
       report_repetition_overflow(max);

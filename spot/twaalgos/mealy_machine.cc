@@ -75,7 +75,7 @@ namespace
     for (auto s = 0u; s < N; ++s)
       {
         if (sp && sp->at(s))
-          continue; // No need tpo check player states
+          continue; // No need to check player states
         bdd all_cond = bddfalse;
         for (const auto& e : m->out(s))
           all_cond |= bdd_exist(e.cond, outs);

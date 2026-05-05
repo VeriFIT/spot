@@ -403,12 +403,12 @@ namespace spot
     unsigned tid_;        ///< \brief The Id of the current thread
     unsigned size_;       ///< \brief Maximum number of thread
     unsigned nb_th_;      ///< \brief Current number of threads
-    unsigned inserted_;   ///< \brief The number of insert succes
+    unsigned inserted_;   ///< \brief The number of successful insertions
     fixed_size_pool<pool_type::Unsafe> p_; ///< \brief The allocator
   };
 
   /// \ingroup model_checking
-  /// \brief This class implements the SCC decomposition algorithm of bloemen
+  /// \brief This class implements the SCC decomposition algorithm of Bloemen
   /// as described in PPOPP'16. It uses a shared union-find augmented to manage
   /// work stealing between threads.
   template<typename State, typename SuccIterator,
@@ -556,7 +556,7 @@ namespace spot
 
     std::string trace()
     {
-      // Returning a trace has no sense in this algorithm
+      // Returning a trace makes no sense in this algorithm
       return "";
     }
 

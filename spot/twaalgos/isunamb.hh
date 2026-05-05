@@ -30,7 +30,7 @@ namespace spot
   /// An automaton is unambiguous if each accepted word is
   /// recognized by only one path.
   ///
-  /// We check unambiguousity by synchronizing the automaton with
+  /// We check unambiguity by synchronizing the automaton with
   /// itself, and then making sure that the co-reachable part of the
   /// squared automaton has the same size as the co-reachable part of
   /// the original automaton.

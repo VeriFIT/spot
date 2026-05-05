@@ -29,7 +29,7 @@ namespace spot
   /// \brief A declarative environment.
   ///
   /// This environment recognizes all atomic propositions
-  /// that have been previously declared.  It will reject other.
+  /// that have been previously declared.  It will reject others.
   class SPOT_API declarative_environment : public environment
   {
   public:

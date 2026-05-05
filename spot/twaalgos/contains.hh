@@ -32,7 +32,7 @@ namespace spot
   /// Both arguments can be either formulas or automata.  Formulas
   /// will be converted into automata.
   ///
-  /// The inclusion check if performed by ensuring that the automaton
+  /// The inclusion check is performed by ensuring that the automaton
   /// associated to \a right does not intersect the automaton
   /// associated to the complement of \a left.  It helps if \a left
   /// is a deterministic automaton or a formula (because in both cases
@@ -68,7 +68,7 @@ namespace spot
   /// contains() or twa::exclusive_run().
   ///
   /// By default those containment checks use a complementation-based
-  /// algorithm that is generic that work on any acceptance condition.
+  /// algorithm that is generic and works on any acceptance condition.
   /// Alternative algorithms such as contains_forq() are available,
   /// for Büchi automata, but are not used by default.
   ///
@@ -83,7 +83,7 @@ namespace spot
   ///
   /// In all cases, the preferred containment check is returned as an
   /// integer.  This integer is meant to be used by Spot's algorithms
-  /// to select the desired containment check to apply, but it's
+  /// to select the desired containment check to apply, but its
   /// encoding (currently 1 for FORQ, 0 for default) should be
   /// regarded as an implementation detail subject to change.
   SPOT_API int containment_select_version(const char* version = nullptr);

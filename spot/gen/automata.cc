@@ -34,7 +34,7 @@ namespace spot
           throw std::runtime_error("ks-nca expects a positive argument");
         // the alphabet has four letters:
         // i, s (for sigma), p (for pi), h (for hash)
-        // we encode this four letters alphabet thanks to two AP a and b
+        // we encode this four-letter alphabet thanks to two AP a and b
         // the exact encoding is not important
         // each letter is a permutation of the set {1..2n}
         // s = (1 2 .. 2n) the rotation
@@ -185,14 +185,14 @@ namespace spot
     {
       if (n == 0)
         throw std::runtime_error
-          ("l-nba expects a positive argument");
+          ("m-nba expects a positive argument");
 
       auto aut = make_twa_graph(dict);
       aut->set_buchi();
       aut->new_states(n + 1);
       aut->set_init_state(0);
 
-      // How many AP to we need to represent n+1 letters
+      // How many AP do we need to represent n+1 letters
       unsigned nap = ulog2(n + 1);
       std::vector<int> apvars(nap);
       for (unsigned a = 0; a < nap; ++a)
@@ -230,7 +230,7 @@ namespace spot
           m = {};
       aut->prop_state_acc(true);
 
-      // How many AP to we need to represent n+1 letters
+      // How many AP do we need to represent n+1 letters
       unsigned nap = ulog2(n + 1);
       std::vector<int> apvars(nap);
       for (unsigned a = 0; a < nap; ++a)
@@ -276,7 +276,7 @@ namespace spot
 
       if (!onehot)
         {
-          // How many AP to we need to represent n letters
+          // How many AP do we need to represent n letters
           unsigned nap = n == 1 ? 1 : ulog2(n);
           std::vector<int> apvars(nap);
           for (unsigned a = 0; a < nap; ++a)

@@ -40,7 +40,7 @@ namespace spot
      BLOEMEN_EC,    ///< \brief Bloemen.16.hvc emptiness check
      BLOEMEN_SCC,   ///< \brief Bloemen.16.ppopp SCC computation
      CNDFS,         ///< \brief Evangelista.12.atva emptiness check
-     DEADLOCK,      ///< \brief Check wether there is a deadlock
+     DEADLOCK,      ///< \brief Check whether there is a deadlock
      REACHABILITY,  ///< \brief Only perform a reachability algorithm
      SWARMING,      ///< \brief Holzmann.11.ieee applied to renault.13.lpar
     };
@@ -49,10 +49,10 @@ namespace spot
     {
      DEADLOCK,                  ///< \brief A deadlock has been found
      EMPTY,                     ///< \brief The product is empty
-     FAILURE,                    ///< \brief The Algorithm finished abnormally
+     FAILURE,                    ///< \brief The algorithm finished abnormally
      NO_DEADLOCK,               ///< \brief No deadlock has been found
      NOT_EMPTY,                 ///< \brief The product is not empty
-     SUCCESS,                   ///< \brief The Algorithm finished normally
+     SUCCESS,                   ///< \brief The algorithm finished normally
     };
 
   /// \brief This structure contains, for each thread, the collected information

@@ -43,7 +43,7 @@ namespace spot
     parity_kind_any
   };
 
-  /// \brief Parity  style type
+  /// \brief Parity style type
   enum parity_style
   {
     /// The new acceptance will be a parity odd
@@ -158,24 +158,24 @@ namespace spot
   /// strongly connected.  Removing the transitions with the maximal
   /// color might leave a few transitions that were not labeled by
   /// this maximal color, but that are part of any cycle anymore:
-  /// those transition could have been colored with the maximal color,
+  /// those transitions could have been colored with the maximal color,
   /// since any cycle going through them would have seen the maximal
-  /// color.  (Once your remove this maximal layer,
-  /// your can define the next layer similarly.)
+  /// color.  (Once you remove this maximal layer,
+  /// you can define the next layer similarly.)
   ///
-  /// When \a layered is true all transition that belong to the same
+  /// When \a layered is true, all transitions that belong to the same
   /// layer receive the same color.  When layer is `false`, only the
-  /// transition that where used initially to define the layers (i.e,
+  /// transitions that were used initially to define the layers (i.e,
   /// the transition with the maximal color in the previous example),
-  /// get their color adjusted.  The other will receive either no
+  /// get their color adjusted.  The others will receive either no
   /// color (if \a colored is false), or a useless color (if \a colored
   /// is true).  Here "useless color" means the smallest color
   /// for parity max, and the largest color for parity min.
   ///
   /// When \a layered is true, the output of this function is
   /// comparable to what acd_transform() would produce.  The
-  /// difference is that this function preserve the kind (min/max) of
-  /// parity input, while acd_transform() always output a parity min
+  /// difference is that this function preserves the kind (min/max) of
+  /// parity input, while acd_transform() always outputs a parity min
   /// automaton.  Additionally, this function needs fewer resources
   /// than acd_transform() because it is already known that the input
   /// is a parity automaton.  In some (historically inaccurate) way,
@@ -183,7 +183,7 @@ namespace spot
   /// acd_transform().
   ///
   /// The reason layered is false by default, is that not introducing
-  /// colors in place where there where none occasionally help with
+  /// colors in place where there were none occasionally help with
   /// simulation-based reductions.
   ///
   /// @{
@@ -204,7 +204,7 @@ namespace spot
   /// that terminal cases of the recursion are odd, and piprime2 assumes
   /// they are even.
   ///
-  /// reduce_parity() actually compare the range of values in these
+  /// reduce_parity() actually compares the range of values in these
   /// two vectors to limit the number of colors.
   struct SPOT_API reduce_parity_data
   {

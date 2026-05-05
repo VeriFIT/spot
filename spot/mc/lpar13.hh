@@ -193,11 +193,11 @@ namespace spot
     }
 
     /// \brief This method is called to notify the emptiness checks
-    /// that a state will be popped. If the method return false, then
+    /// that a state will be popped.  If the method returns false, then
     /// the state will be popped. Otherwise the state \a newtop will
     /// become the new top of the DFS stack. If the state \a top is
     /// the only one in the DFS stack, the parameter \a is_initial is set
-    /// to true and both \a newtop and \a  newtop_dfsnum have inconsistency
+    /// to true and both \a newtop and \a newtop_dfsnum have inconsistent
     /// values.
     bool pop_state(product_state, unsigned top_dfsnum, bool,
                    product_state, unsigned)

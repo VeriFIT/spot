@@ -79,7 +79,7 @@ namespace spot
   /// \brief Check if a formula is stutter invariant.
   ///
   /// It first calls spot::formula::is_syntactic_stutter_invariant()
-  /// to test for the absence of X, but if some X is found, is an
+  /// to test for the absence of X, but if some X is found, an
   /// automaton-based check is performed to detect reliably (and
   /// rather efficiently) whether the language is actually
   /// stutter-invariant.
@@ -118,10 +118,10 @@ namespace spot
   /// \brief Check whether \a aut is stutter-invariant
   ///
   /// This procedure requires the negation of \a aut_f to
-  /// be computed.  This is easily done of \a aut_f is deterministic
+  /// be computed.  This is easily done if \a aut_f is deterministic
   /// or if a formula represented by \a aut_f is known.  Otherwise
   /// \a aut_f will be complemented by determinization, which can
-  /// be expansive.   The determinization can be forbidden using
+  /// be expensive.   The determinization can be forbidden using
   /// the \a do_not_determinize flag.
   ///
   /// If no complemented automaton could be constructed, the
@@ -144,11 +144,11 @@ namespace spot
 
   ///@{
   /// \ingroup stutter_inv
-  /// \brief Determinate the states that are stutter-invariant in \a pos.
+  /// \brief Determine the states that are stutter-invariant in \a pos.
   ///
   /// A state is stutter-invariant if the language recognized from
   /// this state is stutter-invariant, or if the state can only be
-  /// reached by passing though a stutter-invariant state.
+  /// reached by passing through a stutter-invariant state.
   ///
   /// The algorithm needs to compute the complement of \a pos. You can
   /// avoid that costly operation by either supplying the complement
@@ -167,7 +167,7 @@ namespace spot
   ///
   /// A state is stutter-invariant if the language recognized from
   /// this state is stutter-invariant, or if the state can only be
-  /// reached by passing though a stutter-invariant state.
+  /// reached by passing through a stutter-invariant state.
   ///
   /// The algorithm needs to compute the complement of \a pos. You can
   /// avoid that costly operation by either supplying the complement
@@ -189,7 +189,7 @@ namespace spot
 
   ///@{
   /// \ingroup stutter_inv
-  /// \brief Determinate the letters with which each state is
+  /// \brief Determine the letters with which each state is
   /// stutter-invariant.
   ///
   /// A state q is stutter-invariant for ℓ iff the membership to L(q)

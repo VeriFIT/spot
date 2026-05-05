@@ -162,7 +162,7 @@ namespace spot
 
   /// \brief Output a PSL formula as a self-contained LaTeX string.
   ///
-  /// The result cannot be parsed bacl.
+  /// The result cannot be parsed back.
   /// \param f The formula to translate.
   /// \param full_parent Whether or not the string should be fully
   ///                           parenthesized.
@@ -182,7 +182,7 @@ namespace spot
 
   /// \brief Output a SERE formula as a self-contained LaTeX string.
   ///
-  /// The result cannot be parsed bacl.
+  /// The result cannot be parsed back.
   /// \param f The formula to translate.
   /// \param full_parent Whether or not the string should be fully
   ///                           parenthesized.

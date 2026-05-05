@@ -28,7 +28,7 @@ namespace spot
   /// use boolean formulas instead of letters.  So technically a
   /// twa_word can represent a set of words.
   ///
-  /// This class only represent lasso-shaped words using two list of
+  /// This class only represents lasso-shaped words using two lists of
   /// BDDs: one list of the prefix, one list for the cycle.
   struct SPOT_API twa_word final
   {
@@ -61,9 +61,9 @@ namespace spot
     /// single operand.
     void simplify();
 
-    /// \brief Use all atomic proposition.
+    /// \brief Use all atomic propositions.
     ///
-    /// Make sure each letters actually use all variables in \a aps.
+    /// Make sure each letter actually uses all variables in \a aps.
     /// By default, missing variables are introduced as negative,
     /// but setting \a positive to true will reverse that.
     void use_all_aps(bdd aps, bool positive = false);
@@ -85,7 +85,7 @@ namespace spot
     /// This is useful to evaluate a word on an automaton.
     twa_graph_ptr as_automaton() const;
 
-    /// \brief Check if a the twa_word intersect another automaton.
+    /// \brief Check if the twa_word intersects another automaton.
     ///
     /// If the twa_word actually represent a word (i.e., if each
     /// Boolean formula that label its steps have a unique satisfying

@@ -390,7 +390,7 @@ namespace spot
     /// is_useful_scc(), and is_useful_state().
     TRACK_SUCCS = 4,
     /// Conditionally track states if the acceptance condition uses Fin.
-    /// This is sufficiant for determine_unknown_acceptance().
+    /// This is sufficient for determine_unknown_acceptance().
     TRACK_STATES_IF_FIN_USED = 8,
     /// Also compute SCCs for the unreachable states.  When this is
     /// used, SCCs are first enumerated from state 0, and then from
