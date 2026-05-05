@@ -27,8 +27,8 @@ expecterr()
    cat >$1.exp
    autfilt --hoa "$@" 2>$1.err-t >$1.out && exit 1
    test $? = 2
-   # If autfilt is compiled statically, the '.../lt-' parse of
-   # its name is not stripped, and the error message show the
+   # If autfilt is compiled statically, the '.../lt-' part of
+   # its name is not stripped, and the error message shows the
    # full path.
    # Also work around differences between Bison >=3.6 (invalid token)
    # end Bison <3.6 ($undefined).

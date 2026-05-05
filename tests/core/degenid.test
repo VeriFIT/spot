@@ -39,7 +39,7 @@ done
 
 
 # This is another 6-state degeneralized automaton that
-# we used the "redegeneralize" to a 8-state BA...
+# we used the "redegeneralize" to an 8-state BA...
 cat > bug <<EOF
 HOA: v1
 States: 6

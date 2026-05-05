@@ -32,7 +32,7 @@ f1b = spot.parse_infix_psl("a U b", env)
 tc.assertFalse(f1a.errors)
 tc.assertFalse(f1b.errors)
 
-# In the past, atomic propositions requires via different environments were
+# In the past, atomic propositions required via different environments were
 # never equal, but this feature was never used and we changed that in Spot 2.0
 # for the sake of simplicity.
 tc.assertEqual(f1a.f, f1b.f)

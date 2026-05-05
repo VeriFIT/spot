@@ -21,7 +21,7 @@
 
 set -e
 
-# This is example 6 is the manual of pgsolver 4.1
+# This is example 6 in the manual of pgsolver 4.1
 cat >example1.pg <<EOF
 parity 4;
 0 6 1 4,2 "Africa";

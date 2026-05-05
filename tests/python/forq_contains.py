@@ -170,7 +170,7 @@ State: 2
 [t] 2 {0}
 --END--""")
 
-# Equivlent Languages
+# Equivalent Languages
 do_test(subset, superset)
 do_test(superset, subset)
 

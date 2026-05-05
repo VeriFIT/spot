@@ -22,7 +22,7 @@
 set -e
 
 # Issue #631.  The hashing function used in tgba_determinize was quite
-# poor, consing robin_hood to abort on formulas such as the following.
+# poor, causing robin_hood to abort on formulas such as the following.
 # In practice the error was not seen very often, because other
 # optimizations (such as simulation-based reduction, or
 # wdba-minimization) would be used before resorting to

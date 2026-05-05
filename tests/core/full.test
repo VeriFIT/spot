@@ -32,7 +32,7 @@ genltl --dac | ltlfilt -c >/dev/full && exit 1
 genltl --eh | ltl2tgba --stats=%s >/dev/full && exit 1
 genltl --eh | ltl2tgba >/dev/full && exit 1
 randltl -n5 2 >/dev/full && exit 1
-randaut 2 >/dev/full && exit
+randaut 2 >/dev/full && exit 1
 randaut 2 --stats=%s >/dev/full && exit 1
 randaut 2 | autfilt >/dev/full && exit 1
 randaut 2 | autfilt -c >/dev/full && exit 1

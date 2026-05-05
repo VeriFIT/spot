@@ -109,7 +109,7 @@ aut = spot.translate('(a & b) <-> c')
 # by translate().  That object has temporary automata that reference
 # the BDDs variables and those affect the order in which the
 # bdd_to_formula() result is object is presented.  The different order
-# is not wrong, but it makes it diffuclt to write tests.
+# is not wrong, but it makes it difficult to write tests.
 gcollect()
 
 for e in aut.out(aut.get_init_state_number()):

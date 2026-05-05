@@ -61,7 +61,7 @@ F(a & Xb)
 Xa
 EOF
 
-# We do not check i=0 and i=9, as they are too slow.
+# Now we also check i=0 and i=9, since we have fewer formulas.
 for i in 0 1 2 3 4 5 6 7 8 9; do
     SPOT_STUTTER_CHECK=$i
     export SPOT_STUTTER_CHECK

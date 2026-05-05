@@ -110,7 +110,7 @@ cmp formulas.5 formulas.6
 cmp formulas.5 formulas.5a
 cmp formulas.5a formulas.6a
 
-# Make sure ltl2dstar-style litterals always get quoted.
+# Make sure ltl2dstar-style literals always get quoted.
 test "`ltlfilt -l --lbt-input -f 'G F a'`" = 'G F "a"'
-# Original lbt-style litterals are unquoted.
+# Original lbt-style literals are unquoted.
 test "`ltlfilt -l --lbt-input -f 'G F p42'`" = 'G F p42'

@@ -21,9 +21,9 @@ import sys
 from unittest import TestCase
 tc = TestCase()
 
-# CPython use reference counting, so that automata are destructed
+# CPython uses reference counting, so that automata are destructed
 # when we expect them to be.   However other implementations like
-# PyPy may call destructors latter, causing different output.
+# PyPy may call destructors later, causing different output.
 from platform import python_implementation
 if python_implementation() == 'CPython':
     def gcollect():
@@ -31,7 +31,7 @@ if python_implementation() == 'CPython':
 else:
     import gc
     def gcollect():
-        # From some reason PyPy 7.3.20 (only version tested)
+        # For some reason PyPy 7.3.20 (only version tested)
         # requires double collection() for this test to pass.
         # That's odd, because collect() is supposed to perform
         # a full collection pass according to the doc.

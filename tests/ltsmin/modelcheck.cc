@@ -45,7 +45,7 @@
 #include <spot/twacube_algos/convert.hh>
 
 static const char argp_program_doc[] =
-"Process model and formula to check wether a "
+"Process model and formula to check whether a "
 "model meets a specification.\v\
 Exit status:\n\
   0  No counterexample found\n\
@@ -91,7 +91,7 @@ parse_opt_finput(int key, char* arg, struct argp_state*)
       mc_options.force_parallel = true;
       break;
     case 'b':
-      // FIXME Differenciate  bloemen and bloemen_ec: -b/-B is not enough
+      // FIXME Differentiate  bloemen and bloemen_ec: -b/-B is not enough
       mc_options.algorithm = spot::mc_algorithm::BLOEMEN_SCC;
       mc_options.force_parallel = true;
       break;
@@ -187,7 +187,7 @@ static const argp_option options[] =
       , 0 },
     { "is-empty", 'e', nullptr, 0,
       "check if the model meets its specification. Uses Cou99 in sequential "
-      "and bloemen-ec in pallel (option -p). Return 1 if a counterexample "
+      "and bloemen-ec in parallel (option -p). Return 1 if a counterexample "
       "is found."
       , 0 },
     { "parallel", 'p', "INT", 0, "use INT threads (when possible)", 0 },
@@ -328,7 +328,7 @@ static int checked_main()
     }
   else if (mc_options.force_parallel && mc_options.output)
     {
-      std::cerr << "Cannot combine 'Ouput options' with parallelism.\n"
+      std::cerr << "Cannot combine 'Output options' with parallelism.\n"
                 << "Consider removing -p.\n";
       goto safe_exit;
     }
@@ -347,7 +347,7 @@ static int checked_main()
           echeck_inst = spot::make_emptiness_check_instantiator("Cou99", &err);
           if (!echeck_inst)
             {
-              std::cerr << "Unknown emptiness check algorihm `"
+              std::cerr << "Unknown emptiness check algorithm `"
                         << err <<  "'\n";
               exit_code = 1;
               goto safe_exit;
@@ -481,7 +481,7 @@ static int checked_main()
       unsigned int hc = std::thread::hardware_concurrency();
       if (mc_options.nb_threads > hc)
         std::cerr << "Warning: you require " << mc_options.nb_threads
-                  << " threads, but your computer only support " << hc
+                  << " threads, but your computer only supports " << hc
                   << ". This could slow down parallel algorithms.\n";
 
       auto prop_degen = prop;

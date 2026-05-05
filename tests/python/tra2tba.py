@@ -20,9 +20,9 @@ import spot
 from unittest import TestCase
 tc = TestCase()
 
-# CPython use reference counting, so that automata are destructed
+# CPython uses reference counting, so that automata are destructed
 # when we expect them to be.   However other implementations like
-# PyPy may call destructors latter, causing different output.
+# PyPy may call destructors later, causing different output.
 from platform import python_implementation
 is_cpython = python_implementation() == 'CPython'
 

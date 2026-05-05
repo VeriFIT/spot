@@ -24,7 +24,7 @@
 set -e
 
 # With no acceptance condition, everyone should agree and find a run.
-# Do not spend to much time checking this.
+# Do not spend too much time checking this.
 run 0 ../randtgba -e 10 -s 0 -r -m
 # Test some statistic output
 run 0 ../randtgba -z -e 10 -s 0 -r -m

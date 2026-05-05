@@ -147,7 +147,7 @@ ltl2tgba 'X"a b"' --check=stutter-sensitive-example -H1.1 > out
 grep ' !stutter-invariant' out
 grep '^spot\.accepted-word: ".*\\\"' out
 grep '^spot\.rejected-word: ".*\\\"' out
-# Make sur we can parse it ok.
+# Make sure we can parse it ok.
 autfilt -q out
 
 ltl2tgba Ga --check=stutter-sensitive-example > out

@@ -25,6 +25,6 @@ randaut -n10 -A2..3 2 | tee input |
 autcross --language-preserve 'autfilt %L>%O' 'autfilt --complement' \
   --save-bogus=bogus.hoa 2>stderr && exit 1
 cat stderr
-# We should have 4 counterexample per input automaton
+# We should have 4 counterexamples per input automaton
 test 40 = `grep 'both automata accept the infinite word:' stderr | wc -l`
 diff input bogus.hoa

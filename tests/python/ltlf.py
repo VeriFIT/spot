@@ -34,7 +34,7 @@ formulas = ['GFa', 'FGa', '(GFa) U b',
             ]
 
 # The rewriting assume the atomic proposition will not change
-# once we reache the non-alive part.
+# once we reach the non-alive part.
 cst = spot.formula('G(X!alive => ((a <=> Xa) && (b <=> Xb) && (c <=> Xc)))')
 
 for f in formulas:

@@ -66,7 +66,7 @@ test "$out" = "cycle{a},cycle{!a}"
 ltl2tgba FGa > FGa
 test "0,1,0,1" = "`<FGa autfilt -D --stats='%D,%d,%P,%p'`"
 test '0,0,0,1,"a"' = "`<FGa autfilt -C --stats='%D,%d,%P,%p,%[d]x'`"
-# We had some issues in the pase where %P was set only if %p was used
+# We had some issues in the past where %P was set only if %p was used
 # as well.  So we make separate tests for this.
 test "0,0" = "`<FGa autfilt -C --stats='%D,%P'`"
 test "1,1" = "`<GFa autfilt -C --stats='%D,%P'`"
@@ -132,8 +132,8 @@ jb) | (c & jb) | (d & jb) | (e & jb) | (f & m) | (f & h) | (f & i) |
 (r & y) | (r & t) | (r & u) | (r & v) | (r & w) | (fb & x) | (x & z) |
 (ab & x) | (bb & x) | (cb & x)))'
 test 3,5 = `ltl2tgba --low --any --stats=%s,%e "$f"`
-# While we are at it, make sure we can translate this beast.  Dispite
-# the huge number of atomic propositiions, there is only one Boolean
+# While we are at it, make sure we can translate this beast.  Despite
+# the huge number of atomic propositions, there is only one Boolean
 # subformula and it is used twice.
 test 3,4 = `ltl2tgba --stats=%s,%e "$f"`
 

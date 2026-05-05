@@ -130,7 +130,7 @@ try:
 except RuntimeError as e:
     tc.assertIn("Can only", str(e))
 else:
-    report_missing__exception()
+    report_missing_exception()
 spot.set_state_players(a, (False, True, False))
 tc.assertEqual(spot.get_state_player(a, 0), False)
 tc.assertEqual(spot.get_state_player(a, 1), True)

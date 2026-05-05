@@ -142,9 +142,9 @@ def canonicalize(s, type, ignores):
     s = re.sub(r' fill="black"', '', s)
     s = re.sub(r' stroke="transparent"', ' stroke="none"', s)
     s = re.sub(r'><title>', '>\n<title>', s)
-    # Graphiz 13.0.0 adds xml:space="preserve" to SVG labels.
+    # Graphviz 13.0.0 adds xml:space="preserve" to SVG labels.
     s = re.sub(r'xml:space="preserve" ', '', s)
-    # At some point Fedora changed the default font-familly from
+    # At some point Fedora changed the default font-family from
     # Times,serif to Times-Roman.
     s = re.sub(r'"Times[^"]+"', '"Times"', s)
     # tooltips with a ", " are likely to have \n which was not
@@ -231,7 +231,7 @@ def compare_outputs(ref, test, ignores=[]):
     if len(cref) != len(ctest):
         print(f"output length mismatch: expected {len(cref)}, got {len(ctest)}")
         ok = False
-    # There can be several outputs.  For instance wnen the cell both
+    # There can be several outputs.  For instance when the cell both
     # prints a result (goes to "stdout") and displays an automaton
     # (goes to "data").
     exp = pprint.pformat(cref, width=132)

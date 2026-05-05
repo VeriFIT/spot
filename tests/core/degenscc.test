@@ -48,11 +48,11 @@ G!p0 | G((Fp1 U p2) & F!p2)
 EOF
 
 # We want to make sure the degeneralized automaton has fewer SCCs
-# (it can be less if the simulation on the BA is lukier than on the TGBA)
+# (it can be less if the simulation on the BA is luckier than on the TGBA)
 ltl2tgba < input | autfilt -B --stats=": '%M'; test %C -ge %c" > test.sh
 sh -x -e test.sh
 
-# Make sure that this degen-remscc optimizition is actually doing something.
+# Make sure that this degen-remscc optimization is actually doing something.
 # The following test could fail in the future if we improve the translation
 # of some of these formulas.  In that case, regenerate the list of test
 # formula using the command displayed above.

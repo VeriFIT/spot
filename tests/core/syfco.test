@@ -61,7 +61,7 @@ ltlsynt --tlsf test.tlsf/n=1 --tlsf test.tlsf/n=3 --decompose=no \
 ltlsynt --from-pgame pgame.hoa > out3
 diff out2 out3
 
-# Make sure the paremeters where actually used
+# Make sure the parameters were actually used
 test 2 = `grep out_0 out3 | wc -l`
 test 1 = `grep out_1 out3 | wc -l`
 test 1 = `grep out_2 out3 | wc -l`
@@ -151,9 +151,9 @@ MAIN {
     // If (i,j) is selected by either player, then (i,j) should become false.
     &&[0 <= i < N] &&[0 <= j < M]
       (((ox[i] && oy[j]) || (ix[i] && iy[j])) -> !Pos(os,i,j));
-    // if (i,j) is not availlable now, it's not available on next turn.
+    // if (i,j) is not available now, it's not available on next turn.
     &&[0 <= i < N] &&[0 <= j < M] ((!Pos(os,i,j)) -> X !(Pos(os,i,j)));
-    // if (i,j) is availlable now, it might not be on next turn.
+    // if (i,j) is available now, it might not be on next turn.
     &&[0 <= i < N] &&[0 <= j < M]
       (Pos(os,i,j) -> X(Pos(os,i,j) || (ox[i] && oy[j]) || (ix[i] && iy[j])));
   }

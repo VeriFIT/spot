@@ -185,7 +185,7 @@ main(int argc, char** argv)
               if (search_many && runs > ce_found && j < 2)
                 {
                   std::cerr << "ERROR: only " << ce_found
-                            << " counterexamples founds, expected at least "
+                            << " counterexamples found, expected at least "
                             << runs << '\n';
                   exit(1);
                 }

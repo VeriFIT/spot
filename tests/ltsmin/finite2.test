@@ -23,7 +23,7 @@
 
 # Compile the model beforehand to avoid compiler's output interference.
 if ! spins $srcdir/finite.pm; then
-  echo "spins not functionnal."
+  echo "spins not functional."
   exit 77
 fi
 

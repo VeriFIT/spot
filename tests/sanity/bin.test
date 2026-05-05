@@ -100,7 +100,7 @@ do
                 exit_status=2
             fi
             if ! grep -q "%{_bindir}/$binary\$" $top_srcdir/spot.spec.in; then
-                echo "$binary does is not listed in spot.spec.in";
+                echo "$binary is not listed in spot.spec.in";
                 exit_status=2
             fi
 
@@ -114,8 +114,8 @@ do
     fi
 
     # Check --help text.  Set a high rmargin to workaround some
-    # bug in argp where an extra line it sometimes added if the end
-    # of the document string fall right into the rmargin.
+    # bug in argp where an extra line is sometimes added if the end
+    # of the document string falls right into the rmargin.
     ARGP_HELP_FMT=rmargin=10000 \
     $top_builddir/bin/$binary --help > help-$binary.tmp
     if ! $PERL -ne '/\n\s*\n(\s*-.*\n)/ && print("$1") && exit(1)' \

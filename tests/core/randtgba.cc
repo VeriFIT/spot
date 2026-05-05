@@ -137,7 +137,7 @@ syntax(char* prog)
         "  N      are positive integers\n"
         "  PROPS  are the atomic properties to use on transitions\n"
         "Use -dp to see the list of KEYs.\n\n"
-        "When -i is used, a random graph a synchronized with"
+        "When -i is used, a random graph is synchronized with"
         " each formula.\nIf -e N is additionally used"
         " N random graphs are generated for each formula.\n");
   exit(2);

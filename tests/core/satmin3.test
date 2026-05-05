@@ -86,7 +86,7 @@ fi
 export SPOT_SATSOLVER
 
 # Let's try to find a smaller transition-based Streett automaton We
-# easily really check the expected automaton, because different SAT
+# can't easily really check the expected automaton, because different SAT
 # solver (even different versions of glucose) can return different
 # automata.
 autfilt --sat-minimize='acc="Fin(0)|Inf(1)"' test.hoa --stats=%s >output

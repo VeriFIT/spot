@@ -19,7 +19,7 @@
 
 # Make sure we do not install privated header, i.e., headers that
 # declare unexported functions.  We catch these by checking for
-# headers that have no SPOT_API occurrence, but that have an ssociated
+# headers that have no SPOT_API occurrence, but that have an associated
 # *.cc file.
 
 set -e

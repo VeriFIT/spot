@@ -24,7 +24,7 @@
 . ./defs
 set -e
 
-# Skip this test if ltl3dra is not installed.
+# Skip this test if ltl3ba is not installed.
 (ltl3ba -v) || exit 77
 
 # The -H1 option will output alternating automata, so this tests

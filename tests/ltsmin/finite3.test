@@ -22,7 +22,7 @@
 
 # Compile the model beforehand to avoid compiler's output interference.
 if ! gal2c $srcdir/finite.gal; then
-  echo "gal2c not functionnal."
+  echo "gal2c not functional."
   exit 77
 fi
 

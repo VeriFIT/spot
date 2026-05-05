@@ -1,4 +1,4 @@
-// -*- coding: utf-8 -*_
+// -*- coding: utf-8 -*-
 // Copyright (C) by the Spot authors, see the AUTHORS file for details.
 //
 // This file is part of Spot, a model checking library.

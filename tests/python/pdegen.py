@@ -453,7 +453,7 @@ State: 10 [!0&1] 4 [0&1] 8 [!0&!1] 10 {0 1 2 3 5} [0&!1] 13 {1 2 3} State: 11
 [!0&1] 4 [0&1] 7 {0 2 4} [!0&!1] 9 [0&!1] 12 {1 3} State: 13 [!0&1] 4 [0&1] 5
 [!0&!1] 10 {0 1 3 5} [0&!1] 13 {1 3} --END--""")
 si = spot.scc_info(aut15)
-aut15b = si.split_on_sets(2, [])[0]; d
+aut15b = si.split_on_sets(2, [])[0]
 aut15c = spot.partial_degeneralize(aut15b)
 tc.assertTrue(aut15c.equivalent_to(aut15b))
 
