@@ -44,6 +44,6 @@ $(srcdir)/tl.pdf: $(srcdir)/tl.tex $(srcdir)/../spot.bib
 pvc:
 	$(LATEXMK) -pvc $(srcdir)/tl.tex
 
-.PHONY: mainainer-clean-local pvc
-mainainer-clean-local:
+.PHONY: maintainer-clean-local pvc
+maintainer-clean-local:
 	$(LATEXMK) -c $(srcdir)/tl.tex

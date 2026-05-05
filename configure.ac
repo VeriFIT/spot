@@ -297,7 +297,7 @@ case $VERSION:$enable_devel in
   *[[abcdefghijklmnopqrstuvwxyz]]:yes)
     echo
     echo '==================================================================='
-    echo ' This is a development version of Spot: Assertions and debuging    '
+    echo ' This is a development version of Spot: Assertions and debugging   '
     echo ' code are enabled by default.  If you find this too slow or        '
     echo ' plan to do some benchmarking, run configure with --disable-devel. '
     echo '==================================================================='

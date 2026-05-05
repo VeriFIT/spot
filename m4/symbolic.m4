@@ -1,4 +1,4 @@
-dnl This was addapted from a patch submitted written by H.J. Lu for GCC.
+dnl This was adapted from a patch submitted written by H.J. Lu for GCC.
 dnl   https://gcc.gnu.org/ml/gcc/2007-01/msg00363.html
 dnl The -Bsymbolic-functions is no-longer part of the --help of ld, but
 dnl we can call ld -Bsymbolic-functions --help and it will choke if the

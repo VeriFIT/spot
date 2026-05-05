@@ -62,7 +62,7 @@ ltl2tgba.1: $(common_dep) $(srcdir)/ltl2tgba.x $(srcdir)/../ltl2tgba.cc
 ltlcross.1: $(common_dep) $(srcdir)/ltlcross.x $(srcdir)/../ltlcross.cc
 	$(convman) ../ltlcross$(EXEEXT) $(srcdir)/ltlcross.x $@
 
-ltldo.1: $(common_dep) $(srcdir)/ltlcross.x $(srcdir)/../ltldo.cc
+ltldo.1: $(common_dep) $(srcdir)/ltldo.x $(srcdir)/../ltldo.cc
 	$(convman) ../ltldo$(EXEEXT) $(srcdir)/ltldo.x $@
 
 ltlf2dfa.1: $(common_dep) $(srcdir)/ltlf2dfa.x $(srcdir)/../ltlf2dfa.cc

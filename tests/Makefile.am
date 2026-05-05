@@ -25,7 +25,7 @@ LDADD = $(top_builddir)/spot/libspot.la \
        $(top_builddir)/buddy/src/libbddx.la \
        $(LIBLTDL) -lpthread
 
-# Explicitely set it to avoid default value ".test"
+# Explicitly set it to avoid default value ".test"
 TEST_EXTENSIONS =
 LOG_COMPILER = ./run
 # ensure run is rebuilt before the tests are run.
@@ -557,7 +557,7 @@ TESTS_ltsmin =        \
 EXTRA_DIST += ltsmin/beem-peterson.4.dve ltsmin/beem-peterson.4.gal \
   ltsmin/elevator2.1.pm ltsmin/finite.dve ltsmin/finite.pm ltsmin/finite.gal
 
-ltlsmin/kripke.log: core/kripkecat$(EXEEXT)
+ltsmin/kripke.log: core/kripkecat$(EXEEXT)
 
 ############################## SANITY ##############################
 

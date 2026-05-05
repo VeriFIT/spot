@@ -18,7 +18,7 @@ dnl The list of warnings that must be disabled for Spot.
 m4_define([_INTEL_IGNORE_WARNINGS],
 [ 69   dnl Warn when an enum value is used as an int, without any
        dnl explicit cast.
-  177  dnl Warm when a method was declared but never referenced.
+  177  dnl Warn when a method was declared but never referenced.
   279  dnl Warn when a constant expression is used in a control statement.
   654  dnl Warn when a child does not overload all virtual members of his
        dnl parents.

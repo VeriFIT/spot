@@ -112,7 +112,7 @@ int main(int argc, char *argv[[]])
   std::string a{"foo"}, b{"bar"};
   if (b < a)
     return 1;
-  // GCC 12 has spurious warnings about ininialized values in regex.
+  // GCC 12 has spurious warnings about uninitialized values in regex.
   // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105562
   // We need -Wno-maybe-uninitialized in this case.
   std::regex r{"a"};
