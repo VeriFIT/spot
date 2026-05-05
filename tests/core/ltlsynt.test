@@ -1449,4 +1449,60 @@ run 0 ltlsynt --global-equiv=no --print-game \
 # Moore semantics not supported yet
 run 2 ltlsynt -f 'i U o' --sem=Moore
 
+# Test new print option
+cat >expected <<EOF
+REALIZABLE
+HOA: v1
+States: 2
+Start: 1
+AP: 4 "i0" "o0" "o2" "i2"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic weak
+controllable-AP: 1 2
+--BODY--
+State: 0
+[!0&!1&!2&!3 | !0&!1&2&3] 0
+[0&!1&!2&!3 | 0&!1&2&3] 1
+State: 1
+[!0&1&!2&!3 | !0&1&2&3] 0
+[0&1&!2&!3 | 0&1&2&3] 1
+--END--
+HOA: v1
+States: 4
+Start: 0
+AP: 4 "i1" "o2" "i2" "o1"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic weak
+controllable-AP: 1 3
+--BODY--
+State: 0
+[!0&!1&!2&!3 | !0&1&2&!3] 1
+[0&!1&!2&!3 | 0&1&2&!3] 2
+State: 1
+[!0&!1&!2&3 | !0&1&2&3] 3
+[0&!1&!2&3 | 0&1&2&3] 0
+State: 2
+[!0&!1&!2&3 | !0&1&2&3] 1
+[0&!1&!2&3 | 0&1&2&3] 2
+State: 3
+[!0&!1&!2&!3 | !0&1&2&!3] 3
+[0&!1&!2&!3 | 0&1&2&!3] 0
+--END--
+EOF
+
+ltlsynt -f "G(i0 <-> X(o0)) && FG(i1 <-> X[2](o1)) && G(i2<->o2)" \
+        --ins "i0,i1,i2" --outs "o0,o1,o2" --print-each-mealy > out
+diff out expected
+#Test override of aiger output
+ltlsynt -f "G(i0 <-> X(o0)) && FG(i1 <-> X[2](o1)) && G(i2<->o2)" \
+        --ins "i0,i1,i2" --outs "o0,o1,o2" --print-each-mealy \
+        --aiger ite > out
+diff out expected
+ltlsynt -f "G(i0 <-> X(o0)) && FG(i1 <-> X[2](o1)) && G(i2<->o2)" \
+        --ins "i0,i1,i2" --outs "o0,o1,o2" --aiger ite \
+        --print-each-mealy > out
+diff out expected
+
 :

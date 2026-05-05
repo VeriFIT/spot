@@ -59,6 +59,7 @@ enum
   OPT_PART_FILE,
   OPT_POLARITY,
   OPT_PRINT,
+  OPT_PRINT_EMM,
   OPT_PRINT_HOA,
   OPT_REAL,
   OPT_SEMANTICS,
@@ -144,6 +145,9 @@ static const argp_option options[] =
       "print the parity game in the pgsolver format, do not solve it", 0 },
     { "print-game-hoa", OPT_PRINT_HOA, "options", OPTION_ARG_OPTIONAL,
       "print the parity game in the HOA format, do not solve it", 0 },
+    { "print-each-mealy", OPT_PRINT_EMM, "options", OPTION_ARG_OPTIONAL,
+      "print each mealy machine for each subformula if decomposition was "
+      "just before aig encoding would take place. Overrides --aiger.", 0 },
     { "realizability", OPT_REAL, nullptr, 0,
       "realizability only, do not compute a winning strategy", 0 },
     { "aiger", OPT_AIGER, "ite|isop|both[+ud][+dc]"
@@ -205,6 +209,7 @@ static bool opt_csv_with_formula = true;
 static bool opt_print_pg = false;
 static bool opt_print_hoa = false;
 static const char* opt_print_hoa_args = nullptr;
+static bool opt_print_emm = false;
 static bool opt_real = false;
 static bool opt_do_verify = false;
 static const char* opt_aiger = nullptr;
@@ -959,13 +964,26 @@ namespace
            {return ml.success ==
                spot::mealy_like::realizability_code::REALIZABLE_REGULAR; })
                && "ltlsynt: Cannot handle TGBA as strategy.");
-        tot_strat = mealy_machines.front().mealy_like;
-        for (size_t i = 1; i < mealy_machines.size(); ++i)
-          tot_strat = spot::mealy_product(tot_strat,
-                                          mealy_machines[i].mealy_like);
-        if (rs)        // Add any AP we removed
-          rs->patch_mealy(tot_strat);
-        printer.print(tot_strat, timer_printer_dummy);
+        if (opt_print_emm)
+          {
+            // Print each mealy machine individually
+            for (const auto& ml: mealy_machines)
+              {
+                if (rs)
+                  rs->patch_mealy(ml.mealy_like);
+                printer.print(ml.mealy_like, timer_printer_dummy);
+              }
+          }
+        else
+          {
+            tot_strat = mealy_machines.front().mealy_like;
+            for (size_t i = 1; i < mealy_machines.size(); ++i)
+              tot_strat = spot::mealy_product(tot_strat,
+                                              mealy_machines[i].mealy_like);
+            if (rs)        // Add any AP we removed
+              rs->patch_mealy(tot_strat);
+            printer.print(tot_strat, timer_printer_dummy);
+          }
       }
 
     // Final step: Do verification if demanded
@@ -1380,8 +1398,14 @@ parse_opt(int key, char *arg, struct argp_state *)
       opt_print_hoa = true;
       opt_print_hoa_args = arg;
       break;
+    case OPT_PRINT_EMM:
+      opt_aiger = nullptr;
+      opt_print_emm = true;
+      break;
     case OPT_AIGER:
       opt_aiger = arg ? arg : "ite";
+      if (opt_print_emm)
+        opt_aiger = nullptr;
       break;
     case OPT_REAL:
       opt_real = true;
