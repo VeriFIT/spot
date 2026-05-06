@@ -301,8 +301,9 @@ namespace spot
   twa::unregister_ap(int b)
   {
     auto d = get_dict();
-    assert(d->bdd_map[b].type == bdd_dict::var);
-    auto pos = std::find(aps_.begin(), aps_.end(), d->bdd_map[b].f);
+    formula f = d->ap_from_var(b);
+    assert(f);
+    auto pos = std::find(aps_.begin(), aps_.end(), f);
     assert(pos != aps_.end());
     aps_.erase(pos);
     d->unregister_variable(b, this);

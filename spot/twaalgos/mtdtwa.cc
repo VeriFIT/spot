@@ -406,9 +406,8 @@ namespace spot
           }
         std::string label;
 
-        if ((unsigned) var < dict_->bdd_map.size()
-            && dict_->bdd_map[bdd_var(n)].type == bdd_dict::var)
-          label = escape_str(str_psl(dict_->bdd_map[var].f));
+        if (formula f = dict_->ap_from_var(var))
+          label = escape_str(str_psl(f));
         else
           label = "var" + std::to_string(var);
 

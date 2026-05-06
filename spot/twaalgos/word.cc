@@ -252,7 +252,7 @@ namespace spot
         {
           int v = bdd_var(support);
           support = bdd_high(support);
-          aut->register_ap(dict_->bdd_map[v].f);
+          aut->register_ap(dict_->ap_from_var(v));
         }
     }
 

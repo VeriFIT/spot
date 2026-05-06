@@ -1054,12 +1054,12 @@ namespace spot
                notstr, lparstr, rparstr,
                [this, d=aut->get_dict()](int var)->std::string
                {
-                 const bdd_dict::bdd_info& i = d->bdd_map[var];
-                 if (SPOT_UNLIKELY(i.type != bdd_dict::var))
+                 formula f = d->ap_from_var(var);
+                 if (SPOT_UNLIKELY(!f))
                    throw std::runtime_error
                      ("print_dot(): unknown BDD variable");
                  std::ostringstream os;
-                 format_label(os, i.f);
+                 format_label(os, f);
                  return os.str();
                }));
           }

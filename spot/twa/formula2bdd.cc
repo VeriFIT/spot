@@ -38,12 +38,11 @@ namespace spot
       while (b != bddtrue)
         {
           int var = bdd_var(b);
-          const bdd_dict::bdd_info& i = d->bdd_map[var];
-          if (SPOT_UNLIKELY(i.type != bdd_dict::var))
+          formula res = d->ap_from_var(var);
+          if (SPOT_UNLIKELY(!res))
             throw std::runtime_error("bdd_to_formula() was passed a bdd"
                                      " with a variable that is not in "
                                      "the dictionary");
-          formula res = i.f;
 
           bdd high = bdd_high(b);
           if (high == bddfalse)

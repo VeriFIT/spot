@@ -1,6 +1,11 @@
 New in spot 2.15.1.dev  (not yet released)
 
-  Nothing yet.
+  Library:
+
+  - spot::bdd_dict::ap_from_var(int var) is a new method that returns
+    the atomic proposition formula associated to a BDD variable number,
+    or nullptr if the variable is not an atomic proposition.  This avoids
+    having to access the internal bdd_map directly.  (Issue #622.)
 
 New in spot 2.15.1  (2026-04-25)
 

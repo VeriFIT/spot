@@ -127,6 +127,20 @@ namespace spot
       return var_map.at(f);
     }
 
+    /// \brief Return the atomic proposition associated to a BDD variable.
+    ///
+    /// Given a BDD variable number \a var, returns the atomic proposition
+    /// formula it represents, or \c nullptr if the variable is not an
+    /// atomic proposition (e.g., it is an acceptance variable or an
+    /// anonymous variable).
+    formula ap_from_var(int var) const
+    {
+      if (unsigned(var) < bdd_map.size()
+          && bdd_map[var].type == bdd_dict::var)
+        return bdd_map[var].f;
+      return nullptr;
+    }
+
     /// \brief Register an acceptance variable.
     ///
     /// Return (and maybe allocate) a BDD variable designating an

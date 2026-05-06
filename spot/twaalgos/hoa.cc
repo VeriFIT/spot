@@ -582,7 +582,7 @@ namespace spot
        << "AP: " << nap;
     auto d = aut->get_dict();
     for (auto& i: md.vap)
-      escape_str(os << " \"", d->bdd_map[i].f.ap_name()) << '"';
+      escape_str(os << " \"", d->ap_from_var(i).ap_name()) << '"';
     os << nl;
 
     unsigned num_acc = aut->num_sets();

@@ -166,8 +166,8 @@ namespace spot
         // Copy all atomic propositions, except the one corresponding
         // to the variable v used for synchronization.
         int vn = bdd_var(v);
-        assert(dict->bdd_map[vn].type == bdd_dict::var);
-        formula vf = dict->bdd_map[vn].f;
+        formula vf = dict->ap_from_var(vn);
+        assert(vf);
         for (auto a: left->ap())
           if (a != vf)
             res->register_ap(a);

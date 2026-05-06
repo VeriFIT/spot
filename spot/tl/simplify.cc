@@ -185,13 +185,8 @@ namespace spot
           while (cube != bddtrue)
             {
               int var = bdd_var(cube);
-              const bdd_dict::bdd_info& i = dict->bdd_map[var];
-              formula res;
-              if (i.type == bdd_dict::var)
-                {
-                  res = i.f;
-                }
-              else
+              formula res = dict->ap_from_var(var);
+              if (!res)
                 {
                   res = bdd_to_f_[var];
                   assert(res);
