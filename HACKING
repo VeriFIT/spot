@@ -86,8 +86,20 @@ and then go on with the usual
   % make
 
 
-Tricks
-======
+Tips and Tricks
+===============
+
+Speeding up the compilation
+---------------------------
+
+By default, libraries will be compiled both in static and shared
+forms: this require each source file to be compiled twice.  To halve
+the compilation time, you may disable the static version by passing
+option --disable-static to configure.
+
+You should also tell make to compile several files in parallel with
+`make -j4`, adjusting this to your number of CPUs.
+
 
 Avoiding org-mode runs
 ----------------------
