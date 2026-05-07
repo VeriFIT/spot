@@ -3423,6 +3423,7 @@ namespace spot
       mtdfa_ptr res = std::make_shared<mtdfa>(dict);
       dict->register_all_propositions_of(dfa, res);
       res->set_controllable_variables(dfa->get_controllable_variables());
+      res->aps = dfa->aps;
 
       bool keep_names = dfa->names.size() == dfa->states.size();
 
@@ -3508,6 +3509,7 @@ namespace spot
       res->states = dfa->states;
       res->names = dfa->names;
       res->set_controllable_variables(dfa->get_controllable_variables());
+      res->aps = dfa->aps;
 
       unsigned nroots = res->states.size();
 
@@ -3579,6 +3581,7 @@ namespace spot
     {
       bdd_dict_ptr dict = dfa->get_dict();
       mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      res->aps = dfa->aps;
       backprop_bdd_encoder enc;
       unsigned ns = dfa->num_roots();
       bdd outputs = dfa->get_controllable_variables();
