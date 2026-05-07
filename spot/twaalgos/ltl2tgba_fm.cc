@@ -508,8 +508,7 @@ namespace spot
       bdd cube;
       while ((cube = isop.next()) != bddfalse)
         {
-          bdd label = bdd_exist(cube, d.next_set);
-          bdd dest_bdd = bdd_existcomp(cube, d.next_set);
+          auto [dest_bdd, label] = bdd_splitcube(cube, d.next_set);
           formula dest = d.conj_bdd_to_formula(dest_bdd);
           bdd_print_set(std::cerr, d.dict, label) << " => ";
           bdd_print_set(std::cerr, d.dict, dest_bdd) << " = ";
@@ -563,8 +562,7 @@ namespace spot
         bdd out = bddfalse;
         while ((cube = isop.next()) != bddfalse)
           {
-            bdd label = bdd_exist(cube, dict_.next_set);
-            bdd dest_bdd = bdd_existcomp(cube, dict_.next_set);
+            auto [dest_bdd, label] = bdd_splitcube(cube, dict_.next_set);
             formula dest = dict_.conj_bdd_to_sere(dest_bdd);
             if (dest.is(op::eword))
               {
@@ -670,8 +668,8 @@ namespace spot
                       res = bddfalse;
                       while ((cube = isop.next()) != bddfalse)
                         {
-                          bdd label = bdd_exist(cube, dict_.next_set);
-                          bdd dest_bdd = bdd_existcomp(cube, dict_.next_set);
+                          auto [dest_bdd, label] =
+                            bdd_splitcube(cube, dict_.next_set);
                           formula dest = dict_.conj_bdd_to_sere(dest_bdd);
                           if (dest.is(op::eword))
                             {
@@ -704,8 +702,8 @@ namespace spot
                     }
                   while ((cube = isop.next()) != bddfalse)
                     {
-                      bdd label = bdd_exist(cube, dict_.next_set);
-                      bdd dest_bdd = bdd_existcomp(cube, dict_.next_set);
+                      auto [dest_bdd, label] =
+                        bdd_splitcube(cube, dict_.next_set);
                       formula dest = dict_.conj_bdd_to_sere(dest_bdd);
 
                       // The destination is a final state.  Make sure we
@@ -851,8 +849,7 @@ namespace spot
               res = bddfalse;
               while ((cube = isop.next()) != bddfalse)
                 {
-                  bdd label = bdd_exist(cube, dict_.next_set);
-                  bdd dest_bdd = bdd_existcomp(cube, dict_.next_set);
+                  auto [dest_bdd, label] = bdd_splitcube(cube, dict_.next_set);
                   formula dest = dict_.conj_bdd_to_sere(dest_bdd);
 
                   if (dest.accepts_eword())
@@ -1468,8 +1465,8 @@ namespace spot
                   bdd cube;
                   while ((cube = isop.next()) != bddfalse)
                     {
-                      bdd label = bdd_exist(cube, dict_.next_set);
-                      bdd dest_bdd = bdd_existcomp(cube, dict_.next_set);
+                      auto [dest_bdd, label] =
+                        bdd_splitcube(cube, dict_.next_set);
                       formula dest = dict_.conj_bdd_to_sere(dest_bdd);
 
                       if (dest.is(op::eword))
@@ -1535,8 +1532,8 @@ namespace spot
                   bdd cube;
                   while ((cube = isop.next()) != bddfalse)
                     {
-                      bdd label = bdd_exist(cube, dict_.next_set);
-                      bdd dest_bdd = bdd_existcomp(cube, dict_.next_set);
+                      auto [dest_bdd, label] =
+                        bdd_splitcube(cube, dict_.next_set);
                       formula dest = dict_.conj_bdd_to_sere(dest_bdd);
                       formula dest2 = formula::binop(o, dest, node[1]);
 
@@ -1762,8 +1759,7 @@ namespace spot
                 bdd cube;
                 while ((cube = isop.next()) != bddfalse)
                   {
-                    bdd label = bdd_exist(cube, d_.next_set);
-                    bdd dest_bdd = bdd_existcomp(cube, d_.next_set);
+                    auto [dest_bdd, label] = bdd_splitcube(cube, d_.next_set);
                     formula dest = d_.conj_bdd_to_formula(dest_bdd);
 
                     // Handle a Miyano-Hayashi style unrolling for

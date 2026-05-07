@@ -556,8 +556,7 @@ namespace spot
             bdd sup = bdd_support(cond);
             for (bdd cond: minterms_of(cond, sup))
               {
-                bdd in = bdd_exist(cond, opt_mealy_output_);
-                bdd out = bdd_existcomp(cond, opt_mealy_output_);
+                auto [out, in] = bdd_splitcube(cond, opt_mealy_output_);
                 if (auto p = in_out.emplace(in, out); !p.second)
                   p.first->second |= out;
               }

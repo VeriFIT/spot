@@ -76,8 +76,7 @@ namespace spot
     std::vector<unsigned> univ_dest;
     while ((cube = isop.next()) != bddfalse)
       {
-        bdd cond = bdd_exist(cube, vars_);
-        bdd dest = bdd_existcomp(cube, vars_);
+        auto [dest, cond] = bdd_splitcube(cube, vars_);
         while (dest != bddtrue)
           {
             assert(bdd_low(dest) == bddfalse);
