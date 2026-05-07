@@ -7,6 +7,9 @@ New in spot 2.15.1.dev  (not yet released)
     or nullptr if the variable is not an atomic proposition.  This avoids
     having to access the internal bdd_map directly.  (Issue #622.)
 
+  - BuDDy has a new function called bdd_splitcube(), used to spit a cube
+    according to a set of variables.  (Issue #644.)
+
 New in spot 2.15.1  (2026-04-25)
 
   Bugs fixes:
