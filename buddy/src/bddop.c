@@ -87,6 +87,7 @@
 #define CACHEID_APPEXC       0x9
 #define CACHEID_APPALC       0xA
 #define CACHEID_APPUNC       0xB
+#define CACHEID_SPLITCUBE    0xC
 
 
    /* Number of boolean operators */
@@ -168,6 +169,7 @@ static double satcount_rec(int);
 static double satcountln_rec(int);
 static void   varprofile_rec(int);
 static double bdd_pathcount_rec(BDD);
+static void   splitcube_rec(BDD, BDD*, BDD*);  /* non-recursive implementation */
 static int    varset2vartable(BDD, int);
 static int    varset2svartable(BDD);
 
@@ -4513,6 +4515,171 @@ static BDD appquant_rec(BDD l, BDD r)
    return res;
 }
 
+
+
+static void splitcube_rec(BDD r, BDD* res_in_ptr, BDD* res_out_ptr)
+{
+   LOCAL_REC_STACKS;
+   int index;
+
+   goto work;
+   do
+     {
+       index = POPINT_();
+       if (index < 0)
+         {
+           r = POPINT_();
+         work:;
+           if (ISCONST(r))
+             {
+               /* I: -1 r ---   */
+               /* R:      --- r r */
+               PUSHREF_(r);     /* out */
+               PUSHREF_(r);     /* in */
+             }
+           else if (LEVEL(r) > quantlast)
+             {
+               /* I: -1 r ---            */
+               /* R:      --- in=1 out=r */
+               PUSHREF_(r);     /* out */
+               PUSHREF_(1);     /* in */
+             }
+           else
+             {
+               BddCacheData *entry2 =
+                 BddCache_index(&quantcache, QUANTHASH(r), index);
+               if (entry2->i.a == r && entry2->i.c == quantid)
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opHit++;
+#endif
+                   /* I: -1 r ---        */
+                   /* R:      --- in out */
+                   PUSHREF_(entry2->i.res); /* out */
+                   PUSHREF_(entry2->i.b);   /* in */
+                 }
+               else
+                 {
+#ifdef CACHESTATS
+                   bddcachestats.opMiss++;
+#endif
+                   int l = LOW(r);
+                   PUSH2INT_(r, index);
+                   /* I: -1 r --- (-1 lr) index r */
+                   if (l == 0) /* positive literal */
+                     r = HIGH(r);
+                   else         /* negative literal */
+                     r = l;
+                   goto work;
+                 }
+             }
+         }
+       else
+         {
+           /* I: index r ---     */
+           /* R: rin rout --- rin' rout' */
+           BDD r = POPINT_();
+           BDD rin = READREF_(1);
+           BDD rout = READREF_(2);
+           int lvl = LEVEL(r);
+           int pos = LOW(r) == 0;
+           SYNC_REC_STACKS;
+           if (INVARSET(lvl))
+             {
+               int l = pos ? 0 : rin;
+               int r = pos ? rin : 0;
+               rin = bdd_makenode(lvl, l, r);
+             }
+           else
+             {
+               int l = pos ? 0 : rout;
+               int r = pos ? rout : 0;
+               rout = bdd_makenode(lvl, l, r);
+             }
+
+           POPREF_(2);
+           PUSHREF_(rout);
+           PUSHREF_(rin);
+           BddCacheData* entry = quantcache.table + index;
+           entry->i.a = r;
+           entry->i.c = quantid;
+           entry->i.b = rin;
+           entry->i.res = rout;
+         }
+     }
+   while (NONEMPTY_REC_STACK);
+
+   *res_in_ptr = READREF_(1);
+   *res_out_ptr = READREF_(2);
+   POPREF_(2);
+   SYNC_REC_STACKS;
+   CHECK_EMPTY_STACK;
+}
+
+/*
+NAME    {* bdd\_splitcube *}
+SECTION {* operator *}
+SHORT   {* split a cube over two sets of variables *}
+PROTO   {* void bdd_splitcube(BDD r, BDD var, BDD *res_in, BDD *res_out) *}
+DESCR   {* Given a cube {\tt r} and a variable set {\tt var}, splits {\tt r}
+           into two cubes {\tt *res\_in} and {\tt *res\_out} such that
+           {\tt r = *res\_in \& *res\_out}, {\tt *res\_in} uses only variables
+           in {\tt var}, and {\tt *res\_out} uses only variables not in
+           {\tt var}.  This is equivalent to calling {\tt bdd\_existcomp(r,var)}
+           and {\tt bdd\_exist(r,var)} but does both in a single traversal. *}
+ALSO    {* bdd\_exist, bdd\_existcomp, bdd\_makeset *}
+*/
+void bdd_splitcube(BDD r, BDD var, BDD* res_in_ptr, BDD* res_out_ptr)
+{
+   firstReorder = 1;
+   INITREF;
+
+   if (r < 2)                   /* constants */
+     {
+       *res_in_ptr = r;
+       *res_out_ptr = r;
+       return;
+     }
+   if (var < 2)  /* empty set */
+     {
+       *res_in_ptr = 1;
+       *res_out_ptr = r;
+       return;
+     }
+
+ again:
+   if (__likely(bddreordermethod == BDD_REORDER_NONE)
+       || setjmp(bddexception) == 0)
+   {
+      varset2vartable(var, 0);
+
+      quantid = (var << 4) | CACHEID_SPLITCUBE;
+
+      if (__likely(firstReorder))
+	{
+	  splitcube_rec(r, res_in_ptr, res_out_ptr);
+	}
+      else
+	{
+	  bdd_disable_reorder();
+	  splitcube_rec(r, res_in_ptr, res_out_ptr);
+	  bdd_enable_reorder();
+	}
+   }
+   else
+   {
+      RESETREF;
+      bdd_checkreorder();
+
+      if (firstReorder-- == 1)
+	 goto again;
+      *res_in_ptr = 0;
+      *res_out_ptr = 0;
+   }
+
+   checkresize();
+   return;
+}
 
 /*************************************************************************
   Informational functions

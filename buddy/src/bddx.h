@@ -490,6 +490,7 @@ BUDDY_API int*     bdd_varprofile(BDD);
 BUDDY_API double   bdd_pathcount(BDD);
 BUDDY_API int      bdd_have_common_assignment(BDD, BDD);
 BUDDY_API int      bdd_is_cube(BDD);
+BUDDY_API void     bdd_splitcube(BDD, BDD, BDD*, BDD*);
 
 /* In file "bddio.c" */
 
@@ -823,6 +824,7 @@ protected:
    friend double   bdd_pathcount(const bdd &);
    friend int      bdd_have_common_assignment(const bdd&, const bdd&);
    friend int      bdd_is_cube(const bdd&);
+   friend std::pair<bdd,bdd> bdd_splitcube(const bdd&, const bdd&);
 
    friend void   bdd_fprinttable(FILE *, const bdd &);
    friend void   bdd_printtable(const bdd &);
@@ -1209,6 +1211,14 @@ inline bdd bdd_exist(const bdd &r, const bdd &var)
 
 inline bdd bdd_existcomp(const bdd &r, const bdd &var)
 { return bdd_existcomp(r.root, var.root); }
+
+inline std::pair<bdd,bdd>
+bdd_splitcube(const bdd &r, const bdd &var)
+{
+  BDD in, out;
+  bdd_splitcube(r.root, var.root, &in, &out);
+  return {bdd(in), bdd(out)};
+}
 
 inline bdd bdd_forall(const bdd &r, const bdd &var)
 { return bdd_forall(r.root, var.root); }
