@@ -57,6 +57,7 @@
 %module buddy
 
 %include "std_string.i"
+%include "std_pair.i"
 %include "std_container.i"
 
 %{
@@ -244,6 +245,8 @@ int bdd_implies(const bdd &l, const bdd &r);
 bdd bdd_ite(const bdd &f, const bdd &g, const bdd &h);
 bdd bdd_exist(const bdd &r, const bdd &var);
 bdd bdd_existcomp(const bdd &r, const bdd &var);
+%template(bdd_pair) std::pair<bdd, bdd>;
+std::pair<bdd,bdd> bdd_splitcube(const bdd &r, const bdd &var);
 bdd bdd_forall(const bdd &r, const bdd &var);
 bdd bdd_forallcomp(const bdd &r, const bdd &var);
 bdd bdd_unique(const bdd &r, const bdd &var);
