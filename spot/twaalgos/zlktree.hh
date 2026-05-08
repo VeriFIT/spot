@@ -148,8 +148,22 @@ namespace spot
     std::pair<unsigned, unsigned>
     step(unsigned branch, acc_cond::mark_t colors) const;
 
-    /// \brief Whether the tree corresponds to a min even or min odd
+    /// \brief Whether the tree corresponds to a min even
     /// parity acceptance.
+    ///
+    /// The nodes of a Zielonka tree alternate between accepting and
+    /// rejecting at each level.  Depending on the acceptance of the
+    /// root node (at level 0) we can therefore have two situations:
+    ///
+    /// - If is_even() returns true, nodes on *even* levels are
+    ///   *accepting*, and nodes at odd levels are rejecting.
+    ///   The levels can be used to define a min even parity
+    ///   acceptance.
+    ///
+    /// - If is_even() returns false, nodes on *odd* levels are
+    ///   *accepting*, and nodes at even levels are rejecting.
+    ///   The levels can be used to define a min odd parity
+    ///   acceptance.
     bool is_even() const
     {
       return is_even_;
@@ -357,7 +371,7 @@ namespace spot
     /// min odd parity acceptance.
     ///
     /// The choice between even or odd is determined by the parity
-    /// of the tallest tree of the ACD.  In case two tree of opposite
+    /// of the tallest tree of the ACD.  In case two trees of opposite
     /// parity share the tallest height, then even parity is favored.
     bool is_even() const
     {
