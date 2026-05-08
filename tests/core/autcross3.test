@@ -32,16 +32,16 @@ check_csv()
 }
 
 randaut -Q4 2 |
-autcross --language-preserve 'autfilt' 'sleep 5; autfilt %H > %O' \
-  --timeout=2 --csv=out.csv 2>stderr
+autcross --language-preserve 'autfilt' 'sleep 10; autfilt %H > %O' \
+  --timeout=4 --csv=out.csv 2>stderr
 cat stderr
 test `grep 'warning:.*timeout' stderr | wc -l` -eq 1
 test `wc -l < out.csv` -eq 3
 check_csv out.csv
 
 randaut -Q4 2 |
-autcross --language-preserve 'autfilt' 'sleep 5; autfilt %H > %O' \
-  --timeout=2 --fail-on-timeout --csv=out.csv 2>stderr && exit 1
+autcross --language-preserve 'autfilt' 'sleep 10; autfilt %H > %O' \
+  --timeout=4 --fail-on-timeout --csv=out.csv 2>stderr && exit 1
 cat stderr
 test `grep 'error:.*timeout' stderr | wc -l` -eq 1
 test `wc -l < out.csv` -eq 3
