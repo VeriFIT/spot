@@ -545,13 +545,6 @@ namespace
     if (opt_csv)              // reset benchmark data
       gi->bv = spot::synthesis_info::bench_var();
 
-    if (!unobs_aps.empty()
-        && gi->s != spot::synthesis_info::algo::DET_SPLIT
-        && gi->s != spot::synthesis_info::algo::SPLIT_DET)
-      error(2, 0,
-            "Using unobservable inputs currently requires "
-            "--algo=ds or --algo=sd");
-
     spot::stopwatch sw;
     if (gi->bv)
       sw.start();

@@ -118,7 +118,7 @@ Start: 0
 AP: 2 "r" "g"
 acc-name: all
 Acceptance: 0 t
-properties: trans-labels explicit-labels state-acc deterministic
+properties: trans-labels explicit-labels state-acc deterministic weak
 controllable-AP: 1
 --BODY--
 State: 0

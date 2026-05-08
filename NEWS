@@ -12,6 +12,11 @@ New in spot 2.15.1.dev  (not yet released)
 
   - spot::obligation_to_mtdswa() now also supports \exists and \forall.
 
+  - improve support for unobservable inputs in ltlsynt.  It now works
+    with all translation algorithms (not just SD or DS), and relies on
+    existential quantification performed during the translation, not
+    afterwards.
+
 New in spot 2.15.1  (2026-04-25)
 
   Bugs fixes:

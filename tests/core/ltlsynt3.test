@@ -23,12 +23,14 @@ set -e
 
 # LTL synthesis with universal quantification
 
-for algo in ds sd; do
+for algo in ds sd ps lar lar.old acd; do
+
+echo ======= $algo =======
 
 ltlsynt --algo=$algo -f 'G(u <-> X!u) & XF(u <-> o)' && exit 0
 ltlsynt --algo=$algo --real -f 'G(u <-> X!u) -> XF(u <-> o)'
 
-cat >exp <<EOF
+cat >exp1 <<EOF
 REALIZABLE
 HOA: v1
 States: 2
@@ -47,15 +49,7 @@ State: 1
 /*Strategy was verified*/
 EOF
 
-ltlsynt --algo=$algo --verify -f 'G(u <-> X!u) -> XF(u <-> o)' >out
-diff out exp
-
-ltlsynt --algo=$algo --verify \
-        -f 'G(u <-> X!u) -> X(F(u <-> o) && F(u <-> !o))' >out
-diff out exp
-
-
-cat >exp <<EOF
+cat >exp2 <<EOF
 REALIZABLE
 HOA: v1
 States: 2
@@ -63,7 +57,7 @@ Start: 0
 AP: 1 "o"
 acc-name: all
 Acceptance: 0 t
-properties: trans-labels explicit-labels state-acc deterministic
+properties: trans-labels explicit-labels state-acc deterministic weak
 controllable-AP: 0
 --BODY--
 State: 0
@@ -74,12 +68,21 @@ State: 1
 /*Strategy was verified*/
 EOF
 
+ltlsynt --algo=$algo --verify -f 'G(u <-> X!u) -> XF(u <-> o)' >out
+diff out exp1 || diff out exp2
+
+ltlsynt --algo=$algo --verify \
+        -f 'G(u <-> X!u) -> X(F(u <-> o) && F(u <-> !o))' >out
+diff out exp1 || diff out exp2
+
 ltlsynt --algo=$algo --verify --obligation-synthesis=no \
         -f 'G(u <-> X!u) -> XF(u <-> o)' >out
-diff out exp
+diff out exp1 || diff out exp2
+
 ltlsynt --algo=$algo --verify --obligation-synthesis=no \
         -f 'G(u <-> X!u) -> X(F(u <-> o) && F(u <-> !o))' >out
-diff out exp
+diff out exp1 || diff out exp2
+
 
 
 
@@ -118,7 +121,7 @@ Start: 0
 AP: 1 "o"
 acc-name: all
 Acceptance: 0 t
-properties: trans-labels explicit-labels state-acc deterministic
+properties: trans-labels explicit-labels state-acc deterministic weak
 controllable-AP: 0
 --BODY--
 State: 0

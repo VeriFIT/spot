@@ -169,9 +169,14 @@ namespace{
     auto strat_split = make_twa_graph(arena->get_dict());
     strat_split->copy_ap_of(arena);
     if (keep_acc)
-      strat_split->copy_acceptance_of(arena);
+      {
+        strat_split->copy_acceptance_of(arena);
+      }
     else
-      strat_split->acc().set_acceptance(acc_cond::acc_code::t());
+      {
+        strat_split->acc().set_acceptance(acc_cond::acc_code::t());
+        strat_split->prop_weak(true);
+      }
 
     std::stack<unsigned> todo;
     todo.push(arena->get_init_state_number());
@@ -1827,13 +1832,14 @@ namespace spot
         // by working on the negated automaton, doing existential
         // quantification before determinization, and then complementing
         // the DPA.   This cannot work with DPA/LAR approaches.
-        // FIXME: existential quantification simply should be moved into
-        // translator.
-        if (gi.s != algo::DET_SPLIT && gi.s != algo::SPLIT_DET)
-          throw std::runtime_error("ltl_to_game: universal quantification "
-                                   "currently only work with SPLIT_DET or "
-                                   "DET_SPLIT approaches.");
-        f = formula::Not(f);
+        std::vector<spot::formula> unobs_vec;
+        unobs_vec.reserve(unobs->size());
+        for (const std::string& s: *unobs)
+          {
+            spot::formula ap = spot::formula::ap(s);
+            unobs_vec.push_back(ap);
+          }
+        f = formula::exists(unobs_vec, formula::Not(f));
       }
 
     stopwatch sw;
@@ -1841,13 +1847,6 @@ namespace spot
     if (bv)
       sw.start();
     auto aut = trans.run(f);
-    if (unobs) // FIXME: this should be moved in TRANS.
-      {
-        remove_ap rem;
-        for (const std::string& s: *unobs)
-          rem.add_ap(s.c_str());
-        aut = rem.strip(aut);
-      }
     if (bv)
       {
         bv->sum_trans_time += sw.stop();
@@ -1943,6 +1942,8 @@ namespace spot
         if (bv)
           sw.start();
         aut->merge_states();
+        if (unobs)
+          aut = dualize(aut);
         if (bv)
           bv->sum_paritize_time += sw.stop();
         if (vs)
@@ -2001,6 +2002,8 @@ namespace spot
       {
         if (bv)
           sw.start();
+        if (unobs)
+          aut = dualize(aut);
         if (gi.s == algo::LAR)
           {
             dpa = to_parity(aut);

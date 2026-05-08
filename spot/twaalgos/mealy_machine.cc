@@ -4341,6 +4341,9 @@ namespace spot
     else if (3 <= minimize_lvl && !split_out)
       m = unsplit_mealy(m);
 
+    if (m->num_sets() == 0)
+      m->prop_weak(true);
+
     if (si.bv)
       {
         if (si.verbose_stream)
