@@ -2140,13 +2140,58 @@ namespace spot
     std::deque<formula> todo;
     terminal_to_state_map.clear();
 
-    // Keep track of atomic propositions used in he automaton.
+    // Each entry is (vars, is_existential), with the outermost quantifier
+    // block first.  During translation, we apply them in reverse order
+    // (innermost first) using bdd_mt_quantify, one block at a time.
+    // This avoids any assumption about the relative ordering of BDD
+    // variable indices, which would be required by bdd_mt_quantify2.
+    std::vector<std::pair<bdd, bool>> quantifier_blocks;
+    bool is_quantified = false;
+
+    // Keep track of atomic propositions used in the automaton.
     // Actually, the automaton might use fewer atomic propositions
     // than what appears in the formula, but we do not pay attention
     // to that.
     {
+      f = normalize_quantifiers(f);
+
       atomic_prop_set* a = atomic_prop_collect(f);
-      dfa->aps.assign(a->begin(), a->end());
+      dfa->aps.reserve(a->size());
+
+      // Peel quantifier blocks from outermost to innermost, building
+      // one (vars, is_existential) entry per block in quantifier_blocks.
+      // Variable registration order within each block follows the order
+      // the variables appear in the formula body.
+      if (f.is_quantified())
+        {
+          is_quantified = true;
+          std::vector<unsigned char> inblock;
+          while (f.is(op::exists, op::forall))
+            {
+              bool is_exists = f.is(op::exists);
+              bdd block_vars = bddtrue;
+
+              inblock.clear();
+              inblock.resize(formula::apid_count(), 0U);
+              unsigned last = f.size() - 1;
+              for (unsigned i = 0; i < last; ++i)
+                inblock[f[i].apid()] = 1;
+
+              f.traverse([&](const spot::formula& g)
+              {
+                if (!g.is(spot::op::ap))
+                  return false;
+                unsigned id = g.apid();
+                if (inblock[id] && a->erase(g))
+                  block_vars &= bdd_ithvar(dict_->register_proposition(g, dfa));
+                return false;
+              });
+              quantifier_blocks.emplace_back(block_vars, is_exists);
+              f = f[last];
+            }
+        }
+      // Anything left in a are unquantified APs.
+      dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
       delete a;
     }
 
@@ -2178,6 +2223,27 @@ namespace spot
           continue;
 
         bdd b = ltl_to_mtbdd(label);
+        if (is_quantified)
+          {
+            // Apply quantifier blocks from innermost to outermost.
+            // Each block uses bdd_mt_quantify with a fresh prepare call,
+            // so no assumption is made about relative BDD variable ordering.
+            for (int qi = (int)quantifier_blocks.size() - 1; qi >= 0; --qi)
+              {
+                auto [vars, is_exists] = quantifier_blocks[qi];
+                bdd_mt_quantify_prepare(vars);
+                if (is_exists)
+                  b = bdd_mt_quantify(b, term_id,
+                                      term_combine_or, &cache_,
+                                      hash_key_quantify,
+                                      hash_key_or, bddop_or);
+                else
+                  b = bdd_mt_quantify(b, term_id,
+                                      term_combine_and, &cache_,
+                                      hash_key_quantify,
+                                      hash_key_and, bddop_and);
+              }
+          }
         // propositional equivalence on all terminals.
         b = bdd_mt_apply1_leaves(b, terminal_propeq, &cache_, hash_key_propeq);
 
@@ -2235,6 +2301,9 @@ namespace spot
     dfa->names = std::move(names);
     dfa->colors = std::move(colors);
     dict_->register_all_propositions_of(this, dfa);
+    for (auto& [vars, ignored] : quantifier_blocks)
+      for (bdd b = vars; b != bddtrue; b = bdd_high(b))
+        dict_->unregister_variable(bdd_var(b), dfa);
     return dfa;
   }
 

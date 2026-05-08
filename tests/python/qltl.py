@@ -47,3 +47,67 @@ test("\\forall a, b: a U b", "0")
 test("\\exists c: a U b", "a U b")
 test("\\exists a, c: a U b", "1 U b")
 test("\\forall a, e: \\exists b, c: (a -> b) & (c xor d)", "∃ c: c xor d")
+
+# Tests for obligation_to_mtdswa() with quantified LTL.
+#
+# We use formulas where the quantified AP has mixed polarity, so
+# normalize_quantifiers cannot trivially eliminate it.
+d = spot.make_bdd_dict()
+
+def check_equiv(f_str, expected_str):
+    """Assert obligation_to_mtdswa(f) is language-equivalent to expected."""
+    f   = spot.formula(f_str)
+    exp = spot.formula(expected_str)
+    # The formula must stay quantified after normalize_quantifiers,
+    # confirming the AP is not trivially eliminated.
+    tc.assertTrue(spot.normalize_quantifiers(f).is_quantified(),
+                  f"{f_str!r} should remain quantified")
+    aut     = spot.obligation_to_mtdswa(f,   dict=d)
+    exp_aut = spot.obligation_to_mtdswa(exp, dict=d)
+    tc.assertTrue(spot.are_equivalent(aut.as_twa(), exp_aut.as_twa()),
+                  f"obligation_to_mtdswa({f_str!r}) not equiv"
+                  f" to {expected_str!r}")
+
+check_equiv("\\exists a: G(a | b) & G(!a | c)", "G(b | c)")
+check_equiv("\\forall a: G(a | b) & G(!a | c)", "Gb & Gc")
+check_equiv("\\exists a: \\forall b: G(a | b) & G(!a | !b | c)", "Gc")
+
+# Larger tests using the duality property:
+#
+#   L(∀a:∃b:f(a,b)) = complement(L(∃a:∀b:¬f(a,b)))
+#
+# This avoids the need to find an equivalent quantifier-free formula:
+# we simply build both automata and verify they recognize complementary
+# languages.  The formulas below were selected (via randltl | ltlfilt)
+# so that a and b both have mixed polarity and normalize_quantifiers
+# does not eliminate the quantifiers.
+
+def check_dual(f_str):
+    """Check ∀a:∃b:f and ∃a:∀b:¬f produce complementary automata."""
+    fa = spot.formula("\\forall a: \\exists b: " + f_str)
+    eb = spot.formula("\\exists a: \\forall b: !(" + f_str + ")")
+    tc.assertTrue(spot.normalize_quantifiers(fa).is_quantified(),
+                  f"∀a:∃b:f should remain quantified for: {f_str}")
+    tc.assertTrue(spot.normalize_quantifiers(eb).is_quantified(),
+                  f"∃a:∀b:¬f should remain quantified for: {f_str}")
+    aut1 = spot.obligation_to_mtdswa(fa, dict=d)
+    aut2 = spot.obligation_to_mtdswa(eb, dict=d)
+    tc.assertTrue(
+        spot.are_equivalent(aut1.as_twa(),
+                            spot.complement(aut2.as_twa())),
+        f"Duality check failed for: {f_str}")
+
+# 10/11 states
+check_dual(
+    "(Gd & (Fa U c) & ((b & X!a) | (!b & Xa)))"
+    " | ((G!a R !c) & (F!d | (b & Xa) | (!b & X!a)))")
+# 7/5 states
+check_dual(
+    "((!c U !b) & (!c W Gd) & XG!a)"
+    " | ((c M F!d) & ((c R b) | XFa))")
+# 4/3 states
+check_dual(
+    "(Gc & ((a & ((!b & F!d) | (b & Gd)))"
+    "      | (!a & ((!b & Gd) | (b & F!d)))))"
+    " | (F!c & ((a & ((!b & Gd) | (b & F!d)))"
+    "          | (!a & ((!b & F!d) | (b & Gd)))))")

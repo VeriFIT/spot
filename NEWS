@@ -10,6 +10,8 @@ New in spot 2.15.1.dev  (not yet released)
   - BuDDy has a new function called bdd_splitcube(), used to spit a cube
     according to a set of variables.  (Issue #644.)
 
+  - spot::obligation_to_mtdswa() now also supports \exists and \forall.
+
 New in spot 2.15.1  (2026-04-25)
 
   Bugs fixes:

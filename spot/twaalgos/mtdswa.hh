@@ -306,6 +306,8 @@ namespace spot
 
   /// \ingroup mtdswa
   /// \brief Convert a syntactic-obligation to an MTDSwA
+  ///
+  /// The formula may use quantified atomic propositions (\forall or \exists).
   SPOT_API
   mtdswa_ptr obligation_to_mtdswa(formula f, const bdd_dict_ptr& dict,
                                   bool fuse_same_bdds = true,
