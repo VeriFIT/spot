@@ -346,7 +346,19 @@ namespace spot
   ///
   /// The set of output variables should be specified with \a outvars.
   ///
-  /// The LTLf formula may be quantified.
+  /// The dictionary passed to this function should have variables
+  /// registered in the order needed by the semantics you wish to use.
+  /// For Mealy semantics, input variables should be registered before
+  /// output variables.  For Moore semantics, output variables should
+  /// be registered before input variables.
+  ///
+  /// This function will register any missing variable, so it is
+  /// actually enough to pre-register input variables for Mealy, and
+  /// pre-register output variables for Moore.
+  ///
+  /// The formula may also use quantified atomic propositions (\forall
+  /// or \exists).  The quantified variables should not be
+  /// pre-registered in the dictionary.
   ///
   /// If \a backprop is set to `bfs_node_backprop`, or
   /// `dfs_node_backprop`, then a backpropagation graph is constructed

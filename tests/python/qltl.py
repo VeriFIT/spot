@@ -67,6 +67,12 @@ def check_equiv(f_str, expected_str):
     tc.assertTrue(spot.are_equivalent(aut.as_twa(), exp_aut.as_twa()),
                   f"obligation_to_mtdswa({f_str!r}) not equiv"
                   f" to {expected_str!r}")
+    # same with LTLf translation
+    aut1 = spot.ltlf_to_mtdfa(f, dict=d)
+    aut2 = spot.ltlf_to_mtdfa(exp, dict=d)
+    tc.assertTrue(spot.product_xor(aut1, aut2).is_empty(),
+                  f"ltlf_to_mtdfa({f_str!r}) not equiv"
+                  f" to {expected_str!r}")
 
 check_equiv("\\exists a: G(a | b) & G(!a | c)", "G(b | c)")
 check_equiv("\\forall a: G(a | b) & G(!a | c)", "Gb & Gc")
@@ -85,17 +91,23 @@ check_equiv("\\exists a: \\forall b: G(a | b) & G(!a | !b | c)", "Gc")
 def check_dual(f_str):
     """Check ∀a:∃b:f and ∃a:∀b:¬f produce complementary automata."""
     fa = spot.formula("\\forall a: \\exists b: " + f_str)
-    eb = spot.formula("\\exists a: \\forall b: !(" + f_str + ")")
+    fb = spot.formula("\\exists a: \\forall b: !(" + f_str + ")")
     tc.assertTrue(spot.normalize_quantifiers(fa).is_quantified(),
                   f"∀a:∃b:f should remain quantified for: {f_str}")
-    tc.assertTrue(spot.normalize_quantifiers(eb).is_quantified(),
+    tc.assertTrue(spot.normalize_quantifiers(fb).is_quantified(),
                   f"∃a:∀b:¬f should remain quantified for: {f_str}")
+    # LTL
     aut1 = spot.obligation_to_mtdswa(fa, dict=d)
-    aut2 = spot.obligation_to_mtdswa(eb, dict=d)
+    aut2 = spot.obligation_to_mtdswa(fb, dict=d)
     tc.assertTrue(
         spot.are_equivalent(aut1.as_twa(),
                             spot.complement(aut2.as_twa())),
         f"Duality check failed for: {f_str}")
+    # LTLf
+    aut1 = spot.ltlf_to_mtdfa(fa, dict=d)
+    aut2 = spot.ltlf_to_mtdfa(fb, dict=d)
+    tc.assertTrue(spot.product_xnor(aut1, aut2).is_empty(),
+                  "LTLf duality check failed for: {f_str}")
 
 # 10/11 states
 check_dual(
@@ -113,6 +125,7 @@ check_dual(
     "          | (!a & ((!b & F!d) | (b & Gd)))))")
 
 
+# Some LTL translations
 f2 = spot.formula("\\forall a: \\exists b: (Gd & (Fa U c) & (b xor Xa))")
 a2 = spot.obligation_synthesis(f2, ["c"], realizability=True, dict=d)
 
@@ -130,3 +143,19 @@ a2b = spot.obligation_to_mtdswa(f2, dict=d)
 a3b = spot.obligation_to_mtdswa(f3, dict=d)
 tc.assertFalse(a2b.as_twa().is_empty())
 tc.assertTrue(a3b.as_twa().is_empty())
+
+# The same translations, but for LTLf
+a2 = spot.ltlf_to_mtdfa_for_synthesis(f2, ["c"], realizability=True, dict=d)
+try:
+    a3 = spot.ltlf_to_mtdfa_for_synthesis(f3, ["c"], realizability=True, dict=d)
+except RuntimeError as e:
+    tc.assertEqual("quantified variable was already registered "
+                   "with an incompatible level",
+                   str(e))
+else:
+    raise RuntimeError("missing exception")
+
+a2b = spot.ltlf_to_mtdfa(f2, dict=d)
+a3b = spot.ltlf_to_mtdfa(f3, dict=d)
+tc.assertFalse(a2b.is_empty())
+tc.assertFalse(a3b.is_empty())  # unlike in LTL!

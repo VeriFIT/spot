@@ -1755,6 +1755,7 @@ namespace spot
             orig_f = f;
           is_quantified = true;
           std::vector<unsigned char> inblock;
+          int max_level_of_last_block = -1;
           while (f.is(op::exists, op::forall))
             {
               bool is_exists = f.is(op::exists);
@@ -1765,6 +1766,7 @@ namespace spot
               for (unsigned i = 0; i < last; ++i)
                 inblock[f[i].apid()] = 1;
 
+              int max_level_of_current_block = -1;
               f.traverse([&](const spot::formula& g)
               {
                 if (!g.is(spot::op::ap))
@@ -1773,6 +1775,17 @@ namespace spot
                 if (inblock[id] && a->erase(g))
                   {
                     bdd bi = bdd_ithvar(dict_->register_proposition(g, dfa));
+                    int lvl = bdd_level(bi);
+                    if (lvl > max_level_of_current_block)
+                      max_level_of_current_block = lvl;
+                    if (lvl < max_level_of_last_block)
+                      // The variables in one quantified block should
+                      // all have a level greater than the variables
+                      // in the previous block for bdd_mt_quantify2 to
+                      // work.
+                      throw std::runtime_error("quantified variable was "
+                                               "already registered with "
+                                               "an incompatible level");
                     if (is_exists)
                       existsvars &= bi;
                     else
@@ -1781,6 +1794,7 @@ namespace spot
                 return false;
               });
               f = f[last];
+              max_level_of_last_block = max_level_of_current_block;
             }
         }
       // Anything left in a are input
@@ -2066,26 +2080,17 @@ namespace spot
     std::deque<formula> todo;
     terminal_to_state_map.clear();
 
-    bdd forallvars = bddtrue;
-    bdd existsvars = bddtrue;
-
-    // this is the number of variables we had the last time
-    // we called bdd_mt_quantify_prepare().
-    int varnum = 0;
-
-    auto quantify_prepare_maybe = [&] {
-      // Everytime a new BDD variable is created, the quantification
-      // buffer is wiped out.  Adding variables can happen as a
-      // side-effect of ltlf_to_mtbdd().  As a consequence, we have to
-      // call bdd_mt_quantify_prepare() when the number of BDD
-      // variables changed.
-      if (int vn = bdd_varnum(); vn != varnum)
-        {
-          bdd_mt_quantify_prepare(bddtrue, forallvars, existsvars);
-          varnum = vn;
-        }
-    };
-
+    // Each entry is (exists_vars, forall_vars), with the outermost
+    // quantifier block first.  For a purely existential block,
+    // forall_vars is bddtrue; for a purely universal block,
+    // exists_vars is bddtrue.  After building the initial list,
+    // consecutive blocks are merged when all BDD variable levels of
+    // the outer block are smaller than those of the inner block;
+    // bdd_mt_quantify2 then handles both quantification types in a
+    // single pass.  Un-merged blocks pass bddtrue for the inactive
+    // side, making bdd_mt_quantify2 behave as a single-type
+    // quantification with no assumption on relative variable ordering.
+    std::vector<std::pair<bdd, bdd>> quantifier_blocks;
     bool is_quantified = false;
 
     // Keep track of atomic propositions used in the automaton.
@@ -2098,9 +2103,11 @@ namespace spot
       atomic_prop_set* a = atomic_prop_collect(f);
       dfa->aps.reserve(a->size());
 
-      // Declare quantified variables in the order of the quantifiers.
-      // But inside each block, register the variables in the order
-      // they are found in the formula.
+      // Peel quantifier blocks from outermost to innermost, building
+      // one (exists_vars, forall_vars) entry per block in
+      // quantifier_blocks.  Variable registration order within each
+      // block follows the order in which the variables appear in the
+      // formula body.
       if (f.is_quantified())
         {
           if (preserve_quantifiers_in_names)
@@ -2110,6 +2117,7 @@ namespace spot
           while (f.is(op::exists, op::forall))
             {
               bool is_exists = f.is(op::exists);
+              bdd block_vars = bddtrue;
 
               inblock.clear();
               inblock.resize(formula::apid_count(), 0U);
@@ -2123,21 +2131,52 @@ namespace spot
                   return false;
                 unsigned id = g.apid();
                 if (inblock[id] && a->erase(g))
-                  {
-                    bdd bi = bdd_ithvar(dict_->register_proposition(g, dfa));
-                    if (is_exists)
-                      existsvars &= bi;
-                    else
-                      forallvars &= bi;
-                  }
+                  block_vars &= bdd_ithvar(dict_->register_proposition(g, dfa));
                 return false;
               });
+              if (is_exists)
+                quantifier_blocks.emplace_back(block_vars, bddtrue);
+              else
+                quantifier_blocks.emplace_back(bddtrue, block_vars);
               f = f[last];
             }
         }
       // Anything left in a are input
       dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
       delete a;
+
+      // Merge consecutive quantifier blocks when the BDD variable
+      // indices of the outer block are all strictly smaller than
+      // those of the inner block.  Such merged blocks can be handled
+      // by bdd_mt_quantify2 in a single pass.
+      if (quantifier_blocks.size() > 1)
+        {
+          auto max_set_level = [](bdd set) -> int
+          {
+            int v = -1;
+            for (bdd b = set; b != bddtrue; b = bdd_high(b))
+              v = bdd_level(b);
+            return v;
+          };
+
+          size_t i = 0;
+          while (i + 1 < quantifier_blocks.size())
+            {
+              auto& [e0, u0] = quantifier_blocks[i];
+              auto& [e1, u1] = quantifier_blocks[i + 1];
+              int max0 = std::max(max_set_level(e0), max_set_level(u0));
+              int min1 = std::min(e1 != bddtrue ? bdd_level(e1) : INT_MAX,
+                                  u1 != bddtrue ? bdd_level(u1) : INT_MAX);
+              if (max0 < min1)
+                {
+                  e0 &= e1;
+                  u0 &= u1;
+                  quantifier_blocks.erase(quantifier_blocks.begin() + i + 1);
+                }
+              else
+                ++i;
+            }
+        }
     }
 
     auto fixup_names = [&]() -> std::vector<formula>
@@ -2156,13 +2195,21 @@ namespace spot
       bdd b = ltlf_to_mtbdd(g);
       if (is_quantified)
         {
-          quantify_prepare_maybe();
-          b = bdd_mt_quantify2(b, term_id,
-                               term_combine_and, term_combine_or,
-                               &cache_,
-                               hash_key_quantify,
-                               hash_key_and, bddop_and,
-                               hash_key_or, bddop_or);
+          term_combine_trans = this;
+          // Apply quantifier blocks from innermost to outermost.
+          // Each block may mix exists and forall variables; merged
+          // blocks are handled in a single bdd_mt_quantify2 pass.
+          for (int qi = (int)quantifier_blocks.size() - 1; qi >= 0; --qi)
+            {
+              auto [exists_vars, forall_vars] = quantifier_blocks[qi];
+              bdd_mt_quantify_prepare(bddtrue, exists_vars, forall_vars);
+              b = bdd_mt_quantify2(b, term_id,
+                                   term_combine_or, term_combine_and,
+                                   &cache_,
+                                   hash_key_quantify,
+                                   hash_key_or, bddop_or,
+                                   hash_key_and, bddop_and);
+            }
         }
       return b;
     };
@@ -2253,10 +2300,13 @@ namespace spot
     dfa->states = std::move(states);
     dfa->names = fixup_names();
     dict_->register_all_propositions_of(this, dfa);
-    for (bdd b = forallvars; b != bddtrue; b = bdd_high(b))
-      dict_->unregister_variable(bdd_var(b), dfa);
-    for (bdd b = existsvars; b != bddtrue; b = bdd_high(b))
-      dict_->unregister_variable(bdd_var(b), dfa);
+    for (auto& [exists_vars, forall_vars] : quantifier_blocks)
+      {
+        for (bdd b = exists_vars; b != bddtrue; b = bdd_high(b))
+          dict_->unregister_variable(bdd_var(b), dfa);
+        for (bdd b = forall_vars; b != bddtrue; b = bdd_high(b))
+          dict_->unregister_variable(bdd_var(b), dfa);
+      }
     return dfa;
   }
 
