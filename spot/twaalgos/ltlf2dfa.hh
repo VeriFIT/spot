@@ -490,13 +490,19 @@ namespace spot
 
     mtdfa_ptr ltlf_to_mtdfa(formula f, bool fuse_same_bdds,
                             bool detect_empty_univ = true,
-                            const std::vector<std::string>* outvars = nullptr,
-                            bool do_backprop = false,
-                            bool realizability = false,
-                            bool one_step_preprocess = false,
-                            bool bfs = true,
-                            bool terminating_semantics = true,
                             bool preserve_quantifiers_in_names = false);
+
+    mtdfa_ptr ltlf_to_mtdfa_synthesis(formula f, bool fuse_same_bdds,
+                                      bool detect_empty_univ = true,
+                                      const std::vector<std::string>* outvars
+                                      = nullptr,
+                                      bool do_backprop = false,
+                                      bool realizability = false,
+                                      bool one_step_preprocess = false,
+                                      bool bfs = true,
+                                      bool terminating_semantics = true,
+                                      bool preserve_quantifiers_in_names
+                                      = false);
 
     bdd ltlf_to_mtbdd(formula f);
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;

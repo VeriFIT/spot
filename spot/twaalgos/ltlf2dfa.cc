@@ -1627,16 +1627,17 @@ namespace spot
   // This is the main translation function.  It has grown to do a bit
   // too much, as it optionally performs on-the-fly game solving.
   mtdfa_ptr
-  ltlf_translator::ltlf_to_mtdfa(formula f,
-                                 bool fuse_same_bdds,
-                                 bool detect_empty_univ,
-                                 const std::vector<std::string>* outvars,
-                                 bool do_backprop,
-                                 bool realizability,
-                                 bool preprocess,
-                                 bool bfs,
-                                 bool terminating_semantics,
-                                 bool preserve_quantifiers_in_names)
+  ltlf_translator::ltlf_to_mtdfa_synthesis(formula f,
+                                           bool fuse_same_bdds,
+                                           bool detect_empty_univ,
+                                           const std::vector<std::string>*
+                                           outvars,
+                                           bool do_backprop,
+                                           bool realizability,
+                                           bool preprocess,
+                                           bool bfs,
+                                           bool terminating_semantics,
+                                           bool preserve_quantifiers_in_names)
   {
     formula orig_f = nullptr;
     mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
@@ -1669,7 +1670,7 @@ namespace spot
     int varnum = 0;
 
     auto quantify_prepare_maybe = [&] {
-      // Everytime a new BDD variable is created, the quantification
+      // Every time a new BDD variable is created, the quantification
       // buffer is wiped out.  Adding variables can happen as a
       // side-effect of ltlf_to_mtbdd().  As a consequence, we have to
       // call bdd_mt_quantify_prepare() when the number of BDD
@@ -2028,7 +2029,220 @@ namespace spot
       }
 
     // Currently, state[i] contains a bdd representing outgoing
-    // transitions from state i, however the terminal values represent
+    // transitions from state i, however, the terminal values represent
+    // formulas.  We need to remap the terminal values to state values.
+    unsigned sz = states.size();
+    for (unsigned i = 0; i < sz; ++i)
+      states[i] = bdd_mt_apply1(states[i], terminal_to_state,
+                                bddfalse, bddtrue,
+                                &cache_, hash_key_rename);
+
+    dfa->states = std::move(states);
+    dfa->names = fixup_names();
+    dict_->register_all_propositions_of(this, dfa);
+    for (bdd b = forallvars; b != bddtrue; b = bdd_high(b))
+      dict_->unregister_variable(bdd_var(b), dfa);
+    for (bdd b = existsvars; b != bddtrue; b = bdd_high(b))
+      dict_->unregister_variable(bdd_var(b), dfa);
+    return dfa;
+  }
+
+  //////////////////////////////////////////////////////////////////////
+  //          Simplified (translation-only) version of ltlf_to_mtdfa  //
+  //////////////////////////////////////////////////////////////////////
+
+  mtdfa_ptr
+  ltlf_translator::ltlf_to_mtdfa(formula f,
+                                 bool fuse_same_bdds,
+                                 bool detect_empty_univ,
+                                 bool preserve_quantifiers_in_names)
+  {
+    formula orig_f = nullptr;
+    mtdfa_ptr dfa = std::make_shared<mtdfa>(dict_);
+    std::unordered_map<bdd, int, bdd_hash> bdd_to_state;
+    std::unordered_map<formula, int> formula_to_state;
+    std::vector<bdd> states;
+    std::vector<formula> names;
+    std::deque<formula> todo;
+    terminal_to_state_map.clear();
+
+    bdd forallvars = bddtrue;
+    bdd existsvars = bddtrue;
+
+    // this is the number of variables we had the last time
+    // we called bdd_mt_quantify_prepare().
+    int varnum = 0;
+
+    auto quantify_prepare_maybe = [&] {
+      // Everytime a new BDD variable is created, the quantification
+      // buffer is wiped out.  Adding variables can happen as a
+      // side-effect of ltlf_to_mtbdd().  As a consequence, we have to
+      // call bdd_mt_quantify_prepare() when the number of BDD
+      // variables changed.
+      if (int vn = bdd_varnum(); vn != varnum)
+        {
+          bdd_mt_quantify_prepare(bddtrue, forallvars, existsvars);
+          varnum = vn;
+        }
+    };
+
+    bool is_quantified = false;
+
+    // Keep track of atomic propositions used in the automaton.
+    // Actually, the automaton might use fewer atomic propositions
+    // than what appears in the formula, but we do not pay attention
+    // to that.
+    {
+      f = normalize_quantifiers(f);
+
+      atomic_prop_set* a = atomic_prop_collect(f);
+      dfa->aps.reserve(a->size());
+
+      // Declare quantified variables in the order of the quantifiers.
+      // But inside each block, register the variables in the order
+      // they are found in the formula.
+      if (f.is_quantified())
+        {
+          if (preserve_quantifiers_in_names)
+            orig_f = f;
+          is_quantified = true;
+          std::vector<unsigned char> inblock;
+          while (f.is(op::exists, op::forall))
+            {
+              bool is_exists = f.is(op::exists);
+
+              inblock.clear();
+              inblock.resize(formula::apid_count(), 0U);
+              unsigned last = f.size() - 1;
+              for (unsigned i = 0; i < last; ++i)
+                inblock[f[i].apid()] = 1;
+
+              f.traverse([&](const spot::formula& g)
+              {
+                if (!g.is(spot::op::ap))
+                  return false;
+                unsigned id = g.apid();
+                if (inblock[id] && a->erase(g))
+                  {
+                    bdd bi = bdd_ithvar(dict_->register_proposition(g, dfa));
+                    if (is_exists)
+                      existsvars &= bi;
+                    else
+                      forallvars &= bi;
+                  }
+                return false;
+              });
+              f = f[last];
+            }
+        }
+      // Anything left in a are input
+      dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
+      delete a;
+    }
+
+    auto fixup_names = [&]() -> std::vector<formula>
+      {
+        // If the formula was quantified, the quantifiers have been
+        // removed before the translation (but applied during
+        // translation), and we need to add them back to the names of
+        // the states.
+        if (orig_f)
+          for (formula& name: names)
+            name = normalize_quantifiers(copy_quantifiers(orig_f, name));
+        return std::move(names);
+      };
+
+    auto trans_succ = [&](formula g) -> bdd {
+      bdd b = ltlf_to_mtbdd(g);
+      if (is_quantified)
+        {
+          quantify_prepare_maybe();
+          b = bdd_mt_quantify2(b, term_id,
+                               term_combine_and, term_combine_or,
+                               &cache_,
+                               hash_key_quantify,
+                               hash_key_and, bddop_and,
+                               hash_key_or, bddop_or);
+        }
+      return b;
+    };
+
+    // Keep track of whether we have seen an accepting or rejecting
+    // state.  If we are missing one of them, we can reduce the
+    // automaton to a single state.
+    bool has_accepting = false;
+    bool has_rejecting = false;
+
+    todo.push_back(f);
+    do
+      {
+        formula label = todo.front();
+        todo.pop_front();
+        int label_term = formula_to_terminal(label) / 2;
+
+        // already processed
+        if (terminal_to_state_map.find(label_term)
+            != terminal_to_state_map.end())
+          continue;
+
+        bdd b = trans_succ(label);
+
+        if (fuse_same_bdds)
+          if (auto it = bdd_to_state.find(b); it != bdd_to_state.end())
+            {
+              formula_to_state[label] = it->second;
+              terminal_to_state_map[label_term] = it->second;
+              continue;
+            }
+        unsigned n = states.size();
+        formula_to_state[label] = n;
+        bdd_to_state[b] = n;
+        states.push_back(b);
+        names.push_back(label);
+        terminal_to_state_map[label_term] = n;
+
+        for (bdd leaf: leaves_of(b))
+          {
+            if (leaf == bddfalse)
+              {
+                has_rejecting = true;
+                continue;
+              }
+            if (leaf == bddtrue)
+              {
+                has_accepting = true;
+                continue;
+              }
+            int term = bdd_get_terminal(leaf);
+            if (term & 1)
+              has_accepting = true;
+            else
+              has_rejecting = true;
+            if (terminal_to_state_map.find(term / 2)
+                == terminal_to_state_map.end())
+              todo.push_back(terminal_to_formula(term));
+          }
+      }
+    while (!todo.empty());
+
+    if (detect_empty_univ)
+      {
+        if (!has_accepting)     // return a false MTDFA.
+          {
+            dfa->states.push_back(bddfalse);
+            dfa->names.push_back(formula::ff());
+            return dfa;
+          }
+        if (!has_rejecting)     // return a true MTDFA.
+          {
+            dfa->states.push_back(bddtrue);
+            dfa->names.push_back(formula::tt());
+            return dfa;
+          }
+      }
+
+    // Currently, state[i] contains a bdd representing outgoing
+    // transitions from state i, however, the terminal values represent
     // formulas.  We need to remap the terminal values to state values.
     unsigned sz = states.size();
     for (unsigned i = 0; i < sz; ++i)
@@ -2354,7 +2568,6 @@ namespace spot
   {
     ltlf_translator trans(dict, simplify_terms);
     return trans.ltlf_to_mtdfa(f, fuse_same_bdds, detect_empty_univ,
-                               nullptr, false, false, false, true, true,
                                preserve_quantifiers_in_names);
   }
 
@@ -2368,23 +2581,23 @@ namespace spot
     switch (backprop)
       {
       case bfs_node_backprop:
-        return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
-                                   options.detect_empty_univ,
-                                   &outvars, true, realizability,
-                                   options.one_step_preprocess, false,
-                                   options.terminating_semantics);
+        return trans.ltlf_to_mtdfa_synthesis(f, options.fuse_same_bdds,
+                                             options.detect_empty_univ,
+                                             &outvars, true, realizability,
+                                             options.one_step_preprocess, false,
+                                             options.terminating_semantics);
       case dfs_node_backprop:
-        return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
-                                   options.detect_empty_univ,
-                                   &outvars, true, realizability,
-                                   options.one_step_preprocess, true,
-                                   options.terminating_semantics);
+        return trans.ltlf_to_mtdfa_synthesis(f, options.fuse_same_bdds,
+                                             options.detect_empty_univ,
+                                             &outvars, true, realizability,
+                                             options.one_step_preprocess, true,
+                                             options.terminating_semantics);
       case state_refine:
-        return trans.ltlf_to_mtdfa(f, options.fuse_same_bdds,
-                                   options.detect_empty_univ,
-                                   &outvars, false, realizability,
-                                   options.one_step_preprocess, true,
-                                   options.terminating_semantics);
+        return trans.ltlf_to_mtdfa_synthesis(f, options.fuse_same_bdds,
+                                             options.detect_empty_univ,
+                                             &outvars, false, realizability,
+                                             options.one_step_preprocess, true,
+                                             options.terminating_semantics);
       }
     SPOT_UNREACHABLE();
     return nullptr;
