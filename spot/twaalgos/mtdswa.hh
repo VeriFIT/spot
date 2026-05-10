@@ -316,7 +316,19 @@ namespace spot
   /// \ingroup mtdswa
   /// \brief Reactive synthesis of syntactic-obligations
   ///
-  /// The formula may use quantified atomic propositions (\forall or \exists).
+  /// The dictionary passed to this function should have variables
+  /// registered in the order needed by the semantics you wish to use.
+  /// For Mealy semantics, input variables should be registered before
+  /// output variables.  For Moore semantics, output variables should
+  /// be registered before input variables.
+  ///
+  /// This function will register any missing variable, so it is
+  /// actually enough to pre-register input variables for Mealy, and
+  /// pre-register output variables for Moore.
+  ///
+  /// The formula may also use quantified atomic propositions (\forall
+  /// or \exists).  The quantified variables should not be
+  /// pre-registered in the dictionary.
   SPOT_API
   mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
                                   const std::vector<std::string>& outvars,

@@ -2140,12 +2140,16 @@ namespace spot
     std::deque<formula> todo;
     terminal_to_state_map.clear();
 
-    // Each entry is (vars, is_existential), with the outermost quantifier
-    // block first.  During translation, we apply them in reverse order
-    // (innermost first) using bdd_mt_quantify, one block at a time.
-    // This avoids any assumption about the relative ordering of BDD
-    // variable indices, which would be required by bdd_mt_quantify2.
-    std::vector<std::pair<bdd, bool>> quantifier_blocks;
+    // Each entry is (existential_vars, universal_vars), with the outermost
+    // quantifier block first.  For a purely existential block, universal_vars
+    // is bddtrue; for a purely universal block, existential_vars is bddtrue.
+    // After building the initial list, consecutive blocks are merged when all
+    // BDD variable levels of the outer block are smaller than those of the
+    // inner block; bdd_mt_quantify2 then handles both quantification types in
+    // a single pass.  Un-merged blocks pass bddtrue for the inactive side,
+    // making bdd_mt_quantify2 behave as a single-type quantification with no
+    // assumption on relative variable ordering.
+    std::vector<std::pair<bdd, bdd>> quantifier_blocks;
     bool is_quantified = false;
 
     // Keep track of atomic propositions used in the automaton.
@@ -2159,9 +2163,9 @@ namespace spot
       dfa->aps.reserve(a->size());
 
       // Peel quantifier blocks from outermost to innermost, building
-      // one (vars, is_existential) entry per block in quantifier_blocks.
-      // Variable registration order within each block follows the order
-      // the variables appear in the formula body.
+      // one (existential_vars, universal_vars) entry per block in
+      // quantifier_blocks.  Variable registration order within each block
+      // follows the order in which the variables appear in the formula body.
       if (f.is_quantified())
         {
           is_quantified = true;
@@ -2186,13 +2190,51 @@ namespace spot
                   block_vars &= bdd_ithvar(dict_->register_proposition(g, dfa));
                 return false;
               });
-              quantifier_blocks.emplace_back(block_vars, is_exists);
+              if (is_exists)
+                quantifier_blocks.emplace_back(block_vars, bddtrue);
+              else
+                quantifier_blocks.emplace_back(bddtrue, block_vars);
               f = f[last];
             }
         }
       // Anything left in a are unquantified APs.
       dfa->aps.insert(dfa->aps.end(), a->begin(), a->end());
       delete a;
+
+      // Merge consecutive quantifier blocks when the BDD variable indices of
+      // the outer block are all strictly smaller than those of the inner block.
+      // Such merged blocks can be handled by bdd_mt_quantify2 in a single pass.
+      if (quantifier_blocks.size() > 1)
+        {
+          // Return the largest BDD level in a set, or -1 if bddtrue.
+          auto max_set_level = [](bdd set) -> int
+          {
+            int v = -1;
+            for (bdd b = set; b != bddtrue; b = bdd_high(b))
+              v = bdd_level(b);
+            return v;
+          };
+
+          size_t i = 0;
+          while (i + 1 < quantifier_blocks.size())
+            {
+              auto& [e0, u0] = quantifier_blocks[i];
+              auto& [e1, u1] = quantifier_blocks[i + 1];
+              int max0 = std::max(max_set_level(e0), max_set_level(u0));
+              // Set BDDs are ordered: the root holds the smallest level.
+              int min1 = std::min(e1 != bddtrue ? bdd_level(e1) : INT_MAX,
+                                  u1 != bddtrue ? bdd_level(u1) : INT_MAX);
+              if (max0 < min1)
+                {
+                  e0 &= e1;
+                  u0 &= u1;
+                  quantifier_blocks.erase(quantifier_blocks.begin() + i + 1);
+                  // Re-check block i against the new block i+1.
+                }
+              else
+                ++i;
+            }
+        }
     }
 
     // We are going to build a Büchi automaton.
@@ -2224,26 +2266,25 @@ namespace spot
 
         bdd b = ltl_to_mtbdd(label);
         if (is_quantified)
-          {
-            // Apply quantifier blocks from innermost to outermost.
-            // Each block uses bdd_mt_quantify with a fresh prepare call,
-            // so no assumption is made about relative BDD variable ordering.
-            for (int qi = (int)quantifier_blocks.size() - 1; qi >= 0; --qi)
-              {
-                auto [vars, is_exists] = quantifier_blocks[qi];
-                bdd_mt_quantify_prepare(vars);
-                if (is_exists)
-                  b = bdd_mt_quantify(b, term_id,
-                                      term_combine_or, &cache_,
-                                      hash_key_quantify,
-                                      hash_key_or, bddop_or);
-                else
-                  b = bdd_mt_quantify(b, term_id,
-                                      term_combine_and, &cache_,
-                                      hash_key_quantify,
-                                      hash_key_and, bddop_and);
-              }
-          }
+          // Apply quantifier blocks from innermost to outermost using
+          // bdd_mt_quantify2.  For un-merged blocks, one of
+          // exists_vars or forall_vars is bddtrue (no-op for that
+          // quantification type).  For merged blocks both are
+          // non-bddtrue; bdd_mt_quantify2 handles both quantification
+          // types in one pass, which is valid because the merge
+          // condition guarantees that all outer-block variable levels
+          // are below those of the inner block.
+          for (int qi = quantifier_blocks.size() - 1; qi >= 0; --qi)
+            {
+              auto [exists_vars, forall_vars] = quantifier_blocks[qi];
+              bdd_mt_quantify_prepare(bddtrue, exists_vars, forall_vars);
+              b = bdd_mt_quantify2(b, term_id,
+                                   term_combine_or, term_combine_and,
+                                   &cache_,
+                                   hash_key_quantify,
+                                   hash_key_or, bddop_or,
+                                   hash_key_and, bddop_and);
+            }
         // propositional equivalence on all terminals.
         b = bdd_mt_apply1_leaves(b, terminal_propeq, &cache_, hash_key_propeq);
 
@@ -2301,9 +2342,13 @@ namespace spot
     dfa->names = std::move(names);
     dfa->colors = std::move(colors);
     dict_->register_all_propositions_of(this, dfa);
-    for (auto& [vars, ignored] : quantifier_blocks)
-      for (bdd b = vars; b != bddtrue; b = bdd_high(b))
-        dict_->unregister_variable(bdd_var(b), dfa);
+    for (auto& [exists_vars, forall_vars] : quantifier_blocks)
+      {
+        for (bdd b = exists_vars; b != bddtrue; b = bdd_high(b))
+          dict_->unregister_variable(bdd_var(b), dfa);
+        for (bdd b = forall_vars; b != bddtrue; b = bdd_high(b))
+          dict_->unregister_variable(bdd_var(b), dfa);
+      }
     return dfa;
   }
 
@@ -2408,6 +2453,7 @@ namespace spot
         {
           is_quantified = true;
           std::vector<unsigned char> inblock;
+          int max_level_of_last_block = -1;
           while (f.is(op::exists, op::forall))
             {
               bool is_exists = f.is(op::exists);
@@ -2418,6 +2464,7 @@ namespace spot
               for (unsigned i = 0; i < last; ++i)
                 inblock[f[i].apid()] = 1;
 
+              int max_level_of_current_block = -1;
               f.traverse([&](const spot::formula& g)
               {
                 if (!g.is(spot::op::ap))
@@ -2426,6 +2473,16 @@ namespace spot
                 if (inblock[id] && a->erase(g))
                   {
                     bdd bi = bdd_ithvar(dict_->register_proposition(g, dfa));
+                    int lvl = bdd_level(bi);
+                    if (lvl > max_level_of_current_block)
+                      max_level_of_current_block = lvl;
+                    if (lvl < max_level_of_last_block)
+                      // The variables in one quantified block should all
+                      // have a level greater than the variables in the previous
+                      // block for bdd_mt_quantify2 to work.
+                      throw std::runtime_error("quantified variable was "
+                                               "already registered with an "
+                                               "incompatible level");
                     if (is_exists)
                       existsvars &= bi;
                     else
@@ -2434,6 +2491,7 @@ namespace spot
                 return false;
               });
               f = f[last];
+              max_level_of_last_block = max_level_of_current_block;
             }
         }
       // Anything left in a are input

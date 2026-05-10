@@ -111,3 +111,22 @@ check_dual(
     "      | (!a & ((!b & Gd) | (b & F!d)))))"
     " | (F!c & ((a & ((!b & Gd) | (b & F!d)))"
     "          | (!a & ((!b & F!d) | (b & Gd)))))")
+
+
+f2 = spot.formula("\\forall a: \\exists b: (Gd & (Fa U c) & (b xor Xa))")
+a2 = spot.obligation_synthesis(f2, ["c"], realizability=True, dict=d)
+
+try:
+    f3 = spot.formula("\\exists b: \\forall a: (Gd & (Fa U c) & (b xor Xa))")
+    a3 = spot.obligation_synthesis(f3, ["c"], realizability=True, dict=d)
+except RuntimeError as e:
+    tc.assertEqual("quantified variable was already registered "
+                   "with an incompatible level",
+                   str(e))
+else:
+    raise RuntimeError("missing exception")
+
+a2b = spot.obligation_to_mtdswa(f2, dict=d)
+a3b = spot.obligation_to_mtdswa(f3, dict=d)
+tc.assertFalse(a2b.as_twa().is_empty())
+tc.assertTrue(a3b.as_twa().is_empty())
