@@ -10,7 +10,7 @@
 The [[https://arxiv.org/abs/2303.03839][Temporal Logic Synthesis Format]] (or TLSF) is used to express
 synthesis problem in [[http://syntcomp.org/][SYNTCOMP]], the Reactive Synthesis competition.
 
-Although the format is based on LTL it has a much more richer syntax,
+Although the format is based on LTL it has a much richer syntax,
 supporting array of variables (called buses) n-ary operators,
 parameters, helper functions, as well as the specification of the
 expected semantics and the partition of input and output variables.

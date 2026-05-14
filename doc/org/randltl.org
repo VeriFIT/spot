@@ -338,7 +338,7 @@ some new PSL-specific operators: =Closure= is the ={sere}= operator,
 require a SERE argument which is generated according to the priorities
 set by =--sere-priorities=: =eword= is the empty word, =boolform= is a
 Boolean formula (generated using the priorities set by
-=--boolean-priorities=), =star= is the unbounded Kleen star, while
+=--boolean-priorities=), =star= is the unbounded Kleene star, while
 =star_b= is the bounded version, and =andNLM= is the
 non-length-matching variant of the =and= operator.
 

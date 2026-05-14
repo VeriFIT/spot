@@ -22,7 +22,7 @@ successful development build]].
 Spot requires a C++20-compliant compiler.  =g++= 10.0 or later, as well
 as =clang++= 10.0 or later should work.
 
-Spot expects a complete installation of Python (version 3.6 or later).
+Spot expects a complete installation of Python (version 3.8 or later).
 Especially, Python's header files should be installed (the package to
 install has a name like =python-dev= or =libpython3-dev= in most
 distributions).  If you don't have Python installed, and do NOT want
@@ -55,7 +55,7 @@ make install
 Before running =make install=, you might want to run =make check= to
 run our test-suite.
 
-Files =INSTALL= and =README= included in the tarball contains more
+Files =INSTALL= and =README= included in the tarball contain more
 explanations about the various options you can use during the
 compilation process.  Also note that =README= has a section about
 troubleshooting installations.

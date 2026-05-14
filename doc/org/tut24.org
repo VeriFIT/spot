@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #+TITLE: Iterating over alternating automata
-#+DESCRIPTION: Code example for iterating of alternating ω-automata in Spot
+#+DESCRIPTION: Code example for iterating over alternating ω-automata in Spot
 #+INCLUDE: setup.org
 #+HTML_LINK_UP: tut.html
 #+PROPERTY: header-args:python :results output :exports both

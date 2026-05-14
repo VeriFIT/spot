@@ -11,7 +11,7 @@ probably also apply to code written using older Spot 1.x versions.
 This page is in no way exhaustive.  The main intent is just to list
 the major changes that have occurred in the library since version
 1.2.6, so that one can more easily update existing code.  The focus is
-based on features that appear to be commonly used, based on our the
+based on features that appear to be commonly used, based on our
 experience of updating a couple of projects that are using Spot.
 
 * Overview of the changes

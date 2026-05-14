@@ -9,7 +9,7 @@
 
 A monitor is a special type of automaton that is supposed to /monitor/
 a running system and move accordingly.  A monitor detects an error
-when it cannot move: i.e., the system as performed some action, or
+when it cannot move: i.e., the system has performed some action, or
 reached some state that is not supposed to happen.
 
 For instance here is a monitor that checks that *yellow* never occurs

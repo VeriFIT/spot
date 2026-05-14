@@ -13,7 +13,7 @@ it is the following reference:
   /Etienne Renault/, /Maximilien Colange/, /Florian Renkin/,
   /Alexandre Gbaguidi Aisse/, /Philipp Schlehuber-Caissier/, /Thomas
   Medioni/, /Antoine Martin/, /Jérôme Dubois/, /Clément Gillard/, and
-  Henrich Lauko/. In Proc. of CAV'22, LNCS 13372, pp. 174--187.
+  /Henrich Lauko/. In Proc. of CAV'22, LNCS 13372, pp. 174--187.
   Haifa, Israel, Aug. 2022.
   ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.22.cav][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.22.cav.pdf][pdf]])
 
@@ -66,7 +66,7 @@ be more specific about a particular aspect of Spot.
 - *Generic Emptiness Check for Fun and Profit*,
   /Christel Baier/, /František Blahoudek/, /Alexandre Duret-Lutz/,
   /Joachim Klein/, /David Müller/, and /Jan Strejček/.
-  In. Proc. of ATVA'19, LNCS 11781, pp. 445--461, Oct 2019.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#baier.19.atva][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/baier.19.atva.pdf][pdf]] |
+  In Proc. of ATVA'19, LNCS 11781, pp. 445--461, Oct 2019.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#baier.19.atva][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/baier.19.atva.pdf][pdf]] |
   [[https://www.lrde.epita.fr/~adl/dl/adl/baier.19.atva.slides.mefosyloma.pdf][slides1]] | [[https://www.lrde.epita.fr/~adl/dl/adl/baier.19.atva.slides.pdf][slides2]])
 
   Presents the generic emptiness-check implemented in Spot.
@@ -74,7 +74,7 @@ be more specific about a particular aspect of Spot.
 - *Practical Applications of the Alternating Cycle Decomposition*,
   /Antonio Casares/, /Alexandre Duret-Lutz/, /Klara J. Meyer/, /Florian Renkin/,
   and /Salomon Sickert/.
-  In. Proc. of TACAS'22, LNCS 13244, pp. 99--117, Apr 2022.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#casares.22.tacas][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/casares.22.tacas.pdf][pdf]] |
+  In Proc. of TACAS'22, LNCS 13244, pp. 99--117, Apr 2022.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#casares.22.tacas][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/casares.22.tacas.pdf][pdf]] |
   [[https://www.lrde.epita.fr/~adl/dl/adl/casares.22.tacas.slides.pdf][slides1]] | [[https://www.lrde.epita.fr/~adl/dl/adl/casares.22.tacas.slides2.pdf][slides2]])
 
   Shows applications of the ACD implemented in Spot.
@@ -84,14 +84,14 @@ be more specific about a particular aspect of Spot.
   and /Adrien Pommellet/.
   In Formal Methods in System Design, 2023.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#renkin.23.scp][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/renkin.23.scp.pdf][pdf]])
 
-  Discuss the implementation of [[file:ltlsynt.org][=ltlsynt=]].
+  Discusses the implementation of [[file:ltlsynt.org][=ltlsynt=]].
 
 - *Simplifying LTL Model Checking Given Prior Knowledge*,
   /Alexandre Duret-Lutz/, /Denis Poitrenaud/, and /Yann Thierry-Mieg/.
   In Proc. of PetriNet'25, LNCS 15714, pp. 433--456, June 2025.
   ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.25.pn][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.25.pn.pdf][pdf]])
 
-  Discuss the use and implementation of =autfilt --given-formula=.
+  Discusses the use and implementation of =autfilt --given-formula=.
 
 - *Engineering an LTLf Synthesis Tool*
   /Alexandre Duret-Lutz/, /Shufang Zhu/, /Nir Piterman/,
@@ -117,7 +117,7 @@ be more specific about a particular aspect of Spot.
 - *Spot: an extensible model checking library using transition-based
   generalized Büchi automata*, /Alexandre Duret-Lutz/ and /Denis
   Poitrenaud/. In Proc. of MASCOTS'04, pp. 76--83.  Volendam, The
-  Netherlands, Oct. 2004. Volendam.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.04.mascots][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.04.mascots.draft.pdf][pdf]])
+  Netherlands, Oct. 2004.  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.04.mascots][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.04.mascots.draft.pdf][pdf]])
 
   For a while, this used to be the only paper presenting Spot as a
   model-checking library.

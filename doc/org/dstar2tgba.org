@@ -39,7 +39,7 @@ prefix format used by =ltl2dstar=.
 ltlfilt -f '(a U b) & GFb' -l | ltl2dstar --ltl2nba=spin:ltl2tgba@-Ds - fagfb
 #+END_SRC
 
-By looking at the file =fagfb= you can see the =ltl2dsar= actually
+By looking at the file =fagfb= you can see the =ltl2dstar= actually
 produced a 4-state DRA:
 
 #+BEGIN_SRC sh

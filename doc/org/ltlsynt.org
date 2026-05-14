@@ -92,7 +92,7 @@ ltlsynt --ins=a -f 'F a'
    :CUSTOM_ID: input-options
    :END:
 
-=ltlsynt= require two pieces of information two solve a reactive
+=ltlsynt= requires two pieces of information to solve a reactive
 LTL/PSL synthesis problem: an LTL (or PSL) formula, and a partition of
 its atomic propositions as input and output.
 

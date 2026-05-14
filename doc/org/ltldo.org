@@ -13,7 +13,7 @@ input]] and passes each formula to a tool (or a list of tools) specified
 using options similar to those of [[file:ltlcross.org][=ltlcross=]].  In case that tool
 returns an automaton, the resulting automaton is read back by =ltldo=
 and is finally output as specified using the [[file:oaut.org][common options for
-outputing automata]].
+outputting automata]].
 
 In effect, =ltldo= wraps the I/O interface of the Spot tools on top of
 any other tool.

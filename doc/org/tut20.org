@@ -7,7 +7,7 @@
 #+PROPERTY: header-args:python :results output :exports both
 #+PROPERTY: header-args:C+++ :results verbatim :exports both
 
-Our goal convert never claim produced by Spin into an automaton in [[file:hoa.org][the
+Our goal is to convert a never claim produced by Spin into an automaton in [[file:hoa.org][the
 HOA format]].  We will use the following never claim as input:
 
 #+BEGIN_SRC sh

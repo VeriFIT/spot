@@ -18,7 +18,7 @@ implement this Kripke structure using an explicit graph instead.)
 
 The states of our toy model will consist of a pair of modulo-3
 integers $(x,y)$; and at any state the possible actions will be to
-increment any one of the two integer (nondeterministicaly).  That
+increment any one of the two integers (nondeterministically).  That
 increment is obviously done modulo 3.  For instance state $(1,2)$ has
 two possible successors:
   - $(2,2)$ if =x= was incremented, or

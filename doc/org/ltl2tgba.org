@@ -16,7 +16,7 @@ a quick summary:
 
 - =--tgba= (the default) outputs Transition-based Generalized Büchi
   Automata,
-= =--buchi= (or =-b=) outputs transition-based Büchi automata,
+- =--buchi= (or =-b=) outputs transition-based Büchi automata,
 - =--sba= (or =-B=) outputs state-based Büchi automata
   (=--ba= is a historical alias for this option)
 - =--monitor= (or =-M=) outputs monitors
@@ -112,7 +112,7 @@ iff it visits each acceptance set infinitely often.  Therefore, in the
 above example, any accepted path will /necessarily/ leave the initial
 state after a finite amount of steps, and then it will verify the
 property =b= infinitely often.  It is also possible that an automaton
-do not use any acceptance set at all, in which any run is accepting.
+does not use any acceptance set at all, in which case any run is accepting.
 
 Here is a TGBA with multiple acceptance sets (we omit the call to
 =dot= to render the output of =ltl2tgba= from now on):

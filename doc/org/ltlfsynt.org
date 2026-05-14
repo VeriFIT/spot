@@ -14,7 +14,7 @@ signals over time.
 =ltlfsynt= solves this problem when the specification is an LTLf
 formula (i.e., LTL interpreted over finite traces).  It can either
 decide realizability (i.e., decide if a controller satisfying the
-formula exist) or synthesize a reactive controller as an And-Inverter
+formula exists) or synthesize a reactive controller as an And-Inverter
 Graph (AIG).
 
 Consider a set $I$ of /input/ atomic propositions, a set $O$ of
@@ -67,7 +67,7 @@ counter, as encoded on the first line.
 
 When the input variable =inc= is set, the counter should be
 incremented by one on the next step.  This is encoded on the next four
-lines, by using to extra output variables to represent carries
+lines, by using two extra output variables to represent carries
 (=oc0= and =oc1=), and ensuring that, if a next step exists, the next
 value of the counter (=X[!]ob0= and =X[!]ob1=) will be set according
 to its current value and to that of the carries.

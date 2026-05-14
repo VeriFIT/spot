@@ -22,7 +22,7 @@ of all outgoing edges, represented by their guard, their acceptance
 sets, and their destination *classes*.  Also, the translation of LTL
 formulas to transition-based generalized Büchi automata is using an
 intermediate representation of states that is similar to the
-aforementioned signatures, excepts that classes are replaced by
+aforementioned signatures, except that classes are replaced by
 subformulas.
 
 From the point of view of the BDD library, BDDs are just DAGs with

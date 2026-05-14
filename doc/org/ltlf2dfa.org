@@ -38,14 +38,14 @@ are "terminals" labeled by destination states.
 A path going down from a blue rectangle to a magenta rectangle
 corresponds to a transition labeled by the Boolean conjunction
 specified by that path.  As usual in BDD diagrams, plain edges
-indicate that the variable above it is true, and edges are doted if
+indicate that the variable above it is true, and edges are dotted if
 the variable is false.  If the terminal is accepting, as indicated
 with a doubled enclosure, the automaton can accept after reading that
 transition.  In any case, the execution can continue from the blue
 state labeled with LTLf formula that was reached.
 
 That structure can be converted to a transition-based DFA where
-accepting transition are marked with a ⓿.  Any finite run is accepted
+accepting transitions are marked with a ⓿.  Any finite run is accepted
 if the last transition it went through is marked with ⓿.  Note that
 empty runs cannot be accepted.
 
