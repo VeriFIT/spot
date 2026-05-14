@@ -18,7 +18,7 @@
 
 
 # Tests different ways to explore a BDD label, as discussed in
-# https://lists.lrde.epita.fr/hyperkitty/list/spot@lrde.epita.fr/\
+# https://lists.lre.epita.fr/hyperkitty/list/spot@lrde.epita.fr/\
 # message/WIAOWDKKPXTTK6UBE3MAHDFWIT36EUMX/
 import spot
 import buddy

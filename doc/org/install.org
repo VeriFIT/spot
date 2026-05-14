@@ -84,7 +84,7 @@ To install the unstable packages, simply replace =stable/= by =unstable/=.
 
 Note that our Debian repository is signed since that is the new Debian
 policy, and both of the above command blocks start with a download of
-our [[https://www.lrde.epita.fr/repo/debian.gpg][GPG key]].  Its fingerprint is =209B 7362 CFD6 FECF B41D 717F 03D9
+our [[https://wwww.lre.epita.fr/repo/debian.gpg][GPG key]].  Its fingerprint is =209B 7362 CFD6 FECF B41D 717F 03D9
 9E74 44F2 A84A=, if you want to verify it (run =gpg --show-keys
 /etc/apt/keyrings/lre-epita.gpg=).  This key should be valid
 until 2032.
@@ -128,14 +128,14 @@ Fedora version at the moment of the release.
 
 Our =stable= repository contains RPM for released versions of Spot, add it with:
 #+BEGIN_SRC sh
-sudo dnf config-manager --add-repo https://www.lrde.epita.fr/repo/fedora/lrde.repo
+sudo dnf config-manager --add-repo https://wwww.lre.epita.fr/repo/fedora/lrde.repo
 #+END_SRC
 
 Our =unstable= repository contains RPM for the development versions of Spot,
 you can opt to use that instead:
 
 #+BEGIN_SRC sh
-sudo dnf config-manager --add-repo https://www.lrde.epita.fr/repo/fedora/lrde.repo
+sudo dnf config-manager --add-repo https://wwww.lre.epita.fr/repo/fedora/lrde.repo
 sudo dnf config-manager --set-enabled lrde-unstable
 sudo dnf config-manager --set-disabled lrde-stable
 #+END_SRC

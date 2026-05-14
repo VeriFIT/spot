@@ -11,7 +11,7 @@ Spot uses BDD for multiple purposes.
 The most common one is for labeling edges of automata: each edge
 stores a BDD representing its guard (i.e., a Boolean function over
 atomic propositions).  Note that the automaton is still represented as
-a graph (with a [[https://spot.lrde.epita.fr/ipynb/twagraph-internals.html][vector of states and a vector of edges]]) and the BDD is
+a graph (with a [[https://spot.lre.epita.fr/ipynb/twagraph-internals.html][vector of states and a vector of edges]]) and the BDD is
 only used for the guard.  This differs from symbolic representations
 where the entire transition structure is represented as one large BDD.
 

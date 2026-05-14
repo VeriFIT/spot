@@ -61,50 +61,50 @@ For convenience, the following links offer static HTML renderings of
 these notebooks, but we strongly suggest interactively evaluating the
 real notebooks instead.
 
-- [[https://spot.lrde.epita.fr/ipynb/formulas.html][=formulas.ipynb=]] covers the basics of LTL/PSL formula parsing and
+- [[https://spot.lre.epita.fr/ipynb/formulas.html][=formulas.ipynb=]] covers the basics of LTL/PSL formula parsing and
   printing, with some light operations
-- [[https://spot.lrde.epita.fr/ipynb/automata.html][=automata.ipynb=]] covers translation from formulas to automata,
+- [[https://spot.lre.epita.fr/ipynb/automata.html][=automata.ipynb=]] covers translation from formulas to automata,
   automata printing, and some lights transformations
-- [[https://spot.lrde.epita.fr/ipynb/automata-io.html][=automata-io.ipynb=]] shows how to save and read automata from files
-- [[https://spot.lrde.epita.fr/ipynb/randaut.html][=randaut.ipynb=]] shows a simple case where the [[file:randaut.org][=randaut=]] commands
+- [[https://spot.lre.epita.fr/ipynb/automata-io.html][=automata-io.ipynb=]] shows how to save and read automata from files
+- [[https://spot.lre.epita.fr/ipynb/randaut.html][=randaut.ipynb=]] shows a simple case where the [[file:randaut.org][=randaut=]] commands
   generated random automata, which are displayed in a table before and
   after acceptance simplification
-- [[https://spot.lrde.epita.fr/ipynb/accparse.html][=accparse.ipynb=]] exercises the acceptance condition parser
-- [[https://spot.lrde.epita.fr/ipynb/acc_cond.html][=acc_cond.ipynb=]] documents the interface for manipulating acceptance
+- [[https://spot.lre.epita.fr/ipynb/accparse.html][=accparse.ipynb=]] exercises the acceptance condition parser
+- [[https://spot.lre.epita.fr/ipynb/acc_cond.html][=acc_cond.ipynb=]] documents the interface for manipulating acceptance
   conditions
-- [[https://spot.lrde.epita.fr/ipynb/backprop.html][=backprop.ipynb=]] solving reachability games by backpropagation
-- [[https://spot.lrde.epita.fr/ipynb/contains.html][=contains.ipynb=]] demonstrates containment checks between formulas or
+- [[https://spot.lre.epita.fr/ipynb/backprop.html][=backprop.ipynb=]] solving reachability games by backpropagation
+- [[https://spot.lre.epita.fr/ipynb/contains.html][=contains.ipynb=]] demonstrates containment checks between formulas or
   automata
-- [[https://spot.lrde.epita.fr/ipynb/split.html][=split.ipynb=]] illustrates various ways to split labels
-- [[https://spot.lrde.epita.fr/ipynb/parity.html][=parity.ipynb=]] documents algorithms for manipulating parity automata
+- [[https://spot.lre.epita.fr/ipynb/split.html][=split.ipynb=]] illustrates various ways to split labels
+- [[https://spot.lre.epita.fr/ipynb/parity.html][=parity.ipynb=]] documents algorithms for manipulating parity automata
   in Python
-- [[https://spot.lrde.epita.fr/ipynb/games.html][=games.ipynb=]] illustrates support for games
-- [[https://spot.lrde.epita.fr/ipynb/synthesis.html][=synthesis.ipynb=]] illustrates support for game-based LTL reactive synthesis
-- [[https://spot.lrde.epita.fr/ipynb/syntunobs.html][=syntunobs.ipynb=]] illustrates support for synthesis with unobservable variables
-- [[https://spot.lrde.epita.fr/ipynb/product.html][=product.ipynb=]] shows how to re-implement the product of two automata
+- [[https://spot.lre.epita.fr/ipynb/games.html][=games.ipynb=]] illustrates support for games
+- [[https://spot.lre.epita.fr/ipynb/synthesis.html][=synthesis.ipynb=]] illustrates support for game-based LTL reactive synthesis
+- [[https://spot.lre.epita.fr/ipynb/syntunobs.html][=syntunobs.ipynb=]] illustrates support for synthesis with unobservable variables
+- [[https://spot.lre.epita.fr/ipynb/product.html][=product.ipynb=]] shows how to re-implement the product of two automata
   in Python
-- [[https://spot.lrde.epita.fr/ipynb/randltl.html][=randltl.ipynb=]] demonstrates a Python-version of [[file:randltl.org][=randltl=]]
-- [[https://spot.lrde.epita.fr/ipynb/gen.html][=gen.ipynb=]] show how to generate families of LTL formulas (as done in [[file:genltl.org][=genltl=]]) or automata ([[file:genaut.org][=genaut=]])
-- [[https://spot.lrde.epita.fr/ipynb/decompose.html][=decompose.ipynb=]] illustrates the =decompose_strength()=, =decompose_acc_scc()= and =decompose_scc()= functions
-- [[https://spot.lrde.epita.fr/ipynb/ltsmin-dve.html][=ltsmin-dve.ipynb=]] loading a DiVinE model using the LTSmin interface.
-- [[https://spot.lrde.epita.fr/ipynb/ltsmin-pml.html][=ltsmin-pml.ipynb=]] loading a Promela model using the LTSmin interface.
-- [[https://spot.lrde.epita.fr/ipynb/word.html][=word.ipynb=]] example for the =twa_run= and =twa_word= classes.
-- [[https://spot.lrde.epita.fr/ipynb/highlighting.html][=highlighting.ipynb=]] shows how to highlight states or edges in
+- [[https://spot.lre.epita.fr/ipynb/randltl.html][=randltl.ipynb=]] demonstrates a Python-version of [[file:randltl.org][=randltl=]]
+- [[https://spot.lre.epita.fr/ipynb/gen.html][=gen.ipynb=]] show how to generate families of LTL formulas (as done in [[file:genltl.org][=genltl=]]) or automata ([[file:genaut.org][=genaut=]])
+- [[https://spot.lre.epita.fr/ipynb/decompose.html][=decompose.ipynb=]] illustrates the =decompose_strength()=, =decompose_acc_scc()= and =decompose_scc()= functions
+- [[https://spot.lre.epita.fr/ipynb/ltsmin-dve.html][=ltsmin-dve.ipynb=]] loading a DiVinE model using the LTSmin interface.
+- [[https://spot.lre.epita.fr/ipynb/ltsmin-pml.html][=ltsmin-pml.ipynb=]] loading a Promela model using the LTSmin interface.
+- [[https://spot.lre.epita.fr/ipynb/word.html][=word.ipynb=]] example for the =twa_run= and =twa_word= classes.
+- [[https://spot.lre.epita.fr/ipynb/highlighting.html][=highlighting.ipynb=]] shows how to highlight states or edges in
   automata.
-- [[https://spot.lrde.epita.fr/ipynb/atva16-fig2a.html][=atva16-fig2a.ipynb=]] first example from our [[https://www.lrde.epita.fr/~adl/dl/adl/duret.16.atva2.pdf][ATVA'16 tool paper]].
-- [[https://spot.lrde.epita.fr/ipynb/atva16-fig2b.html][=atva16-fig2b.ipynb=]] second example from our [[https://www.lrde.epita.fr/~adl/dl/adl/duret.16.atva2.pdf][ATVA'16 tool paper]].
-- [[https://spot.lrde.epita.fr/ipynb/cav22-figs.html][=cav22-figs.ipynb=]] figures from our [[https://www.lrde.epita.fr/~adl/dl/adl/duret.22.cav.pdf][CAV'22 tool paper]].
-- [[https://spot.lrde.epita.fr/ipynb/alternation.html][=alternation.ipynb=]] examples of alternating automata.
-- [[https://spot.lrde.epita.fr/ipynb/stutter-inv.html][=stutter-inv.ipynb=]] working with stutter-invariant formulas properties.
-- [[https://spot.lrde.epita.fr/ipynb/satmin.html][=satmin.ipynb=]] Python interface for [[file:satmin.org][SAT-based minimization of deterministic ω-automata]].
-- [[https://spot.lrde.epita.fr/ipynb/twagraph-internals.html][=twagraph-internals.ipynb=]] Inner workings of the =twa_graph= class.
-- [[https://spot.lrde.epita.fr/ipynb/aliases.html][=aliases.ipynb=]] Support for HOA aliases.
-- [[https://spot.lrde.epita.fr/ipynb/zlktree.html][=zlktree.ipynb=]] demonstration of Zielonka Trees and ACD
-- [[https://spot.lrde.epita.fr/ipynb/given.html][=given.ipynb=]] simplification of automata given some apriori knowledge
-- [[https://spot.lrde.epita.fr/ipynb/ltlf2dfa.html][=ltlf2dfa.ipynb=]] translation between LTLf and MTDFA
-- [[https://spot.lrde.epita.fr/ipynb/mtdtwa.html][=mtdtwa.ipynb=]] MTBDD-based deterministic transition-based ω-automata
+- [[https://spot.lre.epita.fr/ipynb/atva16-fig2a.html][=atva16-fig2a.ipynb=]] first example from our [[https://wwww.lre.epita.fr/~adl/dl/adl/duret.16.atva2.pdf][ATVA'16 tool paper]].
+- [[https://spot.lre.epita.fr/ipynb/atva16-fig2b.html][=atva16-fig2b.ipynb=]] second example from our [[https://wwww.lre.epita.fr/~adl/dl/adl/duret.16.atva2.pdf][ATVA'16 tool paper]].
+- [[https://spot.lre.epita.fr/ipynb/cav22-figs.html][=cav22-figs.ipynb=]] figures from our [[https://wwww.lre.epita.fr/~adl/dl/adl/duret.22.cav.pdf][CAV'22 tool paper]].
+- [[https://spot.lre.epita.fr/ipynb/alternation.html][=alternation.ipynb=]] examples of alternating automata.
+- [[https://spot.lre.epita.fr/ipynb/stutter-inv.html][=stutter-inv.ipynb=]] working with stutter-invariant formulas properties.
+- [[https://spot.lre.epita.fr/ipynb/satmin.html][=satmin.ipynb=]] Python interface for [[file:satmin.org][SAT-based minimization of deterministic ω-automata]].
+- [[https://spot.lre.epita.fr/ipynb/twagraph-internals.html][=twagraph-internals.ipynb=]] Inner workings of the =twa_graph= class.
+- [[https://spot.lre.epita.fr/ipynb/aliases.html][=aliases.ipynb=]] Support for HOA aliases.
+- [[https://spot.lre.epita.fr/ipynb/zlktree.html][=zlktree.ipynb=]] demonstration of Zielonka Trees and ACD
+- [[https://spot.lre.epita.fr/ipynb/given.html][=given.ipynb=]] simplification of automata given some apriori knowledge
+- [[https://spot.lre.epita.fr/ipynb/ltlf2dfa.html][=ltlf2dfa.ipynb=]] translation between LTLf and MTDFA
+- [[https://spot.lre.epita.fr/ipynb/mtdtwa.html][=mtdtwa.ipynb=]] MTBDD-based deterministic transition-based ω-automata
   (not very developed)
-- [[https://spot.lrde.epita.fr/ipynb/mtdswa.html][=mtdswa.ipynb=]] MTBDD-based deterministic transition-based
+- [[https://spot.lre.epita.fr/ipynb/mtdswa.html][=mtdswa.ipynb=]] MTBDD-based deterministic transition-based
   ω-automata, with obligation translation and synthesis support
 
 

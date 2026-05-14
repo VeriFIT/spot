@@ -217,7 +217,7 @@ rm -f random-?.ltl
 * Deciding class membership syntactically
 
 LTL formulas can also be classified into related classes which we
-shall call /syntactic-safety/, /syntactic-guarantee/, etc.  See [[https://spot.lrde.epita.fr/tl.pdf][tl.pdf]]
+shall call /syntactic-safety/, /syntactic-guarantee/, etc.  See [[https://spot.lre.epita.fr/tl.pdf][tl.pdf]]
 for the grammar of each syntactic class.  Any LTL-definable property
 of class C can be defined by an LTL formulas in class syntactic-C, but
 an LTL formula can describe a property of class C even if that formula

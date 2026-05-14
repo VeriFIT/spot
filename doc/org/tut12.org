@@ -226,7 +226,7 @@ perform some LTLf model checking, you should stop at step 3.  Keep the
 Kripke structure representing your system.
 
 Alternatively, if your Kripke structure is already equipped with some
-=dead= property (as introduced by default in our [[https://spot.lrde.epita.fr/ipynb/ltsmin-dve.html][=ltsmin= interface]]),
+=dead= property (as introduced by default in our [[https://spot.lre.epita.fr/ipynb/ltsmin-dve.html][=ltsmin= interface]]),
 you could replace =alive= by =!dead= by using ~ltlfilt
 --from-ltl="!dead"~ (from the command-line), a running
 =from_ltlf(f, "!dead")= in Python or C++.

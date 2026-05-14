@@ -392,7 +392,7 @@ combination of these two algorithms is implemented by the
 
 Finally, a TGBA can easily be converted into a BA with classical
 degeneralization algorithms (our version of that includes several
-SCC-based optimizations described in our [[https://www.lrde.epita.fr/~adl/dl/adl/babiak.13.spin.pdf][SPIN'13 paper]]).
+SCC-based optimizations described in our [[https://wwww.lre.epita.fr/~adl/dl/adl/babiak.13.spin.pdf][SPIN'13 paper]]).
 
 This generalized case is specialized for two types of acceptances that
 are common (Rabin and Streett).

@@ -919,7 +919,7 @@ some people prefer to write =<>= and =[]= instead of =F= and =G=, =R=
 is written =V= in some tools, etc.
 
 For more discussion about the temporal operators and their semantics,
-see the [[https://spot.lrde.epita.fr/tl.pdf][tl.pdf]] document.
+see the [[https://spot.lre.epita.fr/tl.pdf][tl.pdf]] document.
 
 * Property Specification Language (PSL)
    :PROPERTIES:
@@ -966,7 +966,7 @@ example of formula that can be expressed in PSL but not in LTL.
 
 A few other operators and syntactic sugar are supported.  For more
 discussion about the temporal operators and their semantics, see the
-[[https://spot.lrde.epita.fr/tl.pdf][tl.pdf]] document.
+[[https://spot.lre.epita.fr/tl.pdf][tl.pdf]] document.
 
 * Translation of temporal logic to automata
    :PROPERTIES:
@@ -1032,9 +1032,9 @@ layers.
   - While the online services described pictured in green are not
     distributed with the rest of Spot, their source-code is publicly
     available (in case you want to contribute or run a local version).
-    The [[https://spot-sandbox.lrde.epita.fr/][=spot-sandbox=]] website runs from a Docker container whose
+    The [[https://spot-sandbox.lre.epita.fr/][=spot-sandbox=]] website runs from a Docker container whose
     configuration can be found in [[https://gitlab.lre.epita.fr/spot/sandbox/tree/master][this repository]].  The client and
-    server parts of the [[https://spot.lrde.epita.fr/app/][online LTL translator]] can be found in [[https://gitlab.lre.epita.fr/spot/spot-web-app/][this
+    server parts of the [[https://spot.lre.epita.fr/app/][online LTL translator]] can be found in [[https://gitlab.lre.epita.fr/spot/spot-web-app/][this
     repository]].
 
 * Automaton property flags
@@ -1067,7 +1067,7 @@ automaton, and that can be queried or set by algorithms:
 | =universal=          | there is at most one run *recognizing* each word, but not necessarily accepting it           |
 | =semi_deterministic= | any nondeterminism occurs before entering an accepting SCC                                   |
 | =unambiguous=        | there is at most one run *accepting* each word (but it might be recognized several times)    |
-| =stutter_invariant=  | the property recognized by the automaton is [[https://www.lrde.epita.fr/~adl/dl/adl/michaud.15.spin.pdf][stutter-invariant]]                                |
+| =stutter_invariant=  | the property recognized by the automaton is [[https://wwww.lre.epita.fr/~adl/dl/adl/michaud.15.spin.pdf][stutter-invariant]]                                |
 
 For each flag =flagname=, the =twa= class has a method
 =prop_flagname()= that returns the value of the flag as an instance of

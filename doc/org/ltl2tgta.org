@@ -9,7 +9,7 @@
 forms of Testing Automata, i.e., automata that observe the /changes/
 of atomic propositions, not their values.
 
-For more details, read [[https://www.lrde.epita.fr/~adl/dl/adl/bensalem.12.topnoc.pdf][*Model checking using generalized testing
+For more details, read [[https://wwww.lre.epita.fr/~adl/dl/adl/bensalem.12.topnoc.pdf][*Model checking using generalized testing
 automata*]], /Ala Eddine Ben Salem/, /Alexandre Duret-Lutz/, and
 /Fabrice Kordon/, in Transactions on Petri Nets and Other Models of
 Concurrency (ToPNoC VI), LNCS 7400, p. 94--112, 2012.

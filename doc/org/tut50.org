@@ -22,7 +22,7 @@ from the initial state of an automaton.
 
 The explicit interface can only be used on =twa_graph= objects.  In
 this interface, states and edges are referred to by numbers that are
-indices into state and edge vectors (the [[https://spot.lrde.epita.fr/ipynb/satmin.html][=twagraph-internals.ipynb=]]
+indices into state and edge vectors (the [[https://spot.lre.epita.fr/ipynb/satmin.html][=twagraph-internals.ipynb=]]
 notebook shows these vectors graphically).  This interface is
 lightweight, and is the preferred interface for writing most automata
 algorithms in Spot.

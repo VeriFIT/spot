@@ -91,7 +91,7 @@ simplifications called /trivial identities/.  For instance
 as =formula::tt()=.  These simplifications are those that involve the
 true and false constants, impotence (=F(F(e))=F(e)=), involutions
 (=Not(Not(e))=e=), associativity
-(=And(And(e1,e2),e3)=And({e1,e2,e3})=).  See [[https://spot.lrde.epita.fr/tl.pdf][tl.pdf]] for a list of
+(=And(And(e1,e2),e3)=And({e1,e2,e3})=).  See [[https://spot.lre.epita.fr/tl.pdf][tl.pdf]] for a list of
 these /trivial identities/.
 
 In addition, the arguments of commutative operators
