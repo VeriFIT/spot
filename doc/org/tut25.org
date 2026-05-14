@@ -7,9 +7,9 @@
 #+PROPERTY: header-args:python :results output :exports both
 #+PROPERTY: header-args:C+++ :results verbatim
 
-The [[https://languageinclusion.org/doku.php?id=tools#the_ba_format][BA format]] is a textual representation of a Büchi automaton with
-letter-based alphabet, and supported by tools like [[https://github.com/Mazzocchi/FORKLIFT][FORKLIFT]], [[https://languageinclusion.org/doku.php?id=tools][RABIT]],
-[[http://goal.im.ntu.edu.tw/wiki/doku.php][Goal,]] or [[https://iscasmc.ios.ac.cn/roll/doku.php?id=start][ROLL]].  It looks as follows:
+The [[https://web.archive.org/web/20260118201237/https://languageinclusion.org/doku.php?id=tools#the_ba_format][BA format]] is a textual representation of a Büchi automaton with
+letter-based alphabet, and supported by tools like [[https://github.com/Mazzocchi/FORKLIFT][FORKLIFT]], [[https://web.archive.org/web/20260118201237/https://languageinclusion.org/doku.php?id=tools][RABIT]],
+[[https://web.archive.org/web/20260130062354/https://goal.im.ntu.edu.tw/wiki/doku.php?id=start][Goal,]] or [[https://tis.ios.ac.cn/tool/roll/][ROLL]].  It looks as follows:
 
 #+BEGIN_SRC dot :file tut25-aut.svg :exports results
 digraph "" {

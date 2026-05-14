@@ -428,7 +428,8 @@ namespace spot
       }
 
       // Based on LTLcounter.pl from Kristin Rozier.
-      // http://shemesh.larc.nasa.gov/people/kyr/benchmarking_scripts/
+      // https://web.archive.org/web/20220122030236/https://ti.arc.nasa.gov/m/
+      // profile/kyrozier/benchmarking_scripts/benchmarking_scripts.html
       static formula
       ltl_counter(std::string bit, std::string marker, int n, bool linear)
       {
