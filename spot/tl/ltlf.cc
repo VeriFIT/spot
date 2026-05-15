@@ -17,6 +17,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
+#include <cstdlib>
 #include <spot/tl/ltlf.hh>
 #include <spot/priv/robin_hood.hh>
 #include <iostream>
@@ -25,9 +26,18 @@ namespace spot
 {
   namespace
   {
-    formula from_ltlf_aux(formula f, formula alive)
+    // Original De Giacomo & Vardi (IJCAI'13) auxiliary translation.
+    // Note that the t() function given in the proof of Theorem 1 of
+    // the IJCAI'13 paper by De Giacomo & Vardi has a typo.
+    //  t(a U b) should be equal to t(a) U t(b & alive).
+    // This typo is fixed in the Memocode'14 paper by Dutta & Vardi.
+    //
+    // (However beware that the translation given in the
+    // Memocode'14 paper forgets to ensure that alive holds
+    // initially, as required in the IJCAI'13 paper.)
+    formula from_ltlf_dv_aux(formula f, formula alive)
     {
-      auto t = [&alive] (formula f) { return from_ltlf_aux(f, alive); };
+      auto t = [&alive] (formula f) { return from_ltlf_dv_aux(f, alive); };
       switch (auto o = f.kind())
         {
         case op::strong_X:
@@ -40,14 +50,6 @@ namespace spot
           {
             formula dead = formula::Not(alive);
             return formula::unop(o, formula::Or(dead, t(f[0])));
-            // Note that the t() function given in the proof of Theorem 1 of
-            // the IJCAI'13 paper by De Giacomo & Vardi has a typo.
-            //  t(a U b) should be equal to t(a) U t(b & alive).
-            // This typo is fixed in the Memocode'14 paper by Dutta & Vardi.
-            //
-            // (However beware that the translation given in the
-            // Memocode'14 paper forgets to ensure that alive holds
-            // initially, as required in the IJCAI'13 paper.)
           }
         case op::U:
           {
@@ -75,17 +77,249 @@ namespace spot
           return f.map(t);
         }
     }
+
+    // Forward declarations for the three mutually recursive helpers
+    // that implement the syntactic-obligation translation.
+    static formula t_G(formula f, formula alv, formula nalv);
+    static formula t_S(formula f, formula alv, formula nalv);
+    static formula t_O(formula f, formula alv, formula nalv);
+
+    // t_G(f): phi_G translation — used in "alive &" contexts
+    // (F argument, right of U, left of M).
+    static formula t_G(formula f, formula alv, formula nalv)
+    {
+      switch (f.kind())
+        {
+        case op::strong_X:
+          return formula::X(formula::And(alv, t_G(f[0], alv, nalv)));
+        case op::X:
+          return formula::X(formula::Or(nalv, t_G(f[0], alv, nalv)));
+        case op::F:
+          return formula::F(formula::And(alv, t_G(f[0], alv, nalv)));
+        case op::G:
+          // G f ≡ f U !alive under the alive prefix.
+          return formula::U(t_G(f[0], alv, nalv), nalv);
+        case op::U:
+          {
+            formula left = t_G(f[0], alv, nalv);
+            return formula::U(left, formula::And(alv, t_G(f[1], alv, nalv)));
+          }
+        case op::R:
+          {
+            // f R g = g W (f & g), so
+            // t_G(f R g) = t_G(g) U (!alive | (t_G(f) & t_G(g))).
+            formula ag0 = t_G(f[0], alv, nalv);
+            formula ag1 = t_G(f[1], alv, nalv);
+            return formula::U(ag1,
+                              formula::Or(nalv,
+                                         formula::And(ag0, ag1)));
+          }
+        case op::W:
+          // f W g = (f U g) | G f, so
+          // t_G(f W g) = t_G(f) U (!alive | t_G(g)).
+          {
+            formula left = t_G(f[0], alv, nalv);
+            return formula::U(left, formula::Or(nalv, t_G(f[1], alv, nalv)));
+          }
+        case op::M:
+          {
+            formula left = formula::And(alv, t_G(f[0], alv, nalv));
+            return formula::M(left, t_G(f[1], alv, nalv));
+          }
+        case op::Not:
+          return formula::Not(t_S(f[0], alv, nalv));
+        case op::Implies:
+          {
+            formula left = t_S(f[0], alv, nalv);
+            return formula::Implies(left, t_G(f[1], alv, nalv));
+          }
+        case op::Xor:
+          // phi_G is not closed under xor (only phi_B is), so we expand:
+          //   t_G(f xor g) = (t_G(f) & !t_S(g)) | (!t_S(f) & t_G(g))
+          {
+            formula ag0 = t_G(f[0], alv, nalv);
+            formula ag1 = t_G(f[1], alv, nalv);
+            formula ns0 = t_S(f[0], alv, nalv);
+            formula ns1 = t_S(f[1], alv, nalv);
+            formula not_ns0 = formula::Not(ns0);
+            formula not_ns1 = formula::Not(ns1);
+            formula left = formula::And(ag0, not_ns1);
+            formula right = formula::And(not_ns0, ag1);
+            return formula::Or(left, right);
+          }
+        case op::Equiv:
+          // phi_G is not closed under <->, so we expand:
+          //   t_G(f <-> g) = (t_G(f) & t_G(g)) | (!t_S(f) & !t_S(g))
+          {
+            formula ag0 = t_G(f[0], alv, nalv);
+            formula ag1 = t_G(f[1], alv, nalv);
+            formula ns0 = t_S(f[0], alv, nalv);
+            formula ns1 = t_S(f[1], alv, nalv);
+            formula not_ns0 = formula::Not(ns0);
+            formula not_ns1 = formula::Not(ns1);
+            formula left = formula::And(ag0, ag1);
+            formula right = formula::And(not_ns0, not_ns1);
+            return formula::Or(left, right);
+          }
+        default:
+          // And, Or, atoms (ap, tt, ff): map homomorphically (phi_G is
+          // closed under & and |).
+          return f.map([&alv, &nalv](formula g)
+                       { return t_G(g, alv, nalv); });
+        }
+    }
+
+    // t_S(f): phi_S translation — used in "!alive |" contexts
+    // (G argument, right of R, left of W).
+    static formula t_S(formula f, formula alv, formula nalv)
+    {
+      switch (f.kind())
+        {
+        case op::strong_X:
+          return formula::X(formula::And(alv, t_S(f[0], alv, nalv)));
+        case op::X:
+          return formula::X(formula::Or(nalv, t_S(f[0], alv, nalv)));
+        case op::G:
+          return formula::G(formula::Or(nalv, t_S(f[0], alv, nalv)));
+        case op::F:
+          // F(alive & phi) ≡ phi R alive under the alive prefix.
+          return formula::R(t_S(f[0], alv, nalv), alv);
+        case op::R:
+          {
+            formula left = t_S(f[0], alv, nalv);
+            return formula::R(left, formula::Or(nalv, t_S(f[1], alv, nalv)));
+          }
+        case op::W:
+          {
+            formula left = formula::Or(nalv, t_S(f[0], alv, nalv));
+            return formula::W(left, t_S(f[1], alv, nalv));
+          }
+        case op::U:
+          {
+            // t_S(f U g) = t_S(g) R (alive & (t_S(f) | t_S(g))).
+            formula ns0 = t_S(f[0], alv, nalv);
+            formula ns1 = t_S(f[1], alv, nalv);
+            return formula::R(ns1,
+                              formula::And(alv,
+                                          formula::Or(ns0, ns1)));
+          }
+        case op::M:
+          {
+            // t_S(f M g) = t_S(f) R (alive & t_S(g)).
+            formula left = t_S(f[0], alv, nalv);
+            return formula::R(left, formula::And(alv, t_S(f[1], alv, nalv)));
+          }
+        case op::Not:
+          return formula::Not(t_G(f[0], alv, nalv));
+        case op::Implies:
+          {
+            formula left = t_G(f[0], alv, nalv);
+            return formula::Implies(left, t_S(f[1], alv, nalv));
+          }
+        case op::Xor:
+          // phi_S is not closed under xor (only phi_B is), so we expand:
+          //   t_S(f xor g) = (t_S(f) & !t_G(g)) | (!t_G(f) & t_S(g))
+          {
+            formula ag0 = t_G(f[0], alv, nalv);
+            formula ag1 = t_G(f[1], alv, nalv);
+            formula ns0 = t_S(f[0], alv, nalv);
+            formula ns1 = t_S(f[1], alv, nalv);
+            formula not_ag0 = formula::Not(ag0);
+            formula not_ag1 = formula::Not(ag1);
+            formula left = formula::And(ns0, not_ag1);
+            formula right = formula::And(not_ag0, ns1);
+            return formula::Or(left, right);
+          }
+        case op::Equiv:
+          // phi_S is not closed under <->, so we expand:
+          //   t_S(f <-> g) = (t_S(f) & t_S(g)) | (!t_G(f) & !t_G(g))
+          {
+            formula ag0 = t_G(f[0], alv, nalv);
+            formula ag1 = t_G(f[1], alv, nalv);
+            formula ns0 = t_S(f[0], alv, nalv);
+            formula ns1 = t_S(f[1], alv, nalv);
+            formula not_ag0 = formula::Not(ag0);
+            formula not_ag1 = formula::Not(ag1);
+            formula left = formula::And(ns0, ns1);
+            formula right = formula::And(not_ag0, not_ag1);
+            return formula::Or(left, right);
+          }
+        default:
+          // And, Or, atoms (ap, tt, ff): map homomorphically (phi_S is
+          // closed under & and |).
+          return f.map([&alv, &nalv](formula g)
+                       { return t_S(g, alv, nalv); });
+        }
+    }
+
+    // t_O(f): phi_O translation — the main syntactic-obligation translation.
+    static formula t_O(formula f, formula alv, formula nalv)
+    {
+      switch (f.kind())
+        {
+        case op::strong_X:
+          return formula::X(formula::And(alv, t_O(f[0], alv, nalv)));
+        case op::X:
+          return formula::X(formula::Or(nalv, t_O(f[0], alv, nalv)));
+        case op::F:
+          return formula::F(formula::And(alv, t_G(f[0], alv, nalv)));
+        case op::G:
+          return formula::G(formula::Or(nalv, t_S(f[0], alv, nalv)));
+        case op::U:
+          {
+            formula left = t_O(f[0], alv, nalv);
+            return formula::U(left, formula::And(alv, t_G(f[1], alv, nalv)));
+          }
+        case op::R:
+          {
+            formula left = t_O(f[0], alv, nalv);
+            return formula::R(left, formula::Or(nalv, t_S(f[1], alv, nalv)));
+          }
+        case op::W:
+          {
+            formula left = formula::Or(nalv, t_S(f[0], alv, nalv));
+            return formula::W(left, t_O(f[1], alv, nalv));
+          }
+        case op::M:
+          {
+            formula left = formula::And(alv, t_G(f[0], alv, nalv));
+            return formula::M(left, t_O(f[1], alv, nalv));
+          }
+        default:
+          // Not, And, Or, Implies, Xor, Equiv, atoms: map homomorphically.
+          return f.map([&alv, &nalv](formula g)
+                       { return t_O(g, alv, nalv); });
+        }
+    }
+  }
+
+  formula from_ltlf(formula f, const char* alive_name, int algo)
+  {
+    if (!f.is_ltl_formula())
+      throw std::runtime_error("from_ltlf() only supports LTL formulas");
+    auto alv = ((*alive_name == '!')
+                ? formula::Not(formula::ap(alive_name + 1))
+                : formula::ap(alive_name));
+    auto nalv = formula::Not(alv);
+    if (algo == 0)
+      return formula::And({from_ltlf_dv_aux(f, alv), alv,
+                           formula::U(alv, formula::G(nalv))});
+    // Syntactic-obligation wrapper:
+    // alive & F(!alive) & (alive W G(!alive)) & t_O(f).
+    return formula::And({t_O(f, alv, nalv), alv,
+                         formula::F(nalv),
+                         formula::W(alv, formula::G(nalv))});
   }
 
   formula from_ltlf(formula f, const char* alive)
   {
-    if (!f.is_ltl_formula())
-      throw std::runtime_error("from_ltlf() only supports LTL formulas");
-    auto al = ((*alive == '!')
-               ? formula::Not(formula::ap(alive + 1))
-               : formula::ap(alive));
-    return formula::And({from_ltlf_aux(f, al), al,
-                         formula::U(al, formula::G(formula::Not(al)))});
+    // Read SPOT_FROM_LTLF exactly once and cache the result.
+    static int algo = []()
+      {
+        const char* e = getenv("SPOT_FROM_LTLF");
+        return (e && e[0] == '0') ? 0 : 1;
+      }();
+    return from_ltlf(f, alive, algo);
   }
 
 

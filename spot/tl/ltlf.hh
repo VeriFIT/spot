@@ -25,27 +25,37 @@ namespace spot
   /// \ingroup tl_rewriting
   /// \brief Convert an LTLf into an LTL formula.
   ///
-  /// This is based on De Giacomo & Vardi (IJCAI'13) reduction from
-  /// LTLf (finite-LTL) to LTL. \cite degiacomo.13.ijcai
+  /// \param f      an LTLf formula
+  /// \param alive  name of the "alive" proposition (default: "alive").
+  ///               If the name starts with '!', e.g., <code>!dead</code>,
+  ///               the atomic proposition is built from the rest of the
+  ///               string and its negation is used in the transformation.
+  ///               Using <code>!dead</code> rather than <code>alive</code>
+  ///               makes more sense if the state-space introduces a
+  ///               <code>dead</code> property on states representing the
+  ///               end of finite computations.
+  /// \param algo   translation algorithm to use:
+  ///               <b>1</b> (default) — syntactic-obligation translation
+  ///               that guarantees the result is a phi_O formula;
+  ///               <b>0</b> — original De Giacomo & Vardi (IJCAI'13)
+  ///               translation \cite degiacomo.13.ijcai.
   ///
-  /// In this reduction, finite words are extended into infinite words
-  /// in which a new atomic proposition <code>alive</code> marks the
-  /// prefix of the infinite word that corresponds to the original
-  /// finite word.  The formula is rewritten to ensure that the
-  /// eventualities occur during the "alive" portion.  For instance
-  /// <code>a U b</code> becomes
-  /// <code>alive&(a U (b & alive))&(alive U G!alive)</code>.
+  /// The 1- and 2-argument overloads read the environment variable
+  /// <code>SPOT_FROM_LTLF</code> (values: <b>0</b> = original,
+  /// <b>1</b> = syntactic-obligation) exactly once and cache the result.
+  /// The default when the variable is unset is <b>1</b>.
   ///
-  /// The \a alive argument can be used to change the name of the
-  /// atomic property used to introduce.  Additionally if \a alive is
-  /// a string starting with an exclamation mark, e.g.,
-  /// <code>!dead</code> then the atomic property will be built from
-  /// the rest of the string, and its negation will be used in the
-  /// transformation.  Using <code>!dead</code> rather than
-  /// <code>alive</code> makes more sense if the state-space
-  /// introduces a <code>dead</code> property on states representing
-  /// the end of finite computations.
-  SPOT_API formula from_ltlf(formula f, const char* alive = "alive");
+  /// Note that the description of the translation in \cite
+  /// degiacomo.13.ijcai has a typo in the definition of $t(a U b)$.
+  /// This typo is fixed in \cite dutta.14.memocode but that second
+  /// paper forgets to ensure that $alive$ holds initially.
+  ///
+  /// @{
+  SPOT_API formula
+  from_ltlf(formula f, const char* alive, int algo);
+  SPOT_API formula
+  from_ltlf(formula f, const char* alive = "alive");
+  /// @}
 
   /// \ingroup tl_rewriting
   /// \brief Cheap simplification rules for LTLf formulas.

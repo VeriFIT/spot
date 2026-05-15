@@ -121,6 +121,23 @@ the automaton with property "univ-branch" when no universal branching
 is actually used)
 
 .TP
+\fBSPOT_FROM_LTLF\fR
+Controls the LTLf\-to\-LTL translation used by \fBltlfilt\fR \-\-from\-ltlf,
+\fBltl2tgba\fR \-\-ltlf, and the C++/Python \fBfrom_ltlf()\fR function
+(when called without an explicit algorithm argument).
+Accepted values:
+.RS
+.TP
+\fB1\fR (default)
+Use the syntactic\-obligation translation, which guarantees that the
+result is a syntactic\-obligation formula.
+.TP
+\fB0\fR
+Use the original De\ Giacomo\ &\ Vardi translation, which does not
+produce a syntactic obligation.
+.RE
+
+.TP
 \fBSPOT_O_CHECK\fR
 Specifies the default algorithm that should be used
 by the \fCis_obligation()\fR function.  The value should

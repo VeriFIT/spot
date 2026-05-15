@@ -42,8 +42,8 @@ for f in formulas:
     f2 = f1.unabbreviate()
     f3 = spot.formula_And(spot.from_ltlf(f1), cst)
     f4 = spot.formula_And(spot.from_ltlf(f2), cst)
-    print(f"{f1}\t=>\t{f3}")
-    print(f"{f2}\t=>\t{f4}")
+    # print(f"{f1}\t=>\t{f3}")
+    # print(f"{f2}\t=>\t{f4}")
     tc.assertTrue(lcc.equal(f3, f4))
     print()
 
@@ -86,8 +86,57 @@ for i, j in [('!X!X!a', 'X[!]X!a'),
     f1 = spot.formula(i)
     f2 = spot.formula(j)
     f3 = ls.simplify(f1)
-    print(f1, "  =>  ", f3)
+    # print(f1, "  =>  ", f3)
     tc.assertEqual(f2, f3)
     a = spot.ltlf_to_mtdfa(f1)
     b = spot.ltlf_to_mtdfa(f2)
     tc.assertTrue(spot.product_xor(a, b).is_empty())
+
+# Test the new syntactic-obligation translation (algo=1) and semantic
+# equivalence with the original De Giacomo & Vardi translation (algo=0).
+lcc2 = spot.language_containment_checker()
+
+formulas_o = [
+    'G(a)', 'F(a)', 'a U b', 'a R b', 'a W b', 'a M b',
+    'G(F(a))', 'F(G(a))',
+    'G(a U b)', 'G(a R b)', 'G(a W b)', 'G(a M b)',
+    'F(a U b)', 'F(a R b)', 'F(a W b)', 'F(a M b)',
+    'F(a) U b', 'G(a) U b', 'F(a) R b', 'G(a) R b',
+    'F(a) W b', 'G(a) W b', 'F(a) M b', 'G(a) M b',
+    'a U F(b)', 'a U G(b)', 'a R F(b)', 'a R G(b)',
+    'a W F(b)', 'a W G(b)', 'a M F(b)', 'a M G(b)',
+    '(a U b) U c', '(a U b) R c', '(a U b) W c', '(a U b) M c',
+    '(a R b) U c', '(a R b) R c', '(a R b) W c', '(a R b) M c',
+    '(a W b) U c', '(a W b) R c', '(a W b) W c', '(a W b) M c',
+    '(a M b) U c', '(a M b) R c', '(a M b) W c', '(a M b) M c',
+    'a U (b U c)', 'a U (b R c)', 'a U (b W c)', 'a U (b M c)',
+    'a R (b U c)', 'a R (b R c)', 'a R (b W c)', 'a R (b M c)',
+    'a W (b U c)', 'a W (b R c)', 'a W (b W c)', 'a W (b M c)',
+    'a M (b U c)', 'a M (b R c)', 'a M (b W c)', 'a M (b M c)',
+    'G(F(G(a)))', 'F(G(F(a)))', 'G(F(G(F(a))))',
+    'G(a U G(b))', 'F(a R F(b))', 'G(a W G(b))', 'F(a M F(b))',
+    '(G(a) U b) W c', 'a M (G(b) R c)',
+    'G(a) & F(b)', 'F(a) | G(b)',
+    '(a U b) & G(c)', '(a R b) | F(c)',
+    'G(a & F(b))', 'F(a | G(b))',
+]
+
+for s in formulas_o:
+    f = spot.formula(s)
+    old = spot.from_ltlf(f, 'alive', 0)   # De Giacomo & Vardi translation
+    new = spot.from_ltlf(f, 'alive', 1)   # syntactic-obligation translation
+    tc.assertTrue(lcc2.equal(old, new),
+                  f"Semantic mismatch for {s!r}: old={old}, new={new}")
+    tc.assertTrue(new.is_syntactic_obligation(),
+                  f"Not syntactic obligation for {s!r}: {new}")
+
+gen = spot.randltl(['a', 'b', 'c'], seed=42, tree_size=(15, 20))
+for i, f in enumerate(gen):
+    if i >= 100:
+        break
+    old = spot.from_ltlf(f, 'alive', 0)
+    new = spot.from_ltlf(f, 'alive', 1)
+    tc.assertTrue(lcc2.equal(old, new),
+                  f"Semantic mismatch for {f!r}: old={old}, new={new}")
+    tc.assertTrue(new.is_syntactic_obligation(),
+                  f"Not syntactic obligation for {f!r}: {new}")

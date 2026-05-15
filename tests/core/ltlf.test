@@ -20,6 +20,10 @@
 . ./defs
 set -e
 
+# The existing test blocks below verify the original De Giacomo & Vardi
+# translation.  Force algo=0 so they are unaffected by the new default.
+export SPOT_FROM_LTLF=0
+
 # ltlfilt --from-ltlf is also tested in ltlfilt.test
 ltlfilt --from-ltlf=A -f 'a & Xa' -f 'a & X[!]a' \
         -f '(a U b) & (F(c) | F(d & X(0)))' >out
@@ -300,3 +304,122 @@ State: 4 {0}
 --END--
 EOF
 diff out exp
+
+# ---------- Tests for the new syntactic-obligation translation (algo=1) ------
+export SPOT_FROM_LTLF=1
+
+# All nesting combinations of F, G, U, R, W, M — one formula per line so
+# wc -l gives the exact count for the obligation check below.
+cat > formulas_o.ltl << 'EOF'
+G(a)
+F(a)
+a U b
+a R b
+a W b
+a M b
+G(F(a))
+F(G(a))
+G(a U b)
+G(a R b)
+G(a W b)
+G(a M b)
+F(a U b)
+F(a R b)
+F(a W b)
+F(a M b)
+F(a) U b
+G(a) U b
+F(a) R b
+G(a) R b
+F(a) W b
+G(a) W b
+F(a) M b
+G(a) M b
+a U F(b)
+a U G(b)
+a R F(b)
+a R G(b)
+a W F(b)
+a W G(b)
+a M F(b)
+a M G(b)
+(a U b) U c
+(a U b) R c
+(a U b) W c
+(a U b) M c
+(a R b) U c
+(a R b) R c
+(a R b) W c
+(a R b) M c
+(a W b) U c
+(a W b) R c
+(a W b) W c
+(a W b) M c
+(a M b) U c
+(a M b) R c
+(a M b) W c
+(a M b) M c
+a U (b U c)
+a U (b R c)
+a U (b W c)
+a U (b M c)
+a R (b U c)
+a R (b R c)
+a R (b W c)
+a R (b M c)
+a W (b U c)
+a W (b R c)
+a W (b W c)
+a W (b M c)
+a M (b U c)
+a M (b R c)
+a M (b W c)
+a M (b M c)
+G(F(G(a)))
+F(G(F(a)))
+G(F(G(F(a))))
+G(a U G(b))
+F(a R F(b))
+G(a W G(b))
+F(a M F(b))
+(G(a) U b) W c
+a M (G(b) R c)
+G(a) & F(b)
+F(a) | G(b)
+(a U b) & G(c)
+(a R b) | F(c)
+G(a & F(b))
+F(a | G(b))
+EOF
+
+# Verify that every from_ltlf(algo=1) result is a syntactic obligation.
+total=$(wc -l < formulas_o.ltl)
+ltlfilt --from-ltlf -F formulas_o.ltl |
+    ltlfilt --syntactic-obligation -c > oblig_count
+count=$(cat oblig_count)
+test "$total" = "$count" || {
+  echo "Not all from_ltlf(algo=1) results are obligations."
+  echo "Expected $total, got $count"
+  ltlfilt --from-ltlf -F formulas_o.ltl >&2
+  exit 1
+}
+
+# Semantic equivalence: algo=0 and algo=1 produce language-equivalent formulae.
+# Each tool translates the LTLf formula to an LTL automaton; ltlcross
+# cross-checks that both automata accept the same language.
+# --no-complement is required because the LTLf-to-LTL encoding is NOT a
+# proper LTL encoding: words like cycle{!alive} (which start already dead)
+# are rejected by *both* the positive and the negative translations,
+# violating ltlcross's normal assumption that they are complementary.
+# With --no-complement, ltlcross only checks P0≡P1 and N0≡N1, skipping the
+# Comp(Pi)∩Comp(Ni)=∅ sanity check that does not apply here.
+ltlcross --no-complement \
+  'SPOT_FROM_LTLF=0 ltlfilt --from-ltlf -f %f | ltl2tgba >%O' \
+  'SPOT_FROM_LTLF=1 ltlfilt --from-ltlf -f %f | ltl2tgba >%O' \
+  -F formulas_o.ltl
+
+# Random formulas: use randltl to cover additional operator combinations.
+randltl --seed=42 --tree-size=5..10 -n 100 a b c | \
+  ltlcross --no-complement \
+    'SPOT_FROM_LTLF=0 ltlfilt --from-ltlf -f %f | ltl2tgba >%O' \
+    'SPOT_FROM_LTLF=1 ltlfilt --from-ltlf -f %f | ltl2tgba >%O'

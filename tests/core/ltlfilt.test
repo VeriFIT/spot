@@ -325,6 +325,8 @@ F(GFa | Gb)
 F(b W GFa)
 EOF
 
+SPOT_FROM_LTLF=0
+export SPOT_FROM_LTLF
 checkopt --ltl --from-ltlf=al <<\EOF
 al & (G(!al | F(a & al)) | F(al & G(!al | b))) & (al U G!al)
 al & F(al & (G(!al | F(a & al)) | G(!al | b))) & (al U G!al)
@@ -353,6 +355,23 @@ checkopt --ltl --from-ltlf='!dead' <<\EOF
 a & !dead & (b | c) & (!dead U Gdead)
 0
 !dead & ((a & b) U (!dead & !X!dead)) & (!dead U Gdead)
+EOF
+
+SPOT_FROM_LTLF=1
+export SPOT_FROM_LTLF
+checkopt --ltl --from-ltlf=al <<\EOF
+al & (G(!al | (a R al)) | F(al & (b U !al))) & F!al & (al W G!al)
+al & F(al & ((F(a & al) U !al) | (b U !al))) & F!al & (al W G!al)
+al & F(al & (b U (!al | (F(a & al) U !al)))) & F!al & (al W G!al)
+al & (G(!al | (a R al)) | G(!al | b)) & F!al & (al W G!al)
+al & ((!al | b) W G(!al | (a R al))) & F!al & (al W G!al)
+al & (a U (al & F(al & b))) & F!al & (al W G!al)
+al & G(!al | (a & X(!al | b))) & F!al & (al W G!al)
+al & X(a | !al) & F!al & (al W G!al)
+al & F(a & al & !X(a | !al) & X(!al | b)) & F!al & (al W G!al)
+a & al & (b | c) & F!al & (al W G!al)
+0
+al & ((a & b) U (al & !Xal)) & F!al & (al W G!al)
 EOF
 
 cat >in <<\EOF
