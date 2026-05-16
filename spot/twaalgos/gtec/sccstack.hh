@@ -24,11 +24,13 @@
 
 namespace spot
 {
-  // A stack of Strongly-Connected Components, as needed by the
-  // Tarjan-Couvreur algorithm.
+  /// \brief Stack of strongly connected components for the Tarjan-Couvreur
+  /// emptiness-check algorithm.
   class SPOT_API scc_stack
   {
   public:
+    /// \brief A strongly connected component with its index, accumulated
+    /// acceptance marks, and remaining states.
     struct connected_component
     {
     public:

@@ -32,6 +32,7 @@
 
 namespace spot
 {
+  /// \brief Swarmed variant of the CNDFS parallel emptiness-check algorithm.
   template<typename State, typename SuccIterator,
            typename StateHash, typename StateEqual>
   class SPOT_API swarmed_cndfs

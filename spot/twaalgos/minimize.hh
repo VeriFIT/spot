@@ -84,6 +84,12 @@ namespace spot
   /// \param aut_neg_f an automaton representing the negation of \a aut_f
   /// \param reject_bigger Whether the minimal WDBA should be discarded if
   /// it has more states than the input.
+  /// \param aborter When given, aborts the determinization whenever the
+  /// automaton would become larger than specified; in that case, \a aut_f
+  /// is returned unchanged.
+  /// \param assume_correct When set, the resulting WDBA is not checked
+  /// for correctness, which can be used if the input is known to be an
+  /// obligation property.
   /// \return a new tgba if the automaton could be minimized, \a aut_f if
   /// the automaton cannot be minimized, 0 if we do not know if the
   /// minimization is correct because neither \a f nor \a aut_neg_f

@@ -104,8 +104,8 @@ namespace spot
     void (*fn_decompress_)(const int*, size_t, int*, size_t);
   };
 
-  // \brief This structure is used as a parameter during callback when
-  // generating states from the shared library produced by LTSmin.
+  /// \brief Parameters passed to callbacks when generating successor
+  /// states from the shared library produced by LTSmin.
   struct inner_callback_parameters
   {
     cspins_state_manager* manager;   // The state manager
@@ -124,7 +124,8 @@ namespace spot
   class cspins_iterator final
   {
   public:
-    // Inner struct used to pack the various arguments required by the iterator
+    /// \brief Arguments bundle passed to construct or recycle a
+    /// cspins_iterator.
     struct cspins_iterator_param
     {
       cspins_state s;
@@ -172,7 +173,8 @@ namespace spot
   };
 
 
-  // A specialization of the template class kripke that is thread safe.
+  /// \brief Thread-safe specialization of kripkecube for SpinS states and
+  /// iterators.
   template<>
   class kripkecube<cspins_state, cspins_iterator> final
   {

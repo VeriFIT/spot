@@ -97,6 +97,7 @@ namespace spot
 
     /// \brief Create multiple new states with the same data.
     /// \param n Number of states to create
+    /// \param args Arguments forwarded to each state's data constructor
     /// \return The index of the first newly created state
     template <typename... Args>
     unsigned new_states(unsigned n, Args&&... args)

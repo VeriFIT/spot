@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \brief Helper for stripping or fixing atomic propositions in automata.
   class SPOT_API remove_ap
   {
     std::set<formula> props_exist;

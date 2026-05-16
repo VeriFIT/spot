@@ -33,6 +33,7 @@ namespace spot
   }
 #endif
 
+  /// \brief A fixed-size bitset backed by N unsigned words.
   template<size_t N>
   class SPOT_API bitset
   {
@@ -388,6 +389,7 @@ namespace spot
 
 namespace std
 {
+  /// \brief Hash specialization for spot::bitset<N>.
   template<size_t N>
   struct hash<spot::bitset<N>>
   {

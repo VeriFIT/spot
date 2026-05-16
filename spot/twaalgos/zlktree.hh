@@ -210,6 +210,8 @@ namespace spot
     /// \brief Render the tree as in GraphViz format.
     void dot(std::ostream&) const;
 
+    /// \brief A node in the Zielonka tree, storing parent, sibling, child
+    /// links, level, and color set.
     struct zielonka_node
     {
       unsigned parent;

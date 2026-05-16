@@ -26,6 +26,8 @@
 
 namespace spot
 {
+  /// \brief Abstract base class for objects that can be printed to a stream via
+  /// a format string.
   class printable
   {
   public:
@@ -38,6 +40,7 @@ namespace spot
   };
 
 
+  /// \brief A printable wrapper around a value of type T.
   template <class T>
   class printable_value: public printable
   {
@@ -108,6 +111,8 @@ namespace spot
   };
 
 
+  /// \brief A string formatter that dispatches %-escape sequences to printable
+  /// objects.
   class SPOT_API formater
   {
     printable_id id;

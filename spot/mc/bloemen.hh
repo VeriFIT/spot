@@ -35,6 +35,7 @@
 
 namespace spot
 {
+  /// \brief Iterable Union-Find structure for parallel reachability algorithms.
   template<typename State,
            typename StateHash,
            typename StateEqual>

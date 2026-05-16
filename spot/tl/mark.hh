@@ -23,6 +23,8 @@
 
 namespace spot
 {
+  /// \brief Utilities for marking NegClosure and EConcat operators in temporal
+  /// formulas.
   class SPOT_API mark_tools final
   {
   public:

@@ -43,10 +43,12 @@ namespace spot
   /// `aut->get_named_prop<std::vector<unsigned>>("original-states")`
   /// to retrieve it.
   ///
-  /// If \a drop_univ_branches branch is set, universal branching is replaced
-  /// by existential branching during the copy.
-  ///
+  /// \param old The source automaton to clone.
+  /// \param cpy An empty automaton that will receive the cloned edges.
+  /// \param trans A function/functor to transform each edge during copy.
   /// \param init The optional new initial state.
+  /// \param drop_univ_branches When set, universal branching is replaced
+  /// by existential branching during the copy.
   template<typename Trans>
   void transform_accessible(const const_twa_graph_ptr& old,
                             twa_graph_ptr& cpy,
@@ -137,6 +139,9 @@ namespace spot
   /// It can modify either the condition or the acceptance sets of
   /// the edges.  Set the condition to bddfalse to remove it.  Note that
   /// all transitions will be processed.
+  /// \param old The source automaton to copy.
+  /// \param cpy Destination automaton (states are created with same ids).
+  /// \param trans A function/functor to transform each edge during copy.
   /// \param init The optional new initial state.
   template<typename Trans>
   void transform_copy(const const_twa_graph_ptr& old,

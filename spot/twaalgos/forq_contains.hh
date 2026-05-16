@@ -30,7 +30,7 @@ namespace spot
   /// \cite doveri.22.cav to check whether L(left)⊆L(right), in which
   /// case, it returns nullptr.  Otherwise, it returns a
   /// counterexample, i.e., a word that is accepted by
-  /// $L(left)\setminus L(right)$, hence the name of the function.
+  /// \f$L(left)\setminus L(right)\f$, hence the name of the function.
   ///
   /// \pre Automata \a left and \a right should be non-alternating
   /// Büchi-automata.

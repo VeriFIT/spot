@@ -48,7 +48,8 @@ namespace spot
   /// This version returns a vector such that RESULTS[I] is the rank
   /// of state I in the computed order.
   ///
-  /// \param tie specify how to break ties.
+  /// \param a The automaton to process.
+  /// \param tie Specify how to break ties.
   SPOT_API std::vector<unsigned>
   maximum_cardinality_search(const const_twa_graph_ptr& a,
                              mcs_tie_break tie = MCS_TIE_ANY);

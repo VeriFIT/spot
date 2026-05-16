@@ -356,8 +356,8 @@ namespace spot
   /// actually enough to pre-register input variables for Mealy, and
   /// pre-register output variables for Moore.
   ///
-  /// The formula may also use quantified atomic propositions (\forall
-  /// or \exists).  The quantified variables should not be
+  /// The formula may also use quantified atomic propositions
+  /// (\f$\forall\f$ or \f$\exists\f$).  The quantified variables should not be
   /// pre-registered in the dictionary.
   ///
   /// If \a backprop is set to `bfs_node_backprop`, or

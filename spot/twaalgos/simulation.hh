@@ -67,10 +67,24 @@ namespace spot
   SPOT_API twa_graph_ptr
   simulation(const const_twa_graph_ptr& automaton,
              int trans_pruning = -1);
+  /// \brief Attempt to reduce the automaton by direct simulation.
+  ///
+  /// Like simulation(), but also returns the computed implications vector.
+  /// \param automaton the automaton to simulate.
+  /// \param implications output parameter for simulation implications.
+  /// \param trans_pruning threshold for transition pruning (see simulation()).
+  /// \return a new automaton which is at worst a copy of the received one.
   SPOT_API twa_graph_ptr
   simulation(const const_twa_graph_ptr& automaton,
              std::vector<bdd>* implications,
              int trans_pruning = -1);
+  /// \brief Attempt to reduce a state-based acceptance automaton by direct
+  /// simulation.
+  ///
+  /// Like simulation(), but preserves state-based acceptance.
+  /// \param automaton the automaton to simulate.
+  /// \param trans_pruning threshold for transition pruning (see simulation()).
+  /// \return a new automaton which is at worst a copy of the received one.
   SPOT_API twa_graph_ptr
   simulation_sba(const const_twa_graph_ptr& automaton,
                  int trans_pruning = -1);
@@ -136,6 +150,14 @@ namespace spot
   /// loop.
   ///
   /// \param automaton the automaton to simulate.
+  ///
+  /// \param trans_pruning Transition pruning requires a quadratic
+  /// number of BDD implication checks between all equivalence
+  /// classes, so it can be costly on large automata.  If \a
+  /// trans_pruning is set to a non-negative integer, only
+  /// (non-deterministic) automata with more states than trans_pruning
+  /// will be simplified.
+  ///
   /// \return a new automaton which is at worst a copy of the received
   /// one
   SPOT_API twa_graph_ptr

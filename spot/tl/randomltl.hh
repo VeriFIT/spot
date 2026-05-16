@@ -112,6 +112,8 @@ namespace spot
   protected:
     void update_sums();
 
+    /// \brief Entry describing one operator and its probability for random
+    /// formula generation.
     struct op_proba
     {
       const char* name;
@@ -352,6 +354,8 @@ namespace spot
     random_sere rs;
   };
 
+  /// \brief Generator of random LTL/PSL/SERE/Boolean formulas with configurable
+  /// options.
   class SPOT_API randltlgenerator
   {
     typedef std::unordered_set<formula> fset_t;

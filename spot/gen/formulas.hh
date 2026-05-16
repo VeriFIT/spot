@@ -107,7 +107,7 @@ namespace spot
       /// Describes an obligation property, but is not a syntactic obligation.
       LTL_KV_PSI,
       /// LTL synthesis examples specification from the Lily 1.0.2
-      /// distribution.  \cite jobstmann.06.fmcad
+      /// distribution.  \cite jobsmann.06.fmcad
       LTL_LILY_PATTERNS,
       /// `GF(a1&X(a2&X(a3&...Xan)))&F(b1&F(b2&F(b3&...&Xbm)))`
       /// \cite muller.17.gandalf

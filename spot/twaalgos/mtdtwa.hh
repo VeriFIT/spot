@@ -27,6 +27,7 @@ namespace spot
   typedef std::pair<acc_cond::mark_t, unsigned> terminal_data_t;
   typedef std::vector<terminal_data_t> terminal_data_map_t;
 
+  /// \brief A multi-terminal decision diagram representation of a TωA.
   struct SPOT_API mtdtwa: public std::enable_shared_from_this<mtdtwa>
   {
   public:

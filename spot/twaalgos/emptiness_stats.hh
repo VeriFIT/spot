@@ -28,6 +28,8 @@ namespace spot
   /// \addtogroup emptiness_check_stats
   /// @{
 
+  /// \brief Interface for retrieving unsigned integer statistics from an
+  /// emptiness check.
   struct unsigned_statistics
   {
     virtual

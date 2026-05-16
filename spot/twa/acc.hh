@@ -2294,6 +2294,8 @@ namespace spot
 
   };
 
+  /// \brief A view over Rabin-Streett pairs restricted to a subset of
+  /// acceptance marks.
   struct rs_pairs_view {
     typedef std::vector<acc_cond::rs_pair> rs_pairs;
 
@@ -2473,6 +2475,8 @@ namespace spot
 
 namespace std
 {
+  /// \brief Hash specialization for spot::acc_cond::mark_t acceptance mark
+  /// sets.
   template<>
   struct hash<spot::acc_cond::mark_t>
   {

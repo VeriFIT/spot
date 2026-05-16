@@ -25,6 +25,8 @@
 
 namespace spot
 {
+  /// \brief Options controlling which simplification passes the tl_simplifier
+  /// applies.
   class tl_simplifier_options
   {
   public:

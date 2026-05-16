@@ -142,6 +142,7 @@ namespace spot
     }
 
   protected:
+    /// \brief DFS stack element pairing a state with its successor iterator.
     struct todo__element
     {
       State s;

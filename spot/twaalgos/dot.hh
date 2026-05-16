@@ -28,9 +28,8 @@ namespace spot
   /// \ingroup twa_io
   /// \brief Print reachable states in dot format.
   ///
-  /// If \a assume_sba is set, this assumes that the automaton
-  /// is an SBA and use double ellipse to mark accepting states.
-  ///
+  /// \param os output stream
+  /// \param g automaton to print
   /// \param options an optional string of letters, each indicating a
   /// different option.  Presently the following options are
   /// supported: 'v' for vertical output, 'h' for horizontal output,

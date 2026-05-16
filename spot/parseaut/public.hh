@@ -43,6 +43,7 @@ namespace spot
   struct parse_aut_error_list {};
 #endif
 
+  /// \brief Format type of a parsed automaton.
   enum class parsed_aut_type {
     HOA,
     NeverClaim,
@@ -92,9 +93,12 @@ namespace spot
     bool format_errors(std::ostream& os);
   };
 
+  /// Shared pointer to parsed_aut.
   typedef std::shared_ptr<parsed_aut> parsed_aut_ptr;
+  /// Shared pointer to const parsed_aut.
   typedef std::shared_ptr<const parsed_aut> const_parsed_aut_ptr;
 
+  /// \brief Options controlling the behavior of the automaton stream parser.
   struct automaton_parser_options final
   {
     bool ignore_abort = false;  ///< Skip aborted automata

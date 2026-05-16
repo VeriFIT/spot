@@ -26,6 +26,8 @@
 namespace spot
 {
 
+  /// \brief Maps each powerset-construction state to the set of original states
+  /// it represents.
   struct SPOT_API power_map
   {
     typedef std::set<unsigned> power_state;

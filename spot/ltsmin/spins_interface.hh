@@ -23,9 +23,8 @@
 
 namespace spot
 {
-  ////////////////////////////////////////////////////////////////////////
-  // spins interface
-
+  /// \brief Transition information passed to callbacks during state-space
+  /// exploration.
   typedef struct transition_info
   {
     int* labels; // edge labels, NULL, or pointer to the edge label(s)

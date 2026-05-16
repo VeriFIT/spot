@@ -36,6 +36,8 @@
 
 namespace spot
 {
+  /// \brief Iterable Union-Find structure for parallel emptiness-check
+  /// algorithms.
   template<typename State,
            typename StateHash,
            typename StateEqual>

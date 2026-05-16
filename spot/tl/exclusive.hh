@@ -24,6 +24,8 @@
 
 namespace spot
 {
+  /// \brief A set of atomic proposition groups that are mutually exclusive
+  /// within each group.
   class SPOT_API exclusive_ap final
   {
     std::vector<std::vector<formula>> groups;

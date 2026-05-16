@@ -457,6 +457,7 @@ namespace spot
     block_t local_storage_;
   };
 
+  /// \brief An array of fixed-size bit vectors allocated contiguously.
   class SPOT_API bitvect_array
   {
   private:

@@ -24,6 +24,9 @@
 
 namespace spot
 {
+  /// \defgroup mtdswa MTDSwA (MTBDD-based ω-automata)
+  /// \brief Algorithms and data structures for MTBDD-based ω-automata.
+
   /// \ingroup mtdswa
   /// \brief MTBDD-based representation of a state-based ω-automaton.
   struct SPOT_API mtdswa: public std::enable_shared_from_this<mtdswa>
@@ -307,7 +310,8 @@ namespace spot
   /// \ingroup mtdswa
   /// \brief Convert a syntactic-obligation to an MTDSwA
   ///
-  /// The formula may use quantified atomic propositions (\forall or \exists).
+  /// The formula may use quantified atomic propositions
+  /// (\f$\forall\f$ or \f$\exists\f$).
   SPOT_API
   mtdswa_ptr obligation_to_mtdswa(formula f, const bdd_dict_ptr& dict,
                                   bool fuse_same_bdds = true,
@@ -326,8 +330,8 @@ namespace spot
   /// actually enough to pre-register input variables for Mealy, and
   /// pre-register output variables for Moore.
   ///
-  /// The formula may also use quantified atomic propositions (\forall
-  /// or \exists).  The quantified variables should not be
+  /// The formula may also use quantified atomic propositions
+  /// (\f$\forall\f$ or \f$\exists\f$).  The quantified variables should not be
   /// pre-registered in the dictionary.
   SPOT_API
   mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,

@@ -29,6 +29,7 @@ namespace spot
   /// \addtogroup twa_misc
   /// @{
 
+  /// \brief Basic statistics (states and edges counts) for a TωA.
   struct SPOT_API twa_statistics
   {
     unsigned edges;
@@ -38,6 +39,7 @@ namespace spot
     std::ostream& dump(std::ostream& out) const;
   };
 
+  /// \brief Extended statistics including transition counts for a TωA.
   struct SPOT_API twa_sub_statistics: public twa_statistics
   {
     unsigned long long transitions;
@@ -55,6 +57,7 @@ namespace spot
   SPOT_API unsigned long long
   count_all_transitions(const const_twa_graph_ptr& g);
 
+  /// \brief A printable wrapper for a formula, for use in format strings.
   class SPOT_API printable_formula: public printable_value<formula>
   {
   public:
@@ -69,6 +72,8 @@ namespace spot
     print(std::ostream& os, const char*) const override;
   };
 
+  /// \brief A printable wrapper for an acceptance condition, for use in format
+  /// strings.
   class SPOT_API printable_acc_cond final: public spot::printable
   {
     acc_cond val_;
@@ -83,6 +88,8 @@ namespace spot
     void print(std::ostream& os, const char* pos) const override;
   };
 
+  /// \brief A printable wrapper for SCC information of an automaton, for use in
+  /// format strings.
   class SPOT_API printable_scc_info final:
     public spot::printable
   {
@@ -101,6 +108,8 @@ namespace spot
     void print(std::ostream& os, const char* pos) const override;
   };
 
+  /// \brief A printable wrapper reporting reachable and total state/edge
+  /// counts.
   class SPOT_API printable_size final:
     public spot::printable
   {
@@ -116,6 +125,8 @@ namespace spot
     void print(std::ostream& os, const char* pos) const override;
   };
 
+  /// \brief A printable wrapper reporting reachable and total transition counts
+  /// as long long.
   class SPOT_API printable_long_size final:
     public spot::printable
   {

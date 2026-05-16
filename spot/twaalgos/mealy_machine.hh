@@ -131,21 +131,33 @@ namespace spot
   ///
   /// \note If mm is separated, the returned machine is separated as
   /// well.
-  /// @{
   SPOT_API twa_graph_ptr
   reduce_mealy(const const_twa_graph_ptr& mm,
                bool output_assignment = true);
 
+  /// \ingroup mealy
+  /// \brief Reduce an (in)completely specified mealy machine in place
+  ///
+  /// This is a bisimulation based reduction, that optionally uses
+  /// inclusion between signatures to force some output when there is
+  /// a choice in order to favor more reductions.  Only infinite
+  /// traces are considered.  See \cite renkin.22.forte for details.
+  ///
+  /// \param mm The mealy machine to be minimized in place, has to be unsplit.
+  /// \param output_assignment Whether or not to use output assignment
+  ///
+  /// \note If mm is separated, the resulting machine is separated as
+  /// well.
   SPOT_API void
   reduce_mealy_here(twa_graph_ptr& mm,
                     bool output_assignment = true);
-  /// @}
 
   /// \ingroup mealy
   /// \brief Minimizes an (in)completely specified mealy machine
   ///
   /// The approach is described in \cite renkin.22.forte.
   ///
+  /// \param mm The mealy machine to be minimized.
   /// \param premin Whether to use reduce_mealy as a preprocessing:
   ///   - -1: Do not use;
   ///   - 0: Use without output assignment;
@@ -163,6 +175,7 @@ namespace spot
   ///
   /// The approach is described in \cite renkin.22.forte.
   ///
+  /// \param mm The mealy machine to be minimized.
   /// \param si synthesis_info structure used to store data for benchmarking
   /// and indicates which premin level to use
   ///

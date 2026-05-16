@@ -62,7 +62,8 @@ namespace spot
   class SPOT_API enumerate_cycles
   {
   protected:
-    // Extra information required for the algorithm for each state.
+    /// \brief Per-state information maintained by the cycle enumeration
+    /// algorithm.
     struct state_info
     {
       state_info(unsigned num)
@@ -92,11 +93,12 @@ namespace spot
     // The SCC map built for aut_.
     const scc_info& sm_;
 
-    // The DFS stack.  Each entry contains a state, an iterator on the
-    // transitions leaving that state, and a Boolean f indicating
-    // whether this state as already contributed to a cycle (f is
-    // updated when backtracking, so it should not be used by
-    // cycle_found()).
+    /// \brief DFS stack entry for the cycle enumeration algorithm.
+    ///
+    /// Each entry contains a state, an iterator on the transitions leaving
+    /// that state, and a Boolean f indicating whether this state as already
+    /// contributed to a cycle (f is updated when backtracking, so it should
+    /// not be used by cycle_found()).
     struct dfs_entry
     {
       unsigned s;

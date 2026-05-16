@@ -137,6 +137,7 @@
 
 namespace spot
 {
+  /// \brief Exception thrown when a parse error is encountered.
   struct SPOT_API parse_error: public std::runtime_error
   {
     parse_error(const std::string& s)

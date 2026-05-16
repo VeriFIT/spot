@@ -294,6 +294,7 @@ namespace spot
     /// Multiple translation options are available whose main
     /// goal is to minimize the necessary number of gates.
     ///
+    /// \param c_alt Alternative BDD representations of the same condition.
     /// \param method How to translate the bdd. 0: If-then-else normal form,
     ///               1: isop normal form, 2: try both and retain smaller
     /// \param use_dual Encode the negations of the given bdds and
@@ -427,6 +428,7 @@ namespace spot
   /// \ingroup synthesis
   /// \brief Convert a mealy (like) machine into an aig relying on
   /// the transformation described by \a mode.
+  /// \param m The mealy machine to convert.
   /// \param mode This param has to be of the form
   ///             `ite|isop|both [+dc][+ud][+sub0|+sub1|+sub2]`
   ///             Where `ite` means encoded via if-then-else normal form,
@@ -441,24 +443,31 @@ namespace spot
   ///             blocks with `sub0` being no separation, `sub1` separation into
   ///             input/latches/gates (`isop` only) and `sub2` tries to seek
   ///             common subformulas.
-  ///
-  /// If \a ins and \a outs are specified, the named-property
-  /// synthesis-output is ignored and all properties in \a ins and \a
-  /// outs are guaranteed to appear in the aiger circuit.
-  ///
-  /// If \a rs is given and is not empty, it can be used to specify how
-  /// unused output should be encoded by mapping them to some constant.
+  /// Uses the named-property synthesis-output to determine input/output APs.
   ///@{
   SPOT_API aig_ptr
   mealy_machine_to_aig(const const_twa_graph_ptr& m, const char* mode);
+  SPOT_API aig_ptr
+  mealy_machine_to_aig(const mealy_like& m, const char* mode);
+  ///@}
+
+  /// \ingroup synthesis
+  /// \brief Convert a mealy (like) machine into an aig relying on
+  /// the transformation described by \a mode, with explicit AP lists.
+  /// \param m The mealy machine to convert.
+  /// \param mode Encoding mode; see the 2-argument overload for details.
+  /// \param ins Input atomic propositions; overrides the named-property
+  ///            synthesis-output.  All propositions in \a ins and \a outs
+  ///            are guaranteed to appear in the aiger circuit.
+  /// \param outs Output atomic propositions; see \a ins.
+  /// \param rs When given and non-empty, specifies how unused outputs should
+  ///           be encoded by mapping them to some constant.
+  ///@{
   SPOT_API aig_ptr
   mealy_machine_to_aig(const twa_graph_ptr& m, const char *mode,
                        const std::vector<std::string>& ins,
                        const std::vector<std::string>& outs,
                        const realizability_simplifier* rs = nullptr);
-
-  SPOT_API aig_ptr
-  mealy_machine_to_aig(const mealy_like& m, const char* mode);
   SPOT_API aig_ptr
   mealy_machine_to_aig(mealy_like& m, const char *mode,
                        const std::vector<std::string>& ins,

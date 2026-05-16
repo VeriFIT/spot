@@ -99,6 +99,8 @@ namespace spot
   /// input, and produces TGBAs as output.  (Generalized Büchi
   /// acceptance is only used in presence of size-1 rejecting-SCCs.)
   ///
+  /// \param aut input weak alternating automaton
+  ///
   /// \param named_states name each state for easier debugging
   ///
   /// \param aborter Return nullptr if the built automaton would
@@ -114,7 +116,8 @@ namespace spot
                                    bool raise_if_too_many_sets = true);
 
 
-  // Remove universal edges on the fly.
+  /// \brief State used during on-the-fly removal of universal edges from an
+  /// alternating automaton.
   class SPOT_API univ_remover_state: public state
   {
   protected:
@@ -134,6 +137,8 @@ namespace spot
     bool is_reset() const;
   };
 
+  /// \brief On-the-fly TωA that removes universal edges from an alternating
+  /// automaton.
   class SPOT_API twa_univ_remover: public twa
   {
 

@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \brief A graph wrapper associating named states to graph state indices.
   template <typename Graph,
             typename State_Name,
             typename Name_Hash = std::hash<State_Name>,

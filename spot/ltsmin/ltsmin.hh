@@ -33,6 +33,8 @@
 
 namespace spot
 {
+  /// \brief A loaded LTSmin model that can generate Kripke structures
+  /// on-the-fly.
   class SPOT_API ltsmin_model final
   {
   public:

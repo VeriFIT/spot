@@ -39,7 +39,8 @@ namespace spot
   int hoayystring(const char* data, void** scanner);
   void hoayyclose(void* scanner);
 
-  // This exception is thrown by the lexer when it reads "--ABORT--".
+  /// \brief Exception thrown by the HOA lexer upon reading an "--ABORT--"
+  /// marker.
   struct hoa_abort
   {
     spot::location pos;

@@ -96,6 +96,8 @@ namespace spot
     bool delete_me_;
   };
 
+  /// \brief Successor iterator for alternating automata with tree-and-automata
+  /// (TAA) transitions.
   class SPOT_API taa_succ_iterator final: public twa_succ_iterator
   {
   public:
@@ -294,6 +296,7 @@ namespace spot
     }
   };
 
+  /// \brief A TAA-TGBA automaton where states are labelled with strings.
   class SPOT_API taa_tgba_string final:
 #ifndef SWIG
     public taa_tgba_labelled<std::string>
@@ -319,6 +322,7 @@ namespace spot
     return SPOT_make_shared_enabled__(taa_tgba_string, dict);
   }
 
+  /// \brief A TAA-TGBA automaton where states are labelled with formulas.
   class SPOT_API taa_tgba_formula final:
 #ifndef SWIG
     public taa_tgba_labelled<formula>

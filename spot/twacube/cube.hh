@@ -64,6 +64,8 @@ namespace spot
   /// using the cubeset class
   using cube = unsigned*;
 
+  /// \brief Manager for allocating and manipulating cubes (bit-encoded partial
+  /// assignments over APs).
   class SPOT_API cubeset final
   {
     // \brief The total number of variables stored

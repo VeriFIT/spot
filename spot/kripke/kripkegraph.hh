@@ -90,6 +90,7 @@ namespace spot
     bdd cond_;
   };
 
+  /// \brief Successor iterator for a graph-based Kripke structure state.
   template<class Graph>
   class SPOT_API kripke_graph_succ_iterator final: public kripke_succ_iterator
   {

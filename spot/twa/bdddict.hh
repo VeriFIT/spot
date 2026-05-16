@@ -73,6 +73,8 @@ namespace spot
     typedef std::set<const void*> ref_set;
 
     enum var_type { anon = 0, var, acc };
+    /// \brief Information stored for one BDD variable: its type and the set of
+    /// objects referencing it.
     struct bdd_info {
       bdd_info() noexcept: type(anon) {}
       var_type type;
@@ -287,6 +289,8 @@ namespace spot
     return std::make_shared<bdd_dict>();
   }
 
+  /// \brief A BDD dictionary wrapper that pre-registers atomic propositions
+  /// before use.
   class bdd_dict_preorder
   {
   public:

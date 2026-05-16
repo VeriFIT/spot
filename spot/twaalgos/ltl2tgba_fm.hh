@@ -78,6 +78,9 @@ namespace spot
   /// language recognized by each state, and use that to name each
   /// state.
   ///
+  /// \param force_obligation when true, force the result to satisfy
+  /// the obligation property, as if the formula is already an obligation.
+  ///
   /// \return A spot::twa_graph that recognizes the language of \a f.
   SPOT_API twa_graph_ptr
   ltl_to_tgba_fm(formula f, const bdd_dict_ptr& dict,

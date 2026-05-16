@@ -155,6 +155,8 @@ namespace spot
     const_twa_ptr aut_;                ///< The spot::tgba to explore.
 
     state_map<int> seen;        ///< States already seen.
+    /// \brief DFS stack entry holding a state, its DFS number, and its active
+    /// successor iterator.
     struct stack_item
     {
       const state* src;

@@ -177,6 +177,8 @@ namespace spot
     virtual emptiness_check_result_ptr check() override;
 
   protected:
+    /// \brief A successor state with its associated acceptance marks, used in
+    /// the shy Couvreur check.
     struct successor {
       acc_cond::mark_t acc;
       const spot::state* s;
@@ -201,6 +203,8 @@ namespace spot
     // Position in the loop seeking known successors.
     succ_queue::iterator pos;
 
+    /// \brief DFS stack item holding a state and its queue of unprocessed
+    /// successors.
     struct todo_item
     {
       const state* s;

@@ -69,6 +69,7 @@ namespace spot
   };
 
 
+  /// \brief Hash functor for std::pair combining hashes of both elements.
   struct pair_hash
   {
     template<typename T, typename U>

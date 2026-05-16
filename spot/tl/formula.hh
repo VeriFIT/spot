@@ -61,13 +61,13 @@
 // file to get the definition.  Since Spot 2.13, it is always defined,
 // so users may have to update their code.  The following macro
 // is only defined when strong_X exists.
-#  define SPOT_HAS_STRONG_X 1
+#  define SPOT_HAS_STRONG_X 1 ///< Defined when strong X operator is available
 // This was defined since 2.9 along with SPOT_HAS_STRONG_X when
 // SPOT_USES_STRONG_X was defined so we are keeping it just in case
 // someone depends on it.
-#  define SPOT_WANT_STRONG_X 1
+#  define SPOT_WANT_STRONG_X 1 ///< Legacy macro; prefer SPOT_HAS_STRONG_X
 // This was defined in Spot 2.15 when exists/forall where introduced.
-#  define SPOT_HAS_QUANTIFIERS 1
+#  define SPOT_HAS_QUANTIFIERS 1 ///< Defined when exists/forall operators are available
 
 namespace spot
 {
@@ -771,6 +771,8 @@ namespace spot
 
   class SPOT_API formula;
 
+  /// \brief Comparator for formula pointers that orders Boolean formulas
+  /// before others.
   struct formula_ptr_less_than_bool_first
   {
     bool
@@ -1071,6 +1073,7 @@ namespace spot
 #endif // !SWIG
     /// @}
 
+/// \cond INTERNAL
 #ifdef SWIG
 #define SPOT_DEF_UNOP(Name)                          \
     static formula Name(const formula& f)            \
@@ -1088,6 +1091,7 @@ namespace spot
       return unop(op::Name, std::move(f));           \
     }
 #endif // !SWIG
+/// \endcond
     /// \brief Construct a negation
     /// @{
     SPOT_DEF_UNOP(Not);
@@ -1201,7 +1205,7 @@ namespace spot
 #endif //SWIG
     ///@}
 
-
+/// \cond INTERNAL
 #ifdef SWIG
 #define SPOT_DEF_BINOP(Name)                                         \
     static formula Name(const formula& f, const formula& g)          \
@@ -1227,6 +1231,7 @@ namespace spot
       return binop(op::Name, std::move(f), std::move(g));            \
     }
 #endif // !SWIG
+/// \endcond
     /// \brief Construct an `Xor` formula
     /// @{
     SPOT_DEF_BINOP(Xor);
@@ -1346,6 +1351,7 @@ namespace spot
 #endif // !SWIG
     /// @}
 
+/// \cond INTERNAL
 #ifdef SWIG
 #define SPOT_DEF_MULTOP(Name)                                           \
     static formula Name(const std::vector<formula>& l)                  \
@@ -1419,6 +1425,7 @@ namespace spot
                      (left.to_node_(), right.to_node_()));              \
     }
 #endif // !SWIG
+/// \endcond
     /// \brief Construct an Or formula.
     /// @{
     SPOT_DEF_MULTOP2(Or);
@@ -1476,6 +1483,7 @@ namespace spot
 #endif // !SWIG
     ///@}
 
+/// \cond INTERNAL
 #if SWIG
 #define SPOT_DEF_BUNOP(Name)                                \
     static formula Name(const formula& f,                   \
@@ -1499,6 +1507,7 @@ namespace spot
       return bunop(op::Name, std::move(f), min, max);       \
     }
 #endif
+/// \endcond
     /// \brief Create SERE for `f[*min..max]`
     /// @{
     SPOT_DEF_BUNOP(Star);
@@ -1559,6 +1568,7 @@ namespace spot
     }
 #endif // !SWIG
 
+/// \cond INTERNAL
 #define SPOT_DEF_QUANTIFY(Name)                                         \
     static formula Name(const std::vector<formula>& aps, const formula& f) \
     {                                                                   \
@@ -1569,6 +1579,7 @@ namespace spot
     {                                                                   \
       return quantify(op::Name, ap, f);                                 \
     }
+/// \endcond
 
     /// \brief Create formula for `exists ap : f`
     /// @{
@@ -1986,11 +1997,13 @@ namespace spot
       return formula(ptr_->boolean_operands(width));
     }
 
+/// \cond INTERNAL
 #define SPOT_DEF_PROP(Name)                        \
     bool Name() const                              \
     {                                              \
       return ptr_->Name();                         \
     }
+/// \endcond
     ////////////////
     // Properties //
     ////////////////
@@ -2243,6 +2256,7 @@ namespace spot
 #ifndef SWIG
 namespace std
 {
+  /// \brief Hash specialization for spot::formula using its unique identifier.
   template <>
     struct hash<spot::formula>
     {

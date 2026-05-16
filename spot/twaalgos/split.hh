@@ -40,8 +40,8 @@ namespace spot
   SPOT_API twa_graph_ptr split_edges(const const_twa_graph_ptr& aut);
 
 #ifndef SWIG
-  // pseudo container that we use to iterate over
-  // the items of LABELS that are compatible with COND.
+  /// \brief A filter for iterating over edge labels compatible with a given BDD
+  /// condition.
   template<bool subsumed>
   struct SPOT_API edge_separator_filter
     {
@@ -50,6 +50,8 @@ namespace spot
       {
       }
 
+      /// \brief Iterator over edge labels compatible with the filter's BDD
+      /// condition.
       class iterator
       {
         std::vector<bdd>::const_iterator pos_;

@@ -88,7 +88,7 @@ namespace spot
   /// solver.
   ///
   /// This acts like dtba_sat_synthetize() and obtains a first minimized
-  /// automaton. Then, it adds <param> assumptions, such that each assumption
+  /// automaton. Then, it adds `param` assumptions, such that each assumption
   /// removes a new state and implies the previous assumptions. A first
   /// resolution is attempted assuming the last assumption (thus involving all
   /// the previous ones). If the problem is SAT several stages have just been

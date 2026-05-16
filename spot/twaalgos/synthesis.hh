@@ -48,8 +48,8 @@ namespace spot
       FULLYSYM  // Works on a fully symbolic version of the automaton
     };
 
-    // These statistics are recorded by various steps of the synthesis
-    // process.
+    /// \brief Benchmarking variables tracking timing and counts for each step
+    /// of synthesis.
     struct bench_var
     {
       // Number of sub-specifications resulting from the decomposition.
@@ -222,19 +222,30 @@ namespace spot
   /// \param f The specification given as an LTL/PSL formula
   /// \param all_outs The names of all output propositions
   /// \param gi synthesis_info structure
+  /// \param unobs When non-null, a list of additional unobservable propositions
+  ///        not included in \a all_outs.
   /// \note All propositions in the formula that do not appear in all_outs
   /// are treated as input variables.
-  /// @{
   SPOT_API twa_graph_ptr
   ltl_to_game(formula f,
               const std::vector<std::string>& all_outs,
               synthesis_info& gi,
               const std::vector<std::string>* unobs = nullptr);
+
+  /// \ingroup synthesis
+  /// \brief Creates a game from a specification and a set of
+  /// output propositions
+  ///
+  /// \param f The specification given as an LTL/PSL formula
+  /// \param all_outs The names of all output propositions
+  /// \param unobs When non-null, a list of additional unobservable propositions
+  ///        not included in \a all_outs.
+  /// \note All propositions in the formula that do not appear in all_outs
+  /// are treated as input variables.
   SPOT_API twa_graph_ptr
   ltl_to_game(formula f,
               const std::vector<std::string>& all_outs,
               const std::vector<std::string>* unobs = nullptr);
-  /// @}
 
   /// \ingroup synthesis
   /// \brief creates a mealy machine from a solved game \a arena
@@ -310,6 +321,7 @@ namespace spot
   /// \param f The formula to synthesize a strategy for
   /// \param output_aps A vector with the name of all output properties.
   ///                   All APs not named in this vector are treated as inputs
+  /// \param gi synthesis_info structure controlling the synthesis algorithm.
   /// \param want_strategy Set to false if we don't want to construct the
   /// strategy but only test realizability.
   SPOT_API mealy_like
@@ -325,6 +337,8 @@ namespace spot
   SPOT_API bool
   solve_game(twa_graph_ptr arena, synthesis_info& gi);
 
+  /// \brief Pair of relabeling maps for environment and player edges in a
+  /// synthesis game.
   struct SPOT_API game_relabeling_map
   {
     relabeling_map env_map;

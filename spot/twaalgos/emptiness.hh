@@ -133,6 +133,7 @@ namespace spot
     option_map o_;                ///< The options.
   };
 
+  /// Shared pointer to emptiness_check_result.
   typedef std::shared_ptr<emptiness_check_result> emptiness_check_result_ptr;
 
   /// Common interface to emptiness check algorithms.
@@ -199,9 +200,11 @@ namespace spot
     option_map o_;                ///< The options
   };
 
+  /// Shared pointer to emptiness_check.
   typedef std::shared_ptr<emptiness_check> emptiness_check_ptr;
 
   class emptiness_check_instantiator;
+  /// Shared pointer to emptiness_check_instantiator.
   typedef std::shared_ptr<emptiness_check_instantiator>
     emptiness_check_instantiator_ptr;
 
@@ -251,11 +254,13 @@ namespace spot
   ///
   /// \param name should have the form \c "name" or \c "name(options)".
   ///
+  /// \param err on error, \c *err is set to point to the problematic
+  /// part of \a name: if the algorithm name was unknown, \c *err is set
+  /// to \a name; if some option fragment could not be parsed,
+  /// \c *err points to that fragment.
+  ///
   /// \return Return an emptiness-check instantiator.  On error, the
-  /// function returns \c nullptr.  If the name of the algorithm was
-  /// unknown, \c *err will be set to \c name.  If some fragment of
-  /// the options could not be parsed, \c *err will point to that
-  /// fragment.
+  /// function returns \c nullptr.
   ///
   /// The following names supported and correspond to different emptiness
   /// check algorithms:
@@ -370,6 +375,8 @@ namespace spot
   /// An accepted run, for a twa.
   struct SPOT_API twa_run final
   {
+    /// \brief A single step in a TωA run, pairing a state with an edge label
+    /// and acceptance marks.
     struct step {
       const state* s;
       bdd label;
