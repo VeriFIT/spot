@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup emptiness_check_algorithms
   /// \brief Stack of strongly connected components for the Tarjan-Couvreur
   /// emptiness-check algorithm.
   class SPOT_API scc_stack

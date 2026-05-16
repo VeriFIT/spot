@@ -25,6 +25,7 @@
 namespace spot
 {
 
+  /// \ingroup misc_tools
   /// \brief Reorder \a data in place according to the permutation \a indices.
   // Reorder `data` according the permutation in `indices` by
   // following the cycles in the permutation.  Additionally, if an

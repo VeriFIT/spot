@@ -23,19 +23,26 @@
 namespace spot
 {
   class fair_kripke;
+  /// \ingroup kripke
   /// Shared pointer to fair_kripke.
   typedef std::shared_ptr<fair_kripke> fair_kripke_ptr;
+  /// \ingroup kripke
   /// Shared pointer to const fair_kripke.
   typedef std::shared_ptr<const fair_kripke> const_fair_kripke_ptr;
 
   class kripke;
-  typedef std::shared_ptr<kripke> kripke_ptr; ///< Shared pointer to kripke
+  /// \ingroup kripke
+  /// Shared pointer to kripke.
+  typedef std::shared_ptr<kripke> kripke_ptr;
+  /// \ingroup kripke
   /// Shared pointer to const kripke.
   typedef std::shared_ptr<const kripke> const_kripke_ptr;
 
   class kripke_explicit;
+  /// \ingroup kripke
   /// Shared pointer to const kripke_explicit.
   typedef std::shared_ptr<const kripke_explicit> const_kripke_explicit_ptr;
+  /// \ingroup kripke
   /// Shared pointer to kripke_explicit.
   typedef std::shared_ptr<kripke_explicit> kripke_explicit_ptr;
 }

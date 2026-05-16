@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_misc
   /// \brief Check whether an automaton is terminal.
   ///
   /// An automaton is terminal if it is weak, all its accepting SCCs
@@ -44,6 +45,7 @@ namespace spot
                         scc_info* sm = nullptr);
 
 
+  /// \ingroup twa_misc
   /// \brief Deprecated 3-argument form; the third argument is now ignored.
   SPOT_DEPRECATED("is third argument of is_terminal_automaton()"
                   " is now ignored")
@@ -51,6 +53,7 @@ namespace spot
   is_terminal_automaton(const const_twa_graph_ptr& aut,
                         scc_info* sm, bool);
 
+  /// \ingroup twa_misc
   /// \brief Check whether an automaton is weak.
   ///
   /// An automaton is weak if in any given SCC, all transitions belong
@@ -67,6 +70,7 @@ namespace spot
   SPOT_API bool
   is_weak_automaton(const const_twa_graph_ptr& aut, scc_info* sm = nullptr);
 
+  /// \ingroup twa_misc
   /// \brief Check whether an automaton is very-weak.
   ///
   /// An automaton is very-weak if in any given SCC, all transitions
@@ -85,6 +89,7 @@ namespace spot
   is_very_weak_automaton(const const_twa_graph_ptr& aut,
                          scc_info* sm = nullptr);
 
+  /// \ingroup twa_misc
   /// \brief Check whether an automaton is inherently weak.
   ///
   /// An automaton is inherently weak if in any given SCC, there
@@ -102,6 +107,7 @@ namespace spot
   is_inherently_weak_automaton(const const_twa_graph_ptr& aut,
                                scc_info* sm = nullptr);
 
+  /// \ingroup twa_misc
   /// \brief Check whether an automaton is a safety automaton.
   ///
   /// An automaton is a safety automaton if its acceptance condition
@@ -131,6 +137,7 @@ namespace spot
   is_safety_automaton(const const_twa_graph_ptr& aut,
                       scc_info* sm = nullptr);
 
+  /// \ingroup twa_misc
   /// \brief Whether the automaton represents a liveness property.
   ///
   /// An automaton represents a liveness property if after forcing the
@@ -140,6 +147,7 @@ namespace spot
   SPOT_API bool
   is_liveness_automaton(const const_twa_graph_ptr& aut);
 
+  /// \ingroup twa_misc
   /// \brief Check whether an automaton is weak or terminal.
   ///
   /// This sets the "inherently weak", "weak", "very-weak" and
@@ -153,6 +161,7 @@ namespace spot
   check_strength(const twa_graph_ptr& aut, scc_info* sm = nullptr);
 
 
+  /// \ingroup twa_misc
   /// \brief Extract a sub-automaton of a given strength
   ///
   /// The string \a keep should be a non-empty combination of
@@ -182,6 +191,7 @@ namespace spot
   SPOT_API twa_graph_ptr
   decompose_scc(const const_twa_graph_ptr& aut, const char* keep);
 
+  /// \ingroup twa_misc
   /// \brief Extract a sub-automaton of a given strength
   ///
   /// This works exactly like
@@ -192,6 +202,7 @@ namespace spot
   SPOT_API twa_graph_ptr
   decompose_scc(scc_info& sm, const char* keep);
 
+  /// \ingroup twa_misc
   /// \brief Extract a sub-automaton above an SCC
   ///
   /// This algorithm returns a subautomaton that contains the requested SCC,

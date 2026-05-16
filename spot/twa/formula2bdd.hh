@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_essentials
   /// \brief Convert a Boolean formula into a BDD.
   ///
   /// Convert the Boolean formula \a f into a BDD, using existing
@@ -46,6 +47,7 @@ namespace spot
   }
   /// @}
 
+  /// \ingroup twa_essentials
   /// \brief Convert a BDD into a formula.
   ///
   /// Format the BDD as a Boolean spot::formula object. This works only

@@ -22,7 +22,7 @@
 
 namespace spot
 {
-  /// \ingroup tl_rewriting
+  /// \ingroup tl_ltlf
   /// \brief Convert an LTLf into an LTL formula.
   ///
   /// \param f      an LTLf formula
@@ -47,7 +47,7 @@ namespace spot
   SPOT_API formula
   from_ltlf(formula f, const char* alive, int algo);
 
-  /// \ingroup tl_rewriting
+  /// \ingroup tl_ltlf
   /// \brief Convert an LTLf into an LTL formula.
   ///
   /// \param f      an LTLf formula
@@ -67,7 +67,7 @@ namespace spot
   SPOT_API formula
   from_ltlf(formula f, const char* alive = "alive");
 
-  /// \ingroup tl_rewriting
+  /// \ingroup tl_ltlf
   /// \brief Cheap simplification rules for LTLf formulas.
   class SPOT_API ltlf_simplifier
   {
@@ -82,8 +82,11 @@ namespace spot
   };
 
 
+  /// \ingroup tl_ltlf
+  /// \brief One-step satisfiability rewriting for LTLf formulas.
   SPOT_API formula ltlf_one_step_sat_rewrite(formula f);
 
+  /// \ingroup tl_ltlf
   /// \brief Cached version of the one-step satisfiability rewriting for LTLf
   /// formulas.
   class SPOT_API ltlf_one_step_sat_rewrite_with_cache
@@ -96,8 +99,12 @@ namespace spot
     void *cache_;
   };
 
-  SPOT_API formula ltlf_one_step_unsat_rewrite(formula f, bool negate = false);
+  /// \ingroup tl_ltlf
+  /// \brief One-step unsatisfiability rewriting for LTLf formulas.
+  SPOT_API formula ltlf_one_step_unsat_rewrite(formula f,
+                                               bool negate = false);
 
+  /// \ingroup tl_ltlf
   /// \brief Cached version of the one-step unsatisfiability rewriting for LTLf
   /// formulas.
   class SPOT_API ltlf_one_step_unsat_rewrite_with_cache

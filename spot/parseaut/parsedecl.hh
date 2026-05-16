@@ -39,6 +39,7 @@ namespace spot
   int hoayystring(const char* data, void** scanner);
   void hoayyclose(void* scanner);
 
+  /// \ingroup twa_io
   /// \brief Exception thrown by the HOA lexer upon reading an "--ABORT--"
   /// marker.
   struct hoa_abort

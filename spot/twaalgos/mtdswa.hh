@@ -24,6 +24,9 @@
 
 namespace spot
 {
+  /// \addtogroup mtdswa MTDSwA (MTBDD-based ω-automata)
+  /// \ingroup twa_representation
+
   /// \defgroup mtdswa MTDSwA (MTBDD-based ω-automata)
   /// \brief Algorithms and data structures for MTBDD-based ω-automata.
 

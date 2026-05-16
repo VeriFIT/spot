@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup tl_rewriting
   /// \brief Distribute X at the top-level of a formula
   ///
   /// Convert a formula like X(a | X(b | X(c & Xd)))

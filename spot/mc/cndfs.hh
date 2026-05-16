@@ -32,6 +32,7 @@
 
 namespace spot
 {
+  /// \ingroup model_checking
   /// \brief Swarmed variant of the CNDFS parallel emptiness-check algorithm.
   template<typename State, typename SuccIterator,
            typename StateHash, typename StateEqual>

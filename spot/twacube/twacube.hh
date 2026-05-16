@@ -26,8 +26,16 @@
 #include <spot/twacube/cube.hh>
 #include <spot/twacube/fwd.hh>
 
+/// \defgroup twacube TωA cube representation
+/// \ingroup twa
+/// \brief TωA representations using cube-encoded (non-BDD) transition labels.
+
+/// \defgroup twacube_algos TωA cube algorithms
+/// \ingroup twacube
+
 namespace spot
 {
+  /// \ingroup twacube
   /// \brief Class for thread-safe states.
   class SPOT_API cstate
   {
@@ -38,6 +46,7 @@ namespace spot
     ~cstate() = default;
   };
 
+  /// \ingroup twacube
   /// \brief Class for representing a transition.
   class SPOT_API transition
   {
@@ -52,6 +61,7 @@ namespace spot
     acc_cond::mark_t acc_;
   };
 
+  /// \ingroup twacube
   /// \brief Class for iterators over transitions
   class SPOT_API trans_index final:
     public std::enable_shared_from_this<trans_index>
@@ -117,6 +127,7 @@ namespace spot
     const graph_t::state_storage_t& st_; ///< The underlying states
   };
 
+  /// \ingroup twacube
   /// \brief Class for representing a thread-safe twa.
   class SPOT_API twacube final: public std::enable_shared_from_this<twacube>
   {

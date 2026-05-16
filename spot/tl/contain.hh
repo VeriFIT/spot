@@ -26,6 +26,7 @@ namespace spot
 {
   class tl_simplifier_cache;
 
+  /// \ingroup containment
   /// Check containment between LTL formulas.
   class SPOT_API language_containment_checker
   {

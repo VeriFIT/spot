@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_essentials
   /// \brief An infinite word stored as a lasso.
   ///
   /// This is not exactly a word in the traditional sense because we

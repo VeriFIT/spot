@@ -33,6 +33,7 @@ namespace spot
   }
 #endif
 
+  /// \ingroup misc_tools
   /// \brief A fixed-size bitset backed by N unsigned words.
   template<size_t N>
   class SPOT_API bitset

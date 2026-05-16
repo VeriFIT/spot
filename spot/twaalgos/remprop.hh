@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_algorithms
   /// \brief Helper for stripping or fixing atomic propositions in automata.
   class SPOT_API remove_ap
   {
@@ -44,6 +45,7 @@ namespace spot
     twa_graph_ptr strip(const_twa_graph_ptr aut) const;
   };
 
+  /// \ingroup twa_algorithms
   /// \brief Interpret the "live" part of an automaton as finite automaton.
   ///
   /// This function assumes that there is a property "alive" is

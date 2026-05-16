@@ -35,6 +35,7 @@
 // NB: down_cast can also be used on shared_ptr.
 namespace spot
 {
+  /// \ingroup misc_tools
   /// Downcast pointer \a u to T.
   template<typename T, typename U>
   inline
@@ -44,6 +45,7 @@ namespace spot
     return static_cast<T>(u);
   }
 
+  /// \ingroup misc_tools
   /// Downcast shared pointer \a u to T.
   template<typename T, typename U>
   inline
@@ -53,6 +55,7 @@ namespace spot
     return std::static_pointer_cast<typename T::element_type>(u);
   }
 
+  /// \ingroup misc_tools
   /// Downcast reference \a u to T.
   template<typename T, typename U>
   inline

@@ -42,6 +42,9 @@
 /// \addtogroup tl_misc Miscellaneous Algorithms for Formulas
 /// \ingroup tl
 
+/// \addtogroup tl_ltlf LTLf Algorithms
+/// \ingroup tl
+
 #include <spot/misc/common.hh>
 #include <memory>
 #include <cstdint>

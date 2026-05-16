@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup emptiness_check_algorithms
   /// \brief The status of the emptiness-check on success.
   ///
   /// This contains everything needed to construct a counter-example:

@@ -27,6 +27,7 @@
 
 namespace spot
 {
+  /// \ingroup twacube
   /// \brief A cube is only a set of bits in memory.
   ///
   /// This set can be seen as two bitsets
@@ -64,6 +65,7 @@ namespace spot
   /// using the cubeset class
   using cube = unsigned*;
 
+  /// \ingroup twacube
   /// \brief Manager for allocating and manipulating cubes (bit-encoded partial
   /// assignments over APs).
   class SPOT_API cubeset final

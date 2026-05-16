@@ -27,6 +27,7 @@
 namespace spot
 {
 
+  /// \ingroup games
   /// \brief Graph used for backward propagation of winning conditions in parity
   /// games.
   class SPOT_API backprop_graph final

@@ -25,6 +25,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_acc_transform
   /// A vector of nca_st_info is given as argument to nsa_to_nca() or
   /// dnf_to_nca(). Each nca_st_info has information about a state that must be
   /// seen infinitely often.
@@ -54,6 +55,7 @@ namespace spot
 
   typedef std::vector<struct nca_st_info*> vect_nca_info;
 
+  /// \ingroup twa_acc_transform
   /// \brief Converts a nondet Streett-like aut. to a nondet. co-Büchi aut.
   ///
   /// This function works in top of the augmented subset construction algorithm
@@ -71,6 +73,7 @@ namespace spot
              bool named_states = false,
              vect_nca_info* nca_info = nullptr);
 
+  /// \ingroup twa_acc_transform
   /// \brief Converts an aut. with acceptance in DNF to a nondet. co-Büchi aut.
   ///
   /// This function converts the Rabin-like automaton into a Streett-like
@@ -85,6 +88,7 @@ namespace spot
              bool named_states = false,
              vect_nca_info* nca_info = nullptr);
 
+  /// \ingroup twa_acc_transform
   /// \brief Converts any ω-automata to non-deterministic co-buchi
   ///
   /// The language of the resulting automaton always include the
@@ -96,6 +100,7 @@ namespace spot
   SPOT_API twa_graph_ptr
   to_nca(const_twa_graph_ptr aut, bool named_states = false);
 
+  /// \ingroup twa_acc_transform
   /// \brief Converts a nondet Streett-like aut. to a det. co-Büchi aut.
   ///
   /// This function calls first nsa_to_nca() in order to retrieve some
@@ -107,6 +112,7 @@ namespace spot
   SPOT_API twa_graph_ptr
   nsa_to_dca(const_twa_graph_ptr aut, bool named_states = false);
 
+  /// \ingroup twa_acc_transform
   /// \brief Converts an aut. with acceptance in DNF to a det. co-Büchi aut.
   ///
   /// This function calls first nra_to_nca() in order to retrieve some
@@ -118,6 +124,7 @@ namespace spot
   SPOT_API twa_graph_ptr
   dnf_to_dca(const_twa_graph_ptr aut, bool named_states = false);
 
+  /// \ingroup twa_acc_transform
   /// \brief Converts any ω-automata to deterministic co-buchi
   ///
   /// The language of the resulting automaton always include the

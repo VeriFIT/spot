@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_generic
   /// \brief Enumerate elementary cycles in a SCC.
   ///
   /// This class implements a non-recursive version of the algorithm

@@ -22,7 +22,8 @@
 
 namespace spot
 {
-  /// \brief Convert an alternating automaton to a weak alternating automaton.
+  /// \ingroup twa_acc_transform
+  /// \brief Convert an alternating automaton to a weak alternating automaton.
   ///
   /// The input automaton must have a generalized co-Büchi or Büchi acceptance
   /// condition.

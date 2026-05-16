@@ -27,6 +27,7 @@ namespace spot
   class scc_info;
 
 
+  /// \ingroup twa_reduction
   /// \brief Prune unaccepting SCCs and remove superfluous acceptance
   /// conditions.
   ///
@@ -75,6 +76,7 @@ namespace spot
   scc_filter(const const_twa_graph_ptr& aut, bool remove_all_useless = false,
              scc_info* given_si = nullptr, bool keep_one_color = false);
 
+  /// \ingroup twa_reduction
   /// \brief Prune unaccepting SCCs.
   ///
   /// This is an abridged version of scc_filter(), that preserves
@@ -87,6 +89,7 @@ namespace spot
                     bool remove_all_useless = false,
                     scc_info* given_si = nullptr);
 
+  /// \ingroup twa_reduction
   /// \brief Prune unaccepting SCCs, superfluous acceptance
   /// sets, and suspension variables.
   ///

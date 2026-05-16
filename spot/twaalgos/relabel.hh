@@ -27,6 +27,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_algorithms
   /// \brief replace atomic propositions in an automaton
   ///
   /// The relabeling map \a relmap should have keys that are atomic
@@ -38,6 +39,7 @@ namespace spot
   relabel_here(twa_graph_ptr& aut, relabeling_map* relmap);
 
 
+  /// \ingroup twa_algorithms
   /// \brief Replace conditions in \a aut with non-overlapping conditions
   /// over fresh variables.
   ///

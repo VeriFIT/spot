@@ -25,6 +25,7 @@
 
 namespace spot
 {
+  /// \ingroup kripke
   /// \brief Concrete class for kripke_graph states.
   struct SPOT_API kripke_graph_state: public spot::state
   {
@@ -95,6 +96,7 @@ namespace spot
     bdd cond_;
   };
 
+  /// \ingroup kripke
   /// \brief Successor iterator for a graph-based Kripke structure state.
   template<class Graph>
   class SPOT_API kripke_graph_succ_iterator final: public kripke_succ_iterator
@@ -152,6 +154,7 @@ namespace spot
   };
 
 
+  /// \ingroup kripke
   /// \class kripke_graph
   /// \brief Kripke Structure.
   class SPOT_API kripke_graph final : public kripke

@@ -23,6 +23,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_misc
   /// \brief Identify states that recognize the same language.
   ///
   /// The returned vector is the same size as the automaton's number of states.
@@ -34,6 +35,7 @@ namespace spot
   SPOT_API std::vector<unsigned>
   language_map(const const_twa_graph_ptr& aut);
 
+  /// \ingroup twa_misc
   /// \brief Color states that recognize identical language.
   ///
   /// States that recognize a unique language will not be colored.

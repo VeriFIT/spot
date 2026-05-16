@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup emptiness_check_algorithms
   /// Compute a counter example from a spot::couvreur99_check_status
   class SPOT_API couvreur99_check_result final:
     public emptiness_check_result,

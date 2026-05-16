@@ -28,17 +28,20 @@
 
 namespace spot
 {
+  /// \ingroup twacube_algos
   /// \brief Transform one truth assignment represented as a BDD
   /// into a \a cube cube passed in parameter. The parameter
   /// \a binder map bdd indexes to cube indexes.
   SPOT_API spot::cube satone_to_cube(bdd one, cubeset& cubeset,
                                      std::unordered_map<int, int>& binder);
 
+  /// \ingroup twacube_algos
   /// \brief Transform a \a cube cube into a BDD using the map
   /// that binds cube indexes to BDD indexes.
   SPOT_API bdd cube_to_bdd(spot::cube cube, const cubeset& cubeset,
                            std::unordered_map<int, int>& reverse_binder);
 
+  /// \ingroup twacube_algos
   /// \brief Extract the atomic propositions from the automaton.  This method
   /// also fills the binder, i.e., the mapping between BDD indexes and cube
   /// indexes.
@@ -46,10 +49,12 @@ namespace spot
   extract_aps(spot::const_twa_graph_ptr aut,
               std::unordered_map<int, int>& ap_binder);
 
+  /// \ingroup twacube_algos
   /// \brief Convert a twa into a twacube
   SPOT_API twacube_ptr
   twa_to_twacube(spot::const_twa_graph_ptr aut);
 
+  /// \ingroup twacube_algos
   /// \brief Convert a twacube into a twa.
   /// When \a d is specified, the BDD_dict in parameter is used rather than
   /// creating a new one.
@@ -57,6 +62,7 @@ namespace spot
   twacube_to_twa(spot::twacube_ptr twacube,
                  spot::bdd_dict_ptr d = nullptr);
 
+  /// \ingroup twacube_algos
   /// \brief Check whether a twacube and a twa are equivalent.
   SPOT_API bool are_equivalent(const spot::twacube_ptr twacube,
                                const spot::const_twa_graph_ptr twa);

@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_misc
   /// \brief Restrict labels from "dead-end edges"
   ///
   /// A dead-end edge is an edge between two states S and D such

@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_misc
   /// \brief Randomize a TGBA
   ///
   /// Make a random permutation of the states, and of the edges

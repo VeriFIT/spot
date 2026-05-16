@@ -23,6 +23,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_ltl
   /// \brief Compositional translation algorithm with resetable
   /// suspension.
   ///

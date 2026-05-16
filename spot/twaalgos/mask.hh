@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_algorithms
   /// \brief Clone and mask an automaton.
   ///
   /// Copy the edges of automaton \a old into the empty automaton \a
@@ -126,6 +127,7 @@ namespace spot
     orig_states->shrink_to_fit();
   }
 
+  /// \ingroup twa_algorithms
   /// \brief Copy an automaton and update each edge.
   ///
   /// Copy the states of automaton \a old, into automaton
@@ -169,6 +171,7 @@ namespace spot
       }
   }
 
+  /// \ingroup twa_algorithms
   /// \brief Clone and mask an automaton starting from its initial state.
   ///
   /// Like transform_accessible(old, cpy, trans, init), but uses
@@ -181,6 +184,7 @@ namespace spot
     transform_accessible(old, cpy, trans, old->get_init_state_number());
   }
 
+  /// \ingroup twa_algorithms
   /// \brief Copy an automaton and update each edge, from its initial state.
   ///
   /// Like transform_copy(old, cpy, trans, init), but uses
@@ -193,11 +197,13 @@ namespace spot
     transform_copy(old, cpy, trans, old->get_init_state_number());
   }
 
+  /// \ingroup twa_algorithms
   /// \brief Remove all edges that belong to some given acceptance sets.
   SPOT_API
   twa_graph_ptr mask_acc_sets(const const_twa_graph_ptr& in,
                               acc_cond::mark_t to_remove);
 
+  /// \ingroup twa_algorithms
   /// \brief Keep only the states as specified by \a to_keep.
   ///
   /// Each index in the vector \a to_keep specifies whether or not to
@@ -213,6 +219,7 @@ namespace spot
                                  std::vector<bool>& to_keep,
                                  unsigned int init);
 
+  /// \ingroup twa_algorithms
   /// \brief Keep only the states specified by \a to_keep that are accessible.
   ///
   /// Each index in the vector \a to_keep specifies whether or not to

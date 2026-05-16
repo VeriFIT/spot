@@ -26,6 +26,7 @@
 namespace spot
 {
 
+  /// \ingroup twa_essentials
   /// \brief Print a BDD as a list of literals.
   ///
   /// This assumes that \a b is a conjunction of literals.
@@ -35,6 +36,7 @@ namespace spot
   SPOT_API std::ostream&
   bdd_print_sat(std::ostream& os, const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Format a BDD as a list of literals.
   ///
   /// This assumes that \a b is a conjunction of literals.
@@ -44,6 +46,7 @@ namespace spot
   SPOT_API std::string
   bdd_format_sat(const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Print a BDD as a set of acceptance conditions.
   ///
   /// This is used when saving a TGBA.
@@ -54,6 +57,7 @@ namespace spot
   SPOT_API std::ostream&
   bdd_print_accset(std::ostream& os, const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Format a BDD as a set of acceptance conditions.
   ///
   /// This is used when saving a TGBA.
@@ -63,6 +67,7 @@ namespace spot
   SPOT_API std::string
   bdd_format_accset(const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Print a BDD as a set.
   /// \param os The output stream.
   /// \param dict The dictionary to use, to lookup variables.
@@ -70,6 +75,7 @@ namespace spot
   SPOT_API std::ostream&
   bdd_print_set(std::ostream& os, const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Format a BDD as a set.
   /// \param dict The dictionary to use, to lookup variables.
   /// \param b The BDD to print.
@@ -77,6 +83,7 @@ namespace spot
   SPOT_API std::string
   bdd_format_set(const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Print a BDD as a formula.
   /// \param os The output stream.
   /// \param dict The dictionary to use, to lookup variables.
@@ -84,6 +91,7 @@ namespace spot
   SPOT_API std::ostream&
   bdd_print_formula(std::ostream& os, const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Format a BDD as a formula.
   /// \param dict The dictionary to use, to lookup variables.
   /// \param b The BDD to print.
@@ -91,10 +99,12 @@ namespace spot
   SPOT_API std::string
   bdd_format_formula(const bdd_dict_ptr& dict, bdd b);
 
+  /// \ingroup twa_essentials
   /// \brief Enable UTF-8 output for bdd printers.
   SPOT_API void enable_utf8();
 
 
+  /// \ingroup twa_essentials
   /// \brief Format a BDD as an irredundant sum of product.
   /// \param dict The dictionary to use, to lookup variables.
   /// \param b The BDD to print.
@@ -103,6 +113,7 @@ namespace spot
   bdd_format_isop(const bdd_dict_ptr& dict, bdd b);
 
 
+  /// \ingroup twa_essentials
   /// \brief Print a BDD as an irredundant sum of product.
   /// \param os The output stream.
   /// \param dict The dictionary to use, to lookup variables.

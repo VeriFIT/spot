@@ -29,6 +29,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_representation
   /// \brief A self-loop Transition-based Alternating Automaton (TAA)
   /// which is seen as a TGBA (abstract class, see below).
   class SPOT_API taa_tgba: public twa
@@ -71,6 +72,7 @@ namespace spot
     taa_tgba& operator=(const taa_tgba& other) = delete;
   };
 
+  /// \ingroup twa_representation
   /// Set of states deriving from spot::state.
   class SPOT_API set_state final: public spot::state
   {
@@ -96,6 +98,7 @@ namespace spot
     bool delete_me_;
   };
 
+  /// \ingroup twa_representation
   /// \brief Successor iterator for alternating automata with tree-and-automata
   /// (TAA) transitions.
   class SPOT_API taa_succ_iterator final: public twa_succ_iterator
@@ -296,6 +299,7 @@ namespace spot
     }
   };
 
+  /// \ingroup twa_representation
   /// \brief A TAA-TGBA automaton where states are labelled with strings.
   class SPOT_API taa_tgba_string final:
 #ifndef SWIG
@@ -322,6 +326,7 @@ namespace spot
     return SPOT_make_shared_enabled__(taa_tgba_string, dict);
   }
 
+  /// \ingroup twa_representation
   /// \brief A TAA-TGBA automaton where states are labelled with formulas.
   class SPOT_API taa_tgba_formula final:
 #ifndef SWIG

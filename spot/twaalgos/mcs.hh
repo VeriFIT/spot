@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_misc
   /// \brief Tie-breaking strategy for maximum cardinality search.
   enum mcs_tie_break
     {
@@ -38,6 +39,7 @@ namespace spot
     };
 
 
+  /// \ingroup twa_misc
   /// \brief Return an ordering of the vertices computed by
   /// a maximum cardinality search.
   ///
@@ -55,6 +57,7 @@ namespace spot
   maximum_cardinality_search(const const_twa_graph_ptr& a,
                              mcs_tie_break tie = MCS_TIE_ANY);
 
+  /// \ingroup twa_misc
   /// \brief Reorder the states of \a a according to the order
   /// computed by maximum_cardinality_search().
   ///

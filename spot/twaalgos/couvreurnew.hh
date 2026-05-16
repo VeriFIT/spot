@@ -22,6 +22,7 @@
 
 namespace spot
 {
+  /// \ingroup emptiness_check_algorithms
   /// \brief A rewritten version of the Couvreur emptiness check.
   ///
   /// It is optimized to run on explicit automata (avoiding the memory
@@ -31,6 +32,7 @@ namespace spot
   emptiness_check_ptr
   get_couvreur99_new(const const_twa_ptr& a, option_map o);
 
+  /// \ingroup emptiness_check_algorithms
   /// \brief Same as above, but always uses the abstract interface.
   ///
   /// This function is provided to test the efficiency of specializing our
@@ -40,6 +42,7 @@ namespace spot
   emptiness_check_ptr
   get_couvreur99_new_abstract(const const_twa_ptr& a, option_map o);
 
+  /// \ingroup emptiness_check_algorithms
   /// \brief A shortcut to run the optimized emptiness check directly.
   ///
   /// This is the same as get_couvreur99_new(a, {})->check().

@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \ingroup tl_misc
   /// \brief A set of atomic proposition groups that are mutually exclusive
   /// within each group.
   class SPOT_API exclusive_ap final
