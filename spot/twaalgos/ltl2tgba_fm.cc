@@ -38,7 +38,7 @@ namespace spot
   {
     typedef std::vector<formula> vec;
 
-    // This should only be called on And formulae and return
+    // This should only be called on And formulas and return
     // the set of subformula that are implied by the formulas
     // already in the And.
     // If f = Ga & (b R c) & G(d & (e R (g R h)) & Xj) & Xk this
@@ -118,8 +118,8 @@ namespace spot
       f2a_t f2a_;
     };
 
-    // Helper dictionary.  We represent formulae using BDDs to
-    // simplify them, and then translate BDDs back into formulae.
+    // Helper dictionary.  We represent formulas using BDDs to
+    // simplify them, and then translate BDDs back into formulas.
     //
     // The name of the variables are inspired from Couvreur's FM paper.
     //   "a" variables are promises (written "a" in the paper)
@@ -763,7 +763,7 @@ namespace spot
                 return recurse_and_concat(formula::OrRat(std::move(final)));
               if (!final.empty())
                 {
-                  // let F_i be final formulae
+                  // let F_i be final formulas
                   //     N_i be non final formula
                   // (F_1 & ... & F_n & N_1 & ... & N_m)
                   // =   (F_1 | ... | F_n);[*] && (N_1 & ... & N_m)
@@ -1005,7 +1005,7 @@ namespace spot
       // The following code trims the automaton in a crude way by
       // eliminating SCCs that are not coaccessible.  It does not
       // actually remove the states, it simply marks the corresponding
-      // formulae as associated to the null pointer in the f2a_ map.
+      // formulas as associated to the null pointer in the f2a_ map.
       // The method succ() interprets this as False.
 
       scc_info* sm = new scc_info(a);
@@ -1828,7 +1828,7 @@ namespace spot
 
     private:
       // Map a representation of successors to a canonical formula.
-      // We do this because many formulae (such as `aR(bRc)' and
+      // We do this because many formulas (such as `aR(bRc)' and
       // `aR(bRc).(bRc)') are equivalent, and are trivially identified
       // by looking at the set of successors.
       typedef robin_hood::unordered_node_map<bdd, formula,
@@ -2043,13 +2043,13 @@ namespace spot
         // We used to factor only Next and A variables while computing
         // prime implicants, with
         //    minato_isop isop(res, d.next_set & d.a_set);
-        // in order to obtain transitions with formulae of atomic
+        // in order to obtain transitions with formulas of atomic
         // proposition directly, but unfortunately this led to strange
         // factorizations.  For instance f U g was translated as
         //     r(f U g) = g + a(g).r(X(f U g)).(f + g)
         // instead of just
         //     r(f U g) = g + a(g).r(X(f U g)).f
-        // Of course both formulae are logically equivalent, but the
+        // Of course both formulas are logically equivalent, but the
         // latter is "more deterministic" than the former, so it should
         // be preferred.
         //

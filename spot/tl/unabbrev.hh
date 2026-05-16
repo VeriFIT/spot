@@ -23,6 +23,7 @@
 
 namespace spot
 {
+  /// Default string of operators to unabbreviate.
   constexpr const char* default_unabbrev_string = "eFGiMW^";
 
   /// \ingroup tl_rewriting
@@ -52,6 +53,7 @@ namespace spot
     /// in which each letter denotes an operator (using LBT's
     /// convention).
     unabbreviator(const char* opt = default_unabbrev_string);
+    /// Apply the unabbreviator to formula \a in.
     formula run(formula in);
   };
 

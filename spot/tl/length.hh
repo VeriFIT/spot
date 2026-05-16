@@ -34,10 +34,10 @@ namespace spot
   int length(formula f);
 
   /// \ingroup tl_misc
-  /// \brief Compute the length of a formula, squashing Boolean formulae
+  /// \brief Compute the length of a formula, squashing Boolean formulas
   ///
   /// This is similar to spot::length(), except all Boolean
-  /// formulae are assumed to have length one.
+  /// formulas are assumed to have length one.
   SPOT_API
   int length_boolone(formula f);
 }

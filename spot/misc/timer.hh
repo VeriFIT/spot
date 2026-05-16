@@ -41,8 +41,9 @@ namespace spot
   struct stopwatch
   {
   protected:
+    /// Clock type used by the stopwatch.
     typedef std::chrono::steady_clock clock;
-    clock::time_point start_;
+    clock::time_point start_; ///< Recorded start time point.
   public:
     /// Marks the start of the measurement
     void start()
@@ -69,10 +70,10 @@ namespace spot
       : utime(0), stime(0), cutime(0), cstime(0)
     {
     }
-    clock_t utime;
-    clock_t stime;
-    clock_t cutime;
-    clock_t cstime;
+    clock_t utime;   ///< User time of the process.
+    clock_t stime;   ///< System time of the process.
+    clock_t cutime;  ///< User time of child processes.
+    clock_t cstime;  ///< System time of child processes.
   };
 
   /// A timekeeper that accumulates intervals of time in a more detailed way.
@@ -168,6 +169,10 @@ namespace spot
       return total_.cstime;
     }
 
+    /// Return accumulated CPU ticks for selected time components.
+    ///
+    /// Each boolean flag selects a component: user/system time of
+    /// the current process (parent) or its children.
     clock_t get_uscp(bool user, bool system, bool children, bool parent) const
     {
       clock_t res = 0;
@@ -206,9 +211,10 @@ namespace spot
     }
 
   protected:
-    time_info start_;
-    time_info total_;
-    bool running;
+    time_info start_; ///< Start time of the current interval.
+    time_info total_; ///< Accumulated time across all intervals.
+    bool running;     ///< Whether the timer is currently running.
+    /// Wall-clock start time of the current interval.
     std::chrono::steady_clock::time_point wall_start_;
     std::chrono::milliseconds::rep wall_cumul_ = 0;
   };
@@ -298,14 +304,15 @@ namespace spot
     }
 
   protected:
-    typedef std::pair<spot::timer, int> item_type;
-    typedef std::map<std::string, item_type> tm_type;
-    tm_type tm;
+    typedef std::pair<spot::timer, int> item_type; ///< Timer + count pair.
+    typedef std::map<std::string, item_type> tm_type; ///< Timer map type.
+    tm_type tm; ///< The map of named timers.
   };
 
   /// \brief Struct used to start and stop both timer and stopwatch clocks.
   typedef struct process_timer
   {
+    /// Start both wall-clock and CPU timers.
     void start()
     {
       walltimer.start();
@@ -314,17 +321,20 @@ namespace spot
     // sw.stop() --> It always returns the duration since the last call to
     // start(). Therefore, it won't stop timing, moreover, it can be called
     // multiple times.
+    /// Stop both timers and record elapsed times.
     void stop()
     {
       walltime_lap_ = walltimer.stop();
       cputimer.stop();
     }
 
+    /// Return elapsed wall time in seconds since the last start().
     double walltime() const
     {
       return walltime_lap_;
     }
 
+    /// Return accumulated CPU ticks for selected time components.
     clock_t cputime(bool user, bool system, bool children, bool parent) const
     {
       return cputimer.get_uscp(user, system, children, parent);

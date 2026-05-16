@@ -60,12 +60,14 @@ namespace spot
   };
 
 #ifndef SWIG
+  /// Test whether no options are set.
   inline
   bool operator!(zielonka_tree_options me)
   {
     return me == zielonka_tree_options::NONE;
   }
 
+  /// Bitwise AND of two zielonka_tree_options sets.
   inline
   zielonka_tree_options operator&(zielonka_tree_options left,
                                   zielonka_tree_options right)
@@ -75,6 +77,7 @@ namespace spot
                                               & static_cast<ut>(right));
   }
 
+  /// Bitwise OR of two zielonka_tree_options sets.
   inline
   zielonka_tree_options operator|(zielonka_tree_options left,
                                   zielonka_tree_options right)
@@ -84,6 +87,7 @@ namespace spot
                                               | static_cast<ut>(right));
   }
 
+  /// Remove options from a zielonka_tree_options set (bitwise AND NOT).
   inline
   zielonka_tree_options operator-(zielonka_tree_options left,
                                   zielonka_tree_options right)
@@ -214,12 +218,13 @@ namespace spot
     /// links, level, and color set.
     struct zielonka_node
     {
-      unsigned parent;
-      unsigned next_sibling = 0;
-      unsigned first_child = 0;
-      unsigned level;
-      acc_cond::mark_t colors;
+      unsigned parent; ///< Index of parent node (0 for root).
+      unsigned next_sibling = 0; ///< Index of next sibling node (0 if none).
+      unsigned first_child = 0; ///< Index of first child node (0 if none).
+      unsigned level; ///< Depth level of this node in the tree.
+      acc_cond::mark_t colors; ///< Set of colors associated with this node.
     };
+    /// All nodes of the Zielonka tree.
     std::vector<zielonka_node> nodes_;
   private:
     unsigned one_branch_ = 0;
@@ -269,12 +274,14 @@ namespace spot
   };
 
 #ifndef SWIG
+  /// Test whether no options are set.
   inline
   bool operator!(acd_options me)
   {
     return me == acd_options::NONE;
   }
 
+  /// Bitwise AND of two acd_options sets.
   inline
   acd_options operator&(acd_options left, acd_options right)
   {
@@ -283,6 +290,7 @@ namespace spot
                                     & static_cast<ut>(right));
   }
 
+  /// Bitwise OR of two acd_options sets.
   inline
   acd_options operator|(acd_options left, acd_options right)
   {
@@ -291,6 +299,7 @@ namespace spot
                                     | static_cast<ut>(right));
   }
 
+  /// Remove options from an acd_options set (bitwise AND NOT).
   inline
   acd_options operator-(acd_options left, acd_options right)
   {
@@ -315,6 +324,7 @@ namespace spot
   public:
     /// \brief Build an Alternating Cycle Decomposition an SCC decomposition
     acd(const scc_info& si, acd_options opt = acd_options::NONE);
+    /// \brief Build an ACD directly from an automaton.
     acd(const const_twa_graph_ptr& aut, acd_options opt = acd_options::NONE);
 
     ~acd();
@@ -383,6 +393,7 @@ namespace spot
     /// \brief Return the first branch for \a state
     unsigned first_branch(unsigned state) const;
 
+    /// Return the maximum parity level in the given SCC.
     unsigned scc_max_level(unsigned scc) const
     {
       if (scc >= scc_count_)

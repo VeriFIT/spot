@@ -608,29 +608,36 @@ namespace spot
     friend class internal::killer_edge_iterator<digraph>;
 
   public:
+    /// Iterator over edges of a digraph.
     typedef internal::edge_iterator<digraph> iterator;
+    /// Const iterator over edges of a digraph.
     typedef internal::edge_iterator<const digraph> const_iterator;
 
     // Extra data to store on each state or edge.
-    typedef State_Data state_data_t;
-    typedef Edge_Data edge_data_t;
+    typedef State_Data state_data_t; ///< State data type.
+    typedef Edge_Data edge_data_t;   ///< Edge data type.
 
     // State and edges are identified by their indices in some
     // vector.
-    typedef unsigned state;
-    typedef unsigned edge;
+    typedef unsigned state; ///< State number type.
+    typedef unsigned edge;  ///< Edge number type.
 
+    /// State storage type.
     typedef internal::distate_storage<edge,
                                       internal::boxed_label<State_Data>>
       state_storage_t;
+    /// Edge storage type.
     typedef internal::edge_storage<state, state, edge,
                                    internal::boxed_label<Edge_Data>>
       edge_storage_t;
+    /// Vector of state storage.
     typedef std::vector<state_storage_t> state_vector;
+    /// Vector of edge storage.
     typedef std::vector<edge_storage_t> edge_vector_t;
 
     // A sequence of universal destination groups of the form:
     //   (n state_1 state_2 ... state_n)*
+    /// Vector of universal destinations.
     typedef std::vector<unsigned> dests_vector_t;
 
   protected:
@@ -867,6 +874,7 @@ namespace spot
                            std::forward<Args>(args)...);
     }
 
+    /// Return universal destinations for state \a src.
     internal::const_universal_dests univ_dests(state src) const
     {
       if ((int)src < 0)
@@ -883,6 +891,7 @@ namespace spot
         }
     }
 
+    /// Return universal destinations for edge \a e.
     internal::const_universal_dests univ_dests(const edge_storage_t& e) const
     {
       return univ_dests(e.dst);

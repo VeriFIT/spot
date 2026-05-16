@@ -36,6 +36,7 @@ namespace spot
   class SPOT_API bfs_steps
   {
   public:
+    /// \brief Construct a BFS helper for automaton \a a.
     bfs_steps(const const_twa_ptr& a);
     virtual ~bfs_steps();
 

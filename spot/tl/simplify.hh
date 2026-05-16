@@ -30,6 +30,7 @@ namespace spot
   class tl_simplifier_options
   {
   public:
+    /// \brief Construct with individual option flags.
     tl_simplifier_options(bool basics = true,
                           bool synt_impl = true,
                           bool event_univ = true,
@@ -53,6 +54,10 @@ namespace spot
     {
     }
 
+    /// \brief Construct from a simplification level (0–3).
+    ///
+    /// Level 0: no simplification; level 1: basics + event_univ;
+    /// level 2: + synt_impl; level 3: + containment checks.
     tl_simplifier_options(int level) :
       tl_simplifier_options(false, false, false)
     {
@@ -74,31 +79,31 @@ namespace spot
         }
     }
 
-    bool reduce_basics;
-    bool synt_impl;
-    bool event_univ;
-    bool containment_checks;
-    bool containment_checks_stronger;
-    // If true, Boolean subformulae will not be put into
-    // negative normal form.
+    bool reduce_basics;      ///< Enable basic rewriting rules.
+    bool synt_impl;          ///< Enable syntactic implication simplifications.
+    bool event_univ;         ///< Enable eventuality/universality reductions.
+    bool containment_checks; ///< Enable language containment checks.
+    bool containment_checks_stronger; ///< Enable stronger containment checks.
+    /// If true, Boolean subformulae will not be put into
+    /// negative normal form.
     bool nenoform_stop_on_boolean;
-    // If true, some rules that produce slightly larger formulae
-    // will be disabled.  Those larger formulae are normally easier
-    // to translate, so we recommend to set this to false.
+    /// If true, some rules that produce slightly larger formulas
+    /// will be disabled.  Those larger formulas are normally easier
+    /// to translate, so we recommend to set this to false.
     bool reduce_size_strictly;
-    // If true, Boolean subformulae will be rewritten in ISOP form.
+    /// If true, Boolean subformulae will be rewritten in ISOP form.
     bool boolean_to_isop;
-    // Try to isolate subformulae that are eventual and universal.
+    /// Try to isolate subformulae that are eventual and universal.
     bool favor_event_univ;
-    // Keep Xor and Equiv at the top of the formula, possibly under
-    // &,|, and X operators.  Only rewrite Xor and Equiv under
-    // temporal operators.
+    /// Keep Xor and Equiv at the top of the formula, possibly under
+    /// &,|, and X operators.  Only rewrite Xor and Equiv under
+    /// temporal operators.
     bool keep_top_xor;
-    // If greater than 0, bound the number of states used by automata
-    // in containment checks.
+    /// If greater than 0, bound the number of states used by automata
+    /// in containment checks.
     unsigned containment_max_states = 0;
-    // If greater than 0, maximal number of terms in a multop to perform
-    // containment checks on this multop.
+    /// If greater than 0, maximal number of terms in a multop to perform
+    /// containment checks on this multop.
     unsigned containment_max_ops = 16;
   };
 
@@ -110,7 +115,9 @@ namespace spot
   class SPOT_API tl_simplifier
   {
   public:
+    /// \brief Construct with default options and given BDD dictionary.
     tl_simplifier(const bdd_dict_ptr& dict = make_bdd_dict());
+    /// \brief Construct with given options and BDD dictionary.
     tl_simplifier(const tl_simplifier_options& opt,
                    bdd_dict_ptr dict = make_bdd_dict());
     ~tl_simplifier();
@@ -153,7 +160,7 @@ namespace spot
     bool syntactic_implication_neg(formula f, formula g,
                                    bool right);
 
-    /// \brief check whether two formulae are equivalent.
+    /// \brief check whether two formulas are equivalent.
     ///
     /// This costly check performs up to four translations,
     /// two products, and two emptiness checks.

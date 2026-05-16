@@ -24,6 +24,8 @@
 
 namespace spot
 {
+  /// List of quantifiers: each pair holds a Boolean (true = universal,
+  /// false = existential) and a BDD over the quantified propositions.
   typedef std::vector<std::pair<bool, bdd>> quantifier_list;
 
   /// \ingroup twa_ltl

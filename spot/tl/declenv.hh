@@ -45,6 +45,7 @@ namespace spot
     /// Get the name of the environment.
     virtual const std::string& name() const override;
 
+    /// Map from proposition name to formula.
     typedef std::map<const std::string, formula> prop_map;
 
     /// Get the map of atomic proposition known to this environment.

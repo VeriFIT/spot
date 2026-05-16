@@ -109,32 +109,32 @@ namespace spot
   /// appropriately.
   SPOT_API void check_determinism(twa_graph_ptr aut);
 
-  // \brief Count states with some universal branching.
-  //
-  // This counts the number of states that have edges going to several
-  // destinations at once (as reported by aut->is_univ_dest(...)).
-  //
-  // Note that nondeterministic automata (which include deterministic
-  // automata) have 0 such state, but additionally they also have
-  // "singleton" initial state (which this function does not check).
-  //
-  // \see count_univbranch_edges()
+  /// \brief Count states with some universal branching.
+  ///
+  /// This counts the number of states that have edges going to several
+  /// destinations at once (as reported by aut->is_univ_dest(...)).
+  ///
+  /// Note that nondeterministic automata (which include deterministic
+  /// automata) have 0 such state, but additionally they also have
+  /// "singleton" initial state (which this function does not check).
+  ///
+  /// \see count_univbranch_edges()
   SPOT_API unsigned
   count_univbranch_states(const const_twa_graph_ptr& aut);
 
-  // \brief Count edges with universal branching.
-  //
-  // This counts the number of edges going to several destination at
-  // once (as reported by aut->is_univ_dest(...)).
-  //
-  // If the automaton starts in multiple initial states at once, this
-  // is considered as a universal "initial edge", and adds one to the
-  // total count.
-  //
-  // Nondeterministic automata (which include deterministic automata)
-  // have 0 edges with universal branching.
-  //
-  // \see count_univbranch_states()
+  /// \brief Count edges with universal branching.
+  ///
+  /// This counts the number of edges going to several destination at
+  /// once (as reported by aut->is_univ_dest(...)).
+  ///
+  /// If the automaton starts in multiple initial states at once, this
+  /// is considered as a universal "initial edge", and adds one to the
+  /// total count.
+  ///
+  /// Nondeterministic automata (which include deterministic automata)
+  /// have 0 edges with universal branching.
+  ///
+  /// \see count_univbranch_states()
   SPOT_API unsigned
   count_univbranch_edges(const const_twa_graph_ptr& aut);
 }

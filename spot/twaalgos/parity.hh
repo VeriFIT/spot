@@ -210,9 +210,10 @@ namespace spot
   {
     bool parity_max;       ///< Whether the input automaton is parity max
     bool parity_odd;       ///< Whether the input automaton is parity odd
-    std::vector<int> piprime1;
-    std::vector<int> piprime2;
+    std::vector<int> piprime1; ///< Coloring assuming odd terminal base cases.
+    std::vector<int> piprime2; ///< Coloring assuming even terminal base cases.
 
+    /// \brief Compute parity reduction data for \a aut.
     reduce_parity_data(const const_twa_graph_ptr& aut, bool layered = false);
   };
 

@@ -149,6 +149,7 @@ namespace spot
         return mark_t(_value_t::mone());
       }
 
+      /// Returns a hash value for this mark.
       size_t hash() const noexcept
       {
         std::hash<decltype(id)> h;
@@ -171,100 +172,119 @@ namespace spot
         return !!id;
       }
 
+      /// Equality comparison.
       bool operator==(mark_t o) const
       {
         return id == o.id;
       }
 
+      /// Inequality comparison.
       bool operator!=(mark_t o) const
       {
         return id != o.id;
       }
 
+      /// Less-than comparison.
       bool operator<(mark_t o) const
       {
         return id < o.id;
       }
 
+      /// Less-or-equal comparison.
       bool operator<=(mark_t o) const
       {
         return id <= o.id;
       }
 
+      /// Greater-than comparison.
       bool operator>(mark_t o) const
       {
         return id > o.id;
       }
 
+      /// Greater-or-equal comparison.
       bool operator>=(mark_t o) const
       {
         return id >= o.id;
       }
 
+      /// Returns true iff the mark is non-empty (at least one bit set).
       explicit operator bool() const
       {
         return !!id;
       }
 
+      /// Returns true iff acceptance set \a u is in this mark.
       bool has(unsigned u) const
       {
         return !!this->operator&(mark_t({0}) << u);
       }
 
+      /// Add acceptance set \a u to this mark.
       void set(unsigned u)
       {
         id.set(u);
       }
 
+      /// Remove acceptance set \a u from this mark.
       void clear(unsigned u)
       {
         id.clear(u);
       }
 
+      /// Intersection-assignment.
       mark_t& operator&=(mark_t r)
       {
         id &= r.id;
         return *this;
       }
 
+      /// Union-assignment.
       mark_t& operator|=(mark_t r)
       {
         id |= r.id;
         return *this;
       }
 
+      /// Difference-assignment (removes bits set in \a r).
       mark_t& operator-=(mark_t r)
       {
         id &= ~r.id;
         return *this;
       }
 
+      /// Symmetric-difference-assignment.
       mark_t& operator^=(mark_t r)
       {
         id ^= r.id;
         return *this;
       }
 
+      /// Intersection.
       mark_t operator&(mark_t r) const
       {
         return id & r.id;
       }
 
+      /// Union.
       mark_t operator|(mark_t r) const
       {
         return id | r.id;
       }
 
+      /// Difference (bits in this mark but not in \a r).
       mark_t operator-(mark_t r) const
       {
         return id & ~r.id;
       }
 
+      /// Bitwise complement.
       mark_t operator~() const
       {
         return ~id;
       }
 
+      /// Symmetric difference.
       mark_t operator^(mark_t r) const
       {
         return id ^ r.id;
@@ -283,27 +303,35 @@ namespace spot
 #else
 #  define SPOT_WRAP_OP(ins) ins;
 #endif
+      /// Left-shift all acceptance set indices by \a i.
       mark_t operator<<(unsigned i) const
       {
         SPOT_WRAP_OP(return id << i);
       }
 
+      /// Left-shift-assignment.
       mark_t& operator<<=(unsigned i)
       {
         SPOT_WRAP_OP(id <<= i; return *this);
       }
 
+      /// Right-shift all acceptance set indices by \a i.
       mark_t operator>>(unsigned i) const
       {
         SPOT_WRAP_OP(return id >> i);
       }
 
+      /// Right-shift-assignment.
       mark_t& operator>>=(unsigned i)
       {
         SPOT_WRAP_OP(id >>= i; return *this);
       }
 #undef SPOT_WRAP_OP
 
+      /// \brief Remove bits indexed by \a y and compact the remaining bits.
+      ///
+      /// Each bit position set in \a y is removed from this mark, and
+      /// the surviving bits are shifted down to fill the gaps.
       mark_t strip(mark_t y) const
       {
         // strip every bit of id that is marked in y
@@ -430,6 +458,7 @@ namespace spot
       /// Returns some iterable object that contains the used sets.
       spot::internal::mark_container sets() const;
 
+      /// Returns a string representation of this mark.
       std::string as_string() const;
     };
 
@@ -446,12 +475,12 @@ namespace spot
     /// current operator excluded.
     union acc_word
     {
-      mark_t mark;
+      mark_t mark; ///< A set of acceptance marks.
       struct {
         acc_op op;             // Operator
         unsigned short size; // Size of the subtree (number of acc_word),
                              // not counting this node.
-      } sub;
+      } sub; ///< An operator node with its subtree size.
     };
 
     /// \brief An acceptance formula.
@@ -468,9 +497,11 @@ namespace spot
     /// provided methods instead.
     struct SPOT_API acc_code: public std::vector<acc_word>
     {
+      /// Apply unit propagation to simplify the formula.
       acc_code
       unit_propagation();
 
+      /// Equality comparison of acceptance formulas.
      bool operator==(const acc_code& other) const
       {
         // We have two ways to represent t, unfortunately.
@@ -505,6 +536,7 @@ namespace spot
         return true;
       };
 
+      /// Lexicographic less-than comparison on acceptance formulas.
       bool operator<(const acc_code& other) const
       {
         // We have two ways to represent t, unfortunately.
@@ -555,21 +587,25 @@ namespace spot
         return false;
       }
 
+      /// Greater-than comparison of acceptance formulas.
       bool operator>(const acc_code& other) const
       {
         return other < *this;
       }
 
+      /// Less-or-equal comparison of acceptance formulas.
       bool operator<=(const acc_code& other) const
       {
         return !(other < *this);
       }
 
+      /// Greater-or-equal comparison of acceptance formulas.
       bool operator>=(const acc_code& other) const
       {
         return !(*this < other);
       }
 
+      /// Inequality comparison of acceptance formulas.
       bool operator!=(const acc_code& other) const
       {
         return !(*this == other);
@@ -1560,6 +1596,7 @@ namespace spot
       return code_;
     }
 
+    /// Equality: same number of sets and equivalent formula.
     bool operator==(const acc_cond& other) const
     {
       if (other.num_sets() != num_)
@@ -1569,6 +1606,7 @@ namespace spot
       return (ocode == code_ || (ocode.is_t() && code_.is_t()));
     }
 
+    /// Inequality comparison.
     bool operator!=(const acc_cond& other) const
     {
       return !(*this == other);
@@ -1705,37 +1743,46 @@ namespace spot
     {
 #ifndef SWIG
       rs_pair() = default;
+      /// Copy constructor.
       rs_pair(const rs_pair&) = default;
+      /// Copy-assignment operator.
       rs_pair& operator=(const rs_pair&) = default;
 #endif
 
+      /// Construct a pair with Fin mark \a fin and Inf mark \a inf.
       rs_pair(acc_cond::mark_t fin, acc_cond::mark_t inf) noexcept:
         fin(fin),
         inf(inf)
         {}
-      acc_cond::mark_t fin;
-      acc_cond::mark_t inf;
+      acc_cond::mark_t fin; ///< The Fin acceptance mark of this pair.
+      acc_cond::mark_t inf; ///< The Inf acceptance mark of this pair.
 
+      /// Equality comparison.
       bool operator==(rs_pair o) const
       {
         return fin == o.fin && inf == o.inf;
       }
+      /// Inequality comparison.
       bool operator!=(rs_pair o) const
       {
         return fin != o.fin || inf != o.inf;
       }
+      /// Less-than comparison (lexicographic on fin then inf).
       bool operator<(rs_pair o) const
       {
         return fin < o.fin || (!(o.fin < fin) && inf < o.inf);
       }
+      /// Less-or-equal comparison.
       bool operator<=(rs_pair o) const
       {
         return !(o < *this);
       }
+      /// Greater-than comparison.
       bool operator>(rs_pair o) const
       {
         return o < *this;
       }
+      /// Greater-or-equal comparison.
       bool operator>=(rs_pair o) const
       {
         return !(*this < o);
@@ -1823,23 +1870,27 @@ namespace spot
       return acc_cond(num_, code_.unit_propagation());
     }
 
-    // Return (true, m) if there exist some acceptance mark m that
-    // does not satisfy the acceptance condition.  Return (false, 0U)
-    // otherwise.
+    /// \brief Return an unsatisfying mark if one exists.
+    ///
+    /// Returns (true, m) if there exists an acceptance mark m that
+    /// does not satisfy the acceptance condition; (false, {}) otherwise.
     std::pair<bool, acc_cond::mark_t> unsat_mark() const
     {
       return sat_unsat_mark(false);
     }
-    // Return (true, m) if there exist some acceptance mark m that
-    // does satisfy the acceptance condition.  Return (false, 0U)
-    // otherwise.
+    /// \brief Return a satisfying mark if one exists.
+    ///
+    /// Returns (true, m) if there exists an acceptance mark m that
+    /// satisfies the acceptance condition; (false, {}) otherwise.
     std::pair<bool, acc_cond::mark_t> sat_mark() const
     {
       return sat_unsat_mark(true);
     }
 
   protected:
+    /// Recompute whether the formula uses Fin acceptance.
     bool check_fin_acceptance() const;
+    /// Shared implementation for sat_mark() and unsat_mark().
     std::pair<bool, acc_cond::mark_t> sat_unsat_mark(bool) const;
 
   public:
@@ -2282,14 +2333,16 @@ namespace spot
     std::vector<acc_cond> top_conjuncts() const;
 
   protected:
+    /// Returns a mark with one bit set per declared acceptance set.
     mark_t all_sets_() const
     {
       return mark_t::all() >> (spot::acc_cond::mark_t::max_accsets() - num_);
     }
 
-    unsigned num_;
-    mark_t all_;
-    acc_code code_;
+    unsigned num_;        ///< Number of declared acceptance sets.
+    mark_t all_;          ///< Precomputed all_sets_() value.
+    acc_code code_;       ///< The acceptance formula.
+    /// Whether the formula contains any Fin term.
     bool uses_fin_acceptance_ = false;
 
   };
@@ -2297,16 +2350,18 @@ namespace spot
   /// \brief A view over Rabin-Streett pairs restricted to a subset of
   /// acceptance marks.
   struct rs_pairs_view {
+    /// Type alias for a vector of Rabin-Streett pairs.
     typedef std::vector<acc_cond::rs_pair> rs_pairs;
 
-    // Creates view of pairs 'p' with restriction only to marks in 'm'
+    /// Create a view of pairs \a p restricted to marks visible in \a m.
     explicit rs_pairs_view(const rs_pairs& p, const acc_cond::mark_t& m)
       : pairs_(p), view_marks_(m) {}
 
-    // Creates view of pairs without restriction to marks
+    /// Create an unrestricted view of all pairs in \a p.
     explicit rs_pairs_view(const rs_pairs& p)
       : rs_pairs_view(p, acc_cond::mark_t::all()) {}
 
+    /// Returns the union of all visible Inf marks across all pairs.
     acc_cond::mark_t infs() const
     {
       return do_view([&](const acc_cond::rs_pair& p)
@@ -2315,6 +2370,7 @@ namespace spot
         });
     }
 
+    /// Returns the union of all visible Fin marks across all pairs.
     acc_cond::mark_t fins() const
     {
       return do_view([&](const acc_cond::rs_pair& p)
@@ -2323,6 +2379,7 @@ namespace spot
         });
     }
 
+    /// Returns Fin marks from pairs whose Inf part is not visible.
     acc_cond::mark_t fins_alone() const
     {
       return do_view([&](const acc_cond::rs_pair& p)
@@ -2332,6 +2389,7 @@ namespace spot
         });
     }
 
+    /// Returns Inf marks from pairs whose Fin part is not visible.
     acc_cond::mark_t infs_alone() const
     {
       return do_view([&](const acc_cond::rs_pair& p)
@@ -2341,6 +2399,9 @@ namespace spot
         });
     }
 
+    /// \brief Returns all Inf marks paired with a Fin containing \a mark.
+    ///
+    /// Only considers pairs where both Fin and Inf parts are visible.
     acc_cond::mark_t paired_with_fin(unsigned mark) const
     {
       acc_cond::mark_t res = {};
@@ -2350,6 +2411,7 @@ namespace spot
       return res;
     }
 
+    /// Returns a reference to the underlying vector of pairs.
     const rs_pairs& pairs() const
     {
       return pairs_;
@@ -2480,6 +2542,7 @@ namespace std
   template<>
   struct hash<spot::acc_cond::mark_t>
   {
+    /// Returns the hash of acceptance mark \a m.
     size_t operator()(spot::acc_cond::mark_t m) const noexcept
     {
       return m.hash();

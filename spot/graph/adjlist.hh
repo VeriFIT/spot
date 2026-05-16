@@ -109,12 +109,14 @@ namespace spot
       return s;
     }
 
+    /// Return the state data for state s.
     typename internal::boxed_label<State_Data>::data_t&
     state_data(unsigned s)
     {
       return states_[s].data();
     }
 
+    /// Return the state data for state s.
     const typename internal::boxed_label<State_Data>::data_t&
     state_data(unsigned s) const
     {
@@ -141,48 +143,57 @@ namespace spot
 
     public:
       // Iterator traits
+      /// Standard iterator type alias.
       using iterator_category = std::input_iterator_tag;
-      using value_type = unsigned;
-      using difference_type = std::ptrdiff_t;
-      using pointer = const unsigned*;
-      using reference = const unsigned&;
+      using value_type = unsigned;           ///< Standard iterator type alias.
+      using difference_type = std::ptrdiff_t; ///< Standard iterator type alias.
+      using pointer = const unsigned*;       ///< Standard iterator type alias.
+      using reference = const unsigned&;     ///< Standard iterator type alias.
 
+      /// Construct an iterator over successors of state at idx in graph g.
       successor_iterator(const adjlist* g, unsigned idx)
         : graph(g), edge_index(idx)
       {
       }
 
+      /// Dereference: return destination state.
       int operator*() const
       {
         return graph->edges_[edge_index].dst;
       }
 
+      /// Pre-increment: advance to next successor.
       successor_iterator& operator++() {
         edge_index = graph->edges_[edge_index].next_index;
         return *this;
       }
 
+      /// Post-increment: advance to next successor.
       successor_iterator operator++(int) {
         successor_iterator tmp = *this;
         ++(*this);
         return tmp;
       }
 
+      /// Return true iff iter is past the end.
       friend bool operator==(const successor_iterator& iter, std::nullptr_t)
       {
         return iter.edge_index == 0;
       }
 
+      /// Return true iff iter is past the end.
       friend bool operator==(std::nullptr_t, const successor_iterator& iter)
       {
         return iter.edge_index == 0;
       }
 
+      /// Return true iff iter is not past the end.
       friend bool operator!=(const successor_iterator& iter, std::nullptr_t)
       {
         return iter.edge_index != 0;
       }
 
+      /// Return true iff iter is not past the end.
       friend bool operator!=(std::nullptr_t, const successor_iterator& iter)
       {
         return iter.edge_index != 0;
@@ -197,11 +208,13 @@ namespace spot
       unsigned state;
 
     public:
+      /// Construct range over successors of state s in g.
       successor_range(const adjlist* g, unsigned s)
         : graph(g), state(s)
       {
       }
 
+      /// Return iterator to first successor.
       successor_iterator begin() const
       {
         unsigned first_edge = (state < graph->states_.size()) ?
@@ -209,22 +222,26 @@ namespace spot
         return successor_iterator(graph, first_edge);
       }
 
+      /// Return past-the-end sentinel.
       std::nullptr_t end() const
       {
         return nullptr;
       }
     };
 
+    /// Return successor range for state.
     successor_range out(unsigned state) const
     {
       return successor_range(this, state);
     }
 
+    /// Return the number of states.
     unsigned num_states() const
     {
       return states_.size();
     }
 
+    /// Return the number of edges.
     unsigned num_edges() const
     {
       return edges_.size() - 1;

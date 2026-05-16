@@ -67,7 +67,8 @@
 // someone depends on it.
 #  define SPOT_WANT_STRONG_X 1 ///< Legacy macro; prefer SPOT_HAS_STRONG_X
 // This was defined in Spot 2.15 when exists/forall where introduced.
-#  define SPOT_HAS_QUANTIFIERS 1 ///< Defined when exists/forall operators are available
+/// Defined when the exists/forall operators are available.
+#  define SPOT_HAS_QUANTIFIERS 1
 
 namespace spot
 {
@@ -775,6 +776,7 @@ namespace spot
   /// before others.
   struct formula_ptr_less_than_bool_first
   {
+    /// Compare two fnode pointers, Boolean formulas ordered first.
     bool
       operator()(const fnode* left, const fnode* right) const
       {
@@ -840,6 +842,7 @@ namespace spot
         return old.str() < ord.str();
       }
 
+    /// Compare two formula objects, Boolean formulas ordered first.
     SPOT_API bool
     operator()(const formula& left, const formula& right) const;
 };
@@ -914,6 +917,7 @@ namespace spot
       return *this;
     }
 
+    /// Copy-assignment operator.
     const formula& operator=(const formula& f)
     {
       this->~formula();
@@ -922,12 +926,14 @@ namespace spot
       return *this;
     }
 
+    /// Move-assignment operator.
     const formula& operator=(formula&& f) noexcept
     {
       std::swap(f.ptr_, ptr_);
       return *this;
     }
 
+    /// Less-than comparison (based on unique formula id).
     bool operator<(const formula& other) const noexcept
     {
       if (SPOT_UNLIKELY(!other.ptr_))
@@ -945,41 +951,50 @@ namespace spot
       return ptr_ < other.ptr_;
     }
 
+    /// Less-than-or-equal comparison.
     bool operator<=(const formula& other) const noexcept
     {
       return *this == other || *this < other;
     }
 
+    /// Greater-than comparison.
     bool operator>(const formula& other) const noexcept
     {
       return !(*this <= other);
     }
 
+    /// Greater-than-or-equal comparison.
     bool operator>=(const formula& other) const noexcept
     {
       return !(*this < other);
     }
 
+    /// Equality comparison (formulas are hash-consed, so pointer equality
+    /// suffices).
     bool operator==(const formula& other) const noexcept
     {
       return other.ptr_ == ptr_;
     }
 
+    /// Check whether the formula is null.
     bool operator==(std::nullptr_t) const noexcept
     {
       return ptr_ == nullptr;
     }
 
+    /// Inequality comparison.
     bool operator!=(const formula& other) const noexcept
     {
       return other.ptr_ != ptr_;
     }
 
+    /// Check whether the formula is non-null.
     bool operator!=(std::nullptr_t) const noexcept
     {
       return ptr_ != nullptr;
     }
 
+    /// Return \c true iff the formula is non-null.
     explicit operator bool() const noexcept
     {
       return ptr_ != nullptr;
@@ -1522,6 +1537,10 @@ namespace spot
     /// @}
 #undef SPOT_DEF_BUNOP
 
+    /// \brief Create a quantified formula (∃ or ∀ over an atomic proposition).
+    ///
+    /// The \a quantifier must be op::Exists or op::ForAll.
+    /// @{
     static formula quantify(op quantifier,
                             formula&& ap,
                             formula&& f)
@@ -1566,6 +1585,7 @@ namespace spot
       return formula(fnode::quantify(quantifier, std::move(tmp),
                                      f.ptr_->clone()));
     }
+    /// @}
 #endif // !SWIG
 
 /// \cond INTERNAL
@@ -1796,32 +1816,38 @@ namespace spot
       {
       }
 
+      /// Construct from a raw fnode pointer array position.
       formula_child_iterator(const fnode*const* f)
         : ptr_(f)
       {
       }
 
+      /// Iterator equality.
       bool operator==(formula_child_iterator o)
       {
         return ptr_ == o.ptr_;
       }
 
+      /// Iterator inequality.
       bool operator!=(formula_child_iterator o)
       {
         return ptr_ != o.ptr_;
       }
 
+      /// Dereference to the child formula.
       formula operator*()
       {
         return formula((*ptr_)->clone());
       }
 
+      /// Pre-increment.
       formula_child_iterator operator++()
       {
         ++ptr_;
         return *this;
       }
 
+      /// Post-increment.
       formula_child_iterator operator++(int)
       {
         auto tmp = *this;
@@ -2233,6 +2259,7 @@ namespace spot
     }
 
 #ifndef SWIG
+    /// \brief Report a fatal formula error message and abort.
     [[noreturn]] static void report_message(const char* message);
   private:
     [[noreturn]] static void report_ap_invalid_arg();
@@ -2260,6 +2287,7 @@ namespace std
   template <>
     struct hash<spot::formula>
     {
+      /// Compute hash of a formula using its unique identifier.
       size_t operator()(const spot::formula& x) const noexcept
       {
         return x.id();

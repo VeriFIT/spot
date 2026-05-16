@@ -71,6 +71,7 @@ namespace spot
   class SPOT_API hoa_alias_formater final
   {
   public:
+    /// Type alias for a list of (name, BDD) alias pairs.
     typedef std::vector<std::pair<std::string, bdd>> aliases_t;
   private:
     aliases_t* aliases_;

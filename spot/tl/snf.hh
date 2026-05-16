@@ -23,6 +23,7 @@
 
 namespace spot
 {
+  /// Cache mapping formulas to their star normal form.
   typedef std::unordered_map<formula, formula> snf_cache;
 
   /// \ingroup tl_rewriting

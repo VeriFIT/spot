@@ -41,6 +41,7 @@ namespace spot
     {
     }
 
+    /// Hash \a p using Knuth's multiplicative hash.
     size_t operator()(const T* p) const noexcept
     {
       return knuth32_hash(reinterpret_cast<size_t>(p));
@@ -62,7 +63,7 @@ namespace spot
     {
     }
 
-    size_t operator()(const T& s) const noexcept
+    size_t operator()(const T& s) const noexcept ///< Return \a s as its hash.
     {
       return s;
     }
@@ -72,6 +73,7 @@ namespace spot
   /// \brief Hash functor for std::pair combining hashes of both elements.
   struct pair_hash
   {
+    /// Hash a pair by combining hashes of both elements.
     template<typename T, typename U>
     std::size_t operator()(const std::pair<T, U> &p) const noexcept
     {

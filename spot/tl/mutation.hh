@@ -35,6 +35,12 @@ namespace spot
       Mut_All = -1U
     };
 
+  /// \brief Generate mutations of a formula.
+  ///
+  /// Returns up to \a max_output mutated formulas derived from \a f
+  /// by applying \a mutation_count simultaneous mutations selected by
+  /// \a opts (a bitmask of mut_opts values).  If \a sort is true, the
+  /// results are sorted.
   SPOT_API
   std::vector<formula> mutate(formula f,
                               unsigned opts = Mut_All,

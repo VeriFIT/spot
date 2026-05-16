@@ -592,7 +592,7 @@ namespace spot
                   //    acceptance set if is this not used by the next
                   //    state is a heuristic that is compatible with
                   //    point 2) above while not causing more states to
-                  //    be generated in our benchmark of 188 formulae
+                  //    be generated in our benchmark of 188 formulas
                   //    from the literature.
                   if (!order.empty())
                     {

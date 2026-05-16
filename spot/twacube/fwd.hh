@@ -23,6 +23,8 @@
 namespace spot
 {
   class twacube;
+  /// Shared pointer to twacube.
   typedef std::shared_ptr<twacube> twacube_ptr;
+  /// Shared pointer to const twacube.
   typedef std::shared_ptr<const twacube> const_twacube_ptr;
 }

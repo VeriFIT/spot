@@ -37,6 +37,7 @@ namespace spot
     {
     }
 
+    /// Retrieve a named statistic by its key.
     unsigned
     get(const char* str) const
     {
@@ -45,9 +46,11 @@ namespace spot
       return (this->*i->second)();
     }
 
+    /// Function pointer type for unsigned statistics getters.
     typedef unsigned (unsigned_statistics::*unsigned_fun)() const;
+    /// Map from statistic names to getter function pointers.
     typedef std::map<const char*, unsigned_fun, char_ptr_less_than> stats_map;
-    stats_map stats;
+    stats_map stats; ///< Map of available statistics.
   };
 
   /// \brief Emptiness-check statistics
@@ -71,24 +74,28 @@ namespace spot
           (&ec_statistics::max_depth);
     }
 
+    /// Set the number of visited states.
     void
     set_states(unsigned n)
     {
       states_ = n;
     }
 
+    /// Increment the number of visited states.
     void
     inc_states()
     {
       ++states_;
     }
 
+    /// Increment the number of visited transitions.
     void
     inc_transitions()
     {
       ++transitions_;
     }
 
+    /// Increase the current DFS depth by \a n.
     void
     inc_depth(unsigned n = 1)
     {
@@ -97,6 +104,7 @@ namespace spot
         max_depth_ = depth_;
     }
 
+    /// Decrease the current DFS depth by \a n.
     void
     dec_depth(unsigned n = 1)
     {
@@ -104,24 +112,28 @@ namespace spot
       depth_ -= n;
     }
 
+    /// Return the number of visited states.
     unsigned
     states() const
     {
       return states_;
     }
 
+    /// Return the number of visited transitions.
     unsigned
     transitions() const
     {
       return transitions_;
     }
 
+    /// Return the maximum DFS depth reached.
     unsigned
     max_depth() const
     {
       return max_depth_;
     }
 
+    /// Return the current DFS depth.
     unsigned
     depth() const
     {
@@ -154,24 +166,28 @@ namespace spot
           (&ars_statistics::ars_cycle_states);
     }
 
+    /// Increment the count of prefix states visited.
     void
     inc_ars_prefix_states()
     {
       ++prefix_states_;
     }
 
+    /// Return the number of prefix states visited.
     unsigned
     ars_prefix_states() const
     {
       return prefix_states_;
     }
 
+    /// Increment the count of cycle states visited.
     void
     inc_ars_cycle_states()
     {
       ++cycle_states_;
     }
 
+    /// Return the number of cycle states visited.
     unsigned
     ars_cycle_states() const
     {

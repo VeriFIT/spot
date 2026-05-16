@@ -27,6 +27,7 @@ namespace spot
   class SPOT_API isomorphism_checker final
   {
   public:
+    /// \brief Construct the checker with \a ref as the reference automaton.
     isomorphism_checker(const const_twa_graph_ptr ref);
 
     /// \ingroup twa_misc

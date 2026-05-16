@@ -83,6 +83,7 @@ namespace spot
     /// Deciding how to output those errors is up to you.
     parse_aut_error_list errors;
 
+    /// \brief Construct with \a str as the filename for error display.
     parsed_aut(const std::string& str)
       : filename(str)
     {

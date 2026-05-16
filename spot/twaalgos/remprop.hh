@@ -31,13 +31,16 @@ namespace spot
     std::set<formula> props_pos;
     std::set<formula> props_neg;
   public:
+    /// \brief Register atomic propositions from a comma-separated list.
     void add_ap(const char* ap_csv);
 
+    /// \brief Whether no atomic propositions are registered.
     bool empty() const
     {
       return props_exist.empty() && props_pos.empty() && props_neg.empty();
     }
 
+    /// \brief Strip registered atomic propositions from \a aut.
     twa_graph_ptr strip(const_twa_graph_ptr aut) const;
   };
 

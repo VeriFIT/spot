@@ -40,49 +40,49 @@ namespace spot
   public:
     ~ltsmin_model();
 
-    // \brief Load an ltsmin model, either from divine or promela.
-    //
-    // The filename given can be either a *.pm/*.pml/*.prom promela
-    // source or a *.spins dynamic library compiled with "spins file".
-    // If a promela source is supplied, this function will call spins to
-    // update the *.spins library only if it is not newer.
-    //
-    // Similarly the divine models can be specified as *.dve source or
-    // *.dve or *.dve2C libraries.
-    //
+    /// \brief Load an ltsmin model, either from divine or promela.
+    ///
+    /// The filename given can be either a *.pm/*.pml/*.prom promela
+    /// source or a *.spins dynamic library compiled with "spins file".
+    /// If a promela source is supplied, this function will call spins to
+    /// update the *.spins library only if it is not newer.
+    ///
+    /// Similarly the divine models can be specified as *.dve source or
+    /// *.dve or *.dve2C libraries.
+    ///
     static ltsmin_model load(const std::string& file);
 
-    // \brief Generate a Kripke structure on-the-fly
-    //
-    // The dead parameter is used to control the behavior of the model
-    // on dead states (i.e. the final states of finite sequences).  If
-    // DEAD is formula::ff(), it means we are not interested in finite
-    // sequences of the system, and dead state will have no successor.
-    // If DEAD is formula::tt(), we want to check finite sequences as
-    // well as infinite sequences, but do not need to distinguish
-    // them.  In that case dead state will have a loop labeled by
-    // true.  If DEAD is any atomic proposition (formula::ap("...")),
-    // this is the name of a property that should be true when looping
-    // on a dead state, and false otherwise.
-    //
-    // This function returns nullptr on error.
-    //
-    // \a to_observe the list of atomic propositions that should be observed
-    //               in the model
-    // \a dict the BDD dictionary to use
-    // \a dead an atomic proposition or constant to use for looping on
-    //         dead states
-    // \a compress whether to compress the states.  Use 0 to disable, 1
-    // to enable compression, 2 to enable a faster compression that only
-    // works if all variables are smaller than 2^28.
+    /// \brief Generate a Kripke structure on-the-fly
+    ///
+    /// The dead parameter is used to control the behavior of the model
+    /// on dead states (i.e. the final states of finite sequences).  If
+    /// DEAD is formula::ff(), it means we are not interested in finite
+    /// sequences of the system, and dead state will have no successor.
+    /// If DEAD is formula::tt(), we want to check finite sequences as
+    /// well as infinite sequences, but do not need to distinguish
+    /// them.  In that case dead state will have a loop labeled by
+    /// true.  If DEAD is any atomic proposition (formula::ap("...")),
+    /// this is the name of a property that should be true when looping
+    /// on a dead state, and false otherwise.
+    ///
+    /// This function returns nullptr on error.
+    ///
+    /// \a to_observe the list of atomic propositions that should be observed
+    ///               in the model
+    /// \a dict the BDD dictionary to use
+    /// \a dead an atomic proposition or constant to use for looping on
+    ///         dead states
+    /// \a compress whether to compress the states.  Use 0 to disable, 1
+    /// to enable compression, 2 to enable a faster compression that only
+    /// works if all variables are smaller than 2^28.
     kripke_ptr kripke(const atomic_prop_set* to_observe,
                       bdd_dict_ptr dict,
                       formula dead = formula::tt(),
                       int compress = 0) const;
 
-    // \brief The same as above but returns a kripkecube, i.e., a kripke
-    // that can be used in parallel. Moreover, it supports more elaborate
-    // atomic propositions such as "P.a == P.c".
+    /// \brief The same as above but returns a kripkecube, i.e., a kripke
+    /// that can be used in parallel. Moreover, it supports more elaborate
+    /// atomic propositions such as "P.a == P.c".
     ltsmin_kripkecube_ptr kripkecube(std::vector<std::string> to_observe,
                                      formula dead = formula::tt(),
                                      int compress = 0,

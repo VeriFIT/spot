@@ -26,14 +26,14 @@ namespace spot
 {
   class tl_simplifier_cache;
 
-  /// Check containment between LTL formulae.
+  /// Check containment between LTL formulas.
   class SPOT_API language_containment_checker
   {
     struct record_;
     struct trans_map_;
   public:
     /// This class uses spot::ltl_to_tgba_fm to translate LTL
-    /// formulae.  See that function for the meaning of these options.
+    /// formulas.  See that function for the meaning of these options.
     language_containment_checker(bdd_dict_ptr dict = make_bdd_dict(),
                                  bool exprop = false,
                                  bool symb_merge = true,

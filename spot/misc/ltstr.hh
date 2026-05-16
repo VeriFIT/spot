@@ -37,6 +37,7 @@ namespace spot
   /// \endcode
   struct char_ptr_less_than
   {
+    /// Return true iff \a left < \a right lexicographically.
     bool
     operator()(const char* left, const char* right) const
     {

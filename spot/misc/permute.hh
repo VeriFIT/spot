@@ -25,6 +25,7 @@
 namespace spot
 {
 
+  /// \brief Reorder \a data in place according to the permutation \a indices.
   // Reorder `data` according the permutation in `indices` by
   // following the cycles in the permutation.  Additionally, if an
   // index is -1, the corresponding value is moved to the end of the

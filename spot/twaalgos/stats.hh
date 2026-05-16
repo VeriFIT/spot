@@ -32,19 +32,21 @@ namespace spot
   /// \brief Basic statistics (states and edges counts) for a TωA.
   struct SPOT_API twa_statistics
   {
-    unsigned edges;
-    unsigned states;
+    unsigned edges; ///< Number of edges in the automaton.
+    unsigned states; ///< Number of states in the automaton.
 
     twa_statistics() { edges = 0; states = 0; }
+    /// Dump statistics to an output stream.
     std::ostream& dump(std::ostream& out) const;
   };
 
   /// \brief Extended statistics including transition counts for a TωA.
   struct SPOT_API twa_sub_statistics: public twa_statistics
   {
-    unsigned long long transitions;
+    unsigned long long transitions; ///< Number of transitions in the automaton.
 
     twa_sub_statistics() { transitions = 0; }
+    /// Dump statistics to an output stream.
     std::ostream& dump(std::ostream& out) const;
   };
 
@@ -61,6 +63,7 @@ namespace spot
   class SPOT_API printable_formula: public printable_value<formula>
   {
   public:
+    /// Assign a new formula value.
     printable_formula&
     operator=(formula new_val)
     {
@@ -68,6 +71,7 @@ namespace spot
       return *this;
     }
 
+    /// Print the formula to an output stream.
     virtual void
     print(std::ostream& os, const char*) const override;
   };
@@ -78,6 +82,7 @@ namespace spot
   {
     acc_cond val_;
   public:
+    /// Assign a new acceptance condition value.
     printable_acc_cond&
     operator=(const acc_cond& new_val)
     {
@@ -85,6 +90,7 @@ namespace spot
       return *this;
     }
 
+    /// Print the acceptance condition to an output stream.
     void print(std::ostream& os, const char* pos) const override;
   };
 
@@ -95,16 +101,19 @@ namespace spot
   {
     std::unique_ptr<scc_info> val_;
   public:
+    /// Compute SCC information for the given automaton.
     void automaton(const const_twa_graph_ptr& aut)
     {
       val_ = std::make_unique<scc_info>(aut);
     }
 
+    /// Clear the stored SCC information.
     void reset()
     {
       val_ = nullptr;
     }
 
+    /// Print SCC statistics to an output stream.
     void print(std::ostream& os, const char* pos) const override;
   };
 
@@ -116,12 +125,14 @@ namespace spot
     unsigned reachable_ = 0;
     unsigned all_ = 0;
   public:
+    /// Set the reachable and total counts.
     void set(unsigned reachable, unsigned all)
     {
       reachable_ = reachable;
       all_ = all;
     }
 
+    /// Print the size to an output stream.
     void print(std::ostream& os, const char* pos) const override;
   };
 
@@ -133,12 +144,14 @@ namespace spot
     unsigned long long reachable_ = 0;
     unsigned long long all_ = 0;
   public:
+    /// Set the reachable and total counts.
     void set(unsigned long long reachable, unsigned long long all)
     {
       reachable_ = reachable;
       all_ = all;
     }
 
+    /// Print the long size to an output stream.
     void print(std::ostream& os, const char* pos) const override;
   };
 
@@ -150,6 +163,7 @@ namespace spot
   class SPOT_API stat_printer: protected formater
   {
   public:
+    /// Construct with an output stream and a format string.
     stat_printer(std::ostream& os, const char* format);
 
     /// \brief print the configured statistics.

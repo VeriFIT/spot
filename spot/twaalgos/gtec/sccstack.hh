@@ -34,6 +34,7 @@ namespace spot
     struct connected_component
     {
     public:
+      /// \brief Construct an SCC entry with the given index.
       connected_component(int index = -1);
 
       /// Index of the SCC.
@@ -42,7 +43,7 @@ namespace spot
       /// connected component.
       acc_cond::mark_t condition;
 
-      std::list<const state*> rem;
+      std::list<const state*> rem; ///< Remaining states in this SCC.
     };
 
     /// Stack a new SCC with index \a index.
@@ -71,7 +72,7 @@ namespace spot
     /// Is the stack empty?
     bool empty() const;
 
-    typedef std::list<connected_component> stack_type;
-    stack_type s;
+    typedef std::list<connected_component> stack_type; ///< SCC stack type.
+    stack_type s; ///< The underlying SCC stack storage.
   };
 }

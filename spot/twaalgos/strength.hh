@@ -44,7 +44,7 @@ namespace spot
                         scc_info* sm = nullptr);
 
 
-  // 3-arg form was deprecated in Spot 2.12
+  /// \brief Deprecated 3-argument form; the third argument is now ignored.
   SPOT_DEPRECATED("is third argument of is_terminal_automaton()"
                   " is now ignored")
   SPOT_API bool
@@ -192,6 +192,7 @@ namespace spot
   SPOT_API twa_graph_ptr
   decompose_scc(scc_info& sm, const char* keep);
 
+  /// \brief Deprecated: use decompose_scc() instead.
   SPOT_DEPRECATED("use decompose_scc() instead")
   SPOT_API twa_graph_ptr
   decompose_strength(const const_twa_graph_ptr& aut, const char* keep);

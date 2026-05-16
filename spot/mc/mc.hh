@@ -45,6 +45,7 @@ namespace spot
      SWARMING,      ///< \brief Holzmann.11.ieee applied to renault.13.lpar
     };
 
+  /// \brief Return value of a parallel model-checking algorithm.
   enum class SPOT_API mc_rvalue
     {
      DEADLOCK,                  ///< \brief A deadlock has been found
@@ -69,6 +70,7 @@ namespace spot
    std::string trace;                 ///< \brief The output trace
   };
 
+  /// \brief Print an mc_algorithm value to a stream.
   SPOT_API std::ostream& operator<<(std::ostream& os, const mc_algorithm& ma)
   {
     switch (ma)
@@ -89,6 +91,7 @@ namespace spot
     return os;
   }
 
+  /// \brief Print an mc_rvalue value to a stream.
   SPOT_API std::ostream& operator<<(std::ostream& os, const mc_rvalue& mr)
   {
     switch (mr)
@@ -109,6 +112,7 @@ namespace spot
     return os;
   }
 
+  /// \brief Print ec_stats to a stream.
   SPOT_API std::ostream& operator<<(std::ostream& os, const ec_stats& es)
   {
     for (unsigned i = 0; i < es.name.size(); ++i)

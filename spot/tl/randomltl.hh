@@ -33,6 +33,8 @@ namespace spot
   class SPOT_API random_formula
   {
   public:
+    /// \brief Construct with \a proba_size operator slots
+    /// and atomic propositions \a ap.
     random_formula(unsigned proba_size,
                    const atomic_prop_set* ap,
                    const atomic_prop_set* output_ap = nullptr,
@@ -59,6 +61,7 @@ namespace spot
       return output_ap_;
     }
 
+    /// Return the predicate that classifies propositions as output.
     std::function<bool(formula)> is_output_fun() const
     {
       return is_output_;
@@ -110,31 +113,38 @@ namespace spot
     }
 
   protected:
+    /// Recompute running probability sums after priorities have changed.
     void update_sums();
 
     /// \brief Entry describing one operator and its probability for random
     /// formula generation.
     struct op_proba
     {
-      const char* name;
-      int min_n;
-      double proba;
+      const char* name;  ///< Name of the operator.
+      int min_n;         ///< Minimum formula size needed for this operator.
+      double proba;      ///< Cumulative probability weight.
+      /// Function pointer type for building a formula of this operator.
       typedef formula (*builder)(const random_formula* rl, int n);
-      builder build;
+      builder build;     ///< Builder function for this operator.
+      /// Initialize the entry with \a name, \a min_n, and \a build.
       void setup(const char* name, int min_n, builder build);
     };
-    unsigned proba_size_;
-    op_proba* proba_;
-    double total_1_;
-    op_proba* proba_2_;
-    double total_2_;
-    op_proba* proba_2_or_more_;
+    unsigned proba_size_;       ///< Number of entries in the operator table.
+    op_proba* proba_;           ///< Operator probability table.
+    double total_1_;            ///< Total weight of unary operators.
+    op_proba* proba_2_;         ///< Pointer to binary operators in the table.
+    double total_2_;            ///< Total weight of binary operators.
+    op_proba* proba_2_or_more_; ///< Pointer to operators needing ≥2 children.
+    /// Total weight of operators needing two or more children.
     double total_2_and_more_;
-    const atomic_prop_set* ap_;
+    const atomic_prop_set* ap_; ///< Atomic propositions used to build formulas.
+    /// Output atomic propositions (may be null if not used).
     const atomic_prop_set* output_ap_ = nullptr;
+    /// Sub-formula patterns used as atoms (may be null).
     const atomic_prop_set* patterns_ = nullptr;
+    /// Predicate classifying a proposition as an output (may be null).
     std::function<bool(formula)> is_output_ = nullptr;
-    bool draw_literals_;
+    bool draw_literals_; ///< Whether relabeling APs should use literals.
   };
 
 
@@ -198,7 +208,9 @@ namespace spot
                const atomic_prop_set* subformulas = nullptr);
 
   protected:
+    /// Initialize the probability table, optionally using \a patterns as atoms.
     void setup_proba_(const atomic_prop_set* patterns);
+    /// \brief Construct with explicit table \a size (for subclasses).
     random_ltl(int size, const atomic_prop_set* ap,
                const atomic_prop_set* output_ap = nullptr,
                std::function<bool(formula)> is_output = nullptr);
@@ -293,6 +305,7 @@ namespace spot
     /// the parse_options method of the \c rb attribute.
     random_sere(const atomic_prop_set* ap);
 
+    /// The Boolean formula generator used to build Boolean sub-expressions.
     random_boolean rb;
   };
 
@@ -362,9 +375,12 @@ namespace spot
 
 
   public:
+    /// Output formula type produced by the generator.
     enum output_type { Bool, LTL, SERE, PSL };
+    /// Maximum number of attempts to generate a unique formula.
     static constexpr unsigned MAX_TRIALS = 100000U;
 
+    /// \brief Construct with \a aprops_n random atomic propositions.
     randltlgenerator(int aprops_n, const option_map& opts,
                      char* opt_pL = nullptr,
                      char* opt_pS = nullptr,
@@ -372,6 +388,7 @@ namespace spot
                      const atomic_prop_set* subformulas = nullptr,
                      std::function<bool(formula)> is_output = nullptr);
 
+    /// \brief Construct with an explicit set of atomic propositions.
     randltlgenerator(atomic_prop_set aprops, const option_map& opts,
                      char* opt_pL = nullptr,
                      char* opt_pS = nullptr,
@@ -381,15 +398,23 @@ namespace spot
 
     ~randltlgenerator();
 
+    /// Generate the next random formula (up to MAX_TRIALS attempts).
     formula next();
 
+    /// Print LTL operator priorities to \a os.
     void dump_ltl_priorities(std::ostream& os);
+    /// Print Boolean operator priorities to \a os.
     void dump_bool_priorities(std::ostream& os);
+    /// Print PSL operator priorities to \a os.
     void dump_psl_priorities(std::ostream& os);
+    /// Print SERE operator priorities to \a os.
     void dump_sere_priorities(std::ostream& os);
+    /// Print SERE Boolean operator priorities to \a os.
     void dump_sere_bool_priorities(std::ostream& os);
+    /// Remove some propositions from \a s (used for well-formed generation).
     void remove_some_props(atomic_prop_set& s);
 
+    /// Return a GF(p1 & ... & pn) formula over n random propositions.
     formula GF_n();
 
   private:

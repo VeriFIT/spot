@@ -42,6 +42,8 @@ namespace spot
                   const char* options = nullptr);
 
 
+  /// \ingroup twa_io
+  /// \brief Print an AIG circuit in dot format.
   SPOT_API std::ostream &
   print_dot(std::ostream &os, aig_ptr circuit, const char * = nullptr);
 }

@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \brief Count leading zeros of an unsigned integer.
   template<typename Type,
            typename = std::enable_if_t<std::is_unsigned<Type>::value>>
   inline constexpr unsigned clz(Type n) noexcept

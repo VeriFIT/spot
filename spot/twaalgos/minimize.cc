@@ -209,7 +209,7 @@ namespace spot
           delete non_final;
         }
 
-      // A bdd_states_map is a list of formulae (in a BDD form)
+      // A bdd_states_map is a list of formulas (in a BDD form)
       // associated with a destination set of states.
       typedef std::map<bdd, hash_set*, bdd_less_than> bdd_states_map;
 

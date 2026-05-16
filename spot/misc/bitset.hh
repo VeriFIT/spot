@@ -69,6 +69,7 @@ namespace spot
     /// the -1 (all bits are set to 1)
     static bitset mone() { return bitset(minus_one_tag{}); }
 
+    /// Return true if any bit is set.
     explicit operator bool() const
     {
       for (const auto& v : data)
@@ -77,11 +78,13 @@ namespace spot
       return false;
     }
 
+    /// Return a hash of the bitset.
     size_t hash() const
     {
       return fnv_hash(data.begin(), data.end());
     }
 
+    /// Equality comparison.
     bool operator==(const bitset& other) const
     {
       // TODO use std::algorithms instead?
@@ -91,11 +94,13 @@ namespace spot
       return true;
     }
 
+    /// Inequality comparison.
     bool operator!=(const bitset& other) const
     {
       return !this->operator==(other);
     }
 
+    /// Lexicographic less-than comparison.
     bool operator<(const bitset& other) const
     {
       for (unsigned i = 0; i != N; ++i)
@@ -106,6 +111,7 @@ namespace spot
       return false;
     }
 
+    /// Lexicographic less-than-or-equal comparison.
     bool operator<=(const bitset& other) const
     {
       for (unsigned i = 0; i != N; ++i)
@@ -116,16 +122,19 @@ namespace spot
       return true;
     }
 
+    /// Lexicographic greater-than comparison.
     bool operator>(const bitset& other) const
     {
       return other.operator<(*this);
     }
 
+    /// Lexicographic greater-than-or-equal comparison.
     bool operator>=(const bitset& other) const
     {
       return other.operator<=(*this);
     }
 
+    /// Set bit \a s to one.
     void set(unsigned s)
     {
 #if SPOT_DEBUG || defined(SWIGPYTHON)
@@ -137,6 +146,7 @@ namespace spot
       data[s / (8*sizeof(word_t))] |= 1U << (s % (8*sizeof(word_t)));
     }
 
+    /// Clear bit \a s (set it to zero).
     void clear(unsigned s)
     {
 #if SPOT_DEBUG || defined(SWIGPYTHON)
@@ -148,12 +158,14 @@ namespace spot
       data[s / (8*sizeof(word_t))] &= ~(1U << (s % (8*sizeof(word_t))));
     }
 
+    /// Return the bitset shifted left by \a s positions.
     bitset operator<<(unsigned s) const
     {
       bitset r = *this;
       r <<= s;
       return r;
     }
+    /// Return the bitset shifted right by \a s positions.
     bitset operator>>(unsigned s) const
     {
       bitset r = *this;
@@ -161,6 +173,7 @@ namespace spot
       return r;
     }
 
+    /// Shift left in place by \a s positions.
     bitset& operator<<=(unsigned s)
     {
 #if SPOT_DEBUG || defined(SWIGPYTHON)
@@ -201,6 +214,7 @@ namespace spot
       return *this;
     }
 
+    /// Shift right in place by \a s positions.
     bitset& operator>>=(unsigned s)
     {
 #if SPOT_DEBUG || defined(SWIGPYTHON)
@@ -241,6 +255,7 @@ namespace spot
       return *this;
     }
 
+    /// Return the bitwise complement.
     bitset operator~() const
     {
       bitset r = *this;
@@ -249,6 +264,7 @@ namespace spot
       return r;
     }
 
+    /// Return the bitwise AND of *this and \a other.
     bitset operator&(const bitset& other) const
     {
       bitset r = *this;
@@ -256,6 +272,7 @@ namespace spot
       return r;
     }
 
+    /// Return the bitwise OR of *this and \a other.
     bitset operator|(const bitset& other) const
     {
       bitset r = *this;
@@ -263,6 +280,7 @@ namespace spot
       return r;
     }
 
+    /// Return the bitwise XOR of *this and \a other.
     bitset operator^(const bitset& other) const
     {
       bitset r = *this;
@@ -270,18 +288,21 @@ namespace spot
       return r;
     }
 
+    /// In-place bitwise AND with \a other.
     bitset& operator&=(const bitset& other)
     {
       for (unsigned i = 0; i != N; ++i)
         data[i] &= other.data[i];
       return *this;
     }
+    /// In-place bitwise OR with \a other.
     bitset& operator|=(const bitset& other)
     {
       for (unsigned i = 0; i != N; ++i)
         data[i] |= other.data[i];
       return *this;
     }
+    /// In-place bitwise XOR with \a other.
     bitset& operator^=(const bitset& other)
     {
       for (unsigned i = 0; i != N; ++i)
@@ -289,12 +310,14 @@ namespace spot
       return *this;
     }
 
+    /// Return the result of subtracting \a s from the bitset.
     bitset operator-(word_t s) const
     {
       bitset r = *this;
       r -= s;
       return r;
     }
+    /// Subtract \a s from the bitset in place.
     bitset& operator-=(word_t s)
     {
       for (auto& v : data)
@@ -312,6 +335,7 @@ namespace spot
       return *this;
     }
 
+    /// Return the arithmetic negation (two's complement).
     bitset operator-() const
     {
       bitset res = *this;
@@ -325,6 +349,7 @@ namespace spot
       return res;
     }
 
+    /// Return the number of set bits (popcount).
     unsigned count() const
     {
       unsigned c = 0U;
@@ -343,6 +368,7 @@ namespace spot
       return c;
     }
 
+    /// Return the position of the highest set bit.
     unsigned highest() const
     {
       unsigned res = (N-1)*8*sizeof(word_t);
@@ -360,6 +386,7 @@ namespace spot
       return 0;
     }
 
+    /// Return the position of the lowest set bit.
     unsigned lowest() const
     {
       unsigned res = 0U;
@@ -393,6 +420,7 @@ namespace std
   template<size_t N>
   struct hash<spot::bitset<N>>
   {
+    /// Compute the hash of \a b.
     size_t operator()(const spot::bitset<N>& b) const
     {
       return b.hash();

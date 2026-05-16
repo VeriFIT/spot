@@ -121,7 +121,8 @@ namespace spot
     /// Must only be used with distributed picolib.
     void assume(int lit);
 
-    typedef std::vector<bool> solution;
+    typedef std::vector<bool> solution; ///< SAT solution (one bool per var).
+    /// Return code paired with a solution.
     typedef std::pair<int, solution> solution_pair;
 
     /// \brief Return std::vector<solving_return_code, solution>.

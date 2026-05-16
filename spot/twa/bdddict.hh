@@ -33,7 +33,7 @@ namespace spot
   class bdd_dict_priv;
 
   /// \ingroup twa_essentials
-  /// \brief Map BDD variables to formulae.
+  /// \brief Map BDD variables to formulas.
   ///
   /// The BDD library uses integers to designate Boolean variables in
   /// its decision diagrams.  This class is used to map such integers

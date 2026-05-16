@@ -23,17 +23,18 @@
 
 namespace spot
 {
+  /// \ingroup tl_rewriting
   /// \brief Utilities for marking NegClosure and EConcat operators in temporal
   /// formulas.
   class SPOT_API mark_tools final
   {
   public:
-    /// \ingroup tl_rewriting
     /// \brief Mark operators NegClosure and EConcat.
     ///
     /// \param f The formula to rewrite.
     formula mark_concat_ops(formula f);
 
+    /// \brief Simplify marked NegClosure and EConcat operators.
     formula simplify_mark(formula f);
 
   private:

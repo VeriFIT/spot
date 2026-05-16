@@ -24,6 +24,7 @@
 
 namespace spot
 {
+  /// \brief Tie-breaking strategy for maximum cardinality search.
   enum mcs_tie_break
     {
       ///\brief Break ties by picking the first possible state.

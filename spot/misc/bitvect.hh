@@ -55,7 +55,7 @@ namespace spot
     bitvect(size_t size, size_t block_count, bool);
 
   public:
-    typedef unsigned long block_t;
+    typedef unsigned long block_t; ///< Storage block type.
 
     bitvect():
       size_(0),
@@ -65,6 +65,7 @@ namespace spot
     {
     }
 
+    /// Copy constructor.
     bitvect(const bitvect& other):
       size_(other.size_),
       block_count_(1),
@@ -73,19 +74,22 @@ namespace spot
       *this = other;
     }
 
-    bitvect* clone() const;
+    bitvect* clone() const; ///< Return a heap-allocated copy.
 
+    /// Custom operator delete for placement-new allocated instances.
     void operator delete(void *ptr)
     {
       // This object was allocated using a placement new.
       ::operator delete(ptr);
     }
 
+    /// Reset the size to zero without freeing storage.
     void make_empty()
     {
       size_ = 0;
     }
 
+    /// Copy-assignment operator.
     bitvect& operator=(const bitvect& other)
     {
       reserve_blocks(other.block_count_);
@@ -139,24 +143,29 @@ namespace spot
 
   public:
 
+    /// Return the number of blocks currently in use.
     size_t used_blocks() const
     {
       const size_t bpb = 8 * sizeof(block_t);
       return (size_ + bpb - 1) / bpb;
     }
 
+    /// Return the number of bits in the vector.
     size_t size() const
     {
       return size_;
     }
 
+    /// Return the maximum number of bits the storage can hold.
     size_t capacity() const
     {
       return 8 * block_count_ * sizeof(block_t);
     }
 
+    /// Return a hash of the bit vector.
     size_t hash() const noexcept;
 
+    /// Return the value of bit \a pos.
     bool get(size_t pos) const
     {
       SPOT_ASSERT(pos < size_);
@@ -164,12 +173,14 @@ namespace spot
       return storage_[pos / bpb] & (1UL << (pos % bpb));
     }
 
+    /// Clear all bits (set them to zero).
     void clear_all()
     {
       for (size_t i = 0; i < block_count_; ++i)
         storage_[i] = 0;
     }
 
+    /// Return true iff all bits are zero.
     bool is_fully_clear() const
     {
       size_t i;
@@ -186,6 +197,7 @@ namespace spot
       return (storage_[i] & mask) == 0;
     }
 
+    /// Return true iff all bits are set to one.
     bool is_fully_set() const
     {
       size_t i;
@@ -202,18 +214,21 @@ namespace spot
       return ((~storage_[i]) & mask) == 0;
     }
 
+    /// Set all bits to one.
     void set_all()
     {
       for (size_t i = 0; i < block_count_; ++i)
         storage_[i] = -1UL;
     }
 
+    /// Flip all bits.
     void flip_all()
     {
       for (size_t i = 0; i < block_count_; ++i)
         storage_[i] = ~storage_[i];
     }
 
+    /// Set bit at position \a pos to one.
     void set(size_t pos)
     {
       SPOT_ASSERT(pos < size_);
@@ -221,6 +236,7 @@ namespace spot
       storage_[pos / bpb] |= 1UL << (pos % bpb);
     }
 
+    /// Clear bit at position \a pos (set it to zero).
     void clear(size_t pos)
     {
       SPOT_ASSERT(pos < size_);
@@ -228,6 +244,7 @@ namespace spot
       storage_[pos / bpb] &= ~(1UL << (pos % bpb));
     }
 
+    /// Flip the bit at position \a pos.
     void flip(size_t pos)
     {
       SPOT_ASSERT(pos < size_);
@@ -236,6 +253,7 @@ namespace spot
     }
 
 
+    /// In-place bitwise OR with \a other.
     bitvect& operator|=(const bitvect& other)
     {
       SPOT_ASSERT(other.size_ <= size_);
@@ -245,6 +263,7 @@ namespace spot
       return *this;
     }
 
+    /// In-place bitwise AND with \a other.
     bitvect& operator&=(const bitvect& other)
     {
       SPOT_ASSERT(other.size_ <= size_);
@@ -254,6 +273,7 @@ namespace spot
       return *this;
     }
 
+    /// OR into *this the bits common to \a other1 and \a other2.
     bitvect& add_common(const bitvect& other1, const bitvect& other2)
     {
       SPOT_ASSERT(other1.size_ <= size_ && other2.size_ <= size_);
@@ -264,6 +284,7 @@ namespace spot
       return *this;
     }
 
+    /// Return true if *this and \a other share any set bit.
     bool intersects(const bitvect& other)
     {
       SPOT_ASSERT(other.size_ <= size_);
@@ -274,6 +295,7 @@ namespace spot
       return false;
     }
 
+    /// In-place bitwise XOR with \a other.
     bitvect& operator^=(const bitvect& other)
     {
       SPOT_ASSERT(other.size_ <= size_);
@@ -283,6 +305,7 @@ namespace spot
       return *this;
     }
 
+    /// Clear in *this the bits that are set in \a other.
     bitvect& operator-=(const bitvect& other)
     {
       SPOT_ASSERT(other.block_count_ <= block_count_);
@@ -291,6 +314,7 @@ namespace spot
       return *this;
     }
 
+    /// Return true if every set bit of *this is also set in \a other.
     bool is_subset_of(const bitvect& other) const
     {
       SPOT_ASSERT(other.block_count_ >= block_count_);
@@ -311,6 +335,7 @@ namespace spot
               == (storage_[i] & mask));
     }
 
+    /// Return the number of set bits (popcount).
     unsigned count() const
     {
       size_t i;
@@ -337,6 +362,7 @@ namespace spot
       return c;
     }
 
+    /// Equality comparison.
     bool operator==(const bitvect& other) const
     {
       if (other.size_ != size_)
@@ -358,11 +384,13 @@ namespace spot
       return (storage_[i] & mask) == (other.storage_[i] & mask);
     }
 
+    /// Inequality comparison.
     bool operator!=(const bitvect& other) const
     {
       return !(*this == other);
     }
 
+    /// Lexicographic less-than comparison.
     bool operator<(const bitvect& other) const
     {
       if (size_ != other.size_)
@@ -384,21 +412,25 @@ namespace spot
       return (storage_[i] & mask) < (other.storage_[i] & mask);
     }
 
+    /// Lexicographic greater-than-or-equal comparison.
     bool operator>=(const bitvect& other) const
     {
       return !(*this < other);
     }
 
+    /// Lexicographic greater-than comparison.
     bool operator>(const bitvect& other) const
     {
       return other < *this;
     }
 
+    /// Lexicographic less-than-or-equal comparison.
     bool operator<=(const bitvect& other) const
     {
       return !(other < *this);
     }
 
+    /// Call \a callback with the index of each set bit.
     template<typename F>
     void foreach_set_index(F callback) const
     {
@@ -489,6 +521,7 @@ namespace spot
         at(i).~bitvect();
     }
 
+    /// Custom operator delete for placement-new allocated instances.
     void operator delete(void *ptr)
     {
       // This object was allocated using a placement new.
@@ -501,6 +534,7 @@ namespace spot
       return size_;
     }
 
+    /// Clear all bits in all vectors of the array.
     void clear_all()
     {
       // FIXME: This could be changed into a large memset if the

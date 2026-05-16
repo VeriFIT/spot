@@ -125,7 +125,7 @@ namespace spot
                   bool full_parent = false);
 
   /// \brief Output a formula as a LaTeX string which is parsable.
-  /// unless the formula contains automaton operators (used in ELTL formulae).
+  /// unless the formula contains automaton operators (used in ELTL formulas).
   /// \param f The formula to translate.
   /// \param full_parent Whether or not the string should be fully
   ///                           parenthesized.
@@ -142,7 +142,7 @@ namespace spot
                    bool full_parent = false);
 
   /// \brief Output a SERE formula as a LaTeX string which is parsable.
-  /// unless the formula contains automaton operators (used in ELTL formulae).
+  /// unless the formula contains automaton operators (used in ELTL formulas).
   /// \param f The formula to translate.
   /// \param full_parent Whether or not the string should be fully
   ///                           parenthesized.

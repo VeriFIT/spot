@@ -45,7 +45,7 @@ namespace spot
   /// equal).
   ///
   /// \param symb_merge When false, states with the same symbolic
-  /// representation (these are equivalent formulae) will not be
+  /// representation (these are equivalent formulas) will not be
   /// merged.
   ///
   /// \param branching_postponement When set, several transitions leaving
@@ -61,7 +61,7 @@ namespace spot
   /// formula are observable events, and \c unobs can be filled with
   /// additional unobservable events.
   ///
-  /// \param simplifier If this parameter is set, the LTL formulae
+  /// \param simplifier If this parameter is set, the LTL formulas
   /// representing each state of the automaton will be simplified
   /// before computing the successor.  \a simpl should be configured
   /// for the type of reduction you want, see spot::tl_simplifier.

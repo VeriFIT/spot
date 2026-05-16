@@ -450,7 +450,7 @@ namespace spot
               if (os_seen) // [b..i) is a range that contains [*].
                 {
                   // Place [*] at the start of the range, and erase
-                  // all other formulae.
+                  // all other formulas.
                   (*b)->destroy();
                   *b++ = os->clone();
                   for (vec::iterator c = b; c < i; ++c)
@@ -467,7 +467,7 @@ namespace spot
         abs2 = eword();
         weak_abs = nullptr;
 
-        // Make a first pass to group adjacent Boolean formulae.
+        // Make a first pass to group adjacent Boolean formulas.
         // - Fusion(Exps1...,BoolExp1...BoolExpN,Exps2,Exps3...) =
         //   Fusion(Exps1...,And(BoolExp1...BoolExpN),Exps2,Exps3...)
         {
@@ -488,7 +488,7 @@ namespace spot
                   do
                     ++i;
                   while (i != v.end() && (*i)->is_boolean());
-                  // We have at least two adjacent Boolean formulae.
+                  // We have at least two adjacent Boolean formulas.
                   // Replace the first one by the conjunction of all.
                   // FIXME: Investigate the removal of the temporary
                   // vector, by allowing range to be passed to
@@ -1793,7 +1793,7 @@ namespace spot
   size_t fnode::bump_next_id()
   {
     size_t id = next_id_++;
-    // If the counter of formulae ever loops, we want to skip the
+    // If the counter of formulas ever loops, we want to skip the
     // first three values, because they are permanently associated
     // to constants, and it is convenient to have constants
     // smaller than all other formulas.
@@ -2348,7 +2348,7 @@ namespace spot
           unsigned s = size_;
           bool syntactic_si = is_.syntactic_si && !is_.boolean;
           // Note: AndNLM(p1,p2) and AndRat(p1,p2) are Boolean
-          // formulae, but they are actually rewritten as And(p1,p2)
+          // formulas, but they are actually rewritten as And(p1,p2)
           // by trivial identities before this constructor is called.
           // So at this point, AndNLM/AndRat are always used with at
           // most one Boolean argument, and the result is therefore

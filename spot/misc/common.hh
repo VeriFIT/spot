@@ -140,6 +140,7 @@ namespace spot
   /// \brief Exception thrown when a parse error is encountered.
   struct SPOT_API parse_error: public std::runtime_error
   {
+    /// Construct with error message \a s.
     parse_error(const std::string& s)
       : std::runtime_error(s)
       {
@@ -156,11 +157,12 @@ namespace spot
   {
     unsigned nthreads_;
   public:
+    /// Construct with \a nthreads threads.
     parallel_policy(unsigned nthreads = 1) : nthreads_(nthreads)
     {
     }
 
-    unsigned nthreads() const
+    unsigned nthreads() const ///< Return the number of threads.
     {
       return nthreads_;
     }

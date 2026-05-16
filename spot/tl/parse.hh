@@ -60,6 +60,7 @@ namespace spot
     /// \see format_errors
     parse_error_list errors;
 
+    /// \brief Construct with \a str as the input text before parsing.
     parsed_formula(const std::string& str = "")
       : input(str)
     {

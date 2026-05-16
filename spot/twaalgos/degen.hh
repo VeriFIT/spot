@@ -89,6 +89,7 @@ namespace spot
                bool ignaccsl = false,
                bool remove_extra_scc = true);
 
+  /// \brief Transition-based variant of degeneralize().
   SPOT_API twa_graph_ptr
   degeneralize_tba(const const_twa_graph_ptr& a, bool use_z_lvl = true,
                    bool use_cust_acc_orders = false,

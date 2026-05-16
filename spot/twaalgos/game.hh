@@ -52,8 +52,10 @@ namespace spot
 
 
   // false -> env, true -> player
+  /// Winning region: false = player 0 (env), true = player 1.
   typedef std::vector<bool> region_t;
   // state idx -> global edge number
+  /// Strategy: maps each state index to the chosen global edge number.
   typedef std::vector<unsigned> strategy_t;
 
 

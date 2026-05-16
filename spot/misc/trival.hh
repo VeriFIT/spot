@@ -34,7 +34,8 @@ namespace spot
   public:
     // We use repr_t instead of value_t in bitfields to avoid a warning from gcc
     // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=51242
-    typedef signed char repr_t;
+    typedef signed char repr_t; ///< Underlying integer representation type.
+    /// The three possible logical values.
     enum value_t : repr_t { no_value = -1, maybe_value = 0, yes_value = 1 };
   private:
     value_t val_;
@@ -44,6 +45,7 @@ namespace spot
     {
     }
 
+    /// Construct from a bool: false maps to no, true to yes.
     constexpr trival(bool v) noexcept
       : val_(v ? yes_value : no_value)
     {
@@ -52,17 +54,20 @@ namespace spot
 #ifndef SWIG
     // This is needed internally by Spot to work around the bitfield
     // issue mentioned earlier, it makes no sense to use it in Python.
+    /// Construct from a raw repr_t value.
     static trival from_repr_t(repr_t v)
     {
       return trival(static_cast<value_t>(v));
     }
 #endif
 
+    /// Construct from a value_t enumerator.
     constexpr explicit trival(value_t v)
       : val_(v)
     {
     }
 
+    /// Return a trival representing the maybe (unknown) value.
     static constexpr trival maybe() noexcept
     {
       return trival();
@@ -74,26 +79,31 @@ namespace spot
       return val_ != maybe_value;
     }
 
+    /// Return true iff the value is maybe.
     constexpr bool is_maybe() const
     {
       return val_ == maybe_value;
     }
 
+    /// Return true iff the logical value is yes.
     constexpr bool is_true() const
     {
       return val_ == yes_value;
     }
 
+    /// Return true iff the logical value is no.
     constexpr bool is_false() const
     {
       return val_ == no_value;
     }
 
+    /// Return the raw value_t enumerator.
     constexpr value_t val() const
     {
       return val_;
     }
 
+    /// Return true iff the value is yes.
 #ifndef SWIG
     // constexpr explicit only supported in SWIG >= 3.0.4
     constexpr
@@ -103,6 +113,7 @@ namespace spot
       return val_ == yes_value;
     }
 
+    /// Return the three-valued logical negation.
     constexpr trival operator!() const
     {
       return trival((val_ == yes_value) ? no_value :
@@ -119,17 +130,20 @@ namespace spot
   // on a "bool == trival" comparison in Python, but we usually write
   // "trival == bool" and that works.
 #ifndef SWIG
+  /// Equality comparison of two trival values.
   constexpr bool operator==(trival a, trival b)
   {
     return a.val() == b.val();
   }
 
+  /// Inequality comparison of two trival values.
   constexpr bool operator!=(trival a, trival b)
   {
     return !(a == b);
   }
 #endif
 
+  /// Three-valued Kleene logical AND.
   constexpr trival operator&&(trival a, trival b)
   {
     return
@@ -140,16 +154,19 @@ namespace spot
       : trival(true);
   }
 
+  /// Three-valued AND with bool left operand.
   constexpr trival operator&&(bool a, trival b)
   {
     return trival(a) && b;
   }
 
+  /// Three-valued AND with bool right operand.
   constexpr trival operator&&(trival a, bool b)
   {
     return a && trival(b);
   }
 
+  /// Three-valued Kleene logical OR.
   constexpr trival operator||(trival a, trival b)
   {
     return
@@ -160,16 +177,19 @@ namespace spot
       : trival(false);
   }
 
+  /// Three-valued OR with bool left operand.
   constexpr trival operator||(bool a, trival b)
   {
     return trival(a) || b;
   }
 
+  /// Three-valued OR with bool right operand.
   constexpr trival operator||(trival a, bool b)
   {
     return a || trival(b);
   }
 
+  /// Print a trival value to \a os.
   inline std::ostream& operator<<(std::ostream& os, trival v)
   {
     return os << ((v.val() == trival::no_value) ? "no"

@@ -29,16 +29,19 @@ namespace spot
   struct SPOT_API kripke_graph_state: public spot::state
   {
   public:
+    /// Construct with BDD condition cond.
     kripke_graph_state(bdd cond = bddfalse) noexcept
       : cond_(cond)
     {
     }
 
+    /// Copy constructor.
     kripke_graph_state(const kripke_graph_state& other) noexcept
       : cond_(other.cond_)
     {
     }
 
+    /// Copy assignment operator.
     kripke_graph_state& operator=(const kripke_graph_state& other) noexcept
     {
       cond_ = other.cond_;
@@ -76,11 +79,13 @@ namespace spot
     {
     }
 
+    /// Return the BDD condition of this state.
     bdd cond() const
     {
       return cond_;
     }
 
+    /// Set the BDD condition to c.
     void cond(bdd c)
     {
       cond_ = c;
@@ -101,6 +106,7 @@ namespace spot
     edge t_;
     edge p_;
   public:
+    /// Construct iterator over successors of state s in graph g.
     kripke_graph_succ_iterator(const Graph* g,
                                const typename Graph::state_storage_t* s):
       kripke_succ_iterator(s->cond()),
@@ -113,6 +119,7 @@ namespace spot
     {
     }
 
+    /// Reset the iterator for a new state.
     void recycle(const typename Graph::state_storage_t* s)
     {
       cond_ = s->cond();
@@ -150,10 +157,12 @@ namespace spot
   class SPOT_API kripke_graph final : public kripke
   {
   public:
+    /// The underlying graph type.
     typedef digraph<kripke_graph_state, void> graph_t;
     // We avoid using graph_t::edge_storage_t because graph_t is not
     // instantiated in the SWIG bindings, and SWIG would therefore
     // handle graph_t::edge_storage_t as an abstract type.
+    /// Edge storage type.
     typedef internal::edge_storage<unsigned, unsigned, unsigned,
                                          internal::boxed_label
                                          <void, true>>
@@ -161,22 +170,24 @@ namespace spot
     static_assert(std::is_same<typename graph_t::edge_storage_t,
                   edge_storage_t>::value, "type mismatch");
 
+    /// State storage type.
     typedef internal::distate_storage<unsigned,
             internal::boxed_label<kripke_graph_state, false>>
       state_storage_t;
     static_assert(std::is_same<typename graph_t::state_storage_t,
                   state_storage_t>::value, "type mismatch");
-    typedef std::vector<state_storage_t> state_vector;
+    typedef std::vector<state_storage_t> state_vector; ///< Vector of states.
 
     // We avoid using graph_t::state for the very same reason.
-    typedef unsigned state_num;
+    typedef unsigned state_num; ///< State number type.
     static_assert(std::is_same<typename graph_t::state, state_num>::value,
                   "type mismatch");
 
   protected:
-    graph_t g_;
-    mutable unsigned init_number_;
+    graph_t g_;                  ///< The underlying graph.
+    mutable unsigned init_number_; ///< Initial state number.
   public:
+    /// Construct with BDD dictionary d.
     kripke_graph(const bdd_dict_ptr& d)
       : kripke(d), init_number_(0)
     {
@@ -187,16 +198,19 @@ namespace spot
       get_dict()->unregister_all_my_variables(this);
     }
 
+    /// Return the number of states.
     unsigned num_states() const
     {
       return g_.num_states();
     }
 
+    /// Return the number of edges.
     unsigned num_edges() const
     {
       return g_.num_edges();
     }
 
+    /// Set the initial state.
     void set_init_state(state_num s)
     {
       if (SPOT_UNLIKELY(s >= num_states()))
@@ -205,6 +219,7 @@ namespace spot
       init_number_ = s;
     }
 
+    /// Return the initial state number.
     state_num get_init_state_number() const
     {
       // If the kripke has no state, it has no initial state.
@@ -237,6 +252,7 @@ namespace spot
 
     }
 
+    /// Return the number of state st.
     state_num
     state_number(const state* st) const
     {
@@ -244,18 +260,21 @@ namespace spot
       return s - &g_.state_storage(0);
     }
 
+    /// Return the state with the given number.
     const kripke_graph_state*
     state_from_number(state_num n) const
     {
       return &g_.state_data(n);
     }
 
+    /// Return the state with the given number.
     kripke_graph_state*
     state_from_number(state_num n)
     {
       return &g_.state_data(n);
     }
 
+    /// Return string representation of state n.
     std::string format_state(unsigned n) const
     {
       auto named = get_named_prop<std::vector<std::string>>("state-names");
@@ -277,26 +296,31 @@ namespace spot
       return gs->cond();
     }
 
+    /// Return edge storage at index t.
     edge_storage_t& edge_storage(unsigned t)
     {
       return g_.edge_storage(t);
     }
 
+    /// Return edge storage at index t.
     const edge_storage_t edge_storage(unsigned t) const
     {
       return g_.edge_storage(t);
     }
 
+    /// Create a new state with the given condition.
     unsigned new_state(bdd cond)
     {
       return g_.new_state(cond);
     }
 
+    /// Create n new states with the given condition.
     unsigned new_states(unsigned n, bdd cond)
     {
       return g_.new_states(n, cond);
     }
 
+    /// Add a new edge from src to dst.
     unsigned new_edge(unsigned src, unsigned dst)
     {
       return g_.new_edge(src, dst);
@@ -304,18 +328,21 @@ namespace spot
 
 
 #ifndef SWIG
+    /// Return all states.
     const state_vector& states() const
     {
       return g_.states();
     }
 #endif
 
+    /// Return all states.
     state_vector& states()
     {
       return g_.states();
     }
 
 #ifndef SWIG
+    /// Return all edges.
     internal::all_trans<const graph_t>
     edges() const noexcept
     {
@@ -323,6 +350,7 @@ namespace spot
     }
 #endif
 
+    /// Return all edges.
     internal::all_trans<graph_t>
     edges() noexcept
     {
@@ -330,6 +358,7 @@ namespace spot
     }
 
 #ifndef SWIG
+    /// Return successor range for src.
     internal::state_out<const graph_t>
     out(unsigned src) const
     {
@@ -337,6 +366,7 @@ namespace spot
     }
 #endif
 
+    /// Return successor range for src.
     internal::state_out<graph_t>
     out(unsigned src)
     {
@@ -345,8 +375,10 @@ namespace spot
 
   };
 
+  /// Shared pointer to a kripke_graph.
   typedef std::shared_ptr<kripke_graph> kripke_graph_ptr;
 
+  /// Create a new kripke_graph.
   inline kripke_graph_ptr
   make_kripke_graph(const bdd_dict_ptr& d)
   {

@@ -81,7 +81,7 @@ namespace spot
     void
     print_stats(std::ostream& os) const
     {
-      os << "simplified formulae:    " << simplified_.size() << " entries\n"
+      os << "simplified formulas:    " << simplified_.size() << " entries\n"
          << "negative normal form:   " << nenoform_.size() << " entries\n"
          << "syntactic implications: " << syntimpl_.size() << " entries\n"
          << "boolean to bdd:         " << as_bdd_.size() << " entries\n"
@@ -1101,7 +1101,7 @@ namespace spot
               // The above usually make more sense when reversed (see
               // them in the And and Or rewritings), except when we
               // try to maximize the size of subformula that do not
-              // have EventUniv formulae.
+              // have EventUniv formulas.
               if (opt_.favor_event_univ)
                 if (c.is(op::Or, op::And))
                   {
@@ -1236,7 +1236,7 @@ namespace spot
               // Disabled by default:
               //     F(f1 & GF(f2)) = F(f1) & GF(f2)
               //
-              // As is, these two formulae are translated into
+              // As is, these two formulas are translated into
               // equivalent Büchi automata so the rewriting is
               // useless.
               //
@@ -1277,7 +1277,7 @@ namespace spot
                     if (res != f)
                       return recurse(res);
                   }
-              // If u3 and u4 are universal formulae and h is not:
+              // If u3 and u4 are universal formulas and h is not:
               // F(f1 | f2 | Fu3 | u4 | FGg | Fh | Xu5 | G(f6 | Xu7 | u8))
               //    = F(f1 | f2 | u3 | u4 | Gg | h | u5 | Gf6 | u7 | u8)
               // or
@@ -1423,7 +1423,7 @@ namespace spot
                       if (res != f)
                         return recurse(res);
                     }
-                  // If e3 and e4 are eventual formulae and h is not:
+                  // If e3 and e4 are eventual formulas and h is not:
                   // G(f1 & f2 & Ge3 & e4 & GFg & Gh & Xe5 & F(f6 & Xe7 & e8))
                   //    = G(f1 & f2 & e3 & e4 & Fg & h & e5 & Ff6 & e7 & e8)
                   // or
@@ -2041,7 +2041,7 @@ namespace spot
                       r.insert(r.begin(), a[--pos]);
                     while (r.front().accepts_eword());
                     // If it's the last block, take all leading
-                    // formulae as well.
+                    // formulas as well.
                     if (count == 1)
                       while (pos > 0)
                         {
@@ -2809,7 +2809,7 @@ namespace spot
                                                    std::move(*s.res_FG));
                   // Xa & Xb = X(a & b)
                   // Xa & Xb & FG(c) = X(a & b & FG(c))
-                  // For Universal&Eventual formulae f1...fn we also have:
+                  // For Universal&Eventual formulas f1...fn we also have:
                   // Xa & Xb & f1...fn = X(a & b & f1...fn)
                   if (!s.res_X->empty() && !opt_.favor_event_univ)
                     {
@@ -2820,11 +2820,11 @@ namespace spot
                                       s.res_EventUniv->end());
                     }
                   else
-                    // If f1...fn are event&univ formulae, with at least
+                    // If f1...fn are event&univ formulas, with at least
                     // one formula of the form G(...),
                     // Rewrite  g & f1...fn  as  g & G(f1..fn) while
                     // stripping any leading G from f1...fn.
-                    // This gathers eventual&universal formulae
+                    // This gathers eventual&universal formulas
                     // under the same term.
                     {
                       vec eu;
@@ -3012,7 +3012,7 @@ namespace spot
                                       s.res_R_or_M->begin(),
                                       s.res_R_or_M->end());
 
-                  // Those "G" formulae that are eventual can be
+                  // Those "G" formulas that are eventual can be
                   // postponed inside the X term if there is one.
                   //
                   // In effect we rewrite
@@ -3424,7 +3424,7 @@ namespace spot
                            && s.res_other->empty())
                     {
                       // If there is no X but some F and only
-                      // eventual&universal formulae f1...fn|GF(c), do:
+                      // eventual&universal formulas f1...fn|GF(c), do:
                       // Fa|Fb|f1...fn|GF(c) = F(a|b|f1...fn|GF(c))
                       //
                       // The reasoning here is that if we should
@@ -3644,7 +3644,7 @@ namespace spot
                                       s.res_R_or_M->begin(),
                                       s.res_R_or_M->end());
 
-                  // Those "F" formulae that are universal can be
+                  // Those "F" formulas that are universal can be
                   // postponed inside the X term if there is one.
                   //
                   // In effect we rewrite
@@ -4092,8 +4092,8 @@ namespace spot
   tl_simplifier_cache::syntactic_implication(formula f,
                                               formula g)
   {
-    // We cannot run syntactic_implication on SERE formulae,
-    // except on Boolean formulae.
+    // We cannot run syntactic_implication on SERE formulas,
+    // except on Boolean formulas.
     if (f.is_sere_formula() && !f.is_boolean())
       return false;
     if (g.is_sere_formula() && !g.is_boolean())
@@ -4151,8 +4151,8 @@ namespace spot
                                                   formula f2,
                                                   bool right)
   {
-    // We cannot run syntactic_implication_neg on SERE formulae,
-    // except on Boolean formulae.
+    // We cannot run syntactic_implication_neg on SERE formulas,
+    // except on Boolean formulas.
     if (f1.is_sere_formula() && !f1.is_boolean())
       return false;
     if (f2.is_sere_formula() && !f2.is_boolean())

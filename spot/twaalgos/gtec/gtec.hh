@@ -127,6 +127,7 @@ namespace spot
     public ec_statistics, public emptiness_check
   {
   public:
+    /// Construct an emptiness check for the given automaton and options.
     couvreur99_check(const const_twa_ptr& a, option_map o = option_map());
 
     virtual ~couvreur99_check();
@@ -160,6 +161,7 @@ namespace spot
     /// Number of dead SCC removed by the algorithm.
     unsigned removed_components;
 
+    /// Return the number of dead SCCs removed by the algorithm.
     unsigned get_removed_components() const;
     unsigned get_vmsize() const;
   };
@@ -171,6 +173,7 @@ namespace spot
   class SPOT_API couvreur99_check_shy final: public couvreur99_check
   {
   public:
+    /// Construct the shy variant for the given automaton and options.
     couvreur99_check_shy(const const_twa_ptr& a, option_map o = option_map());
     virtual ~couvreur99_check_shy();
 
@@ -180,8 +183,9 @@ namespace spot
     /// \brief A successor state with its associated acceptance marks, used in
     /// the shy Couvreur check.
     struct successor {
-      acc_cond::mark_t acc;
-      const spot::state* s;
+      acc_cond::mark_t acc; ///< Acceptance marks on the edge to this successor.
+      const spot::state* s; ///< The successor state.
+      /// Construct a successor from acceptance marks and a state.
       successor(acc_cond::mark_t acc, const spot::state* s) noexcept
         : acc(acc), s(s) {}
     };
@@ -198,6 +202,7 @@ namespace spot
     // * todo, the depth-first search stack.  This holds pairs of the
     //   form (STATE, SUCCESSORS) where SUCCESSORS is a list of
     //   (ACCEPTANCE_CONDITIONS, STATE) pairs.
+    /// Queue type for unprocessed successors of a state.
     typedef std::list<successor> succ_queue;
 
     // Position in the loop seeking known successors.
@@ -207,15 +212,18 @@ namespace spot
     /// successors.
     struct todo_item
     {
-      const state* s;
-      int n;
-      succ_queue q;                // Unprocessed successors of S
+      const state* s; ///< The state at this DFS stack entry.
+      int n; ///< The DFS order number of this state.
+      succ_queue q; ///< Unprocessed successors of s.
+      /// Construct a DFS stack item for the given state.
       todo_item(const state* s, int n, couvreur99_check_shy* shy);
     };
 
+    /// List type for the DFS stack.
     typedef std::list<todo_item> todo_list;
-    todo_list todo;
+    todo_list todo; ///< The DFS stack.
 
+    /// Clear the DFS stack.
     void clear_todo();
 
     /// Whether successors should be grouped for states in the same SCC.

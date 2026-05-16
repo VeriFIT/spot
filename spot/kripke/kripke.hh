@@ -138,6 +138,7 @@ namespace spot
     {
     }
 
+    /// Reset the iterator's condition to \a cond for reuse.
     void recycle(const bdd& cond)
     {
       cond_ = cond;
@@ -148,7 +149,7 @@ namespace spot
     virtual bdd cond() const override;
     virtual acc_cond::mark_t acc() const override;
   protected:
-    bdd cond_;
+    bdd cond_; ///< BDD condition returned by cond().
   };
 
   /// \ingroup kripke
@@ -176,6 +177,7 @@ namespace spot
   class SPOT_API kripke: public fair_kripke
   {
   public:
+    /// Construct with BDD dictionary \a d.
     kripke(const bdd_dict_ptr& d)
       : fair_kripke(d)
       {

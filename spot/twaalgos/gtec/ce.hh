@@ -36,6 +36,7 @@ namespace spot
 
     virtual twa_run_ptr accepting_run() override;
 
+    /// Print statistics to \a os.
     void print_stats(std::ostream& os) const;
 
     virtual unsigned acss_states() const override;

@@ -37,7 +37,7 @@ namespace spot
     // Calling bdd_satprefix (it returns a&b&c and modify input to
     // point to function) this way is an optimization to the
     // original algorithm, because in many cases we are trying to
-    // build ISOPs out of formulae that are already cubes.
+    // build ISOPs out of formulas that are already cubes.
     cube_.push(bdd_satprefix(input));
     todo_.emplace(input, input, vars);
   }

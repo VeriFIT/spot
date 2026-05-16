@@ -52,6 +52,7 @@ namespace spot
         }
     }
 
+    /// Round \a size up to alignment and enforce minimum block size.
     size_t fixsize(size_t size) const
     {
       if (size < sizeof(block_))

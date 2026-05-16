@@ -441,7 +441,7 @@ namespace spot
     update_sums();
   }
 
-  // Boolean formulae
+  // Boolean formulas
   random_boolean::random_boolean(const atomic_prop_set* ap,
                                  const atomic_prop_set* output_ap,
                                  std::function<bool(formula)> is_output,
@@ -477,7 +477,7 @@ namespace spot
     update_sums();
   }
 
-  // LTL formulae
+  // LTL formulas
   void
   random_ltl::setup_proba_(const atomic_prop_set* patterns)
   {

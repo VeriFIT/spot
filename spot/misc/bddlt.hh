@@ -31,6 +31,7 @@ namespace spot
   /// depending on how the BDD library has been used before.
   struct bdd_less_than
   {
+    /// Compare two BDDs by id.
     bool
     operator()(const bdd& left, const bdd& right) const
     {
@@ -47,6 +48,7 @@ namespace spot
   /// operations.
   struct bdd_less_than_stable
   {
+    /// Compare two BDDs stably by variable order.
     bool
     operator()(const bdd& left, const bdd& right) const
     {
@@ -58,6 +60,7 @@ namespace spot
   /// \brief Hash functor for BDDs.
   struct bdd_hash
   {
+    /// Hash a BDD by its id.
     size_t
     operator()(const bdd& b) const noexcept
     {

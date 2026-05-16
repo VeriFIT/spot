@@ -56,8 +56,8 @@ namespace spot
     virtual bdd cond() const override;
     virtual acc_cond::mark_t acc() const override;
   protected:
-    bdd cond_;
-    acc_cond::mark_t acc_cond_;
+    bdd cond_; ///< BDD condition returned by cond().
+    acc_cond::mark_t acc_cond_; ///< Acceptance mark returned by acc().
   };
 
   /// \ingroup kripke
@@ -86,6 +86,7 @@ namespace spot
   class SPOT_API fair_kripke: public twa
   {
   public:
+    /// Construct with BDD dictionary \a d.
     fair_kripke(const bdd_dict_ptr& d)
       : twa(d)
       {

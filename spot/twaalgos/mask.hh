@@ -169,6 +169,10 @@ namespace spot
       }
   }
 
+  /// \brief Clone and mask an automaton starting from its initial state.
+  ///
+  /// Like transform_accessible(old, cpy, trans, init), but uses
+  /// \a old's initial state as starting point.
   template<typename Trans>
   void transform_accessible(const const_twa_graph_ptr& old,
                             twa_graph_ptr& cpy,
@@ -177,6 +181,10 @@ namespace spot
     transform_accessible(old, cpy, trans, old->get_init_state_number());
   }
 
+  /// \brief Copy an automaton and update each edge, from its initial state.
+  ///
+  /// Like transform_copy(old, cpy, trans, init), but uses
+  /// \a old's initial state.
   template<typename Trans>
   void transform_copy(const const_twa_graph_ptr& old,
                       twa_graph_ptr& cpy,

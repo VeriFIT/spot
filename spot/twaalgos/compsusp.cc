@@ -301,7 +301,7 @@ namespace spot
     if (!no_simulation)
       res = iterated_simulations(res);
 
-    // Create a map of suspended formulae to BDD variables.
+    // Create a map of suspended formulas to BDD variables.
     spot::formula_bdd_map susp;
     for (auto& it: g2s)
       {
@@ -316,7 +316,7 @@ namespace spot
           susp[it.second] = bdd_ithvar(j->second);
       }
 
-    // Remove suspendable formulae from non-accepting SCCs.
+    // Remove suspendable formulas from non-accepting SCCs.
     bdd suspvars = bddtrue;
     for (formula_bdd_map::const_iterator i = susp.begin();
          i != susp.end(); ++i)

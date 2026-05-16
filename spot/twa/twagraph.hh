@@ -42,10 +42,12 @@ namespace spot
     {
     }
 
+    /// Copy constructor (no-op; graph states are identified by address).
     twa_graph_state(const twa_graph_state&) noexcept
     {
     }
 
+    /// Copy-assignment (no-op; graph states are identified by address).
     twa_graph_state& operator=(const twa_graph_state&) noexcept
     {
       return *this;
@@ -92,14 +94,15 @@ namespace spot
   /// the each to each acceptance set.
   struct SPOT_API twa_graph_edge_data
   {
-    bdd cond;
-    acc_cond::mark_t acc;
+    bdd cond;              ///< The Boolean formula labeling this edge.
+    acc_cond::mark_t acc;  ///< The acceptance mark of this edge.
 
     explicit twa_graph_edge_data() noexcept
       : cond(bddfalse), acc({})
     {
     }
 
+    /// Construct an edge labeled with \a cond and acceptance mark \a acc.
     twa_graph_edge_data(
         bdd cond,
         acc_cond::mark_t acc = {}) noexcept
@@ -107,6 +110,7 @@ namespace spot
     {
     }
 
+    /// Lexicographic less-than comparison on (cond id, acc).
     bool operator<(const twa_graph_edge_data& other) const
     {
       if (cond.id() < other.cond.id())
@@ -116,6 +120,7 @@ namespace spot
       return acc < other.acc;
     }
 
+    /// Equality: same condition and same acceptance mark.
     bool operator==(const twa_graph_edge_data& other) const
     {
       return cond.id() == other.cond.id() &&
@@ -141,11 +146,13 @@ namespace spot
     edge p_;
 
   public:
+    /// Construct an iterator starting at edge \a t of graph \a g.
     twa_graph_succ_iterator(const Graph* g, edge t)
       : g_(g), t_(t)
     {
     }
 
+    /// Reset the iterator to start from edge \a t.
     void recycle(edge t)
     {
       t_ = t;
@@ -186,6 +193,7 @@ namespace spot
       return g_->edge_data(p_).acc;
     }
 
+    /// Returns the index of the current edge.
     edge pos() const
     {
       return p_;
@@ -198,10 +206,12 @@ namespace spot
   class SPOT_API twa_graph final: public twa
   {
   public:
+    /// The underlying graph type.
     typedef digraph<twa_graph_state, twa_graph_edge_data> graph_t;
     // We avoid using graph_t::edge_storage_t because graph_t is not
     // instantiated in the SWIG bindings, and SWIG would therefore
     // handle graph_t::edge_storage_t as an abstract type.
+    /// Edge storage type (src, dst, and edge data).
     typedef spot::internal::edge_storage<unsigned, unsigned, unsigned,
                                          internal::boxed_label
                                          <twa_graph_edge_data, false>>
@@ -209,22 +219,24 @@ namespace spot
     static_assert(std::is_same<typename graph_t::edge_storage_t,
                   edge_storage_t>::value, "type mismatch");
     // We avoid using graph_t::state for the very same reason.
-    typedef unsigned state_num;
+    typedef unsigned state_num; ///< Numeric type used to identify states.
     static_assert(std::is_same<typename graph_t::state, state_num>::value,
                   "type mismatch");
 
   protected:
-    graph_t g_;
-    mutable unsigned init_number_;
+    graph_t g_;                   ///< The underlying graph.
+    mutable unsigned init_number_; ///< Number of the initial state.
 
   public:
 
+    /// Construct an empty automaton using \a dict for BDD variables.
     twa_graph(const bdd_dict_ptr& dict)
       : twa(dict),
         init_number_(0)
     {
     }
 
+    /// Copy another automaton, keeping only the properties in \a p.
     explicit twa_graph(const const_twa_graph_ptr& other, prop_set p)
       : twa(other->get_dict()),
         g_(other->g_), init_number_(other->init_number_)
@@ -239,11 +251,13 @@ namespace spot
     }
 
 #ifndef SWIG
+    /// Template alias for a helper that names graph states.
     template <typename State_Name,
               typename Name_Hash = std::hash<State_Name>,
               typename Name_Equal = std::equal_to<State_Name>>
     using namer = named_graph<graph_t, State_Name, Name_Hash, Name_Equal>;
 
+    /// Create a namer to associate custom names of type State_Name to states.
     template <typename State_Name,
               typename Name_Hash = std::hash<State_Name>,
               typename Name_Equal = std::equal_to<State_Name>>
@@ -253,36 +267,46 @@ namespace spot
       return new named_graph<graph_t, State_Name, Name_Hash, Name_Equal>(g_);
     }
 
+    /// Create a namer that associates formulas to states.
     namer<formula>*
     create_formula_namer()
     {
       return create_namer<formula>();
     }
 
+    /// \brief Release a formula namer.
+    ///
+    /// If \a keep_names is true, state names are preserved as a
+    /// named property of the automaton.
     void
     release_formula_namer(namer<formula>* namer, bool keep_names);
 #endif
 
+    /// Access the underlying digraph.
     graph_t& get_graph()
     {
       return g_;
     }
 
+    /// Access the underlying digraph (const overload).
     const graph_t& get_graph() const
     {
       return g_;
     }
 
+    /// Returns the number of states in the automaton.
     unsigned num_states() const
     {
       return g_.num_states();
     }
 
+    /// Returns the number of edges in the automaton.
     unsigned num_edges() const
     {
       return g_.num_edges();
     }
 
+    /// Set the initial state to state number \a s.
     void set_init_state(state_num s)
     {
       bool univ = is_univ_dest(s);
@@ -294,6 +318,7 @@ namespace spot
       init_number_ = s;
     }
 
+    /// Set a universal initial state from a range of destination states.
     template<class I>
     void set_univ_init_state(I dst_begin, I dst_end)
     {
@@ -305,11 +330,13 @@ namespace spot
       init_number_ = g_.new_univ_dests(dst_begin, dst_end);
     }
 
+    /// Set a universal initial state from an initializer list.
     void set_univ_init_state(const std::initializer_list<state_num>& il)
     {
       set_univ_init_state(il.begin(), il.end());
     }
 
+    /// Returns the number of the initial state.
     state_num get_init_state_number() const
     {
       // If the automaton has no state, it has no initial state.
@@ -344,11 +371,13 @@ namespace spot
       return new twa_graph_succ_iterator<graph_t>(&g_, s->succ);
     }
 
+    /// Returns true iff edge \a e has a universal destination.
     static constexpr bool is_univ_dest(const edge_storage_t& e)
     {
       return is_univ_dest(e.dst);
     }
 
+    /// Returns true iff destination \a s is a universal destination.
     static constexpr bool is_univ_dest(unsigned s)
     {
       // Universal destinations are stored with their most-significant
@@ -356,6 +385,7 @@ namespace spot
       return (int) s < 0;
     }
 
+    /// Returns the state number corresponding to state pointer \a st.
     state_num
     state_number(const state* st) const
     {
@@ -363,12 +393,14 @@ namespace spot
       return s - &g_.state_storage(0);
     }
 
+    /// Returns the state pointer for state number \a n.
     const twa_graph_state*
     state_from_number(state_num n) const
     {
       return &g_.state_data(n);
     }
 
+    /// Returns a human-readable representation of state number \a n.
     std::string format_state(unsigned n) const;
 
     virtual std::string format_state(const state* st) const override
@@ -376,68 +408,84 @@ namespace spot
       return format_state(state_number(st));
     }
 
+    /// Returns the index of the current edge of iterator \a it.
     unsigned edge_number(const twa_succ_iterator* it) const
     {
       auto* i = down_cast<const twa_graph_succ_iterator<graph_t>*>(it);
       return i->pos();
     }
 
+    /// Returns the index of edge \a e.
     unsigned edge_number(const edge_storage_t& e) const
     {
       return g_.index_of_edge(e);
     }
 
+    /// Returns the edge data at the current position of iterator \a it.
     twa_graph_edge_data& edge_data(const twa_succ_iterator* it)
     {
       return g_.edge_data(edge_number(it));
     }
 
+    /// Returns the edge data for edge number \a t.
     twa_graph_edge_data& edge_data(unsigned t)
     {
       return g_.edge_data(t);
     }
 
+    /// Returns the edge data at the position of iterator \a it (const).
     const twa_graph_edge_data& edge_data(const twa_succ_iterator* it) const
     {
       return g_.edge_data(edge_number(it));
     }
 
+    /// Returns the edge data for edge number \a t (const overload).
     const twa_graph_edge_data& edge_data(unsigned t) const
     {
       return g_.edge_data(t);
     }
 
+    /// Returns the edge storage at the position of iterator \a it.
     edge_storage_t& edge_storage(const twa_succ_iterator* it)
     {
       return g_.edge_storage(edge_number(it));
     }
 
+    /// Returns the edge storage for edge number \a t.
     edge_storage_t& edge_storage(unsigned t)
     {
       return g_.edge_storage(t);
     }
 
+    /// Returns edge storage at the position of iterator \a it (const).
     const edge_storage_t
       edge_storage(const twa_succ_iterator* it) const
     {
       return g_.edge_storage(edge_number(it));
     }
 
+    /// Returns edge storage for edge number \a t (const overload).
     const edge_storage_t edge_storage(unsigned t) const
     {
       return g_.edge_storage(t);
     }
 
+    /// Create a new state and return its number.
     unsigned new_state()
     {
       return g_.new_state();
     }
 
+    /// Create \a n new states; return the number of the first one.
     unsigned new_states(unsigned n)
     {
       return g_.new_states(n);
     }
 
+    /// \brief Create a new edge from \a src to \a dst.
+    ///
+    /// The edge is labeled with BDD \a cond and acceptance mark \a acc.
+    /// Returns the index of the new edge.
     unsigned new_edge(unsigned src, unsigned dst,
                       bdd cond,
                       acc_cond::mark_t acc = {})
@@ -445,6 +493,9 @@ namespace spot
       return g_.new_edge(src, dst, cond, acc);
     }
 
+    /// \brief Create an edge from \a src to \a dst.
+    ///
+    /// If \a acc is true, all acceptance sets are set on the edge.
     unsigned new_acc_edge(unsigned src, unsigned dst,
                           bdd cond, bool acc = true)
     {
@@ -454,6 +505,7 @@ namespace spot
         return g_.new_edge(src, dst, cond);
     }
 
+    /// Create a universal edge from \a src to states in [begin, end).
     template<class I>
     unsigned new_univ_edge(unsigned src, I begin, I end,
                            bdd cond,
@@ -462,6 +514,7 @@ namespace spot
       return g_.new_univ_edge(src, begin, end, cond, acc);
     }
 
+    /// Create a universal edge from \a src to the listed destinations.
     unsigned new_univ_edge(unsigned src, std::initializer_list<unsigned> dst,
                            bdd cond,
                            acc_cond::mark_t acc = {})
@@ -470,6 +523,7 @@ namespace spot
     }
 
 #ifndef SWIG
+    /// Returns a range over outgoing edges of state \a src (const).
     internal::state_out<const graph_t>
     out(unsigned src) const
     {
@@ -477,24 +531,28 @@ namespace spot
     }
 #endif
 
+    /// Returns a range over outgoing edges of state \a src.
     internal::state_out<graph_t>
     out(unsigned src)
     {
       return g_.out(src);
     }
 
+    /// Returns an edge-erasing iterator over outgoing edges of \a src.
     internal::killer_edge_iterator<graph_t>
     out_iteraser(unsigned src)
     {
       return g_.out_iteraser(src);
     }
 
+    /// Returns the universal destinations of dest-index \a d.
     internal::const_universal_dests
     univ_dests(unsigned d) const noexcept
     {
       return g_.univ_dests(d);
     }
 
+    /// Returns the universal destinations of edge \a e.
     internal::const_universal_dests
     univ_dests(const edge_storage_t& e) const noexcept
     {
@@ -508,11 +566,14 @@ namespace spot
     }
 
 #ifndef SWIG
+    /// Returns a range over all states (const).
     auto states() const
       SPOT_RETURN(g_.states());
+    /// Returns a range over all states.
     auto states()
       SPOT_RETURN(g_.states());
 
+    /// Returns a range over all edges (const).
     internal::all_trans<const graph_t>
     edges() const noexcept
     {
@@ -520,6 +581,7 @@ namespace spot
     }
 #endif
 
+    /// Returns a range over all edges.
     internal::all_trans<graph_t>
     edges() noexcept
     {
@@ -527,17 +589,21 @@ namespace spot
     }
 
 #ifndef SWIG
+    /// Returns the raw edge storage vector (const).
     auto edge_vector() const
       SPOT_RETURN(g_.edge_vector());
+    /// Returns the raw edge storage vector.
     auto edge_vector()
       SPOT_RETURN(g_.edge_vector());
 #endif
 
+    /// Returns true iff edge number \a t is a dead (removed) edge.
     bool is_dead_edge(unsigned t) const
     {
       return g_.is_dead_edge(t);
     }
 
+    /// Returns true iff edge \a t is a dead (removed) edge.
     bool is_dead_edge(const graph_t::edge_storage_t& t) const
     {
       return g_.is_dead_edge(t);
@@ -643,6 +709,10 @@ namespace spot
     /// \see purge_dead_states
     typedef void (*shift_action)(const std::vector<unsigned>& newst,
                                  void* action_data);
+    /// \brief Remove all unreachable states.
+    ///
+    /// Accepts an optional callback \a f, invoked with a renumbering
+    /// vector where newst[i]==-1U means state \a i was deleted.
     void purge_unreachable_states(shift_action* f = nullptr,
                                   void* action_data = nullptr);
 
@@ -700,6 +770,7 @@ namespace spot
     }
     ///@}
 
+    /// Structural equality: same states, edges, labels, and acceptance.
     bool operator==(const twa_graph& aut) const
     {
       auto& dests1 = g_.dests_vector();

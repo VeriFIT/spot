@@ -30,6 +30,7 @@ namespace spot
 {
   struct twa_run;
   typedef std::shared_ptr<twa_run> twa_run_ptr;
+  /// Shared pointer to const twa_run.
   typedef std::shared_ptr<const twa_run> const_twa_run_ptr;
 
   /// \addtogroup emptiness_check Emptiness-checks
@@ -80,6 +81,7 @@ namespace spot
   class SPOT_API emptiness_check_result
   {
   public:
+    /// Construct a result for the given automaton and options.
     emptiness_check_result(const const_twa_ptr& a,
                            option_map o = option_map())
       : a_(a), o_(o)
@@ -141,6 +143,7 @@ namespace spot
     public std::enable_shared_from_this<emptiness_check>
   {
   public:
+    /// Construct an emptiness check for the given automaton and options.
     emptiness_check(const const_twa_ptr& a, option_map o = option_map())
       : a_(a), o_(o)
     {
@@ -242,7 +245,7 @@ namespace spot
   protected:
     emptiness_check_instantiator(option_map o, void* i);
 
-    option_map o_;
+    option_map o_; ///< The options.
     void *info_;
   };
 
@@ -378,10 +381,11 @@ namespace spot
     /// \brief A single step in a TωA run, pairing a state with an edge label
     /// and acceptance marks.
     struct step {
-      const state* s;
-      bdd label;
-      acc_cond::mark_t acc;
+      const state* s; ///< Source state.
+      bdd label; ///< Transition label.
+      acc_cond::mark_t acc; ///< Acceptance marks on the transition.
 
+      /// Construct a step from a state, label, and acceptance marks.
       step(const state* s, bdd label, acc_cond::mark_t acc) noexcept
         : s(s), label(label), acc(acc)
       {
@@ -389,19 +393,20 @@ namespace spot
       step() = default;
     };
 
-    typedef std::list<step> steps;
+    typedef std::list<step> steps; ///< Ordered sequence of run steps.
 
-    steps prefix;
-    steps cycle;
-    const_twa_ptr aut;
+    steps prefix; ///< The prefix part of the run.
+    steps cycle; ///< The cycle part of the run.
+    const_twa_ptr aut; ///< The automaton this run is associated with.
 
     ~twa_run();
+    /// Construct an empty run for the given automaton.
     twa_run(const const_twa_ptr& aut) noexcept
       : aut(aut)
     {
     }
-    twa_run(const twa_run& run);
-    twa_run& operator=(const twa_run& run);
+    twa_run(const twa_run& run); ///< Copy constructor.
+    twa_run& operator=(const twa_run& run); ///< Copy-assignment operator.
 
     /// \brief Raise an exception if the cycle is empty.
     ///

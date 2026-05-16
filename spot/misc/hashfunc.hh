@@ -72,8 +72,8 @@ namespace spot
   {
     static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value,
                   "Fowler-Noll-Vo hash requires an unsigned integral type");
-    static constexpr T init = 2166136261UL;
-    static constexpr T prime = 16777619UL;
+    static constexpr T init = 2166136261UL;  ///< FNV offset basis.
+    static constexpr T prime = 16777619UL;   ///< FNV prime.
   };
 
   /// Fowler-Noll-Vo hash parameters for 64 bits
@@ -82,8 +82,8 @@ namespace spot
   {
     static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value,
                   "Fowler-Noll-Vo hash requires an unsigned integral type");
-    static constexpr T init = 14695981039346656037ULL;
-    static constexpr T prime = 1099511628211ULL;
+    static constexpr T init = 14695981039346656037ULL; ///< FNV offset basis.
+    static constexpr T prime = 1099511628211ULL;        ///< FNV prime.
   };
 
   /// \brief Fowler-Noll-Vo hash function

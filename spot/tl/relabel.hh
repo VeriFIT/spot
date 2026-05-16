@@ -24,8 +24,10 @@
 
 namespace spot
 {
+  /// Style for relabeling atomic propositions.
   enum relabeling_style { Abc, Pnn };
 
+  /// Map associating new (key) formula names to old (value) ones.
   typedef std::map<formula, formula> relabeling_map;
 
   /// \ingroup tl_rewriting

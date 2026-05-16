@@ -34,6 +34,8 @@ namespace spot
   typedef std::shared_ptr<const kripke> const_kripke_ptr;
 
   class kripke_explicit;
+  /// Shared pointer to const kripke_explicit.
   typedef std::shared_ptr<const kripke_explicit> const_kripke_explicit_ptr;
+  /// Shared pointer to kripke_explicit.
   typedef std::shared_ptr<kripke_explicit> kripke_explicit_ptr;
 }
