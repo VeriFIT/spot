@@ -35,15 +35,6 @@ namespace spot
   namespace internal
   {
     class mark_container;
-
-    template<bool>
-    struct _32acc {};
-    template<>
-    struct _32acc<true>
-    {
-      SPOT_DEPRECATED("mark_t no longer relies on unsigned, stop using value_t")
-      typedef unsigned value_t;
-    };
   }
 
   /// \ingroup twa_essentials
@@ -79,8 +70,7 @@ namespace spot
     /// (i.e., the size of the bit vector) supported is a compile-time
     /// constant.  It can be changed by passing an option to the
     /// configure script of Spot.
-    struct mark_t :
-      public internal::_32acc<SPOT_MAX_ACCSETS == 8*sizeof(unsigned)>
+    struct mark_t
     {
     private:
       // configure guarantees that SPOT_MAX_ACCSETS % (8*sizeof(unsigned)) == 0
@@ -114,19 +104,6 @@ namespace spot
         : mark_t(vals.begin(), vals.end())
       {
       }
-
-      SPOT_DEPRECATED("use brace initialization instead")
-      mark_t(unsigned i)
-      {
-        unsigned j = 0;
-        while (i)
-          {
-            if (i & 1U)
-              this->set(j);
-            ++j;
-            i >>= 1;
-          }
-      }
 #endif
 
       /// \brief The maximum number of acceptance sets supported by
@@ -154,22 +131,6 @@ namespace spot
       {
         std::hash<decltype(id)> h;
         return h(id);
-      }
-
-      SPOT_DEPRECATED("compare mark_t to mark_t, not to unsigned")
-      bool operator==(unsigned o) const
-      {
-        SPOT_ASSERT(o == 0U);
-        (void)o;
-        return !id;
-      }
-
-      SPOT_DEPRECATED("compare mark_t to mark_t, not to unsigned")
-      bool operator!=(unsigned o) const
-      {
-        SPOT_ASSERT(o == 0U);
-        (void)o;
-        return !!id;
       }
 
       /// Equality comparison.
@@ -2091,14 +2052,6 @@ namespace spot
     /// So usually you should only use this method in cases you know
     /// that the condition is satisfied.
     mark_t accepting_sets(mark_t inf) const;
-
-    // Deprecated since Spot 2.8
-    SPOT_DEPRECATED("Use operator<< instead.")
-    std::ostream& format(std::ostream& os, mark_t m) const;
-
-    // Deprecated since Spot 2.8
-    SPOT_DEPRECATED("Use operator<< or mark_t::as_string() instead.")
-    std::string format(mark_t m) const;
 
     /// \brief The number of sets used in the acceptance condition.
     unsigned num_sets() const

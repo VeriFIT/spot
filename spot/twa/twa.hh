@@ -884,24 +884,6 @@ namespace spot
     /// this case an explicit product is performed.
     virtual twa_run_ptr intersecting_run(const_twa_ptr other) const;
 
-    // (undocumented)
-    //
-    // If \a from_other is true, the returned run will be over the
-    // \a other automaton.  Otherwise, the run will be over this
-    // automaton.
-    //
-    // This function was deprecated in Spot 2.8.
-    SPOT_DEPRECATED("replace a->intersecting_run(b, true) "
-                    "by b->intersecting_run(a).")
-    twa_run_ptr intersecting_run(const_twa_ptr other,
-                                 bool from_other) const
-    {
-      if (from_other)
-        return other->intersecting_run(shared_from_this());
-      else
-        return this->intersecting_run(other);
-    }
-
     /// \brief Return a word accepted by two automata.
     ///
     /// Return nullptr if no accepting word were found.
@@ -1403,24 +1385,6 @@ namespace spot
         is.unambiguous = is.semi_deterministic = val.val();
     }
 
-    // Starting with Spot 2.4, an automaton is deterministic if it is
-    // both universal and existential, but as we already have
-    // twa::is_existential(), we only need to additionally record the
-    // universal property.  Before that, the deterministic property
-    // was just a synonym for universal, hence we keep the deprecated
-    // function prop_deterministic() with this meaning.
-    SPOT_DEPRECATED("use prop_universal() instead")
-    void prop_deterministic(trival val)
-    {
-      prop_universal(val);
-    }
-
-    SPOT_DEPRECATED("use prop_universal() instead")
-    trival prop_deterministic() const
-    {
-      return prop_universal();
-    }
-
     /// \brief Whether the automaton is unambiguous
     ///
     /// An automaton is unambiguous if any accepted word is recognized
@@ -1577,24 +1541,6 @@ namespace spot
         stutter_inv(stutter_inv)
       {
       }
-
-#ifndef SWIG
-      // The "complete" argument was added in Spot 2.4
-      SPOT_DEPRECATED("prop_set() now takes 6 arguments")
-      prop_set(bool state_based,
-               bool inherently_weak,
-               bool deterministic,
-               bool improve_det,
-               bool stutter_inv)
-      : state_based(state_based),
-        inherently_weak(inherently_weak),
-        deterministic(deterministic),
-        improve_det(improve_det),
-        complete(false),
-        stutter_inv(stutter_inv)
-      {
-      }
-#endif
 
       /// \brief An all-true \c prop_set
       ///

@@ -161,40 +161,6 @@ namespace spot
   to_parity_old(const const_twa_graph_ptr& aut, bool pretty_print = false);
 
   /// \ingroup twa_acc_transform
-  /// \brief Turn a Rabin-like or Streett-like automaton into a parity automaton
-  /// based on the index appearance record (IAR)
-  ///
-  /// This is an implementation of \cite kretinsky.17.tacas .
-  /// If the input automaton has n states and k pairs, the output automaton has
-  /// at most k!*n states and 2k+1 colors. If the input automaton is
-  /// deterministic, the output automaton is deterministic as well, which is the
-  /// intended use case for this function. If the input automaton is
-  /// non-deterministic, the result is still correct, but way larger than an
-  /// equivalent Büchi automaton.
-  ///
-  /// If the input automaton is Rabin-like (resp. Streett-like), the output
-  /// automaton has max odd (resp. min even) acceptance condition.
-  ///
-  /// Throws an std::runtime_error if the input is neither Rabin-like nor
-  /// Streett-like.
-  ///
-  /// It is better to use to_parity() instead, as it will use better
-  /// strategies when possible, and has additional optimizations.
-  SPOT_DEPRECATED("use to_parity() instead") // deprecated since Spot 2.9
-  SPOT_API twa_graph_ptr
-  iar(const const_twa_graph_ptr& aut, bool pretty_print = false);
-
-  /// \ingroup twa_acc_transform
-  /// \brief Turn a Rabin-like or Streett-like automaton into a parity automaton
-  /// based on the index appearance record (IAR)
-  ///
-  /// Returns nullptr if the input automaton is neither Rabin-like nor
-  /// Streett-like, and calls spot::iar() otherwise.
-  SPOT_DEPRECATED("use to_parity() and spot::acc_cond::is_rabin_like() instead")
-  SPOT_API twa_graph_ptr   // deprecated since Spot 2.9
-  iar_maybe(const const_twa_graph_ptr& aut, bool pretty_print = false);
-
-  /// \ingroup twa_acc_transform
   /// \brief Convert an automaton into a parity max automaton preserving
   /// structure when possible.
   ///

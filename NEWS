@@ -26,6 +26,44 @@ New in spot 2.15.1.dev  (not yet released)
     SPOT_FROM_LTLF environment variable to pick the algorithm
     (defaulting to 1).
 
+  Removed functions (deprecated since Spot 2.9 or earlier):
+
+  - spot::copy() [twaalgos/copy.hh, deprecated since 2.4]:
+    use spot::make_twa_graph() instead.
+  - spot::dtwa_complement() [twaalgos/complement.hh, deprecated since 2.4]:
+    use spot::dualize() instead.
+  - spot::decompose_strength() [twaalgos/strength.hh, deprecated since 2.4]:
+    use spot::decompose_scc() instead.
+  - spot::twa::prop_deterministic() (setter and getter)
+    [twa/twa.hh, deprecated since 2.4]:
+    use spot::twa::prop_universal() instead.
+  - spot::twa::prop_set(bool, bool, bool, bool, bool) (5-argument form)
+    [twa/twa.hh, deprecated since 2.4]:
+    use the 6-argument form that also takes a "complete" argument.
+  - spot::scc_info::acc() [twaalgos/sccinfo.hh, deprecated since 2.5]:
+    use spot::scc_info::acc_sets_of() instead.
+  - spot::scc_info::used_acc() [twaalgos/sccinfo.hh, deprecated since 2.5]:
+    use spot::scc_info::marks() instead.
+  - spot::scc_info::used_acc_of() [twaalgos/sccinfo.hh, deprecated since 2.5]:
+    use spot::scc_info::marks_of() instead.
+  - spot::acc_cond::mark_t::value_t [twa/acc.hh, deprecated since 2.6]:
+    mark_t no longer relies on unsigned.
+  - spot::acc_cond::mark_t(unsigned) [twa/acc.hh, deprecated since 2.6]:
+    use brace initialization instead (e.g., mark_t{} or mark_t::all()).
+  - spot::acc_cond::mark_t::operator==(unsigned) and operator!=(unsigned)
+    [twa/acc.hh, deprecated since 2.6]:
+    compare mark_t to mark_t, not to unsigned.
+  - spot::twa::intersecting_run(const_twa_ptr, bool)
+    [twa/twa.hh, deprecated since 2.8]:
+    replace a->intersecting_run(b, true) by b->intersecting_run(a).
+  - spot::acc_cond::format(std::ostream&, mark_t) and
+    spot::acc_cond::format(mark_t) [twa/acc.hh, deprecated since 2.8]:
+    use operator<< or mark_t::as_string() instead.
+  - spot::iar() [twaalgos/toparity.hh, deprecated since 2.9]:
+    use spot::to_parity() instead.
+  - spot::iar_maybe() [twaalgos/toparity.hh, deprecated since 2.9]:
+    use spot::to_parity() and spot::acc_cond::is_rabin_like() instead.
+
 New in spot 2.15.1  (2026-04-25)
 
   Bugs fixes:

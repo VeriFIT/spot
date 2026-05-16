@@ -29,16 +29,6 @@
 
 namespace spot
 {
-  twa_graph_ptr
-  dtwa_complement(const const_twa_graph_ptr& aut)
-  {
-    if (!is_deterministic(aut))
-      throw
-        std::runtime_error("dtwa_complement() requires a deterministic input");
-
-    return dualize(aut);
-  }
-
   namespace
   {
     enum ncsb

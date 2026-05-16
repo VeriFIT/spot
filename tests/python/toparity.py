@@ -527,7 +527,7 @@ State: 7 7 {3} 7 {2 4} 3 {3} 3 {2 4} 9 10 {2 4} 2 4 {2 4} State: 8 0 {1
 3 3 {2 4} 1 {1 5} 0 {1 2 4} 2 {1 5} 4 {1 2 4} State: 10 7 {3} 7 {2 4}
 3 {3} 3 {2 4} 1 {1} 0 {1 2 4} 2 {1} 4 {1 2 4} --END--
 """)
-b = spot.iar_maybe(a)
+b = spot.to_parity(a, no_option)
 tc.assertEqual(b.num_states(), 11)
 tc.assertTrue(a.equivalent_to(b))
 test(a, [11, 11, 11, 11, 11, 11, 11, 11, 11])
@@ -543,7 +543,7 @@ HOA: v1 States: 10 Start: 0 AP: 2 "p0" "p1" acc-name: Rabin 4 Acceptance:
 7 1 {3 6} 8 {2} 1 {3 6} 8 {2} State: 8 8 {3 4 7} 3 {2} 8 {3 4 7} 3 {2}
 State: 9 3 {4} 2 3 {4} 6 --END--
 """)
-b = spot.iar_maybe(a)
+b = spot.to_parity(a, no_option)
 tc.assertEqual(b.num_states(), 87)
 tc.assertTrue(a.equivalent_to(b))
 test(a, [87, 91, 91, 87, 87, 87, 51, 35, 21])

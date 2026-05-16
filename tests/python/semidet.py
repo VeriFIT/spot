@@ -32,9 +32,9 @@ for f, isd, issd in formulas:
     aut = spot.translate(f)
     # The formula with isd=True, issd=True is the only one
     # for which both properties are already set.
-    tc.assertTrue(aut.prop_deterministic().is_maybe() or
+    tc.assertTrue(aut.prop_universal().is_maybe() or
                   aut.prop_semi_deterministic().is_maybe() or
                   isd == issd)
     spot.check_determinism(aut)
-    tc.assertEqual(aut.prop_deterministic(), isd)
+    tc.assertEqual(aut.prop_universal(), isd)
     tc.assertEqual(aut.prop_semi_deterministic(), issd)

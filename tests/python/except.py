@@ -31,15 +31,6 @@ def report_missing_exception():
     raise RuntimeError("missing exception")
 
 
-aut = spot.translate('GFa & GFb & GFc')
-aut.set_acceptance(spot.acc_cond("parity min even 4"))
-try:
-    spot.iar(aut)
-except RuntimeError as e:
-    tc.assertIn('iar() expects Rabin-like or Streett-like input', str(e))
-else:
-    report_missing_exception()
-
 alt = spot.dualize(spot.translate('FGa | FGb'))
 try:
     spot.tgba_determinize(alt)

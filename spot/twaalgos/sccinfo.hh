@@ -659,12 +659,6 @@ namespace spot
       return node(scc).is_trivial();
     }
 
-    SPOT_DEPRECATED("use acc_sets_of() instead")
-    acc_cond::mark_t acc(unsigned scc) const
-    {
-      return acc_sets_of(scc);
-    }
-
     bool is_accepting_scc(unsigned scc) const
     {
       return node(scc).is_accepting();
@@ -721,18 +715,6 @@ namespace spot
     /// in it.
     std::vector<std::set<acc_cond::mark_t>> marks() const;
     std::set<acc_cond::mark_t> marks_of(unsigned scc) const;
-
-    // Same as above, with old names.
-    SPOT_DEPRECATED("use marks() instead")
-    std::vector<std::set<acc_cond::mark_t>> used_acc() const
-    {
-      return marks();
-    }
-    SPOT_DEPRECATED("use marks_of() instead")
-    std::set<acc_cond::mark_t> used_acc_of(unsigned scc) const
-    {
-      return marks_of(scc);
-    }
 
     /// \brief Returns, for a given SCC, the set of all colors appearing in it.
     /// It is the set of colors that appear in some mark among those returned by

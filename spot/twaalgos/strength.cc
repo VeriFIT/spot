@@ -422,12 +422,6 @@ namespace spot
     return decompose_scc(si, keep_opt);
   }
 
-    twa_graph_ptr
-  decompose_strength(const const_twa_graph_ptr& aut, const char* keep_opt)
-  {
-    return decompose_scc(aut, keep_opt);
-  }
-
   twa_graph_ptr
   decompose_scc(scc_info& sm, unsigned scc_num, bool accepting)
   {

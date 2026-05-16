@@ -113,7 +113,6 @@
 #include <spot/twaalgos/backprop.hh>
 #include <spot/twaalgos/cleanacc.hh>
 #include <spot/twaalgos/cobuchi.hh>
-#include <spot/twaalgos/copy.hh>
 #include <spot/twaalgos/complete.hh>
 #include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/dbranch.hh>
@@ -647,12 +646,6 @@ namespace std {
 %include <spot/twa/acc.hh>
 %template(pair_bool_mark) std::pair<bool, spot::acc_cond::mark_t>;
 
-%pythonprepend spot::twa::prop_deterministic %{
-  from warnings import warn
-  warn("use prop_universal() instead of prop_deterministic()",
-       DeprecationWarning)
-%}
-
 // Must occur before the twa declaration
 %typemap(out) unsigned* spot::twa::get_highlight_state,
               unsigned* spot::twa::get_highlight_edge %{
@@ -772,7 +765,6 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/backprop.hh>
 %include <spot/twaalgos/cleanacc.hh>
 %include <spot/twaalgos/cobuchi.hh>
-%include <spot/twaalgos/copy.hh>
 %include <spot/twaalgos/complete.hh>
 %include <spot/twaalgos/dbranch.hh>
 %include <spot/twaalgos/deadends.hh>
@@ -853,12 +845,6 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/are_isomorphic.hh>
 %include <spot/twaalgos/toparity.hh>
 %include <spot/twaalgos/zlktree.hh>
-
-%pythonprepend spot::twa::dtwa_complement %{
-  from warnings import warn
-  warn("use dualize() instead of dtwa_complement()",
-       DeprecationWarning)
-%}
 
 %include <spot/twaalgos/complement.hh>
 

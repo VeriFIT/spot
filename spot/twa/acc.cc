@@ -75,24 +75,6 @@ namespace spot
     return os.str();
   }
 
-  // Deprecated since Spot 2.8
-  std::ostream& acc_cond::format(std::ostream& os,
-                                 acc_cond::mark_t m) const
-  {
-    if (!m)
-      return os;
-    return os << m;
-  }
-
-  // Deprecated since Spot 2.8
-  std::string acc_cond::format(acc_cond::mark_t m) const
-  {
-    std::ostringstream os;
-    if (m)
-      os << m;
-    return os.str();
-  }
-
   std::ostream& operator<<(std::ostream& os, const acc_cond& acc)
   {
     return os << '(' << acc.num_sets() << ", " << acc.get_acceptance() << ')';

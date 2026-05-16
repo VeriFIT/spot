@@ -37,7 +37,6 @@ twaalgos_HEADERS = \
   complement.hh \
   compsusp.hh \
   contains.hh \
-  copy.hh \
   couvreurnew.hh \
   cycles.hh \
   dbranch.hh \

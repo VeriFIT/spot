@@ -192,11 +192,6 @@ namespace spot
   SPOT_API twa_graph_ptr
   decompose_scc(scc_info& sm, const char* keep);
 
-  /// \brief Deprecated: use decompose_scc() instead.
-  SPOT_DEPRECATED("use decompose_scc() instead")
-  SPOT_API twa_graph_ptr
-  decompose_strength(const const_twa_graph_ptr& aut, const char* keep);
-
   /// \brief Extract a sub-automaton above an SCC
   ///
   /// This algorithm returns a subautomaton that contains the requested SCC,

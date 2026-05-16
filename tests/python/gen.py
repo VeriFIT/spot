@@ -32,7 +32,7 @@ tc.assertTrue(k2.prop_universal().is_false())
 tc.assertTrue(k2.prop_inherently_weak().is_false())
 tc.assertTrue(k2.prop_stutter_invariant().is_false())
 tc.assertTrue(k2.prop_semi_deterministic().is_false())
-tc.assertTrue(k2.prop_deterministic().is_false())
+tc.assertTrue(k2.prop_universal().is_false())
 tc.assertTrue(k2.prop_terminal().is_false())
 
 # to_str is defined in the spot package, so this makes sure
@@ -46,7 +46,7 @@ tc.assertTrue(k3.prop_universal().is_false())
 tc.assertTrue(k3.prop_inherently_weak().is_false())
 tc.assertTrue(k3.prop_stutter_invariant().is_false())
 tc.assertTrue(k3.prop_semi_deterministic().is_false())
-tc.assertTrue(k3.prop_deterministic().is_false())
+tc.assertTrue(k3.prop_universal().is_false())
 tc.assertTrue(k3.prop_terminal().is_false())
 
 tc.assertEqual(k2.get_dict(), k3.get_dict())
