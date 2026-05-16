@@ -23,18 +23,41 @@
 
 namespace spot
 {
+  /// \ingroup tl_rewriting
+  /// \brief Types of mutations supported by mutate().
   enum mut_opts
     {
-      Mut_Ap2Const = 1U<<0,
-      Mut_Simplify_Bounds = 1U<<1,
-      Mut_Remove_Multop_Operands = 1U<<2,
-      Mut_Remove_Ops = 1U<<3,
-      Mut_Split_Ops = 1U<<4,
-      Mut_Rewrite_Ops = 1U<<5,
-      Mut_Remove_One_Ap = 1U<<6,
+      /// Convert atomic propositions to constants.
+      Mut_Ap2Const = 1U << 0,
+      /// \brief Simplify bounds of bounded operators.
+      ///
+      /// If a bound is not formula::unbounded(), it can
+      /// be reduced by one, or set to formula::unbounded().
+      Mut_Simplify_Bounds = 1U << 1,
+      /// Remove operands from n-ary operators.
+      Mut_Remove_Multop_Operands = 1U << 2,
+      /// \brief Remove operators.
+      ///
+      /// Unary operators can be replaced by their operand.
+      /// Binary operators can be replaced by one of their operands.
+      Mut_Remove_Ops = 1U << 3,
+      /// \brief Split syntactic sugar into simpler forms.
+      ///
+      /// For instance a<->b could be rewritten as a->b or b->a.
+      Mut_Split_Ops = 1U << 4,
+      /// \brief Rewrite some operators.
+      ///
+      /// Currently U can be changed to W.
+      /// M can be changed to R or U.
+      /// R can be changed to W.
+      Mut_Rewrite_Ops = 1U << 5,
+      /// Replace one atomic proposition by another one.
+      Mut_Remove_One_Ap = 1U << 6,
+      /// Attempt every mutation possible.
       Mut_All = -1U
     };
 
+  /// \ingroup tl_rewriting
   /// \brief Generate mutations of a formula.
   ///
   /// Returns up to \a max_output mutated formulas derived from \a f
