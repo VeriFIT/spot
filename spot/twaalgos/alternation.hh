@@ -51,9 +51,12 @@ namespace spot
     std::map<int, unsigned> var_to_state;
     bdd vars_;
   public:
+    /// \brief Construct from an alternating automaton.
     outedge_combiner(const twa_graph_ptr& aut);
     ~outedge_combiner();
+    /// \brief Combine outgoing edges of state \a st.
     bdd operator()(unsigned st);
+    /// \brief Compute new destinations for state \a st under condition \a out.
     void new_dests(unsigned st, bdd out) const;
   };
 
@@ -116,16 +119,19 @@ namespace spot
                                    bool raise_if_too_many_sets = true);
 
 
+  /// \ingroup twa_algorithms
   /// \brief State used during on-the-fly removal of universal edges from an
   /// alternating automaton.
   class SPOT_API univ_remover_state: public state
   {
   protected:
-    std::set<unsigned> states_;
-    bool is_reset_;
+    std::set<unsigned> states_; ///< The set of original states represented.
+    bool is_reset_; ///< Whether this state represents a reset.
 
   public:
+    /// \brief Construct a state from a set of original states.
     univ_remover_state(const std::set<unsigned>& states);
+    /// \brief Copy constructor.
     univ_remover_state(const univ_remover_state& other)
       : states_(other.states_), is_reset_(other.is_reset_)
     {
@@ -133,10 +139,13 @@ namespace spot
     int compare(const state* other) const override;
     size_t hash() const override;
     state* clone() const override;
+    /// \brief Return the set of original states.
     const std::set<unsigned>& states() const;
+    /// \brief Check if this is a reset state.
     bool is_reset() const;
   };
 
+  /// \ingroup twa_algorithms
   /// \brief On-the-fly TωA that removes universal edges from an alternating
   /// automaton.
   class SPOT_API twa_univ_remover: public twa
@@ -149,13 +158,17 @@ namespace spot
     bdd all_states_;
 
   public:
+    /// \brief Construct from an alternating automaton.
     twa_univ_remover(const const_twa_graph_ptr& aut);
+    /// \brief Allocate BDD variables for the states.
     void allocate_state_vars();
     const state* get_init_state() const override;
     twa_succ_iterator* succ_iter(const state* s) const override;
     std::string format_state(const state* s) const override;
   };
 
+  /// \ingroup twa_algorithms
+  /// \brief Shared pointer to a twa_univ_remover.
   typedef std::shared_ptr<twa_univ_remover> twa_univ_remover_ptr;
 
   /// \ingroup twa_algorithms

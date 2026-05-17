@@ -30,6 +30,7 @@ namespace spot
   /// \brief Benchmarking data and options for synthesis
   struct SPOT_API synthesis_info
   {
+    /// \brief Algorithm selection for synthesis.
     enum class algo
     {
       DET_SPLIT = 0,
@@ -40,6 +41,7 @@ namespace spot
       ACD,
     };
 
+    /// \brief Splitting strategy for 2-step games.
     enum class splittype
     {
       AUTO = 0,  // Uses a heuristic to choose
@@ -48,73 +50,66 @@ namespace spot
       FULLYSYM  // Works on a fully symbolic version of the automaton
     };
 
-    /// \brief Benchmarking variables tracking timing and counts for each step
-    /// of synthesis.
+    /// \brief Benchmarking variables tracking timing and counts for
+    /// each step of synthesis.
+    ///
+    /// The sum_* and max_* variables make more sense when the
+    /// specification is split into multiple sub-specifications.  In
+    /// this case, sum_*/max_* variables are sums/max over all
+    /// sub-specifications.
     struct bench_var
     {
-      // Number of sub-specifications resulting from the decomposition.
-      // Updated by ltlsynt.
+      /// \brief Number of sub-specifications, after decomposition.
       unsigned sub_specs = 0;
-      // Total time needed for the synthesis.  Computed by ltlsynt.
+      /// \brief Total synthesis time.
       double total_time = 0.0;
-      // Time needed to transform the LTL formula(s) into automata, summed
-      // over all subspecs.   The type of automaton constructed depends on
-      // the "algo" parameter.
+      /// \brief Total LTL-to-automaton translation time.
       double sum_trans_time = 0.0;
-      // Time needed to split the automata into separate
-      // environment/controller steps.  Summed over all subspecs.
-      // Splitting may occur before or after paritization depending on
-      // the "algo" parameter.
+      /// \brief Total automaton splitting time.
       double sum_split_time = 0.0;
-      // Time needed to convert the automaton to deterministic parity
-      // automata.  Summed over all subspecs.  Paritization may occur
-      // before or after splitting depending on the "algo" parameter.
+      /// \brief Total paritization time.
       double sum_paritize_time = 0.0;
-      // Time needed to solve the game.  Summed over all subspecs.
+      /// \brief Total game solving time.
       double sum_solve_time = 0.0;
-      // Time needed to convert the winning strategy into an
-      // automaton.  Summed over all subspecs.
+      /// \brief Total strategy-to-automaton conversion time.
       double sum_strat2aut_time = 0.0;
-      // Time needed to simplify the winning strategy.  Summed over
-      // all subspecs.
+      /// \brief Total strategy simplification time.
       double sum_simplify_strat_time = 0.0;
-      // Time needed to encode all the strategies into one AIG.
+      /// \brief Total AIG encoding time.
       double aig_time = 0.0;
-      // Size of the automaton resulting from the main translation.
-      // If multiple subspecifications are used, only the largest
-      // (states,edges,colors,aps) triplet is kept.
+      /// \brief Max translated automaton states.
       unsigned max_trans_states = 0;
+      /// \brief Max translated automaton edges.
       unsigned max_trans_edges = 0;
+      /// \brief Max translated automaton colors.
       unsigned max_trans_colors = 0;
+      /// \brief Max translated automaton APs.
       unsigned max_trans_ap = 0;
-      // Size of the game that should be solved.  If multiple
-      // subspecifications are used, only the maximum states and
-      // colors are kept (those are compared independently).
+      /// \brief Max game states.
       unsigned max_game_states = 0;
+      /// \brief Max game colors.
       unsigned max_game_colors = 0;
-      // Size of the strategy extracted from the game.  If multiple
-      // subspecifications are used, only the maximum pair (states,
-      // edges) is kept.
+      /// \brief Max strategy states.
       unsigned max_strat_states = 0;
+      /// \brief Max strategy edges.
       unsigned max_strat_edges = 0;
-      // Size of the strategy extracted from the game, summed over all
-      // subspecifications.
+      /// \brief Total strategy states.
       unsigned sum_strat_states = 0;
+      /// \brief Total strategy edges.
       unsigned sum_strat_edges = 0;
-      // Size of the strategy after simplification game.  If multiple
-      // subspecifications are used, only the maximum pair (states,
-      // edges) is kept.
+      /// \brief Max simplified strategy states.
       unsigned max_simpl_strat_states = 0;
+      /// \brief Max simplified strategy edges.
       unsigned max_simpl_strat_edges = 0;
-      // Size of the strategy after simplification, summed over all
-      // subspecifications.
+      /// \brief Total simplified strategy states.
       unsigned sum_simpl_strat_states = 0;
+      /// \brief Total simplified strategy edges.
       unsigned sum_simpl_strat_edges = 0;
-      // Size of the AIG
+      /// \brief Number of AIG latches.
       unsigned aig_latches = 0;
+      /// \brief Number of AIG gates.
       unsigned aig_gates = 0;
-      // Whether the (global) specification is realizable.  Updated by
-      // ltlsynt.
+      /// \brief Whether the specification is realizable.
       bool realizable = false;
     };
 
@@ -129,14 +124,14 @@ namespace spot
     {
     }
 
-    bool force_sbacc;
-    algo s;
-    int minimize_lvl;
-    splittype sp;
-    std::optional<bench_var> bv;
-    std::ostream* verbose_stream;
-    option_map opt;
-    bdd_dict_ptr dict;
+    bool force_sbacc; ///< Force state-based acceptance.
+    algo s; ///< Selected algorithm.
+    int minimize_lvl; ///< Minimization level.
+    splittype sp; ///< Splitting strategy.
+    std::optional<bench_var> bv; ///< Benchmarking data.
+    std::ostream* verbose_stream; ///< Verbose output stream.
+    option_map opt; ///< Additional options.
+    bdd_dict_ptr dict; ///< BDD dictionary.
   };
 
   /// \addtogroup synthesis Reactive Synthesis
@@ -274,6 +269,7 @@ namespace spot
   ///        objects
   struct SPOT_API mealy_like
   {
+    /// \brief Realizability result codes.
     enum class realizability_code
     {
       UNREALIZABLE,
@@ -283,9 +279,9 @@ namespace spot
       REALIZABLE_DTGBA
     };
 
-    realizability_code success;
+    realizability_code success; ///< Realizability result.
     twa_graph_ptr mealy_like;
-    bdd glob_cond;
+    bdd glob_cond; ///< Global condition for DTGBA strategies.
   };
 
   /// \ingroup synthesis
@@ -341,8 +337,8 @@ namespace spot
   /// synthesis game.
   struct SPOT_API game_relabeling_map
   {
-    relabeling_map env_map;
-    relabeling_map player_map;
+    relabeling_map env_map; ///< Map for environment edges.
+    relabeling_map player_map; ///< Map for player edges.
   };
 
   /// \ingroup synthesis

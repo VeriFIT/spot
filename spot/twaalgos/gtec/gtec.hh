@@ -148,6 +148,7 @@ namespace spot
     std::shared_ptr<const couvreur99_check_status> result() const;
 
   protected:
+    /// \brief Shared status object holding the DFS data structures.
     std::shared_ptr<couvreur99_check_status> ecs_;
     /// \brief Remove a strongly component from the hash.
     ///
@@ -163,6 +164,7 @@ namespace spot
 
     /// Return the number of dead SCCs removed by the algorithm.
     unsigned get_removed_components() const;
+    /// \brief Return the virtual memory size used by the process (in kB).
     unsigned get_vmsize() const;
   };
 
@@ -195,10 +197,10 @@ namespace spot
     // * couvreur99_check::h, a hash of all visited nodes, with their order,
     //   (it is called "Hash" in Couvreur's paper)
     // * arc, a stack of acceptance conditions between each of these SCC,
-    std::stack<acc_cond::mark_t> arc;
+    std::stack<acc_cond::mark_t> arc; ///< Stack of inter-SCC acceptance marks.
     // * num, the number of visited nodes.  Used to set the order of each
     //   visited node,
-    int num;
+    int num; ///< Counter of visited nodes (DFS order).
     // * todo, the depth-first search stack.  This holds pairs of the
     //   form (STATE, SUCCESSORS) where SUCCESSORS is a list of
     //   (ACCEPTANCE_CONDITIONS, STATE) pairs.
@@ -206,7 +208,7 @@ namespace spot
     typedef std::list<successor> succ_queue;
 
     // Position in the loop seeking known successors.
-    succ_queue::iterator pos;
+    succ_queue::iterator pos; ///< Iterator into current successor queue.
 
     /// \brief DFS stack item holding a state and its queue of unprocessed
     /// successors.
@@ -230,6 +232,7 @@ namespace spot
     bool group_;
     // If the "group2" option is set (it implies "group"), we
     // reprocess the successor states of SCC that have been merged.
+    /// \brief If set, reprocess successors of merged SCCs (implies group_).
     bool group2_;
   };
 #endif

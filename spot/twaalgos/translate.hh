@@ -63,6 +63,7 @@ namespace spot
   class SPOT_API translator: protected postprocessor
   {
   public:
+    /// \brief Construct a translator with a given simplifier.
     translator(tl_simplifier* simpl, const option_map* opt = nullptr)
       : postprocessor(opt), simpl_(simpl), simpl_owned_(nullptr)
     {
@@ -70,6 +71,7 @@ namespace spot
       setup_opt(opt);
     }
 
+    /// \brief Construct a translator with a given BDD dictionary.
     translator(const bdd_dict_ptr& dict, const option_map* opt = nullptr)
       : postprocessor(opt)
     {
@@ -77,6 +79,7 @@ namespace spot
       build_simplifier(dict);
     }
 
+    /// \brief Construct a translator with optional options.
     translator(const option_map* opt = nullptr)
       : postprocessor(opt)
     {
@@ -90,24 +93,30 @@ namespace spot
       delete simpl_owned_;
     }
 
+    /// \brief Output type selection (inherited from postprocessor).
     using postprocessor::output_type;
 
+    /// \brief Select the desired output type.
     void
     set_type(output_type type)
     {
       this->postprocessor::set_type(type);
     }
 
+    /// \brief Output preferences bitmask.
     using postprocessor::output_pref;
 
+    /// \brief Select the desired output characteristics.
     void
     set_pref(output_pref pref)
     {
       this->postprocessor::set_pref(pref);
     }
 
+    /// \brief Optimization level selection.
     using postprocessor::optimization_level;
 
+    /// \brief Set the optimization level.
     void
     set_level(optimization_level level)
     {
@@ -137,8 +146,11 @@ namespace spot
     void clear_caches();
 
   protected:
+    /// \brief Initialize options from an option_map.
     void setup_opt(const option_map* opt);
+    /// \brief Build the LTL simplifier with the given dict.
     void build_simplifier(const bdd_dict_ptr& dict);
+    /// \brief Run translation on a formula.
     twa_graph_ptr run_aux(formula f);
 
   private:

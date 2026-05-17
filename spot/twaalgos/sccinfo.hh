@@ -284,25 +284,28 @@ namespace spot
   class SPOT_API scc_info_node
   {
   public:
+    /// \brief List of successor SCC indices.
     typedef std::vector<unsigned> scc_succs;
     friend class scc_info;
   protected:
-    scc_succs succ_;
-    std::vector<unsigned> states_; // States of the component
-    unsigned one_state_;
-    acc_cond::mark_t acc_;
-    acc_cond::mark_t common_;
-    bool trivial_:1;
-    bool accepting_:1;        // Necessarily accepting
-    bool rejecting_:1;        // Necessarily rejecting
-    bool useful_:1;
+    scc_succs succ_;          ///< Successor SCCs of this SCC.
+    std::vector<unsigned> states_; ///< States of the component.
+    unsigned one_state_;      ///< An arbitrary state in this SCC.
+    acc_cond::mark_t acc_;    ///< Union of acceptance marks seen.
+    acc_cond::mark_t common_; ///< Marks common to all edges.
+    bool trivial_:1;          ///< True if the SCC has no cycle.
+    bool accepting_:1;        ///< True if the SCC is necessarily accepting.
+    bool rejecting_:1;        ///< True if the SCC is necessarily rejecting.
+    bool useful_:1;           ///< True if the SCC can reach an accepting SCC.
   public:
+    /// \brief Default-construct an empty trivial SCC node.
     scc_info_node() noexcept:
       acc_({}), trivial_(true), accepting_(false),
       rejecting_(false), useful_(false)
     {
     }
 
+    /// \brief Construct an SCC node with given acceptance information.
     scc_info_node(acc_cond::mark_t acc,
                   acc_cond::mark_t common, bool trivial) noexcept
       : acc_(acc), common_(common),
@@ -311,6 +314,7 @@ namespace spot
     {
     }
 
+    /// \brief True if the SCC has no cycle.
     bool is_trivial() const
     {
       return trivial_;
@@ -336,31 +340,37 @@ namespace spot
       return rejecting_;
     }
 
+    /// \brief True if the SCC can reach an accepting SCC.
     bool is_useful() const
     {
       return useful_;
     }
 
+    /// \brief Return the union of all acceptance marks in this SCC.
     acc_cond::mark_t acc_marks() const
     {
       return acc_;
     }
 
+    /// \brief Return the marks common to all transitions in this SCC.
     acc_cond::mark_t common_marks() const
     {
       return common_;
     }
 
+    /// \brief Return all states belonging to this SCC.
     const std::vector<unsigned>& states() const
     {
       return states_;
     }
 
+    /// \brief Return one arbitrary state in this SCC.
     unsigned one_state() const
     {
       return one_state_;
     }
 
+    /// \brief Return the list of successor SCC indices.
     const scc_succs& succ() const
     {
       return succ_;
@@ -403,12 +413,16 @@ namespace spot
     ALL = TRACK_STATES | TRACK_SUCCS,
   };
 
+  /// \ingroup twa_algorithms
+  /// \brief Test if an scc_info_options value equals NONE.
   inline
   bool operator!(scc_info_options me)
   {
     return me == scc_info_options::NONE;
   }
 
+  /// \ingroup twa_algorithms
+  /// \brief Bitwise AND of two scc_info_options values.
   inline
   scc_info_options operator&(scc_info_options left, scc_info_options right)
   {
@@ -417,6 +431,8 @@ namespace spot
                                          & static_cast<ut>(right));
   }
 
+  /// \ingroup twa_algorithms
+  /// \brief Bitwise OR of two scc_info_options values.
   inline
   scc_info_options operator|(scc_info_options left, scc_info_options right)
   {
@@ -450,27 +466,29 @@ namespace spot
   public:
     // scc_node used to be an inner class, but Swig 3.0.10 does not
     // support that yet.
-    typedef scc_info_node scc_node;
-    typedef scc_info_node::scc_succs scc_succs;
+    typedef scc_info_node scc_node; ///< Alias for scc_info_node.
+    typedef scc_info_node::scc_succs scc_succs; ///< Successor SCC list.
 
     // These types used to be defined here in Spot up to 2.9.
-    typedef spot::edge_filter_choice edge_filter_choice;
-    typedef spot::edge_filter edge_filter;
+    typedef spot::edge_filter_choice edge_filter_choice; ///< Imported type.
+    typedef spot::edge_filter edge_filter; ///< Imported edge filter type.
 
   protected:
 
-    std::vector<unsigned> sccof_;
-    std::vector<scc_node> node_;
-    const_twa_graph_ptr aut_;
-    unsigned initial_state_;
-    edge_filter filter_;
-    void* filter_data_;
-    int one_acc_scc_ = -1;
-    scc_info_options options_;
+    std::vector<unsigned> sccof_; ///< SCC number for each state.
+    std::vector<scc_node> node_;  ///< SCC nodes in reverse topological order.
+    const_twa_graph_ptr aut_;     ///< The automaton being analyzed.
+    unsigned initial_state_;      ///< Initial state of the automaton.
+    edge_filter filter_;          ///< Optional edge filter function.
+    void* filter_data_;           ///< User data passed to the edge filter.
+    int one_acc_scc_ = -1;        ///< Index of one accepting SCC, or -1.
+    scc_info_options options_;    ///< Options used during construction.
 
     // Update the useful_ bits.  Called automatically.
+    /// \brief Update the useful_ bits for all SCC nodes.
     void determine_usefulness();
 
+    /// \brief Return the SCC node for the given SCC index.
     const scc_node& node(unsigned scc) const
     {
       return node_[scc];
@@ -517,26 +535,31 @@ namespace spot
     }
     /// @}
 
+    /// \brief Return the automaton passed to the constructor.
     const_twa_graph_ptr get_aut() const
     {
       return aut_;
     }
 
+    /// \brief Return the options used during construction.
     scc_info_options get_options() const
     {
       return options_;
     }
 
+    /// \brief Return the edge filter function.
     edge_filter get_filter() const
     {
       return filter_;
     }
 
+    /// \brief Return the user data passed to the edge filter.
     void* get_filter_data() const
     {
       return filter_data_;
     }
 
+    /// \brief Return the total number of SCCs.
     unsigned scc_count() const
     {
       return node_.size();
@@ -555,46 +578,55 @@ namespace spot
       return one_acc_scc_;
     }
 
+    /// \brief True if state \a st is reachable from the initial state.
     bool reachable_state(unsigned st) const
     {
       return scc_of(st) != -1U;
     }
 
+    /// \brief Return the SCC number containing state \a st.
     unsigned scc_of(unsigned st) const
     {
       return sccof_[st];
     }
 
+    /// \brief Iterator to the first SCC node.
     std::vector<scc_node>::const_iterator begin() const
     {
       return node_.begin();
     }
 
+    /// \brief Past-the-end iterator over SCC nodes.
     std::vector<scc_node>::const_iterator end() const
     {
       return node_.end();
     }
 
+    /// \brief Const iterator to the first SCC node.
     std::vector<scc_node>::const_iterator cbegin() const
     {
       return node_.cbegin();
     }
 
+    /// \brief Const past-the-end iterator over SCC nodes.
     std::vector<scc_node>::const_iterator cend() const
     {
       return node_.cend();
     }
 
+    /// \brief Reverse iterator to the last SCC node.
     std::vector<scc_node>::const_reverse_iterator rbegin() const
     {
       return node_.rbegin();
     }
 
+    /// \brief Reverse past-the-end iterator over SCC nodes.
     std::vector<scc_node>::const_reverse_iterator rend() const
     {
       return node_.rend();
     }
 
+    /// \brief Return all states belonging to SCC \a scc.
     const std::vector<unsigned>& states_of(unsigned scc) const
     {
       if (SPOT_UNLIKELY(!(options_ & scc_info_options::TRACK_STATES)))
@@ -635,6 +667,7 @@ namespace spot
               const_cast<void*>(filter_data_)};
     }
 
+    /// \brief Return one arbitrary state in SCC \a scc.
     unsigned one_state_of(unsigned scc) const
     {
       return node(scc).one_state();
@@ -647,6 +680,7 @@ namespace spot
       return scc_of(initial_state_);
     }
 
+    /// \brief Return the successor SCCs of SCC \a scc.
     const scc_succs& succ(unsigned scc) const
     {
       if (SPOT_UNLIKELY(!(options_ & scc_info_options::TRACK_SUCCS)))
@@ -654,16 +688,19 @@ namespace spot
       return node(scc).succ();
     }
 
+    /// \brief True if SCC \a scc has no cycle.
     bool is_trivial(unsigned scc) const
     {
       return node(scc).is_trivial();
     }
 
+    /// \brief True if SCC \a scc is necessarily accepting.
     bool is_accepting_scc(unsigned scc) const
     {
       return node(scc).is_accepting();
     }
 
+    /// \brief True if SCC \a scc is necessarily rejecting.
     bool is_rejecting_scc(unsigned scc) const
     {
       return node(scc).is_rejecting();
@@ -697,6 +734,7 @@ namespace spot
     /// This method needs the STOP_ON_ACC option.
     void get_accepting_run(unsigned scc, twa_run_ptr r) const;
 
+    /// \brief True if SCC \a scc can reach an accepting SCC.
     bool is_useful_scc(unsigned scc) const
     {
       if (SPOT_UNLIKELY(!!(options_ & scc_info_options::STOP_ON_ACC)))
@@ -706,6 +744,7 @@ namespace spot
       return node(scc).is_useful();
     }
 
+    /// \brief True if state \a st belongs to a useful SCC.
     bool is_useful_state(unsigned st) const
     {
       return reachable_state(st) && is_useful_scc(scc_of(st));
@@ -714,6 +753,7 @@ namespace spot
     /// \brief Returns, for each accepting SCC, the set of all marks appearing
     /// in it.
     std::vector<std::set<acc_cond::mark_t>> marks() const;
+    /// \brief Return the set of all marks appearing in SCC \a scc.
     std::set<acc_cond::mark_t> marks_of(unsigned scc) const;
 
     /// \brief Returns, for a given SCC, the set of all colors appearing in it.
@@ -731,8 +771,10 @@ namespace spot
       return node(scc).common_marks();
     }
 
+    /// \brief Return a vector indicating which SCCs are weak.
     std::vector<bool> weak_sccs() const;
 
+    /// \brief Return the APs that appear in SCC \a scc.
     bdd scc_ap_support(unsigned scc) const;
 
     /// \brief Split an SCC into multiple automata separated by some
@@ -783,6 +825,7 @@ namespace spot
   };
 
 
+  /// \ingroup twa_misc
   /// \brief Create a filter for SCC and marks.
   ///
   /// An scc_and_mark_filter can be passed to scc_info to explore only
@@ -791,21 +834,24 @@ namespace spot
   class SPOT_API scc_and_mark_filter
   {
   protected:
-    const scc_info* lower_si_;
-    unsigned lower_scc_;
-    acc_cond::mark_t cut_sets_;
-    const_twa_graph_ptr aut_;
-    acc_cond old_acc_;
-    bool restore_old_acc_ = false;
-    const bitvect* keep_ = nullptr;
+    const scc_info* lower_si_; ///< The original scc_info used to filter.
+    unsigned lower_scc_;       ///< SCC number in lower_si_ to restrict to.
+    acc_cond::mark_t cut_sets_; ///< Acceptance sets treated as cut edges.
+    const_twa_graph_ptr aut_;  ///< The automaton being filtered.
+    acc_cond old_acc_;         ///< Saved acceptance for restoration.
+    bool restore_old_acc_ = false; ///< Whether to restore old_acc_.
+    const bitvect* keep_ = nullptr; ///< Optional set of edges to keep.
 
+    /// \brief Filter by SCC membership and cut sets.
     static scc_info::edge_filter_choice
     filter_scc_and_mark_(const twa_graph::edge_storage_t& e,
                          unsigned dst, void* data);
 
+    /// \brief Filter by acceptance marks only.
     static scc_info::edge_filter_choice
     filter_mark_(const twa_graph::edge_storage_t& e, unsigned, void* data);
 
+    /// \brief Filter by SCC, marks, and edge set.
     static scc_info::edge_filter_choice
     filter_scc_and_mark_and_edges_(const twa_graph::edge_storage_t& e,
                                    unsigned dst, void* data);
@@ -835,6 +881,7 @@ namespace spot
         }
     }
 
+    /// \brief Construct with an additional bitvect of edges to keep.
     scc_and_mark_filter(const scc_info& lower_si,
                         unsigned lower_scc,
                         acc_cond::mark_t cut_sets,
@@ -860,12 +907,14 @@ namespace spot
       restore_acceptance();
     }
 
+    /// \brief Temporarily override the automaton's acceptance condition.
     void override_acceptance(const acc_cond& new_acc)
     {
       std::const_pointer_cast<twa_graph>(aut_)->set_acceptance(new_acc);
       restore_old_acc_ = true;
     }
 
+    /// \brief Restore the original acceptance condition.
     void restore_acceptance()
     {
       if (!restore_old_acc_)
@@ -874,11 +923,13 @@ namespace spot
       restore_old_acc_ = false;
     }
 
+    /// \brief Return the filtered automaton.
     const_twa_graph_ptr get_aut() const
     {
       return aut_;
     }
 
+    /// \brief Return the starting state for scc_info exploration.
     unsigned start_state() const
     {
       if (lower_si_)
@@ -886,6 +937,7 @@ namespace spot
       return aut_->get_init_state_number();
     }
 
+    /// \brief Return the appropriate edge filter function.
     scc_info::edge_filter get_filter() const
     {
       if (keep_)

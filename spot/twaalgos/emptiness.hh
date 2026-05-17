@@ -243,10 +243,11 @@ namespace spot
     /// \return \c -1U if no upper bound exists.
     unsigned int max_sets() const;
   protected:
+    /// \brief Construct an instantiator from options and implementation info.
     emptiness_check_instantiator(option_map o, void* i);
 
     option_map o_; ///< The options.
-    void *info_;
+    void *info_;   ///< Opaque pointer to implementation-specific data.
   };
 
   /// \brief Create an emptiness-check instantiator, given the name

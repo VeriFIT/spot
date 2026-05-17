@@ -26,6 +26,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_algorithms
   /// \brief Automata constructed by product() contain a property
   /// named "product-states" with this type
   typedef std::vector<std::pair<unsigned, unsigned>> product_states;

@@ -30,6 +30,7 @@ namespace spot
   class SPOT_API twa_reachable_iterator
   {
   public:
+    /// \brief Construct an iterator over reachable states.
     twa_reachable_iterator(const const_twa_ptr& a);
     virtual ~twa_reachable_iterator();
 
@@ -96,6 +97,7 @@ namespace spot
     public twa_reachable_iterator
   {
   public:
+    /// \brief Construct a breadth-first iterator.
     twa_reachable_iterator_breadth_first(const const_twa_ptr& a);
 
     virtual void add_state(const state* s) override;
@@ -110,6 +112,7 @@ namespace spot
   class SPOT_API twa_reachable_iterator_depth_first
   {
   public:
+    /// \brief Construct a depth-first iterator.
     twa_reachable_iterator_depth_first(const const_twa_ptr& a);
     virtual ~twa_reachable_iterator_depth_first();
 
@@ -159,9 +162,9 @@ namespace spot
     /// successor iterator.
     struct stack_item
     {
-      const state* src;
-      int src_n;
-      twa_succ_iterator* it;
+      const state* src;  ///< Source state (as a const_state*).
+      int src_n;         ///< Source state index.
+      twa_succ_iterator* it; ///< Iterator over successors of src.
     };
     std::deque<stack_item> todo; ///< the DFS stack
 
@@ -180,6 +183,7 @@ namespace spot
     : public twa_reachable_iterator_depth_first
   {
   public:
+    /// \brief Construct a depth-first iterator that exposes its stack.
     twa_reachable_iterator_depth_first_stack(const const_twa_ptr& a);
     /// \brief Whether state sn is on the DFS stack.
     ///
@@ -190,6 +194,6 @@ namespace spot
     virtual void push(const state* s, int sn) override;
     virtual void pop() override;
 
-    std::unordered_set<int> stack_;
+    std::unordered_set<int> stack_; ///< DFS stack of pending states.
   };
 }

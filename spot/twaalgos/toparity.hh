@@ -24,8 +24,9 @@
 
 namespace spot
 {
-  /// Structure used by to_parity to store some information about the
-  /// construction
+  /// \ingroup twa_acc_transform
+  /// \brief Structure used by to_parity to store some information about
+  /// the construction.
   struct to_parity_data
   {
     /// Total number of states created

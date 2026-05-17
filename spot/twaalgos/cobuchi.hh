@@ -36,10 +36,15 @@ namespace spot
   ///  - destinations of all outgoing edges of 's' (represented as a bitvect)
   struct nca_st_info
   {
-    unsigned clause_num;
-    unsigned state_num;
-    bitvect* all_dst;
+    unsigned clause_num; ///< Index of the NCA clause for this state.
+    unsigned state_num;  ///< State number in the NCA.
+    bitvect* all_dst;    ///< Bit vector of all successor states.
 
+    /// \brief Construct an nca_st_info entry.
+    ///
+    /// \param clause  clause index
+    /// \param st      state number
+    /// \param dst     bitvector of successor states (ownership taken)
     nca_st_info(unsigned clause, unsigned st, bitvect* dst)
     {
       clause_num = clause;
@@ -53,6 +58,8 @@ namespace spot
     }
   };
 
+  /// \ingroup twa_acc_transform
+  /// \brief Vector of nca_st_info pointers used by the co-Büchi construction.
   typedef std::vector<struct nca_st_info*> vect_nca_info;
 
   /// \ingroup twa_acc_transform

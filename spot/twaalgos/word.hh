@@ -33,7 +33,9 @@ namespace spot
   /// BDDs: one list of the prefix, one list for the cycle.
   struct SPOT_API twa_word final
   {
+    /// \brief Construct an empty word with the given BDD dictionary.
     twa_word(const bdd_dict_ptr& dict) noexcept;
+    /// \brief Construct a word from a twa_run.
     twa_word(const twa_run_ptr& run) noexcept;
     ~twa_word()
     {
@@ -69,10 +71,12 @@ namespace spot
     /// but setting \a positive to true will reverse that.
     void use_all_aps(bdd aps, bool positive = false);
 
+    /// \brief Type for a sequence of BDD conditions.
     typedef std::list<bdd> seq_t;
-    seq_t prefix;
-    seq_t cycle;
+    seq_t prefix; ///< Finite prefix of the word.
+    seq_t cycle;  ///< Infinite repeating cycle of the word.
 
+    /// \brief Return the BDD dictionary.
     bdd_dict_ptr get_dict() const
     {
       return dict_;
@@ -112,6 +116,7 @@ namespace spot
     bdd_dict_ptr dict_;
   };
 
+  /// \ingroup twa_essentials
   /// \brief Create an empty twa_word
   ///
   /// Note that empty twa_word are invalid and cannot be printed.
@@ -122,12 +127,14 @@ namespace spot
     return std::make_shared<twa_word>(dict);
   }
 
-  /// Create a twa_word from a twa_run
+  /// \ingroup twa_essentials
+  /// \brief Create a twa_word from a twa_run
   inline twa_word_ptr make_twa_word(const twa_run_ptr& run)
   {
     return std::make_shared<twa_word>(run);
   }
 
+  /// \ingroup twa_essentials
   /// \brief Parse a twa_word.
   ///
   /// The input should have the form

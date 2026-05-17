@@ -67,32 +67,21 @@ namespace spot
     /// algorithm.
     struct state_info
     {
+      /// \brief Construct with initial state number.
       state_info(unsigned num)
         : seen(false), reach(false), mark(false), del(num)
       {
       }
-      bool seen;
-      // Whether the state has already left the stack at least once.
-      bool reach;
-      // set to true when the state current state w is stacked, and
-      // reset either when the state is unstacked after having
-      // contributed to a cycle, or when some state z that (1) w could
-      // reach (even indirectly) without discovering a cycle, and (2)
-      // that a contributed to a contributed to a cycle.
-      bool mark;
-      // Deleted successors (in the paper, states deleted from A(x))
-      std::vector<bool> del;
-      // Predecessors of the current states, that could not yet
-      // contribute to a cycle.
-      std::vector<unsigned> b;
+      bool seen;   ///< Whether this state has been visited.
+      bool reach;  ///< Whether this state is reachable from the start.
+      bool mark;   ///< Whether this state is marked.
+      std::vector<bool> del;      ///< Delayed transition set.
+      std::vector<unsigned> b;    ///< BDD labeling associated with the state.
     };
 
-    // The automaton we are working on.
-    const_twa_graph_ptr aut_;
-    // Store the state_info for all visited states.
-    std::vector<state_info> info_;
-    // The SCC map built for aut_.
-    const scc_info& sm_;
+    const_twa_graph_ptr aut_;   ///< The automaton being explored.
+    std::vector<state_info> info_;  ///< SCC information.
+    const scc_info& sm_;        ///< The state map used during exploration.
 
     /// \brief DFS stack entry for the cycle enumeration algorithm.
     ///
@@ -102,18 +91,21 @@ namespace spot
     /// not be used by cycle_found()).
     struct dfs_entry
     {
-      unsigned s;
-      unsigned succ = 0U;
-      bool f = false;
+      unsigned s;       ///< State index.
+      unsigned succ = 0U; ///< Current successor being explored.
+      bool f = false;   ///< Edge condition accumulated so far.
+      /// \brief Construct a DFS entry for state \a s.
       dfs_entry(unsigned s) noexcept
         : s(s)
       {
       }
     };
+    /// \brief Stack type used during DFS traversal.
     typedef std::vector<dfs_entry> dfs_stack;
-    dfs_stack dfs_;
+    dfs_stack dfs_;  ///< The DFS stack.
 
   public:
+    /// \brief Construct a cycle enumerator for the given SCC.
     enumerate_cycles(const scc_info& map);
     virtual ~enumerate_cycles() {}
 

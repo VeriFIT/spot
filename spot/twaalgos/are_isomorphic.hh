@@ -23,7 +23,8 @@
 
 namespace spot
 {
-  /// Check if two automata are isomorphic.
+  /// \ingroup twa_misc
+  /// \brief Check if two automata are isomorphic.
   class SPOT_API isomorphism_checker final
   {
   public:

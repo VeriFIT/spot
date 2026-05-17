@@ -45,13 +45,15 @@ namespace spot
                         scc_info* sm = nullptr);
 
 
+  /// \cond DEPRECATED
   /// \ingroup twa_misc
   /// \brief Deprecated 3-argument form; the third argument is now ignored.
   SPOT_DEPRECATED("is third argument of is_terminal_automaton()"
-                  " is now ignored")
+                  " is now ignored") // Deprecated in Spot 2.12
   SPOT_API bool
   is_terminal_automaton(const const_twa_graph_ptr& aut,
                         scc_info* sm, bool);
+  /// \endcond
 
   /// \ingroup twa_misc
   /// \brief Check whether an automaton is weak.

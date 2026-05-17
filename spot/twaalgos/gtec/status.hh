@@ -33,16 +33,17 @@ namespace spot
   class SPOT_API couvreur99_check_status
   {
   public:
+    /// \brief Construct a status object for the given automaton.
     couvreur99_check_status(const const_twa_ptr& aut);
 
     ~couvreur99_check_status();
 
-    const_twa_ptr aut;
-    scc_stack root;
+    const_twa_ptr aut;        ///< The automaton being checked.
+    scc_stack root;           ///< Stack of SCCs found during DFS.
 
-    state_map<int> h;
+    state_map<int> h;         ///< Map from state to its DFS order number.
 
-    const state* cycle_seed;
+    const state* cycle_seed;  ///< Seed state for the accepting cycle.
 
     /// Output statistics about this object.
     void print_stats(std::ostream& os) const;

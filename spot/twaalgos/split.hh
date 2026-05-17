@@ -40,11 +40,13 @@ namespace spot
   SPOT_API twa_graph_ptr split_edges(const const_twa_graph_ptr& aut);
 
 #ifndef SWIG
-  /// \brief A filter for iterating over edge labels compatible with a given BDD
-  /// condition.
+  /// \ingroup twa_misc
+  /// \brief A filter for iterating over edge labels compatible with a given
+  /// BDD condition.
   template<bool subsumed>
   struct SPOT_API edge_separator_filter
     {
+      /// \brief Construct a filter from the given label basis and condition.
       edge_separator_filter(const std::vector<bdd>& labels, bdd cond)
       : labels_(labels), cond_(cond)
       {
@@ -59,6 +61,7 @@ namespace spot
         bdd cond_;
 
       public:
+        /// \brief Construct an iterator over matching labels.
         iterator(const std::vector<bdd>& labels, bdd cond)
           : labels_(labels), cond_(cond)
         {
@@ -66,6 +69,7 @@ namespace spot
           next();
         }
 
+        /// \brief Advance to the next matching label.
         iterator& operator++()
         {
           ++pos_;
@@ -73,6 +77,7 @@ namespace spot
           return *this;
         }
 
+        /// \brief Advance to the next matching label (implementation).
         void next()
         {
           // If subsumed is true, we want to match the labels
@@ -84,6 +89,7 @@ namespace spot
             ++pos_;
         }
 
+        /// \brief Dereference to get the current label.
         bdd operator*() const
         {
           if (subsumed)
@@ -92,32 +98,38 @@ namespace spot
             return *pos_ & cond_;
         }
 
+        /// \brief Check equality with another iterator.
         bool operator==(const iterator& other) const
         {
           return pos_ == other.pos_;
         }
 
+        /// \brief Check inequality with another iterator.
         bool operator!=(const iterator& other) const
         {
           return pos_ != other.pos_;
         }
 
+        /// \brief Check equality with a vector iterator.
         bool operator==(std::vector<bdd>::const_iterator pos) const
         {
           return pos_ == pos;
         }
 
+        /// \brief Check inequality with a vector iterator.
         bool operator!=(std::vector<bdd>::const_iterator pos) const
         {
           return pos_ != pos;
         }
       };
 
+      /// \brief Return an iterator to the first matching label.
       iterator begin() const
       {
         return iterator(labels_, cond_);
       }
 
+      /// \brief Return an iterator past the last label.
       std::vector<bdd>::const_iterator end() const
       {
         return labels_.end();
@@ -210,11 +222,13 @@ namespace spot
     }
 #endif
 
+    /// \brief Return the number of basis elements.
     unsigned basis_size() const
     {
       return basis_.size();
     }
 
+    /// \brief Return the basis vector.
     const std::vector<bdd>& basis() const
     {
       return basis_;

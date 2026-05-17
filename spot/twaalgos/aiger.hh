@@ -41,7 +41,11 @@ namespace spot
 
   class aig;
 
+  /// \ingroup synthesis
+  /// \brief Shared pointer to an aig.
   typedef std::shared_ptr<aig> aig_ptr;
+  /// \ingroup synthesis
+  /// \brief Shared pointer to a const aig.
   typedef std::shared_ptr<const aig> const_aig_ptr;
 
   /// \ingroup synthesis
@@ -59,30 +63,30 @@ namespace spot
   class SPOT_API aig
   {
   protected:
-    const unsigned num_inputs_;
-    const unsigned num_outputs_;
-    const unsigned num_latches_;
-    const std::vector<std::string> input_names_;
-    const std::vector<std::string> output_names_;
-    unsigned max_var_;
+    const unsigned num_inputs_; ///< Number of inputs.
+    const unsigned num_outputs_; ///< Number of outputs.
+    const unsigned num_latches_; ///< Number of latches.
+    const std::vector<std::string> input_names_; ///< Input signal names.
+    const std::vector<std::string> output_names_; ///< Output signal names.
+    unsigned max_var_; ///< Maximum variable index.
 
-    std::vector<unsigned> next_latches_;
-    std::vector<unsigned> outputs_;
-    std::vector<std::pair<unsigned, unsigned>> and_gates_;
-    bdd_dict_ptr dict_;
+    std::vector<unsigned> next_latches_; ///< Next-state for each latch.
+    std::vector<unsigned> outputs_; ///< Output functions.
+    std::vector<std::pair<unsigned, unsigned>> and_gates_; ///< AND gates.
+    bdd_dict_ptr dict_; ///< BDD dictionary.
     // Cache the function computed by each variable as a bdd.
     // Bidirectional map
-    std::unordered_map<unsigned, bdd> var2bdd_;
-    std::unordered_map<int, unsigned> bdd2var_; //uses id
+    std::unordered_map<unsigned, bdd> var2bdd_; ///< AIG variable to BDD.
+    std::unordered_map<int, unsigned> bdd2var_; ///< BDD to AIG variable.
     // First anonymous var marking the beginning of variables used
     // as latches
-    int l0_;
+    int l0_; ///< First latch variable.
 
-    bdd all_ins_;
-    bdd all_latches_;
+    bdd all_ins_; ///< Conjunction of all inputs.
+    bdd all_latches_; ///< Conjunction of all latches.
 
     // For simulation
-    std::vector<bool> state_;
+    std::vector<bool> state_; ///< Current simulation state.
 
   public:
 
@@ -92,6 +96,7 @@ namespace spot
     /// To improve performances, one can "save" the current status
     ///  and revert changes afterwards if needed
     using safe_point = std::pair<unsigned, unsigned>;
+    /// \brief RAII helper for saving/restoring AIG state.
     using safe_stash =
             std::tuple<std::vector<std::pair<unsigned, unsigned>>,
                        std::vector<std::pair<unsigned, bdd>>,
@@ -118,7 +123,9 @@ namespace spot
   protected:
     /// \brief Register a new literal in both maps
     void register_new_lit_(unsigned v, const bdd &b);
+    /// \brief Register a latch with a given BDD.
     void register_latch_(unsigned i, const bdd& b);
+    /// \brief Register an input with a given BDD.
     void register_input_(unsigned i, const bdd& b);
     /// \brief Remove a literal from both maps
     void unregister_lit_(unsigned v);
@@ -320,11 +327,13 @@ namespace spot
     /// \brief Associate the ith latch state after update to the variable v
     void set_next_latch(unsigned i, unsigned v);
 
+    /// \brief Return the literal for constant true (1).
     static constexpr unsigned aig_true() noexcept
     {
       return 1;
     };
 
+    /// \brief Return the literal for constant false (0).
     static constexpr unsigned aig_false() noexcept
     {
       return 0;
@@ -371,11 +380,13 @@ namespace spot
     parse_aag(const std::string& aig_file,
               bdd_dict_ptr dict = make_bdd_dict());
 
+    /// \brief Parse an AAG circuit from a data buffer.
     static aig_ptr
     parse_aag(const char* data,
               const std::string& filename,
               bdd_dict_ptr dict = make_bdd_dict());
 
+    /// \brief Parse an AAG circuit from a stream.
     static aig_ptr
     parse_aag(std::istream& iss,
               const std::string& filename,

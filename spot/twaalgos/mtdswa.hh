@@ -35,6 +35,7 @@ namespace spot
   struct SPOT_API mtdswa: public std::enable_shared_from_this<mtdswa>
   {
   public:
+    /// \brief Construct an MTDSwA with the given BDD dictionary.
     mtdswa(const bdd_dict_ptr& dict) noexcept
       : dict_(dict)
      {
@@ -56,18 +57,16 @@ namespace spot
     /// with another sorted vector.
     std::vector<formula> aps;
 
-    std::vector<bdd> states;
-    std::vector<formula> names;
-    std::vector<acc_cond::mark_t> colors;
-    acc_cond acc;
+    std::vector<bdd> states; ///< BDD transitions for each root state.
+    std::vector<formula> names; ///< Name formula for each root state.
+    std::vector<acc_cond::mark_t> colors; ///< Acceptance marks per root state.
+    acc_cond acc; ///< Acceptance condition of the automaton.
 
-    // If this map is non-empty, it is used to map terminal values
-    // to states while printing the automaton.  Use this only for debugging,
-    // other algorithms will ignore it.
+    /// \brief Map terminal BDD values to state indices (debug only).
     std::unordered_map<int, int> terminal_to_state_map;
-    // colors some nodes
+    /// \brief Highlighted BDD nodes (for visualization).
     std::unordered_map<int, unsigned> highlight_nodes;
-    // for each element (A, B) put state A in cluster B
+    /// \brief Cluster grouping for BDD nodes (for visualization).
     std::unordered_map<int, int> highlight_groups;
 
     /// \brief Get the bdd_dict associated to this automaton
@@ -76,6 +75,10 @@ namespace spot
       return dict_;
     }
 
+    /// \brief Return the number of root states.
+    ///
+    /// Note that this does not include bddtrue and bddfalse even if
+    /// they are reachable.
     unsigned num_roots() const
     {
       return states.size();
@@ -156,7 +159,11 @@ namespace spot
   };
 
 
+  /// \ingroup mtdswa
+  /// \brief Shared pointer to an mtdswa.
   typedef std::shared_ptr<mtdswa> mtdswa_ptr;
+  /// \ingroup mtdswa
+  /// \brief Shared pointer to a const mtdswa.
   typedef std::shared_ptr<const mtdswa> const_mtdswa_ptr;
 
   /// \ingroup mtdswa
@@ -241,35 +248,56 @@ namespace spot
   class SPOT_API simple_ltl_translator
   {
   public:
+    /// \brief Construct the translator with the given BDD dictionary.
     simple_ltl_translator(const bdd_dict_ptr& dict,
                           bool simplify_terms = true);
 
+    /// \brief Translate an LTL formula to an MTDSwA.
     mtdswa_ptr ltl_to_mtdswa(formula f, bool fuse_same_bdds);
+    /// \brief Translate an LTL formula for synthesis to MTDSwA.
     mtdswa_ptr ltl_to_mtdswa_synthesis(formula f,
                                        const std::vector<std::string>& outvars,
                                        bool realizability, int debug = -1);
 
+    /// \brief Convert an LTL formula to an MTBDD.
     bdd ltl_to_mtbdd(formula f);
+    /// \brief Convert a leaf value to a formula.
     formula leaf_to_formula(int b, int term) const;
 
+    /// \brief Convert a terminal integer to a formula.
     formula terminal_to_formula(int t) const;
+    /// \brief Convert a formula to an integer key.
     int formula_to_int(formula f);
+    /// \brief Convert a propositional equivalence formula to int.
     int formula_propeq_to_int(formula f);
+    /// \brief Convert a formula to a terminal index.
     int formula_to_terminal(formula f);
+    /// \brief Convert a formula to a terminal BDD.
     bdd formula_to_terminal_bdd(formula f);
+    /// \brief Convert a formula to a terminal BDD integer.
     int formula_to_terminal_bdd_as_int(formula f);
+    /// \brief Convert propositional equiv formula to terminal BDD int.
     int formula_propeq_to_terminal_bdd_as_int(formula f);
 
+    /// \brief Combine two BDDs with logical AND.
     bdd combine_and(bdd left, bdd right);
+    /// \brief Combine two BDDs with logical OR.
     bdd combine_or(bdd left, bdd right);
+    /// \brief Combine two BDDs with logical implication.
     bdd combine_implies(bdd left, bdd right);
+    /// \brief Combine two BDDs with logical equivalence.
     bdd combine_equiv(bdd left, bdd right);
+    /// \brief Combine two BDDs with exclusive OR.
     bdd combine_xor(bdd left, bdd right);
+    /// \brief Negate a BDD.
     bdd combine_not(bdd b);
 
+    /// \brief Encode a formula using propositional equivalences.
     bdd propeq_encode(formula f, int level = 0);
+    /// \brief Get the representative formula for a propositional equiv.
     formula propeq_representative(formula f, bool isacc);
 
+    /// \brief Return a pointer to the internal BDD cache.
     bddExtCache* get_cache()
     {
       return &cache_;

@@ -71,6 +71,7 @@ namespace spot
                bool deterministic = false, bool state_acc = false,
                bool colored = false);
 
-  /// Build a random acceptance where each acceptance sets is used once.
+  /// \ingroup twa_misc
+  /// \brief Build a random acceptance where each acceptance set is used once.
   SPOT_API acc_cond::acc_code random_acceptance(unsigned n_accs);
 }

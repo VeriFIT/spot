@@ -26,13 +26,16 @@
 namespace spot
 {
 
-  /// \brief Maps each powerset-construction state to the set of original states
-  /// it represents.
+  /// \ingroup twa_algorithms
+  /// \brief Maps each powerset-construction state to the set of original
+  /// states it represents.
   struct SPOT_API power_map
   {
+    /// \brief Set of NFA states in the powerset construction.
     typedef std::set<unsigned> power_state;
-    std::vector<power_state> map_;
+    std::vector<power_state> map_; ///< Map from DFA states to NFA state sets.
 
+    /// \brief Return the set of NFA states for DFA state \a s.
     const power_state&
     states_of(unsigned s) const
     {
@@ -40,6 +43,7 @@ namespace spot
     }
   };
 
+  /// \ingroup twa_algorithms
   /// \brief Helper object to specify when an algorithm
   /// should abort its construction.
   class SPOT_API output_aborter
@@ -48,22 +52,26 @@ namespace spot
     unsigned max_edges_;
     mutable bool reason_is_states_;
   public:
+    /// \brief Construct with max states and max edges limits.
     output_aborter(unsigned max_states,
                    unsigned max_edges = ~0U)
       : max_states_(max_states), max_edges_(max_edges)
     {
     }
 
+    /// \brief Return the maximum number of states allowed.
     unsigned max_states() const
     {
       return max_states_;
     }
 
+    /// \brief Return the maximum number of edges allowed.
     unsigned max_edges() const
     {
       return max_edges_;
     }
 
+    /// \brief Check if the automaton exceeds the size limits.
     bool too_large(const const_twa_graph_ptr& aut) const
     {
       bool too_many_states = aut->num_states() > max_states_;
@@ -74,6 +82,7 @@ namespace spot
       return true;
     }
 
+    /// \brief Print the reason why the construction was aborted.
     std::ostream& print_reason(std::ostream&) const;
   };
 
@@ -103,6 +112,8 @@ namespace spot
                 power_map& pm, bool merge = true,
                 const output_aborter* aborter = nullptr,
                 std::vector<unsigned>* accepting_sinks = nullptr);
+  /// \ingroup twa_algorithms
+  /// \brief Compute the powerset construction of a TGBA.
   SPOT_API twa_graph_ptr
   tgba_powerset(const const_twa_graph_ptr& aut,
                 const output_aborter* aborter = nullptr,

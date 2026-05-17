@@ -31,6 +31,7 @@ namespace spot
     public acss_statistics
   {
   public:
+    /// \brief Construct a result object from a Couvreur99 check status.
     couvreur99_check_result(const
                             std::shared_ptr<const couvreur99_check_status>& ecs,
                             option_map o = option_map());

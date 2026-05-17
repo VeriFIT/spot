@@ -71,6 +71,7 @@ namespace spot
     /// options used for debugging or benchmarking.
     postprocessor(const option_map* opt = nullptr);
 
+    /// \brief Output type selection.
     enum output_type {
       TGBA = 0, // Historical.  Use GeneralizedBuchi instead
       GeneralizedBuchi = 0, // Introduced in Spot 2.10 to replace TGBA
@@ -152,6 +153,7 @@ namespace spot
       Colored = 32,             // Colored parity; requires parity acceptance
       Obligation = 64,          // Assume the input is an obligation (Spot≥2.13)
     };
+    /// \brief Output preferences bitmask.
     typedef int output_pref;
 
     /// \brief Select the desired characteristics of the output automaton.
@@ -207,6 +209,7 @@ namespace spot
       pref_ = pref;
     }
 
+    /// \brief Optimization level selection.
     enum optimization_level { Low, Medium, High };
     /// \brief Set the optimization level
     ///
@@ -235,52 +238,60 @@ namespace spot
     twa_graph_ptr run(twa_graph_ptr input, formula f = nullptr);
 
   protected:
+    /// \brief Perform the simulation step.
     twa_graph_ptr do_simul(const twa_graph_ptr& input, int opt) const;
+    /// \brief Perform state-based acceptance simulation.
     twa_graph_ptr do_sba_simul(const twa_graph_ptr& input, int opt) const;
+    /// \brief Choose degeneralization strategy.
     twa_graph_ptr choose_degen(const twa_graph_ptr& input) const;
+    /// \brief Perform the degeneralization step.
     twa_graph_ptr do_degen(const twa_graph_ptr& input) const;
+    /// \brief Perform TBA degeneralization.
     twa_graph_ptr do_degen_tba(const twa_graph_ptr& input) const;
+    /// \brief Perform the SCC filter step.
     twa_graph_ptr do_scc_filter(const twa_graph_ptr& a, bool arg) const;
+    /// \brief Perform the SCC filter step.
     twa_graph_ptr do_scc_filter(const twa_graph_ptr& a) const;
+    /// \brief Finalize the automaton.
     twa_graph_ptr finalize(twa_graph_ptr tmp) const;
 
-    output_type type_ = TGBA;
-    int pref_ = Small;
-    optimization_level level_ = High;
+    output_type type_ = TGBA; ///< Output type option.
+    int pref_ = Small; ///< Output preference option.
+    optimization_level level_ = High; ///< Optimization level option.
     // Fine-tuning options fetched from the option_map.
-    bool degen_reset_ = true;
-    bool degen_order_ = false;
-    int degen_cache_ = 1;
-    bool degen_lskip_ = true;
-    bool degen_lowinit_ = false;
-    bool degen_remscc_ = true;
-    bool det_scc_ = true;
-    int det_simul_ = -1;
-    bool det_stutter_ = true;
-    int det_max_states_ = -1;
-    int det_max_edges_ = -1;
-    int simul_ = -1;
-    int simul_method_ = -1;
-    int simul_trans_pruning_ = 512;
-    int dpa_simul_ = -1;
-    int dba_simul_ = -1;
-    int scc_filter_ = -1;
-    int ba_simul_ = -1;
-    bool tba_determinisation_ = false;
-    int sat_minimize_ = 0;
-    int sat_incr_steps_ = 0;
-    bool sat_langmap_ = false;
-    int sat_acc_ = 0;
-    int sat_states_ = 0;
-    int gen_reduce_parity_ = 1;
-    bool state_based_ = false;
-    int wdba_minimize_ = -1;
-    int simul_max_ = 4096;
-    int merge_states_min_ = 128;
-    int wdba_det_max_ = 4096;
-    bool acd_ = true;
-    bool acd_was_used_;
-    int rde_ = -1;
+    bool degen_reset_ = true; ///< Degeneralization reset option.
+    bool degen_order_ = false; ///< Degeneralization order option.
+    int degen_cache_ = 1; ///< Degeneralization cache option.
+    bool degen_lskip_ = true; ///< Degeneralization level-skip option.
+    bool degen_lowinit_ = false; ///< Degeneralization low-init option.
+    bool degen_remscc_ = true; ///< Degeneralization remove-SCC option.
+    bool det_scc_ = true; ///< Determinization use-SCC option.
+    int det_simul_ = -1; ///< Determinization simulation option.
+    bool det_stutter_ = true; ///< Determinization stutter option.
+    int det_max_states_ = -1; ///< Determinization max states limit.
+    int det_max_edges_ = -1; ///< Determinization max edges limit.
+    int simul_ = -1; ///< Simulation option.
+    int simul_method_ = -1; ///< Simulation method option.
+    int simul_trans_pruning_ = 512; ///< Simulation transition pruning option.
+    int dpa_simul_ = -1; ///< DPA simulation option.
+    int dba_simul_ = -1; ///< DBA simulation option.
+    int scc_filter_ = -1; ///< SCC filter option.
+    int ba_simul_ = -1; ///< BA simulation option.
+    bool tba_determinisation_ = false; ///< TBA determinization option.
+    int sat_minimize_ = 0; ///< SAT minimization option.
+    int sat_incr_steps_ = 0; ///< SAT incremental steps option.
+    bool sat_langmap_ = false; ///< SAT language map option.
+    int sat_acc_ = 0; ///< SAT acceptance sets option.
+    int sat_states_ = 0; ///< SAT states option.
+    int gen_reduce_parity_ = 1; ///< Generalized parity reduction option.
+    bool state_based_ = false; ///< State-based acceptance option.
+    int wdba_minimize_ = -1; ///< WDBA minimization option.
+    int simul_max_ = 4096; ///< Simulation max states option.
+    int merge_states_min_ = 128; ///< Merge states minimum option.
+    int wdba_det_max_ = 4096; ///< WDBA determinization max states.
+    bool acd_ = true; ///< ACD option.
+    bool acd_was_used_; ///< Whether ACD was used.
+    int rde_ = -1; ///< RDE option.
   };
   /// @}
 }

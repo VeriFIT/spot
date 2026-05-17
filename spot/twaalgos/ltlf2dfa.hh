@@ -130,8 +130,8 @@ namespace spot
       dict_->unregister_all_my_variables(this);
     }
 
-    std::vector<bdd> states;
-    std::vector<formula> names;
+    std::vector<bdd> states;  ///< BDD transitions for each root state.
+    std::vector<formula> names; ///< Name formula for each root state.
     /// \brief The list of atomic propositions possibly used by the automaton.
     ///
     /// This is actually the list of atomic propositions that appeared
@@ -164,6 +164,7 @@ namespace spot
 
     // This assumes that all states are reachable, so we just have to
     // check if one terminal is accepting.
+    /// \brief Check if the automaton recognizes the empty language.
     bool is_empty() const;
 
     /// \brief Print the `states` array of MTBDD in graphviz format.
@@ -247,7 +248,11 @@ namespace spot
     bdd controllable_variables_ = bddtrue;
     };
 
+  /// \ingroup mtdfa
+  /// \brief Shared pointer to a mtdfa.
   typedef std::shared_ptr<mtdfa> mtdfa_ptr;
+  /// \ingroup mtdfa
+  /// \brief Shared pointer to a const mtdfa.
   typedef std::shared_ptr<const mtdfa> const_mtdfa_ptr;
 
   /// \ingroup mtdfa
@@ -295,6 +300,8 @@ namespace spot
                 bool preserve_quantifiers_in_names = false);
 
 
+  /// \ingroup mtdfa
+  /// \brief Backpropagation mode for LTLf synthesis.
   enum ltlf_synthesis_backprop {
     state_refine,         ///< no backpropagation, just local refinement
     bfs_node_backprop,    ///< on-the-fly, BFS
@@ -497,13 +504,16 @@ namespace spot
   class SPOT_API ltlf_translator
   {
   public:
+    /// \brief Construct the translator with the given BDD dictionary.
     ltlf_translator(const bdd_dict_ptr& dict,
                     bool simplify_terms = true);
 
+    /// \brief Translate an LTLf formula to a Multi-Terminal DFA.
     mtdfa_ptr ltlf_to_mtdfa(formula f, bool fuse_same_bdds,
                             bool detect_empty_univ = true,
                             bool preserve_quantifiers_in_names = false);
 
+    /// \brief Translate an LTLf formula to MTdfa for synthesis.
     mtdfa_ptr ltlf_to_mtdfa_synthesis(formula f, bool fuse_same_bdds,
                                       bool detect_empty_univ = true,
                                       const std::vector<std::string>* outvars
@@ -516,30 +526,49 @@ namespace spot
                                       bool preserve_quantifiers_in_names
                                       = false);
 
+    /// \brief Convert an LTLf formula to an MTBDD.
     bdd ltlf_to_mtbdd(formula f);
+    /// \brief Convert a leaf value to a formula.
     std::pair<formula, bool>  leaf_to_formula(int b, int term) const;
 
+    /// \brief Convert a terminal integer to a formula.
     formula terminal_to_formula(int t) const;
+    /// \brief Convert a formula to an integer key.
     int formula_to_int(formula f);
+    /// \brief Convert a formula to a terminal index.
     int formula_to_terminal(formula f, bool may_stop = false);
+    /// \brief Convert a formula to a terminal BDD.
     bdd formula_to_terminal_bdd(formula f, bool may_stop = false);
+    /// \brief Convert a formula to a terminal BDD integer.
     int formula_to_terminal_bdd_as_int(formula f, bool may_stop = false);
 
+    /// \brief Combine two BDDs with logical AND.
     bdd combine_and(bdd left, bdd right);
+    /// \brief Combine two BDDs with logical OR.
     bdd combine_or(bdd left, bdd right);
+    /// \brief Combine two BDDs with implication.
     bdd combine_implies(bdd left, bdd right);
+    /// \brief Combine two BDDs with equivalence.
     bdd combine_equiv(bdd left, bdd right);
+    /// \brief Combine two BDDs with exclusive OR.
     bdd combine_xor(bdd left, bdd right);
+    /// \brief Negate a BDD.
     bdd combine_not(bdd b);
 
 
+    /// \brief Encode a formula using propositional equivalences.
     bdd propeq_encode(formula f);
+    /// \brief Get the representative for a propositional equiv.
     formula propeq_representative(formula f);
+    /// \brief Convert propositional equiv formula to int.
     int formula_propeq_to_int(formula f);
+    /// \brief Convert propositional equiv formula to terminal BDD int.
     int formula_propeq_to_terminal_bdd_as_int(formula f, bool may_stop);
+    /// \brief Convert propositional equiv formula to terminal.
     int formula_propeq_to_terminal(formula f, bool may_stop = false);
 
 
+    /// \brief Return a pointer to the internal BDD cache.
     bddExtCache* get_cache()
     {
       return &cache_;

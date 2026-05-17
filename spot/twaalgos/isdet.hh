@@ -77,6 +77,7 @@ namespace spot
   highlight_nondet_edges(twa_graph_ptr& aut, unsigned color);
   /// @}
 
+  /// \ingroup twa_misc
   /// \brief Highlight the deterministic part of the automaton
   ///
   /// In the case of a semideterministic automaton, highlights the
@@ -87,6 +88,7 @@ namespace spot
   SPOT_API void
   highlight_semidet_sccs(scc_info& si, unsigned color);
 
+  /// \ingroup twa_misc
   /// \brief Return true iff \a aut is complete.
   ///
   /// An automaton is complete if its translation relation is total,
@@ -94,6 +96,7 @@ namespace spot
   SPOT_API bool
   is_complete(const const_twa_graph_ptr& aut);
 
+  /// \ingroup twa_misc
   /// \brief Return true iff \a aut is semi-deterministic.
   ///
   /// An automaton is semi-deterministic if the sub-automaton
@@ -101,10 +104,12 @@ namespace spot
   SPOT_API bool
   is_semi_deterministic(const const_twa_graph_ptr& aut);
 
+  /// \ingroup twa_misc
   /// \brief Whether an SCC is in the deterministic part of an automaton
   SPOT_API std::vector<bool>
   semidet_sccs(scc_info& si);
 
+  /// \ingroup twa_misc
   /// \brief Set the deterministic and semi-deterministic properties
   /// appropriately.
   SPOT_API void check_determinism(twa_graph_ptr aut);

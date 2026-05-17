@@ -54,55 +54,72 @@ namespace spot
       }
     };
   public:
+    /// \brief Construct the backpropagation graph.
     backprop_graph(bool stop_asap = true)
       : stop_asap_(stop_asap)
     {
     }
 
+    /// \brief Add a new state; \a owner is true if owned by Player 1.
     int new_state(bool owner)
     {
       return reverse_.new_state(owner);
     }
 
+    /// \brief Set the name of the given state.
     void set_name(unsigned state, const std::string& s)
     {
       names_.emplace(state, s);
     }
 
-    // return true if the status of src is now known
+    /// \brief Add an edge from \a src to \a dst.
     bool new_edge(unsigned src, unsigned dst);
 
-    // call once the successors of a state have all been declared to
-    // see if the status of that state can be determined already
+    /// \brief Mark a state as frozen (no more incoming edges).
+    ///
+    /// Once a state is frozen, no more incoming edges can be added.
+    /// If all successors are won by the other player, then a frozen
+    /// state can be marked as won by the other player too.
     bool freeze_state(unsigned state);
 
+    /// \brief Check if a state is frozen.
+    ///
+    /// Once a state is frozen, no more incoming edges can be added.
+    /// If all successors are won by the other player, then a frozen
+    /// state can be marked as won by the other player too.
     bool is_frozen(unsigned state) const
     {
       return (*this)[state].frozen;
     }
 
+    /// \brief Check if the winner of a state has been determined.
     bool is_determined(unsigned state) const
     {
       return (*this)[state].determined;
     }
 
+    /// \brief Return the winner of a state (true = Player 0).
     bool winner(unsigned state) const
     {
       return (*this)[state].winner;
     }
 
+    /// \brief Return the chosen successor for a state.
     unsigned choice(unsigned state) const
     {
       return (*this)[state].choice;
     }
 
+    /// \brief Set the winner of a state.
     bool set_winner(unsigned state, bool winner)
     {
       return set_winner(state, winner, target);
     }
 
+    /// \brief Print the graph in dot format.
     std::ostream& print_dot(std::ostream& os) const;
 
+    /// \brief Return the number of edges.
     unsigned num_edges() const
     {
       return reverse_.num_edges();
