@@ -36,6 +36,8 @@
 namespace spot
 {
   struct twa_run;
+  /// \ingroup twa_essentials
+  /// \brief Shared pointer to a twa_run.
   typedef std::shared_ptr<twa_run> twa_run_ptr;
 
   struct twa_word;
@@ -122,6 +124,7 @@ namespace spot
   /// \endcode
   struct state_ptr_less_than
   {
+    /// \brief Compare two state pointers using state::compare().
     bool
     operator()(const state* left, const state* right) const
     {
@@ -145,6 +148,7 @@ namespace spot
   /// \endcode
   struct state_ptr_equal
   {
+    /// \brief Test two state pointers for equality via state::compare().
     bool
     operator()(const state* left, const state* right) const
     {
@@ -169,6 +173,7 @@ namespace spot
   /// \endcode
   struct state_ptr_hash
   {
+    /// \brief Hash a state pointer using state::hash().
     size_t
     operator()(const state* that) const
     {
@@ -241,6 +246,7 @@ namespace spot
         }
     }
 
+    /// \brief Return the number of unique states in the table.
     size_t
     size()
     {
@@ -248,13 +254,26 @@ namespace spot
     }
   };
 
-
-
   // Functions related to shared_ptr.
   //////////////////////////////////////////////////
 
+  /// \ingroup twa_essentials
+  /// \brief Shared pointer to a const state.
+  ///
+  /// Used in algorithms that manage state ownership via shared
+  /// pointers rather than raw pointers.  Pair with
+  /// shared_state_deleter to call state::destroy() on deletion.
   typedef std::shared_ptr<const state> shared_state;
 
+  /// \ingroup twa_essentials
+  /// \brief Deleter for shared_state: calls state::destroy().
+  ///
+  /// Use this as the custom deleter when constructing a shared_state
+  /// from a raw state pointer:
+  /// \code
+  ///   shared_state s(aut->get_init_state(),
+  ///                  spot::shared_state_deleter);
+  /// \endcode
   inline void shared_state_deleter(state* s) { s->destroy(); }
 
   /// \ingroup twa_essentials
@@ -272,6 +291,7 @@ namespace spot
   /// \endcode
   struct state_shared_ptr_less_than
   {
+    /// \brief Compare two shared states using state::compare().
     bool
     operator()(shared_state left,
                shared_state right) const
@@ -300,6 +320,7 @@ namespace spot
   /// \see shared_state_set
   struct state_shared_ptr_equal
   {
+    /// \brief Test two shared states for equality via state::compare().
     bool
     operator()(shared_state left,
                shared_state right) const
@@ -329,6 +350,7 @@ namespace spot
   /// \see shared_state_set
   struct state_shared_ptr_hash
   {
+    /// \brief Hash a shared state using state::hash().
     size_t
     operator()(shared_state that) const
     {
@@ -618,6 +640,7 @@ namespace spot
   class SPOT_API twa: public std::enable_shared_from_this<twa>
   {
   protected:
+    /// \brief Construct a TωA using the given BDD dictionary.
     twa(const bdd_dict_ptr& d);
     /// Any iterator returned via release_iter.
     mutable twa_succ_iterator* iter_cache_;
@@ -1056,17 +1079,23 @@ namespace spot
     };
     union
     {
-      unsigned props;
-      bprop is;
+      unsigned props; ///< All property flags packed as a bitmask.
+      bprop is;       ///< Named access to individual property flags.
     };
 
   protected:
 #ifndef SWIG
-    // Dynamic properties, are given with a name and a destructor function.
+    /// \brief Storage for named properties.
+    ///
+    /// Maps property names to (pointer, destructor) pairs.
     std::unordered_map<std::string,
                        std::pair<void*,
                                  std::function<void(void*)>>> named_prop_;
 #endif
+    /// \brief Look up a named property by name.
+    ///
+    /// Returns a void* to the stored value, or nullptr if not found.
+    /// This is the untyped backend for get_named_prop<T>().
     void* get_named_prop_(std::string s) const;
 
   public:
@@ -1517,6 +1546,7 @@ namespace spot
       bool complete;        ///< preserve completeness
       bool stutter_inv;     ///< preserve stutter invariance
 
+      /// \brief Construct a prop_set with all flags set to false.
       prop_set()
       : state_based(false),
         inherently_weak(false),
@@ -1527,6 +1557,17 @@ namespace spot
       {
       }
 
+      /// \brief Construct a prop_set with explicit flag values.
+      ///
+      /// \param state_based    preserve state-based acceptance
+      /// \param inherently_weak preserve inherently weak, weak,
+      ///                        and terminal
+      /// \param deterministic  preserve deterministic, semi-det,
+      ///                        unambiguous
+      /// \param improve_det    improve deterministic, semi-det,
+      ///                        unambiguous
+      /// \param complete       preserve completeness
+      /// \param stutter_inv    preserve stutter invariance
       prop_set(bool state_based,
                bool inherently_weak,
                bool deterministic,
@@ -1641,6 +1682,10 @@ namespace spot
         prop_stutter_invariant(trival::maybe());
     }
 
+    /// \brief Reset all automaton properties to trival::maybe().
+    ///
+    /// This is equivalent to prop_keep({}) and causes all
+    /// automaton properties to be considered unknown.
     void prop_reset()
     {
       prop_keep({});

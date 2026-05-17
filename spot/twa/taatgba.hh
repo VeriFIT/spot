@@ -35,20 +35,24 @@ namespace spot
   class SPOT_API taa_tgba: public twa
   {
   public:
+    /// \brief Construct a TAA automaton using the given dictionary.
     taa_tgba(const bdd_dict_ptr& dict);
 
     struct transition;
+    /// \brief Type of a TAA state: a list of outgoing transitions.
     typedef std::list<transition*> state;
+    /// \brief Type of a set of TAA states.
     typedef std::set<state*> state_set;
 
-    /// Explicit transitions.
+    /// \brief An explicit TAA transition.
     struct transition
     {
-      bdd condition;
-      acc_cond::mark_t acceptance_conditions;
-      const state_set* dst;
+      bdd condition;                    ///< Boolean label of the edge.
+      acc_cond::mark_t acceptance_conditions; ///< Acceptance marks.
+      const state_set* dst;            ///< Destination state set.
     };
 
+    /// \brief Add a Boolean condition \a f to transition \a t.
     void add_condition(transition* t, formula f);
 
     /// TGBA interface.
@@ -58,12 +62,13 @@ namespace spot
       const override final;
 
   protected:
-
+    /// \brief Type of a vector of state sets (used internally).
     typedef std::vector<taa_tgba::state_set*> ss_vec;
 
-    taa_tgba::state_set* init_;
-    ss_vec state_set_vec_;
+    taa_tgba::state_set* init_;      ///< Initial state set.
+    ss_vec state_set_vec_;           ///< All allocated state sets.
 
+    /// \brief Map from formulas to acceptance marks.
     std::map<formula, acc_cond::mark_t> acc_map_;
 
   private:
@@ -77,6 +82,10 @@ namespace spot
   class SPOT_API set_state final: public spot::state
   {
   public:
+    /// \brief Construct a set_state wrapping state set \a s.
+    ///
+    /// If \a delete_me is true the set pointed by \a s will be
+    /// deleted when this state is destroyed.
     set_state(const taa_tgba::state_set* s, bool delete_me = false)
       : s_(s), delete_me_(delete_me)
     {
@@ -92,6 +101,7 @@ namespace spot
         delete s_;
     }
 
+    /// \brief Return the underlying TAA state set.
     const taa_tgba::state_set* get_state() const;
   private:
     const taa_tgba::state_set* s_;
@@ -104,6 +114,7 @@ namespace spot
   class SPOT_API taa_succ_iterator final: public twa_succ_iterator
   {
   public:
+    /// \brief Construct an iterator over the successors of state \a s.
     taa_succ_iterator(const taa_tgba::state_set* s, const acc_cond& acc);
     virtual ~taa_succ_iterator();
 
@@ -147,6 +158,7 @@ namespace spot
   class SPOT_API taa_tgba_labelled: public taa_tgba
   {
   public:
+    /// \brief Construct a labelled TAA using the given dictionary.
     taa_tgba_labelled(const bdd_dict_ptr& dict) : taa_tgba(dict) {};
 
     ~taa_tgba_labelled()
@@ -159,17 +171,20 @@ namespace spot
         }
     }
 
+    /// \brief Set the initial state to the singleton \a s.
     void set_init_state(const label& s)
     {
       std::vector<label> v(1);
       v[0] = s;
       set_init_state(v);
     }
+    /// \brief Set the initial state to the conjunction of states in \a s.
     void set_init_state(const std::vector<label>& s)
     {
       init_ = add_state_set(s);
     }
 
+    /// \brief Create a transition from \a s to the conjunction of \a d.
     transition*
     create_transition(const label& s,
                       const std::vector<label>& d)
@@ -184,6 +199,7 @@ namespace spot
       return t;
     }
 
+    /// \brief Create a transition from \a s to singleton destination \a d.
     transition*
     create_transition(const label& s, const label& d)
     {
@@ -192,6 +208,7 @@ namespace spot
       return create_transition(s, vec);
     }
 
+    /// \brief Add acceptance condition \a f to transition \a t.
     void add_acceptance_condition(transition* t, formula f)
     {
       auto p = acc_map_.emplace(f, acc_cond::mark_t({}));
@@ -233,14 +250,17 @@ namespace spot
     }
 
   protected:
+    /// \brief The label type for this automaton.
     typedef label label_t;
 
+    /// \brief Map from label to taa_tgba::state*.
     typedef std::unordered_map<label, taa_tgba::state*> ns_map;
+    /// \brief Map from taa_tgba::state* to label.
     typedef std::unordered_map<const taa_tgba::state*, label,
                                ptr_hash<taa_tgba::state> > sn_map;
 
-    ns_map name_state_map_;
-    sn_map state_name_map_;
+    ns_map name_state_map_; ///< Map from label to state pointer.
+    sn_map state_name_map_; ///< Map from state pointer to label.
 
     /// \brief Return a label as a string.
     virtual std::string label_to_string(const label_t& lbl) const = 0;
@@ -309,6 +329,7 @@ namespace spot
 #endif
   {
   public:
+    /// \brief Construct a string-labelled TAA automaton.
     taa_tgba_string(const bdd_dict_ptr& dict) :
       taa_tgba_labelled<std::string>(dict) {}
     ~taa_tgba_string()
@@ -318,9 +339,15 @@ namespace spot
       const override;
   };
 
+  /// \ingroup twa_representation
+  /// \brief Shared pointer to a taa_tgba_string automaton.
   typedef std::shared_ptr<taa_tgba_string> taa_tgba_string_ptr;
+  /// \ingroup twa_representation
+  /// \brief Shared pointer to a const taa_tgba_string automaton.
   typedef std::shared_ptr<const taa_tgba_string> const_taa_tgba_string_ptr;
 
+  /// \ingroup twa_representation
+  /// \brief Construct a taa_tgba_string automaton.
   inline taa_tgba_string_ptr make_taa_tgba_string(const bdd_dict_ptr& dict)
   {
     return SPOT_make_shared_enabled__(taa_tgba_string, dict);
@@ -336,6 +363,7 @@ namespace spot
 #endif
   {
   public:
+    /// \brief Construct a formula-labelled TAA automaton.
     taa_tgba_formula(const bdd_dict_ptr& dict) :
       taa_tgba_labelled<formula>(dict) {}
     ~taa_tgba_formula()
@@ -345,9 +373,15 @@ namespace spot
       const override;
   };
 
+  /// \ingroup twa_representation
+  /// \brief Shared pointer to a taa_tgba_formula automaton.
   typedef std::shared_ptr<taa_tgba_formula> taa_tgba_formula_ptr;
+  /// \ingroup twa_representation
+  /// \brief Shared pointer to a const taa_tgba_formula automaton.
   typedef std::shared_ptr<const taa_tgba_formula> const_taa_tgba_formula_ptr;
 
+  /// \ingroup twa_representation
+  /// \brief Construct a taa_tgba_formula automaton.
   inline taa_tgba_formula_ptr make_taa_tgba_formula(const bdd_dict_ptr& dict)
   {
     return SPOT_make_shared_enabled__(taa_tgba_formula, dict);

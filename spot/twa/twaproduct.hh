@@ -47,12 +47,14 @@ namespace spot
 
     virtual void destroy() const override;
 
+    /// \brief Return the left component of this product state.
     const state*
     left() const
     {
       return left_;
     }
 
+    /// \brief Return the right component of this product state.
     const state*
     right() const
     {
@@ -96,14 +98,16 @@ namespace spot
     virtual state* project_state(const state* s, const const_twa_ptr& t)
       const override;
 
+    /// \brief Return the acceptance condition of the left automaton.
     const acc_cond& left_acc() const;
+    /// \brief Return the acceptance condition of the right automaton.
     const acc_cond& right_acc() const;
 
   protected:
-    const_twa_ptr left_;
-    const_twa_ptr right_;
-    bool left_kripke_;
-    fixed_size_pool<pool_type::Safe> pool_;
+    const_twa_ptr left_;         ///< Left component automaton.
+    const_twa_ptr right_;        ///< Right component automaton.
+    bool left_kripke_;           ///< True iff left is a Kripke structure.
+    fixed_size_pool<pool_type::Safe> pool_; ///< Pool for state_product.
 
   private:
     // Disallow copy.
@@ -115,12 +119,18 @@ namespace spot
   class SPOT_API twa_product_init final: public twa_product
   {
   public:
+    /// \brief Construct a product with explicit initial states.
+    ///
+    /// \param left       Left component automaton.
+    /// \param right      Right component automaton.
+    /// \param left_init  Initial state of the left component.
+    /// \param right_init Initial state of the right component.
     twa_product_init(const const_twa_ptr& left, const const_twa_ptr& right,
                       const state* left_init, const state* right_init);
     virtual const state* get_init_state() const override;
   protected:
-    const state* left_init_;
-    const state* right_init_;
+    const state* left_init_;  ///< Overridden left initial state.
+    const state* right_init_; ///< Overridden right initial state.
   };
 
   /// \brief on-the-fly TGBA product

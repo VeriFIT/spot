@@ -29,6 +29,7 @@
 
 namespace spot
 {
+  /// \ingroup twa_essentials
   /// \brief Private data for bdd_dict.
   class bdd_dict_priv;
 
@@ -72,17 +73,30 @@ namespace spot
     /// BDD-variable reference counts.
     typedef std::set<const void*> ref_set;
 
-    enum var_type { anon = 0, var, acc };
-    /// \brief Information stored for one BDD variable: its type and the set of
-    /// objects referencing it.
+    /// \brief Type of a BDD variable in the dictionary.
+    ///
+    /// Variables can be anonymous (e.g., temporary), represent
+    /// atomic propositions, or represent acceptance conditions.
+    enum var_type
+    {
+      anon = 0, ///< Anonymous variable (no formula associated).
+      var,      ///< Atomic-proposition variable.
+      acc       ///< Acceptance-condition variable.
+    };
+
+    /// \brief Information stored for one BDD variable.
+    ///
+    /// Holds the type of the variable, the formula it encodes (if
+    /// any), and the set of objects that currently reference it.
     struct bdd_info {
       bdd_info() noexcept: type(anon) {}
-      var_type type;
-      formula f;        // Used unless t==anon.
-      ref_set refs;
+      var_type type; ///< Type of this BDD variable.
+      formula f;     ///< Formula encoded (unused when type==anon).
+      ref_set refs;  ///< Set of objects referencing this variable.
     };
+    /// \brief Type of the per-variable information table.
     typedef std::vector<bdd_info> bdd_info_map;
-    // Map BDD variables to their meaning.
+    /// \brief Table mapping BDD variable numbers to their meaning.
     bdd_info_map bdd_map;
 
     /// \brief Register an atomic proposition.
@@ -120,10 +134,13 @@ namespace spot
     }
     /// @}
 
-    // \brief return the BDD variable associated to a registered
-    // proposition.
+    // \brief Return the BDD variable number for a registered proposition.
     //
-    // Throws std::out_of_range if the \a is not a known proposition.
+    // Throws std::out_of_range if \a f is not a known proposition.
+    /// \brief Return the BDD variable number for a registered
+    /// proposition.
+    ///
+    /// \throw std::out_of_range if \a f is not a known proposition.
     int varnum(formula f)
     {
       return var_map.at(f);
@@ -282,39 +299,51 @@ namespace spot
     bdd_dict& operator=(const bdd_dict& other) = delete;
   };
 
+  /// \ingroup twa_essentials
+  /// \brief Shared pointer to a bdd_dict.
   typedef std::shared_ptr<bdd_dict> bdd_dict_ptr;
 
+  /// \ingroup twa_essentials
+  /// \brief Create a new, empty bdd_dict wrapped in a shared pointer.
   inline bdd_dict_ptr make_bdd_dict()
   {
     return std::make_shared<bdd_dict>();
   }
 
+  /// \ingroup twa_essentials
   /// \brief A BDD dictionary wrapper that pre-registers atomic propositions
   /// before use.
   class bdd_dict_preorder
   {
   public:
     bdd_dict_preorder() = default;
+    /// \brief Construct from an existing bdd_dict.
     bdd_dict_preorder(bdd_dict_ptr dict)
       : dict_(dict)
     {
     }
 
+    /// \brief Implicit conversion to the underlying bdd_dict_ptr.
     operator bdd_dict_ptr() const
     {
       return dict_;
     }
 
+    /// \brief Return the underlying bdd_dict shared pointer.
     bdd_dict_ptr get_dict() const
     {
       return dict_;
     }
 
+    /// \brief Register atomic proposition \a f and return its
+    /// BDD variable number.
     int register_proposition(formula f)
     {
       return dict_->register_proposition(f, this);
     }
 
+    /// \brief Register atomic proposition \a f (by name) and
+    /// return its BDD variable number.
     int register_proposition(const std::string& f)
     {
       return register_proposition(formula::ap(f));
