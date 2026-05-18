@@ -122,7 +122,9 @@ namespace spot
   class SPOT_API realizability_simplifier_base
   {
   public:
+    /// \brief Mapping from removed to replacement formulas.
     typedef std::vector<std::tuple<formula, bool, formula>> mapping_t;
+    /// \brief Options for realizability simplification.
     enum realizability_simplifier_option {
       /// \brief remove APs with single polarity
       polarity = 1,
@@ -134,6 +136,7 @@ namespace spot
       /// \brief remove equivalent APs (Moore semantics)
       global_equiv_moore = 10,
     };
+    /// \brief Build a realizability simplifier.
     realizability_simplifier_base(const std::vector<std::string>& in_or_out,
                                   bool is_input,
                                   unsigned options = polarity | global_equiv,
@@ -144,7 +147,7 @@ namespace spot
     std::pair<formula, mapping_t> simplify(formula f);
   protected:
     struct data;
-    data* data_;
+    data* data_; ///< Internal implementation data.
   };
 
 
@@ -153,6 +156,7 @@ namespace spot
     public realizability_simplifier_base
   {
   public:
+    /// \brief Build a realizability simplifier.
     realizability_simplifier(formula f,
                              const std::vector<std::string>& inputs,
                              unsigned options = polarity | global_equiv,

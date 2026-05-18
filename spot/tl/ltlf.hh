@@ -72,8 +72,11 @@ namespace spot
   class SPOT_API ltlf_simplifier
   {
   public:
+    /// \brief Build an LTLf simplifier.
     ltlf_simplifier();
+    /// \brief Destroy the simplifier.
     ~ltlf_simplifier();
+    /// \brief Simplify an LTLf formula.
     formula simplify(formula f, bool negated = false);
   private:
     formula simplify_aux(formula f, bool negated);
@@ -92,8 +95,11 @@ namespace spot
   class SPOT_API ltlf_one_step_sat_rewrite_with_cache
   {
   public:
+    /// \brief Build the cache.
     ltlf_one_step_sat_rewrite_with_cache();
+    /// \brief Destroy the cache.
     ~ltlf_one_step_sat_rewrite_with_cache();
+    /// \brief Rewrite an LTLf formula.
     formula rewrite(formula f);
   private:
     void *cache_;
@@ -110,8 +116,11 @@ namespace spot
   class SPOT_API ltlf_one_step_unsat_rewrite_with_cache
   {
   public:
+    /// \brief Build the cache.
     ltlf_one_step_unsat_rewrite_with_cache();
+    /// \brief Destroy the cache.
     ~ltlf_one_step_unsat_rewrite_with_cache();
+    /// \brief Rewrite an LTLf formula.
     formula rewrite(formula f);
   private:
     void *cache_;

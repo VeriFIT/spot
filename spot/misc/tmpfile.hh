@@ -48,25 +48,31 @@ namespace spot
   class SPOT_API temporary_file: public printable
   {
   public:
+    /// \brief Iterator position in the cleanup list.
     typedef std::list<temporary_file*>::iterator cleanpos_t;
 
+    /// \brief Build a temporary file wrapper.
     SPOT_LOCAL temporary_file(char* name, cleanpos_t cp);
 
     temporary_file(const temporary_file& other) = delete;
 
+    /// \brief Destroy the temporary file.
     virtual ~temporary_file() override;
 
+    /// \brief Return the file name.
     const char* name() const
     {
       return name_;
     }
 
+    /// \brief Stream the file name.
     friend std::ostream& operator<<(std::ostream& os, const temporary_file* f)
     {
       os << f->name();
       return os;
     }
 
+    /// \brief Print the file name.
     virtual void
     print(std::ostream& os, const char*) const final override
     {
@@ -74,8 +80,8 @@ namespace spot
     }
 
   protected:
-    char* name_;
-    cleanpos_t cleanpos_;
+    char* name_;           ///< File name.
+    cleanpos_t cleanpos_;  ///< Cleanup-list position.
   };
 
   /// \brief Open temporary file
@@ -88,18 +94,22 @@ namespace spot
   class SPOT_API open_temporary_file final: public temporary_file
   {
   public:
+    /// \brief Build an open temporary file wrapper.
     SPOT_LOCAL open_temporary_file(char* name, cleanpos_t cp, int fd);
+    /// \brief Destroy the temporary file and close the descriptor.
     virtual ~open_temporary_file() override;
 
+    /// \brief Close the file descriptor.
     void close();
 
+    /// \brief Return the file descriptor.
     int fd() const
     {
       return fd_;
     }
 
   protected:
-    int fd_;
+    int fd_;  ///< File descriptor.
   };
 
   /// \brief Create a temporary file.

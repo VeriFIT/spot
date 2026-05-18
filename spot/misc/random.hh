@@ -62,6 +62,7 @@ namespace spot
   /// Statistics, 1974, vol 23, pp 96-97.
   SPOT_API double nrand();
 
+  /// \ingroup random
   /// \brief Compute pseudo-random integer value between 0
   /// and \a n included, following a binomial distribution
   /// with probability \a p.
@@ -77,11 +78,13 @@ namespace spot
   class barand
   {
   public:
+    /// \brief Build a binomial random generator.
     barand(int n, double p)
       : n_(n), m_(n * p), s_(sqrt(n * p * (1 - p)))
     {
     }
 
+    /// \brief Return a random value.
     int
     rand() const
     {
@@ -97,9 +100,9 @@ namespace spot
       return 0;
     }
   protected:
-    const int n_;
-    const double m_;
-    const double s_;
+    const int n_;     ///< Upper bound.
+    const double m_;  ///< Mean.
+    const double s_;  ///< Standard deviation.
   };
 
   /// \brief Shuffle the container using mrand function above.

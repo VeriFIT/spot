@@ -641,11 +641,10 @@ namespace spot
     typedef std::vector<unsigned> dests_vector_t;
 
   protected:
-    state_vector states_;
-    edge_vector_t edges_;
-    dests_vector_t dests_;      // Only used by alternating automata.
-    // Number of erased edges.
-    unsigned killed_edge_;
+    state_vector states_;       ///< State storage.
+    edge_vector_t edges_;       ///< Edge storage.
+    dests_vector_t dests_;      ///< Used by alternating automata.
+    unsigned killed_edge_;      ///< Number of erased edges.
   public:
     /// \brief Construct an empty graph
     ///
@@ -1089,6 +1088,7 @@ namespace spot
         }
     }
 
+    /// \brief Flags controlling dump_storage() output.
     enum dump_storage_items {
       DSI_GraphHeader = 1,
       DSI_GraphFooter = 2,

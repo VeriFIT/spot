@@ -42,6 +42,7 @@ namespace spot
   public:
     cstate() = default;
     cstate(const cstate& s) = delete;
+    /// \brief Move a state.
     cstate(cstate&& s) noexcept;
     ~cstate() = default;
   };
@@ -53,12 +54,14 @@ namespace spot
   public:
     transition() = default;
     transition(const transition& t) = delete;
+    /// \brief Move a transition.
     transition(transition&& t) noexcept;
+    /// \brief Build a transition from a cube and an acceptance mark.
     transition(const cube& cube, acc_cond::mark_t acc);
     ~transition() = default;
 
-    cube cube_;
-    acc_cond::mark_t acc_;
+    cube cube_;               ///< Transition cube.
+    acc_cond::mark_t acc_;    ///< Acceptance mark.
   };
 
   /// \ingroup twacube
@@ -67,16 +70,20 @@ namespace spot
     public std::enable_shared_from_this<trans_index>
   {
   public:
+    /// \brief Underlying graph type.
     typedef digraph<cstate, transition> graph_t;
+    /// \brief Edge storage type.
     typedef graph_t::edge_storage_t edge_storage_t;
 
     trans_index(trans_index& ci) = delete;
+    /// \brief Build an iterator for state \a state.
     trans_index(unsigned state, const graph_t& g):
       st_(g.state_storage(state))
     {
       reset();
     }
 
+    /// \brief Move an iterator.
     trans_index(trans_index&& ci):
       idx_(ci.idx_),
       st_(ci.st_)
@@ -135,8 +142,10 @@ namespace spot
     twacube() = delete;
 
     /// \brief Build a new automaton from a list of atomic propositions.
+    /// \param aps The atomic proposition names.
     twacube(const std::vector<std::string> aps);
 
+    /// \brief Destroy the automaton.
     ~twacube();
 
     /// \brief Returns the acceptance condition associated to the automaton.
@@ -171,16 +180,19 @@ namespace spot
     /// in memory. This is mandatory for swarming techniques.
     bool succ_contiguous() const;
 
+    /// \brief Return the number of states.
     unsigned num_states() const
     {
       return theg_.num_states();
     }
 
+    /// \brief Return the number of edges.
     unsigned num_edges() const
     {
       return theg_.num_edges();
     }
 
+    /// \brief Underlying graph type.
     typedef digraph<cstate, transition> graph_t;
 
     /// \brief Returns the underlying graph for this automaton.
@@ -188,6 +200,7 @@ namespace spot
     {
       return theg_;
     }
+    /// \brief Edge storage type.
     typedef graph_t::edge_storage_t edge_storage_t;
 
     /// \brief Returns the storage associated to a transition.
@@ -211,16 +224,19 @@ namespace spot
       return std::make_shared<trans_index>(i, theg_);
     }
 
+    /// \brief Stream a twacube.
     friend SPOT_API std::ostream& operator<<(std::ostream& os,
                                              const twacube& twa);
   private:
-    unsigned init_;                  ///< The Id of the initial state
-    acc_cond acc_;                       ///< The acceptance condition
-    const std::vector<std::string> aps_; ///< The name of atomic propositions
-    graph_t theg_;                       ///< The underlying graph
-    cubeset cubeset_;                    ///< Ease the cube manipulation
+    unsigned init_;                    ///< Initial state.
+    acc_cond acc_;                     ///< Acceptance condition.
+    const std::vector<std::string> aps_; ///< Atomic proposition names.
+    graph_t theg_;                     ///< Underlying graph.
+    cubeset cubeset_;                  ///< Cube manipulator.
   };
 
+  /// \ingroup twacube
+  /// \brief Build a shared twacube automaton.
   inline twacube_ptr make_twacube(const std::vector<std::string> aps)
   {
     return std::make_shared<twacube>(aps);

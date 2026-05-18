@@ -23,14 +23,18 @@
 
 namespace spot
 {
+  /// \ingroup ltsmin_interface
+  /// @{
+
   /// \brief Transition information passed to callbacks during state-space
   /// exploration.
   typedef struct transition_info
   {
-    int* labels; // edge labels, NULL, or pointer to the edge label(s)
-    int  group;  // holds transition group or -1 if unknown
+    int* labels; ///< Edge labels, NULL, or label pointer.
+    int  group;  ///< Transition group, or -1 if unknown.
   } transition_info_t;
 
+  /// \brief Callback used by the PINS interface.
   typedef void (*TransitionCB)(void *ctx,
                                transition_info_t *transition_info,
                                int *dst);
@@ -43,28 +47,41 @@ namespace spot
   class SPOT_API spins_interface
   {
   public:
+    /// \brief Load a Spins interface from a shared library.
     spins_interface() = default;
+    /// \brief Load a Spins interface from \a file_arg.
     spins_interface(const std::string& file_arg);
     ~spins_interface();
 
-    // The various functions that can be called once the object
-    // has been instantiated.
+    /// Function to get the initial state.
     void (*get_initial_state)(void *to);
+    /// Function to check whether properties are available.
     int (*have_property)();
+    /// Function to compute successors.
     int (*get_successors)(void* m, int *in, TransitionCB, void *arg);
+    /// Function to return the state size.
     int (*get_state_size)();
+    /// Function to name a state variable.
     const char* (*get_state_variable_name)(int var);
+    /// Function to return a state variable type.
     int (*get_state_variable_type)(int var);
+    /// Function to return the number of types.
     int (*get_type_count)();
+    /// Function to name a type.
     const char* (*get_type_name)(int type);
+    /// Function to count values for a type.
     int (*get_type_value_count)(int type);
+    /// Function to name a type value.
     const char* (*get_type_value_name)(int type, int value);
 
   private:
     // handle to the dynamic library. The variable is of type lt_dlhandle, but
     // we need this trick since we cannot put ltdl.h in public headers
-    void* handle;
+    void* handle; ///< Dynamic library handle.
   };
 
-  using spins_interface_ptr = std::shared_ptr<const spins_interface>;
+  /// \brief Shared pointer to a Spins interface.
+  typedef std::shared_ptr<const spins_interface> spins_interface_ptr;
+
+  /// @}
 }

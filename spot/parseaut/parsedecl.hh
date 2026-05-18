@@ -33,10 +33,18 @@ YY_DECL;
 
 namespace spot
 {
+  /// \ingroup twa_io
+  /// @{
+
+  /// \brief Reset the HOA lexer state.
   void hoayyreset(void* scanner);
+  /// \brief Open an HOA file from a path.
   int hoayyopen(const std::string& name, void** scanner);
+  /// \brief Open an HOA file from a descriptor.
   int hoayyopen(int fd, void** scanner);
+  /// \brief Scan HOA data from a string.
   int hoayystring(const char* data, void** scanner);
+  /// \brief Close the HOA lexer.
   void hoayyclose(void* scanner);
 
   /// \ingroup twa_io
@@ -44,6 +52,8 @@ namespace spot
   /// marker.
   struct hoa_abort
   {
-    spot::location pos;
+    spot::location pos; ///< Location of the abort marker.
   };
+
+  /// @}
 }

@@ -24,9 +24,9 @@
 
 namespace spot
 {
+  /// \ingroup emptiness_check_algorithms
   /// \brief Emptiness check based on Geldenhuys and Valmari's
   /// TACAS'04 paper.
-  /// \ingroup emptiness_check_algorithms
   /// \pre The automaton \a a must have at most one acceptance condition.
   ///
   /// The original algorithm, coming from \cite geldenhuys.04.tacas ,

@@ -32,16 +32,21 @@ namespace spot
     std::vector<std::vector<formula>> groups;
   public:
 #ifndef SWIG
+    /// \brief Add a group of mutually exclusive APs.
     void add_group(std::vector<formula> ap);
 #endif
+    /// \brief Add a group of mutually exclusive APs.
     void add_group(const char* ap_csv);
 
+    /// \brief Whether no AP groups are registered.
     bool empty() const
     {
       return groups.empty();
     }
 
+    /// \brief Constrain a formula using the AP groups.
     formula constrain(formula f) const;
+    /// \brief Constrain an automaton using the AP groups.
     twa_graph_ptr constrain(const_twa_graph_ptr aut,
                                bool simplify_guards = false) const;
   };

@@ -33,6 +33,9 @@
 namespace spot
 {
   /// \ingroup ltsmin_interface
+  /// @{
+
+  /// \ingroup ltsmin_interface
   /// \brief A Spins state is represented as an array of integer
   /// Note that this array has two reserved slots (position 0 and 1).
   ///
@@ -47,6 +50,7 @@ namespace spot
   /// \brief This class provides the ability to compare two states
   struct cspins_state_equal
   {
+    /// \brief Compare two states for equality.
     bool operator()(const cspins_state lhs, const cspins_state rhs) const
     {
       return 0 == memcmp(lhs, rhs, (2+rhs[1])* sizeof(int));
@@ -57,6 +61,7 @@ namespace spot
   /// \brief This class provides the ability to hash a state
   struct cspins_state_hash
   {
+    /// \brief Return the cached hash of a state.
     size_t operator()(const cspins_state that) const
     {
       return that[0];
@@ -108,12 +113,12 @@ namespace spot
   /// states from the shared library produced by LTSmin.
   struct inner_callback_parameters
   {
-    cspins_state_manager* manager;   // The state manager
-    std::vector<cspins_state>* succ; // The successors of a state
-    int* compressed;                 // Area to store compressed state
-    int* uncompressed;               // Area to store uncompressed state
-    bool compress;                   // Should the state be compressed?
-    bool selfloopize;                // Should the state be selfloopized
+    cspins_state_manager* manager;   ///< State manager.
+    std::vector<cspins_state>* succ; ///< Successors of a state.
+    int* compressed;                ///< Buffer for compressed states.
+    int* uncompressed;              ///< Buffer for uncompressed states.
+    bool compress;                  ///< Whether compression is used.
+    bool selfloopize;               ///< Whether to selfloopize.
   };
 
   /// \brief This class provides an iterator over the successors of a state.
@@ -128,32 +133,38 @@ namespace spot
     /// cspins_iterator.
     struct cspins_iterator_param
     {
-      cspins_state s;
-      const spot::spins_interface* d;
-      cspins_state_manager& manager;
-      inner_callback_parameters& inner;
-      cube cond;
-      bool compress;
-      bool selfloopize;
-      spot::cubeset& cubeset;
-      int dead_idx;
-      unsigned tid;
+      cspins_state s;               ///< Current state.
+      const spot::spins_interface* d; ///< Spins interface.
+      cspins_state_manager& manager; ///< State manager.
+      inner_callback_parameters& inner; ///< Callback arguments.
+      cube cond;                    ///< Current cube condition.
+      bool compress;                ///< Whether compression is used.
+      bool selfloopize;             ///< Whether to selfloopize.
+      spot::cubeset& cubeset;       ///< Cube set.
+      int dead_idx;                 ///< Deadlock AP index.
+      unsigned tid;                 ///< Thread identifier.
     };
 
     cspins_iterator(const cspins_iterator&) = delete;
     cspins_iterator(cspins_iterator&) = delete;
 
+    /// \brief Build an iterator from parameters.
     cspins_iterator(cspins_iterator_param& p);
+    /// \brief Recycle an iterator from parameters.
     void recycle(cspins_iterator_param& p);
     ~cspins_iterator();
 
+    /// \brief Move to the next successor.
     void next();
+    /// \brief Whether all successors were visited.
     bool done() const;
+    /// \brief Return the current successor state.
     cspins_state state() const;
+    /// \brief Return the current transition condition.
     cube condition() const;
 
   private:
-    /// \brief Compute the real index in the successor vector
+    /// \brief Compute the real index in the successor vector.
     unsigned compute_index() const;
 
     inline void setup_iterator(cspins_state s,
@@ -215,14 +226,20 @@ namespace spot
     prop_set pset_;
 
   public:
+    /// \brief Build a kripkecube from a Spins interface.
     kripkecube(spins_interface_ptr sip, bool compress,
                std::vector<std::string> visible_aps,
                bool selfloopize, std::string dead_prop,
                unsigned int nb_threads);
+    /// \brief Destroy the kripkecube.
     ~kripkecube();
+    /// \brief Return the initial state for thread \a tid.
     cspins_state initial(unsigned tid);
+    /// \brief Convert a state to a string.
     std::string to_string(const cspins_state s, unsigned tid = 0) const;
+    /// \brief Return the iterator for a state.
     cspins_iterator* succ(const cspins_state s, unsigned tid);
+    /// \brief Recycle an iterator.
     void recycle(cspins_iterator* it, unsigned tid);
 
     /// \brief List the atomic propositions used by *this* kripke
@@ -240,20 +257,20 @@ namespace spot
     /// will then be given to all iterators.
     void compute_condition(cube c, cspins_state s, unsigned tid = 0);
 
-    spins_interface_ptr sip_;        // The interface to the shared library
-    const spot::spins_interface* d_; // To avoid numerous sip_.get()
-    cspins_state_manager* manager_;  // One manager per thread
-    bool compress_;                  // Should a compression be performed
+    spins_interface_ptr sip_;         ///< The interface to the shared library.
+    const spot::spins_interface* d_;  ///< Avoid repeated sip_.get() calls.
+    cspins_state_manager* manager_;   ///< One manager per thread.
+    bool compress_;                   ///< Whether compression is used.
 
     // One per threads to store no longer used iterators (and save memory)
     std::vector<std::vector<cspins_iterator*>> recycle_;
 
-    inner_callback_parameters* inner_; // One callback per thread
-    cubeset cubeset_;                  // A single cubeset to manipulate cubes
-    bool selfloopize_;                 // Should selfloopize be performed
-    int dead_idx_;                     // If yes, index of the "dead ap"
-    std::vector<std::string> aps_;     // All the atomic propositions
-    unsigned int nb_threads_;          // The number of threads used
+    inner_callback_parameters* inner_; ///< One callback per thread.
+    cubeset cubeset_;                  ///< Cube manipulator.
+    bool selfloopize_;                 ///< Whether to selfloopize.
+    int dead_idx_;                     ///< Index of the dead AP.
+    std::vector<std::string> aps_;     ///< Atomic propositions.
+    unsigned int nb_threads_;          ///< Number of threads.
   };
 
   /// \brief shortcut to manipulate the kripke below
@@ -261,6 +278,7 @@ namespace spot
                                            spot::cspins_iterator>>
   ltsmin_kripkecube_ptr;
 
+  /// @}
 }
 
 #include <spot/ltsmin/spins_kripke.hxx>

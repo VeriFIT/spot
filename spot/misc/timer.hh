@@ -216,7 +216,7 @@ namespace spot
     bool running;     ///< Whether the timer is currently running.
     /// Wall-clock start time of the current interval.
     std::chrono::steady_clock::time_point wall_start_;
-    std::chrono::milliseconds::rep wall_cumul_ = 0;
+    std::chrono::milliseconds::rep wall_cumul_ = 0; ///< Wall time sum.
   };
 
   // This function declared here must be implemented in each file

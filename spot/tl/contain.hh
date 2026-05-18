@@ -58,19 +58,22 @@ namespace spot
     bool equal(formula l, formula g);
 
   protected:
+    /// \brief Test whether two cached formulas are incompatible.
     bool incompatible_(record_* l, record_* g);
 
+    /// \brief Register a formula in the translation cache.
     record_* register_formula_(formula f);
 
     /* Translation options */
-    bdd_dict_ptr dict_;
-    bool exprop_;
-    bool symb_merge_;
-    bool branching_postponement_;
-    bool fair_loop_approx_;
+    bdd_dict_ptr dict_; ///< Dictionary used for translations.
+    bool exprop_;       ///< Use existential properties.
+    bool symb_merge_;   ///< Merge symbolic states.
+    bool branching_postponement_; ///< Postpone branching choices.
+    bool fair_loop_approx_;       ///< Approximate fair loops.
     /* Translation Maps */
-    trans_map_* translated_;
-    tl_simplifier_cache* c_;
+    trans_map_* translated_; ///< Translation cache.
+    tl_simplifier_cache* c_; ///< Formula simplifier cache.
+    /// \brief Optional output aborter.
     std::unique_ptr<const output_aborter> aborter_ = nullptr;
   };
 }

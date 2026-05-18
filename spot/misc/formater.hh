@@ -26,6 +26,9 @@
 
 namespace spot
 {
+  /// \ingroup misc_tools
+  /// @{
+
   /// \brief Abstract base class for objects that can be printed to a stream via
   /// a format string.
   class printable
@@ -35,6 +38,7 @@ namespace spot
     {
     }
 
+    /// \brief Print this object using \a fmt.
     virtual void
     print(std::ostream&, const char*) const = 0;
   };
@@ -45,28 +49,33 @@ namespace spot
   class printable_value: public printable
   {
   protected:
-    T val_;
+    T val_; ///< Stored value.
   public:
+    /// \brief Access the stored value.
     const T& val() const
     {
       return val_;
     }
 
+    /// \brief Access the stored value.
     T& val()
     {
       return val_;
     }
 
+    /// \brief Implicit conversion to the stored value.
     operator const T&() const
     {
       return val();
     }
 
+    /// \brief Implicit conversion to the stored value.
     operator T&()
     {
       return val();
     }
 
+    /// \brief Assign a new value.
     printable_value&
     operator=(const T& new_val)
     {
@@ -74,6 +83,7 @@ namespace spot
       return *this;
     }
 
+    /// \brief Assign a new value.
     printable_value&
     operator=(T&& new_val)
     {
@@ -81,6 +91,7 @@ namespace spot
       return *this;
     }
 
+    /// \brief Print the stored value.
     virtual void
     print(std::ostream& os, const char*) const override
     {
@@ -92,6 +103,7 @@ namespace spot
   class printable_id: public printable
   {
   public:
+    /// \brief Print the requested escape code.
     virtual void
     print(std::ostream& os, const char* x) const override
     {
@@ -103,6 +115,7 @@ namespace spot
   class printable_percent: public printable
   {
   public:
+    /// \brief Print a literal percent sign.
     virtual void
     print(std::ostream& os, const char*) const override
     {
@@ -129,7 +142,6 @@ namespace spot
     {
     }
 
-    /// \ingroup misc_tools
     /// \brief Scan the %-sequences occurring in \a fmt.
     ///
     /// Set has['c'] for each %c in \a fmt.   \a has must
@@ -211,6 +223,8 @@ namespace spot
     std::vector<bool> has_;
     std::vector<const printable*> call_;
   protected:
-    std::ostream* output_;
+    std::ostream* output_; ///< Current output stream.
   };
+
+  /// @}
 }
