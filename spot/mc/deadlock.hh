@@ -90,16 +90,19 @@ namespace spot
 
   public:
 
-    ///< \brief Shortcut to ease shared map manipulation
+    /// \brief Concurrent hashset for shared state storage
     using shared_map = brick::hashset::FastConcurrent <deadlock_pair*,
                                                        pair_hasher>;
+    /// \brief Type alias for shared structure
     using shared_struct = shared_map;
 
+    /// \brief Create shared structure for thread tid
     static shared_struct* make_shared_structure(shared_map, unsigned)
     {
       return nullptr; // Useless
     }
 
+    /// \brief Constructor for parallel deadlock detection
     swarmed_deadlock(kripkecube<State, SuccIterator>& sys,
                      twacube_ptr, /* useless here */
                      shared_map& map, shared_struct* /* useless here */,
@@ -126,6 +129,7 @@ namespace spot
         }
     }
 
+    /// \brief Run the algorithm
     void run()
     {
       setup();
@@ -166,11 +170,13 @@ namespace spot
       finalize();
     }
 
+    /// \brief Setup thread resources
     void setup()
     {
       tm_.start("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Push state onto stack
     bool push(State s)
     {
       // Prepare data for a newer allocation
@@ -208,6 +214,7 @@ namespace spot
       return true;
     }
 
+    /// \brief Pop state from stack
     bool pop()
     {
       // Track maximum dfs size
@@ -220,6 +227,7 @@ namespace spot
       return true;
     }
 
+    /// \brief Finalize thread resources
     void finalize()
     {
       bool tst_val = false;
@@ -230,26 +238,31 @@ namespace spot
       tm_.stop("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Check if this thread finished the search
     bool finisher()
     {
       return finisher_;
     }
 
+    /// \brief Return number of states visited
     unsigned states()
     {
       return states_;
     }
 
+    /// \brief Return number of transitions traversed
     unsigned transitions()
     {
       return transitions_;
     }
 
+    /// \brief Return wall time in milliseconds
     unsigned walltime()
     {
       return tm_.timer("DFS thread " + std::to_string(tid_)).walltime();
     }
 
+    /// \brief Return algorithm name
     std::string name()
     {
       if (compute_deadlock)
@@ -257,11 +270,13 @@ namespace spot
       return "reachability";
     }
 
+    /// \brief Return number of SCCs found (returns -1)
     int sccs()
     {
       return -1;
     }
 
+    /// \brief Return deadlock detection result
     mc_rvalue result()
     {
       if (compute_deadlock)
@@ -269,6 +284,7 @@ namespace spot
       return mc_rvalue::SUCCESS;
     }
 
+    /// \brief Return trace
     std::string trace()
     {
       std::string result;

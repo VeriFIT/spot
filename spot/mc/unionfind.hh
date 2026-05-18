@@ -42,11 +42,18 @@ namespace spot
     int root(int i);
 
   public:
+    /// \brief Default constructor
     int_unionfind();
+    /// \brief Create a new singleton set containing element e
     void makeset(int e);
+    /// \brief Unite the sets containing e1 and e2; return true if they
+    /// were different
     bool unite(int e1, int e2);
+    /// \brief Mark element e as dead
     void markdead(int e);
+    /// \brief Check if elements are in the same set
     bool sameset(int e1, int e2);
+    /// \brief Check if element is marked as dead
     bool isdead(int e);
   };
 }

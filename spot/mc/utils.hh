@@ -33,20 +33,23 @@ namespace spot
   {
   public:
 
-  kripkecube_to_twa(kripkecube<State, SuccIterator>& sys, bdd_dict_ptr dict):
-    sys_(sys), dict_(dict)
-    {
-     static_assert(spot::is_a_kripkecube_ptr<decltype(&sys),
-                   State, SuccIterator>::value,
-                   "error: does not match the kripkecube requirements");
-    }
+    /// \brief Constructor for kripkecube-to-twa conversion
+    kripkecube_to_twa(kripkecube<State, SuccIterator>& sys, bdd_dict_ptr dict):
+      sys_(sys), dict_(dict)
+      {
+       static_assert(spot::is_a_kripkecube_ptr<decltype(&sys),
+                     State, SuccIterator>::value,
+                     "error: does not match the kripkecube requirements");
+      }
 
-    ~kripkecube_to_twa()
-    {
-     visited_.clear();
-    }
+      /// \brief Destructor
+      ~kripkecube_to_twa()
+      {
+       visited_.clear();
+      }
 
-    void run()
+      /// \brief Run the conversion algorithm
+      void run()
     {
      setup();
      State initial = sys_.initial(0);
@@ -89,6 +92,7 @@ namespace spot
      finalize();
     }
 
+    /// \brief Setup algorithm resources
     void setup()
     {
      auto d = spot::make_bdd_dict();
@@ -103,6 +107,7 @@ namespace spot
        }
     }
 
+    /// \brief Push state to stack
     bool push(State s, unsigned i)
     {
 
@@ -117,11 +122,13 @@ namespace spot
       return true;
     }
 
+    /// \brief Pop state from stack
     bool pop(State)
     {
       return true;
     }
 
+    /// \brief Add edge from src to dst
     void edge(unsigned src, unsigned dst)
     {
      cubeset cs(sys_.ap().size());
@@ -130,36 +137,50 @@ namespace spot
      res_->new_edge(src, dst, cond);
     }
 
+    /// \brief Finalize the result twa
     void finalize()
     {
      res_->purge_unreachable_states();
      res_->set_named_prop<std::vector<std::string>>("state-names", names_);
     }
 
+    /// \brief Return the resulting twa
     twa_graph_ptr twa()
     {
      return res_;
     }
 
   protected:
-    /// \brief DFS stack element pairing a state with its successor iterator.
+    /// \brief DFS stack element pairing a state its with successor iterator
     struct todo__element
     {
+      /// \brief State
       State s;
+      /// \brief Iterator over successors
       SuccIterator* it;
     };
 
+    /// \brief Type alias for visited map
     typedef std::unordered_map<const State, int,
                                StateHash, StateEqual> visited__map;
 
+    /// \brief Reference to system model
     kripkecube<State, SuccIterator>& sys_;
+    /// \brief DFS todo stack
     std::vector<todo__element> todo_;
+    /// \brief Visited states map
     visited__map visited_;
+    /// \brief DFS numbering counter
     unsigned int dfs_number_ = 0;
+    /// \brief Transitions counter
     unsigned int transitions_ = 0;
+    /// \brief Result twa
     spot::twa_graph_ptr res_;
+    /// \brief State names
     std::vector<std::string>* names_;
+    /// \brief BDD dictionary
     bdd_dict_ptr dict_;
+    /// \brief Reverse binding for APs
     std::unordered_map<int, int> reverse_binder_;
   };
 
@@ -202,6 +223,7 @@ namespace spot
     };
 
   public:
+    /// \brief Constructor for product-to-twa conversion
     product_to_twa(kripkecube<State, SuccIterator>& sys,
                    twacube_ptr twa):
       sys_(sys), twa_(twa)
@@ -211,11 +233,13 @@ namespace spot
                     "error: does not match the kripkecube requirements");
     }
 
+    /// \brief Destructor
     virtual ~product_to_twa()
     {
      map.clear();
     }
 
+    /// \brief Run the conversion algorithm
     bool run()
     {
       setup();
@@ -281,6 +305,7 @@ namespace spot
       return false;
     }
 
+    /// \brief Return the resulting twa
     twa_graph_ptr twa()
     {
       res_->purge_unreachable_states();
@@ -288,6 +313,7 @@ namespace spot
       return res_;
     }
 
+    /// \brief Setup algorithm resources
     void setup()
     {
       auto d = spot::make_bdd_dict();
@@ -302,6 +328,7 @@ namespace spot
         }
     }
 
+    /// \brief Push product state to stack
     bool push_state(product_state s, unsigned i, acc_cond::mark_t)
     {
       unsigned st = res_->new_state();
@@ -328,6 +355,7 @@ namespace spot
       return true;
     }
 
+    /// \brief Update state with acceptance condition
     bool update(product_state, unsigned src,
                 product_state, unsigned dst,
                 acc_cond::mark_t cond)
@@ -344,12 +372,14 @@ namespace spot
       return false;
     }
 
+    /// \brief Pop state from stack
     bool pop_state(product_state, unsigned, bool, product_state, unsigned)
     {
       return true;
     }
 
   private:
+    /// \brief DFS stack element
     struct todo__element
     {
       product_state st;
@@ -357,18 +387,28 @@ namespace spot
       std::shared_ptr<trans_index> it_prop;
     };
 
+    /// \brief Type alias for visited map
     typedef std::unordered_map<const product_state, int,
                                product_state_hash,
                                product_state_equal> visited_map;
 
+    /// \brief Reference to system model
     kripkecube<State, SuccIterator>& sys_;
+    /// \brief Reference to property automaton
     twacube_ptr twa_;
+    /// \brief DFS todo stack
     std::vector<todo__element> todo_;
+    /// \brief Visited states map
     visited_map map;
+    /// \brief DFS numbering counter
     unsigned int dfs_number_ = 0;
+    /// \brief Transitions counter
     unsigned int transitions_ = 0;
+    /// \brief Result twa
     spot::twa_graph_ptr res_;
+    /// \brief State names
     std::vector<std::string>* names_;
+    /// \brief Reverse binding for APs
     std::unordered_map<int, int> reverse_binder_;
   };
 }

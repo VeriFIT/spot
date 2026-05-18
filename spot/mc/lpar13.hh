@@ -71,14 +71,18 @@ namespace spot
 
   public:
 
+    /// \brief Type alias for shared map (useless for sequential algorithm)
     using shared_map = int; // Useless here.
+    /// \brief Type alias for shared structure (useless here)
     using shared_struct = int; // Useless here.
 
+    /// \brief Create shared structure for thread tid
     static shared_struct* make_shared_structure(shared_map m, unsigned i)
     {
       return nullptr; // Useless
     }
 
+    /// \brief Constructor for LPAR13 emptiness check
     lpar13(kripkecube<State, SuccIterator>& sys,
                      twacube_ptr twa,
                      shared_map& map, /* useless here */
@@ -93,6 +97,7 @@ namespace spot
                       "error: does not match the kripkecube requirements");
       }
 
+    /// \brief Destructor
     virtual ~lpar13()
     {
       map.clear();
@@ -103,6 +108,7 @@ namespace spot
         }
     }
 
+    /// \brief Run the algorithm
     bool run()
     {
       setup();
@@ -180,11 +186,13 @@ namespace spot
       return false;
     }
 
+    /// \brief Setup thread resources
     void setup()
     {
       tm_.start("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Push product state to stack
     bool push_state(product_state, unsigned dfsnum, acc_cond::mark_t cond)
     {
       uf_.makeset(dfsnum);
@@ -212,7 +220,9 @@ namespace spot
       return true;
     }
 
-    /// \brief This method is called for every closing, back, or forward edge.
+    /// \brief This method is called for every closing, back, or forward
+    /// edge.
+    ///
     /// Return true if a counterexample has been found.
     bool update(product_state, unsigned,
                 product_state, unsigned dst_dfsnum,
@@ -235,6 +245,7 @@ namespace spot
       return found_;
     }
 
+    /// \brief Finalize thread resources
     void finalize()
     {
       bool tst_val = false;
@@ -245,41 +256,49 @@ namespace spot
       tm_.stop("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Check if this thread finished the search
     bool finisher()
     {
       return finisher_;
     }
 
+    /// \brief Return number of states visited
     unsigned int states()
     {
       return dfs_number;
     }
 
+    /// \brief Return number of transitions traversed
     unsigned int transitions()
     {
       return trans_;
     }
 
+    /// \brief Return wall time in milliseconds
     unsigned walltime()
     {
       return tm_.timer("DFS thread " + std::to_string(tid_)).walltime();
     }
 
+    /// \brief Return algorithm name
     std::string name()
     {
       return "renault_lpar13";
     }
 
+    /// \brief Return number of SCCs found
     int sccs()
     {
       return sccs_;
     }
 
+    /// \brief Return emptiness check result
     mc_rvalue result()
     {
       return !found_ ? mc_rvalue::EMPTY : mc_rvalue::NOT_EMPTY;
     }
 
+    /// \brief Return trace
     std::string trace()
     {
       SPOT_ASSERT(found_);

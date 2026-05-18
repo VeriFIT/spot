@@ -97,16 +97,19 @@ namespace spot
 
   public:
 
-    ///< \brief Shortcut to ease shared map manipulation
+    /// \brief Concurrent hashset for shared state storage
     using shared_map = brick::hashset::FastConcurrent <product_state,
                                                        state_hasher>;
+    /// \brief Type alias for shared structure
     using shared_struct = shared_map;
 
+    /// \brief Create shared structure for thread tid
     static shared_struct* make_shared_structure(shared_map m, unsigned i)
     {
       return nullptr; // Useless here.
     }
 
+    /// \brief Constructor for parallel CNDFS algorithm
     swarmed_cndfs(kripkecube<State, SuccIterator>& sys, twacube_ptr twa,
                   shared_map& map, shared_struct* /* useless here*/,
                   unsigned tid, std::atomic<bool>& stop):
@@ -136,6 +139,7 @@ namespace spot
         }
     }
 
+    /// \brief Run the algorithm
     void run()
     {
       setup();
@@ -143,11 +147,13 @@ namespace spot
       finalize();
     }
 
+    /// \brief Setup thread resources
     void setup()
     {
       tm_.start("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Push state to blue stack
     std::pair<bool,  product_state>
     push_blue(product_state s, bool from_accepting)
     {
@@ -187,6 +193,7 @@ namespace spot
       return {true, *it};
     }
 
+    /// \brief Push state to red stack
     std::pair<bool, product_state>
     push_red(product_state s, bool ignore_cyan)
     {
@@ -210,6 +217,7 @@ namespace spot
       return {true, *it};
     }
 
+    /// \brief Pop state from blue stack
     bool pop_blue()
     {
       // Track maximum dfs size
@@ -221,6 +229,7 @@ namespace spot
       return true;
     }
 
+    /// \brief Pop state from red stack
     bool pop_red()
     {
       // Track maximum dfs size
@@ -233,6 +242,7 @@ namespace spot
       return true;
     }
 
+    /// \brief Finalize thread resources
     void finalize()
     {
       bool tst_val = false;
@@ -243,41 +253,49 @@ namespace spot
       tm_.stop("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Check if this thread finished the search
     bool finisher()
     {
       return finisher_;
     }
 
+    /// \brief Return number of states visited
     unsigned states()
     {
       return states_;
     }
 
+    /// \brief Return number of transitions traversed
     unsigned transitions()
     {
       return transitions_;
     }
 
+    /// \brief Return wall time in milliseconds
     unsigned walltime()
     {
       return tm_.timer("DFS thread " + std::to_string(tid_)).walltime();
     }
 
+    /// \brief Return algorithm name
     std::string name()
     {
       return "cndfs";
     }
 
+    /// \brief Return number of SCCs found (returns -1)
     int sccs()
     {
       return -1;
     }
 
+    /// \brief Return emptiness check result
     mc_rvalue result()
     {
       return is_empty_ ? mc_rvalue::EMPTY : mc_rvalue::NOT_EMPTY;
     }
 
+    /// \brief Return trace
     std::string trace()
     {
       SPOT_ASSERT(!is_empty_);

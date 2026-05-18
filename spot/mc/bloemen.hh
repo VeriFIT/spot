@@ -35,7 +35,8 @@
 
 namespace spot
 {
-  /// \brief Iterable Union-Find structure for parallel reachability algorithms.
+  /// \ingroup model_checking
+  /// \brief Iterable Union-Find for parallel reachability algorithms
   template<typename State,
            typename StateHash,
            typename StateEqual>
@@ -43,8 +44,11 @@ namespace spot
   {
 
   public:
+    /// \brief Status values for union-find elements
     enum class uf_status  { LIVE, LOCK, DEAD };
+    /// \brief Status values for list operations
     enum class list_status  { BUSY, LOCK, DONE };
+    /// \brief Status values for claim operations
     enum class claim_status  { CLAIM_FOUND, CLAIM_NEW, CLAIM_DEAD };
 
     /// \brief Represents a Union-Find element
@@ -60,18 +64,21 @@ namespace spot
       std::atomic<uf_element*> next_;
       /// \brief current status for the element
       std::atomic<uf_status> uf_status_;
-      ///< \brief current status for the list
+      /// \brief current status for the list
       std::atomic<list_status> list_status_;
     };
 
-    /// \brief The hasher for the previous uf_element.
+    /// \brief Hasher for union-find elements
     struct uf_element_hasher
     {
+      /// \brief Constructor from element pointer
       uf_element_hasher(const uf_element*)
       { }
 
+      /// \brief Default constructor
       uf_element_hasher() = default;
 
+      /// \brief Compute hash of element
       brick::hash::hash128_t
       hash(const uf_element* lhs) const
       {
@@ -81,6 +88,7 @@ namespace spot
         return {u, u};
       }
 
+      /// \brief Check equality of elements
       bool equal(const uf_element* lhs,
                  const uf_element* rhs) const
       {
@@ -89,10 +97,11 @@ namespace spot
       }
     };
 
-    ///< \brief Shortcut to ease shared map manipulation
+    /// \brief Concurrent hashset for shared state storage
     using shared_map = brick::hashset::FastConcurrent <uf_element*,
                                                        uf_element_hasher>;
 
+    /// \brief Copy constructor
     iterable_uf(const iterable_uf<State, StateHash, StateEqual>& uf):
       map_(uf.map_), tid_(uf.tid_), size_(std::thread::hardware_concurrency()),
       nb_th_(std::thread::hardware_concurrency()), inserted_(0),
@@ -100,6 +109,7 @@ namespace spot
     {  }
 
 
+    /// \brief Constructor from shared map and thread ID
     iterable_uf(shared_map& map, unsigned tid):
       map_(map), tid_(tid), size_(std::thread::hardware_concurrency()),
       nb_th_(std::thread::hardware_concurrency()), inserted_(0),
@@ -107,8 +117,10 @@ namespace spot
     {
     }
 
+    /// \brief Destructor
     ~iterable_uf() {}
 
+    /// \brief Try to claim a state; returns status and element pointer
     std::pair<claim_status, uf_element*>
     make_claim(State a)
     {
@@ -150,6 +162,7 @@ namespace spot
       return {claim_status::CLAIM_NEW, *it};
     }
 
+    /// \brief Find root of element using path compression
     uf_element* find(uf_element* a)
     {
       uf_element* parent = a->parent.load();
@@ -169,6 +182,7 @@ namespace spot
       return x;
     }
 
+    /// \brief Check if elements are in same set
     bool sameset(uf_element* a, uf_element* b)
     {
       while (true)
@@ -183,6 +197,7 @@ namespace spot
         }
     }
 
+    /// \brief Lock root element if live; return true if successful
     bool lock_root(uf_element* a)
     {
       uf_status expected = uf_status::LIVE;
@@ -199,11 +214,13 @@ namespace spot
       return false;
     }
 
+    /// \brief Unlock root element
     inline void unlock_root(uf_element* a)
     {
       a->uf_status_.store(uf_status::LIVE);
     }
 
+    /// \brief Lock next element in list
     uf_element* lock_list(uf_element* a)
     {
       uf_element* a_list = a;
@@ -227,11 +244,13 @@ namespace spot
         }
     }
 
+    /// \brief Unlock list element
     void unlock_list(uf_element* a)
     {
       a->list_status_.store(list_status::BUSY);
     }
 
+    /// \brief Unite two sets
     void unite(uf_element* a, uf_element* b)
     {
       uf_element* a_root;
@@ -302,6 +321,7 @@ namespace spot
       unlock_root(q);
     }
 
+    /// \brief Pick element from list; mark SCC as dead if complete
     uf_element* pick_from_list(uf_element* u, bool* sccfound)
     {
       uf_element* a = u;
@@ -377,6 +397,7 @@ namespace spot
         }
     }
 
+    /// \brief Mark element as removed from list
     void remove_from_list(uf_element* a)
     {
       while (true)
@@ -392,6 +413,7 @@ namespace spot
         }
     }
 
+    /// \brief Return number of successfully inserted states
     unsigned inserted()
     {
       return inserted_;
@@ -409,29 +431,37 @@ namespace spot
   };
 
   /// \ingroup model_checking
-  /// \brief This class implements the SCC decomposition algorithm of Bloemen
-  /// as described in PPOPP'16. It uses a shared union-find augmented to manage
-  /// work stealing between threads.
+  /// \brief Bloemen parallel SCC decomposition algorithm for reachability
+  ///
+  /// This class implements the SCC decomposition algorithm of Bloemen
+  /// as described in PPOPP'16. It uses a shared union-find augmented
+  /// to manage work stealing between threads.
   template<typename State, typename SuccIterator,
-           typename StateHash, typename StateEqual>
+          typename StateHash, typename StateEqual>
   class swarmed_bloemen
   {
   private:
-    swarmed_bloemen() = delete;
+   swarmed_bloemen() = delete;
 
   public:
 
-    using uf = iterable_uf<State, StateHash, StateEqual>;
+   /// \brief Type alias for iterable union-find
+   using uf = iterable_uf<State, StateHash, StateEqual>;
+   /// \brief Type alias for union-find element
     using uf_element = typename uf::uf_element;
 
-    using shared_struct = uf;
-    using shared_map = typename uf::shared_map;
+   /// \brief Type alias for shared structure
+   using shared_struct = uf;
+   /// \brief Type alias for shared map
+   using shared_map = typename uf::shared_map;
 
-    static shared_struct* make_shared_structure(shared_map m, unsigned i)
-    {
-      return new uf(m, i);
-    }
+   /// \brief Create shared structure for thread tid
+   static shared_struct* make_shared_structure(shared_map m, unsigned i)
+   {
+     return new uf(m, i);
+   }
 
+   /// \brief Constructor for parallel Bloemen algorithm
    swarmed_bloemen(kripkecube<State, SuccIterator>& sys,
                    twacube_ptr, /* useless here */
                    shared_map& map, /* useless here */
@@ -447,6 +477,7 @@ namespace spot
                     "error: does not match the kripkecube requirements");
     }
 
+    /// \brief Run the algorithm
     void run()
     {
       setup();
@@ -505,11 +536,13 @@ namespace spot
       finalize();
     }
 
+    /// \brief Setup thread resources
     void setup()
     {
       tm_.start("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Finalize thread resources
     void finalize()
     {
       bool tst_val = false;
@@ -520,41 +553,49 @@ namespace spot
       tm_.stop("DFS thread " + std::to_string(tid_));
     }
 
+    /// \brief Check if this thread finished the search
     bool finisher()
     {
       return finisher_;
     }
 
+    /// \brief Return number of states visited
     unsigned states()
     {
       return states_;
     }
 
+    /// \brief Return number of transitions traversed
     unsigned transitions()
     {
       return transitions_;
     }
 
+    /// \brief Return wall time in milliseconds
     unsigned walltime()
     {
       return tm_.timer("DFS thread " + std::to_string(tid_)).walltime();
     }
 
+    /// \brief Return algorithm name
     std::string name()
     {
       return "bloemen_scc";
     }
 
+    /// \brief Return number of SCCs found
     int sccs()
     {
       return sccs_;
     }
 
+    /// \brief Return emptiness check result
     mc_rvalue result()
     {
       return mc_rvalue::SUCCESS;
     }
 
+    /// \brief Return trace (returns empty string)
     std::string trace()
     {
       // Returning a trace makes no sense in this algorithm
@@ -566,14 +607,14 @@ namespace spot
     std::vector<uf_element*> todo_;          ///< \brief The "recursive" stack
     std::vector<uf_element*> Rp_;            ///< \brief The DFS stack
     iterable_uf<State, StateHash, StateEqual> uf_; ///< Copy!
-    unsigned tid_;
-    unsigned nb_th_;
+    unsigned tid_;                           ///< \brief Thread identifier
+    unsigned nb_th_;                         ///< \brief Number of threads
     unsigned inserted_ = 0;           ///< \brief Number of states inserted
     unsigned states_  = 0;            ///< \brief Number of states visited
     unsigned transitions_ = 0;        ///< \brief Number of transitions visited
     unsigned sccs_ = 0;               ///< \brief Number of SCC visited
     spot::timer_map tm_;              ///< \brief Time execution
-    std::atomic<bool>& stop_;
-    bool finisher_ = false;
+    std::atomic<bool>& stop_;                ///< \brief Stop flag for threads
+    bool finisher_ = false;                  ///< \brief Thread finished first
   };
 }
