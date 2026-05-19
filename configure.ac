@@ -63,6 +63,18 @@ AC_ARG_ENABLE([doxygen],
   [enable generation of Doxygen documentation (requires Doxygen)])],
   [enable_doxygen=$enableval], [enable_doxygen=no])
 AM_CONDITIONAL([ENABLE_DOXYGEN], [test "x${enable_doxygen:-no}" = xyes])
+# Doxygen < 1.9.5 has a bug where some bib entries trigger spurious
+# "Unexpected tag <dd>" warnings; disable WARN_AS_ERROR for those versions.
+# See https://github.com/doxygen/doxygen/pull/9345
+# This is supposed to be fixed in 1.9.5, but we have observed the issue in 1.9.8
+# as well, so we check for 1.10 until we now better.
+DOXYGEN_WARN_AS_ERROR=YES
+if test "x${enable_doxygen:-no}" = xyes; then
+  doxygen_version=$(doxygen --version 2>/dev/null)
+  AS_VERSION_COMPARE([$doxygen_version], [1.10],
+    [DOXYGEN_WARN_AS_ERROR=NO])
+fi
+AC_SUBST([DOXYGEN_WARN_AS_ERROR])
 
 # Option to indicate the maximal number of acceptance marks
 AC_COMPUTE_INT([default_max_accsets], [8*sizeof(unsigned)])
