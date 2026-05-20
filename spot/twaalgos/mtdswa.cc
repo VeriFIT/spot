@@ -4501,4 +4501,181 @@ namespace spot
     return quantify_forall(swa, aps_to_bdd(swa, aps), trim);
   }
 
+
+  // Used to renumber states.
+  static std::vector<int> renum;
+  static std::vector<short> inevitably_const;
+
+  static int trim_renumber_and_collapse(int bdd, int term)
+  {
+    // Constants bddtrue and bddfalse are left unchanged.
+    if (bdd == 0 || bdd == 1)
+      return bdd;
+    assert((unsigned) term < renum.size());
+    int newterm = renum[term];
+    // Renumbered state.
+    if (newterm != -1)
+      return bdd_terminal_as_int(newterm);
+    // Inevitably false.
+    else if (inevitably_const[term] == -1)
+      return 0;
+    // Inevitably true.
+    else if (inevitably_const[term] == 1)
+      return 1;
+    return 0;
+  }
+
+
+  void trim_mtdswa(mtdswa_ptr swa)
+  {
+    // 1 - Detect inaccessible states
+    // Do a BFS from the initial state, and mark all accessible states.
+    unsigned n = swa->num_roots();
+    std::vector<bool> accessible(n, false);
+    std::queue<int> q;
+    q.push(0);
+    accessible[0] = true;
+    while (!q.empty())
+      {
+        int s = q.front();
+        q.pop();
+        // Mark all leaves rechable from s as accessible.
+        for (bdd term : leaves_of(swa->states[s]))
+          {
+            if (term != bddfalse && term != bddtrue)
+              {
+                int next = bdd_get_terminal(term);
+                if (!accessible[next])
+                  {
+                    // Only continue the BFS from states that are not
+                    // already marked as accessible.
+                    accessible[next] = true;
+                    q.push(next);
+                  }
+              }
+          }
+      }
+
+    // 2 - Mark all states that inevitably point to bddtrue or to bddfalse.
+    inevitably_const.assign(n, 0);
+    bool changed = true;
+    while (changed)
+      {
+        changed = false;
+        // Never remove initial state 0.
+        for (unsigned s = 1; s < n; s++)
+          {
+            // Skip states that are not accessible, or that are already known
+            // to be inevitably true or false.
+            if (!accessible[s] || inevitably_const[s] != 0)
+              continue;
+            // Check all reachable leaves from s.
+            auto leaves = leaves_of(swa->states[s]);
+            for (bdd term : leaves)
+              {
+                // If points to itself, see if it is accepting or rejecting.
+                if (bdd_is_terminal(term) && bdd_get_terminal(term) == (int) s)
+                  {
+                    if (swa->acc.accepting(swa->colors[s])
+                        && inevitably_const[s] != -1)
+                      {
+                        // Accepting loop : inevitably true.
+                        inevitably_const[s] = 1;
+                      }
+                    else if (!swa->acc.accepting(swa->colors[s])
+                             && inevitably_const[s] != 1)
+                      {
+                        // Rejecting loop : inevitably false.
+                        inevitably_const[s] = -1;
+                      }
+                    else {
+                      // Not inevitably true nor inevitably false
+                      inevitably_const[s] = 0;
+                      break;
+                    }
+                  }
+                // If points to false or to an inevitably false state
+                else if ((term == bddfalse
+                     || (bdd_is_terminal(term)
+                     && inevitably_const[bdd_get_terminal(term)] == -1))
+                    && inevitably_const[s] != 1)
+                  {
+                    inevitably_const[s] = -1;
+                  }
+                // If points to true or to an inevitably true state
+                else if ((term == bddtrue
+                          || (bdd_is_terminal(term)
+                          && inevitably_const[bdd_get_terminal(term)] == 1))
+                         && inevitably_const[s] != -1)
+                  {
+                    inevitably_const[s] = 1;
+                  }
+                // If points to a non-inevitable state, or to both an
+                // inevitably true and an inevitably false state
+                else
+                  {
+                    inevitably_const[s] = 0;
+                    break;
+                  }
+              }
+            if (inevitably_const[s] != 0)
+              {
+                changed = true;
+              }
+          }
+      }
+
+    // 3 - Compute renumbering of states.
+    renum = std::vector<int>(n, -1);
+    int newnum = 0;
+    for (unsigned s = 0; s < n; ++s)
+      {
+        if (accessible[s] && inevitably_const[s] == 0)
+          {
+            // This state is kept, and gets new number newnum.
+            renum[s] = newnum;
+            ++newnum;
+          }
+      }
+
+    // 4 - Apply renumbering and remove states that 
+    // are not accessible or inevitably true / false.
+
+    bddExtCache cache;
+    bdd_extcache_init(&cache, 100, true);
+    std::vector<bdd> new_states;
+    new_states.reserve(newnum);
+
+    // Renumber and collapse the states
+    for (unsigned s = 0; s < n; ++s)
+      if (renum[s] != -1)
+        {
+          bdd new_state = bdd_mt_apply1_leaves(swa->states[s],
+                                               trim_renumber_and_collapse,
+                                               &cache, 0);
+          new_states.push_back(new_state);
+        }
+
+    bdd_extcache_done(&cache);
+
+    // Build new vectors after renumbering and removing inaccessible states.
+    std::vector<formula> new_names;
+    std::vector<acc_cond::mark_t> new_colors;
+    new_names.reserve(newnum);
+    new_colors.reserve(newnum);
+    for (unsigned s = 0; s < n; ++s)
+      {
+        if (renum[s] != -1)
+          {
+            if (s < swa->names.size())
+              new_names.push_back(swa->names[s]);
+            if (s < swa->colors.size())
+              new_colors.push_back(swa->colors[s]);
+          }
+      }
+    swa->states = new_states;
+    swa->names = new_names;
+    swa->colors = new_colors;
+  }
+
 }

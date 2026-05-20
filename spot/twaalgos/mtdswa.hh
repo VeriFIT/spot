@@ -456,4 +456,12 @@ namespace spot
   SPOT_API twa_graph_ptr
   mtdswa_strategy_to_mealy(mtdswa_ptr strategy, bool labels = true,
                            bool loop = false);
+
+
+  /// \ingroup mtdswa
+  /// \brief Remove unnecessary states from an MTDSwA.
+  /// This removes states that are not accessible from the initial state, and
+  /// states that inevitably point to constant values (bddtrue or bddfalse).
+  SPOT_API void trim_mtdswa(mtdswa_ptr swa);
+
 }
