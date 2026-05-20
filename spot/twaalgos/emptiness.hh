@@ -37,8 +37,8 @@ namespace spot
   /// \ingroup twa_algorithms
   ///
   /// You can create an emptiness check either by instantiating it
-  /// explicitly (calling one of the functions of \ref
-  /// emptiness_check_algorithms "this list"), or indirectly via
+  /// explicitly (calling one of the functions of
+  /// \ref emptiness_check_algorithms), or indirectly via
   /// spot::make_emptiness_check_instantiator().  The latter function
   /// allows user-options to influence the choice of the
   /// emptiness-check algorithm used, and the intermediate
@@ -68,7 +68,7 @@ namespace spot
   ///
   /// The acceptance run returned by
   /// spot::emptiness_check_result::accepting_run(), if any, is of
-  /// type spot::twa_run.  \ref twa_run "This page" gathers existing
+  /// type spot::twa_run.  See \ref twa_run for existing
   /// operations on these objects.
   ///
   /// @{

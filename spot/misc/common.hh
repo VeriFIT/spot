@@ -162,7 +162,8 @@ namespace spot
     {
     }
 
-    unsigned nthreads() const ///< Return the number of threads.
+    /// Return the number of threads.
+    unsigned nthreads() const
     {
       return nthreads_;
     }

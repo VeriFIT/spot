@@ -32,7 +32,7 @@ AM_CPPFLAGS = -I$(PYTHONINC) -I$(top_builddir) -I$(top_srcdir) \
 	      $(BUDDY_CPPFLAGS) -lpthread -DSWIG_TYPE_TABLE=spot \
 	      -D__STDC_FORMAT_MACROS
 
-SWIGFLAGS = -c++ -python -py3 -O -MD
+SWIGFLAGS = -c++ -python -py3 -O -MD -doxygen
 
 EXTRA_DIST = buddy.i spot/impl.i spot/ltsmin.i spot/gen.i
 nobase_pyexec_PYTHON = \

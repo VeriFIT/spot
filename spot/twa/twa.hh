@@ -575,12 +575,10 @@ namespace spot
   /// \defgroup twa TωA (Transition-based ω-Automata)
   ///
   /// Spot is centered around the spot::twa type.  This type and its
-  /// cousins are listed \ref twa_essentials "here".  This is an
-  /// abstract interface.  Its implementations are either \ref
-  /// twa_representation "concrete representations", or \ref
-  /// twa_on_the_fly_algorithms "on-the-fly algorithms".  Other
-  /// algorithms that work on spot::twa are \ref twa_algorithms
-  /// "listed separately".
+  /// cousins are listed in \ref twa_essentials.  This is an
+  /// abstract interface.  Its implementations are either
+  /// \ref twa_representation or \ref twa_on_the_fly_algorithms.  Other
+  /// algorithms that work on spot::twa are listed in \ref twa_algorithms.
 
   /// \addtogroup twa_essentials Essential TωA types
   /// \ingroup twa

@@ -128,7 +128,7 @@ namespace spot
   /// spin -f, ltl2ba, ltl3ba, and modella.  If you know of some other
   /// tool that produce Büchi automata in the form of a neverclaim,
   /// but is not understood by this parser, please report it to
-  /// spot@lrde.epita.fr.
+  /// spot@@lrde.epita.fr.
   ///
   /// The parser for HOA recognize a few extensions.  It maps the
   /// `controlled-AP:` header \cite perez.19.hoa to the

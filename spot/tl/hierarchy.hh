@@ -183,7 +183,7 @@ namespace spot
   /// Add letter '~' to force \a into negative normal form before
   /// processing it.
   ///
-  /// The string should be terminated by '\0' or ']'.
+  /// The string should be terminated by '\\0' or ']'.
   SPOT_API unsigned nesting_depth(formula f, const char* opers);
 
 

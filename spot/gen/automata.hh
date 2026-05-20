@@ -74,7 +74,7 @@ namespace spot
       /// descriptions of this automaton can be found in a number
       /// of papers \cite thomas.97.chapter .
       ///
-      /// Our implementation uses \f$\lceil \log_2(n+1)\rceil\f$ atomic
+      /// Our implementation uses ⌈log₂(n+1)⌉ atomic
       /// propositions to encode the $n+1$ letters used in the
       /// original alphabet.
       AUT_M_NBA,

@@ -34,7 +34,7 @@ namespace spot
   /// the usual `bddfalse` and `bddtrue`, but some integer-valued
   /// terminal representing the destination state.  A terminal with
   /// integer label $2d+b$ represents destination state $d$ and uses
-  /// \f$b\in\{0,1\}\f$ to indicate whether the transition is accepting
+  /// b∈{0,1} to indicate whether the transition is accepting
   /// (i.e., the evaluation can stop after reading the last letter).
   /// The `bddfalse` and `bddtrue` nodes are kept to represent
   /// rejecting and accepting sinks; using them helps some to shortcut
@@ -364,7 +364,7 @@ namespace spot
   /// pre-register output variables for Moore.
   ///
   /// The formula may also use quantified atomic propositions
-  /// (\f$\forall\f$ or \f$\exists\f$).  The quantified variables should not be
+  /// (∀ or ∃).  The quantified variables should not be
   /// pre-registered in the dictionary.
   ///
   /// If \a backprop is set to `bfs_node_backprop`, or

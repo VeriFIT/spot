@@ -342,7 +342,7 @@ namespace spot
   /// \brief Convert a syntactic-obligation to an MTDSwA
   ///
   /// The formula may use quantified atomic propositions
-  /// (\f$\forall\f$ or \f$\exists\f$).
+  /// (∀ or ∃).
   SPOT_API
   mtdswa_ptr obligation_to_mtdswa(formula f, const bdd_dict_ptr& dict,
                                   bool fuse_same_bdds = true,
@@ -362,7 +362,7 @@ namespace spot
   /// pre-register output variables for Moore.
   ///
   /// The formula may also use quantified atomic propositions
-  /// (\f$\forall\f$ or \f$\exists\f$).  The quantified variables should not be
+  /// (∀ or ∃).  The quantified variables should not be
   /// pre-registered in the dictionary.
   SPOT_API
   mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
