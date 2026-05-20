@@ -64,6 +64,7 @@
 // file to get the definition.  Since Spot 2.13, it is always defined,
 // so users may have to update their code.  The following macro
 // is only defined when strong_X exists.
+#ifndef SWIG
 #  define SPOT_HAS_STRONG_X 1 ///< Defined when strong X operator is available
 // This was defined since 2.9 along with SPOT_HAS_STRONG_X when
 // SPOT_USES_STRONG_X was defined so we are keeping it just in case
@@ -72,6 +73,7 @@
 // This was defined in Spot 2.15 when exists/forall where introduced.
 /// Defined when the exists/forall operators are available.
 #  define SPOT_HAS_QUANTIFIERS 1
+#endif // !defined SWIG
 
 namespace spot
 {
