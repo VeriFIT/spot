@@ -204,7 +204,9 @@ def __twa_acc2_tmp(self):
 
 
 twa.acc = __twa_acc1_tmp
+twa.acc.__doc__ = __twa__acc1.__doc__
 twa.get_acceptance = __twa_acc2_tmp
+twa.get_acceptance.__doc__ = __twa__acc2.__doc__
 
 
 @_extend(twa)
