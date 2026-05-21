@@ -25,7 +25,7 @@ namespace spot
 {
 
   /// \ingroup twa_on_the_fly_algorithms
-  /// \brief A state for spot::twa_product.
+  /// \brief A state for \ref twa_product.
   ///
   /// This state is in fact a pair of state: the state from the left
   /// automaton and that of the right.
@@ -36,7 +36,7 @@ namespace spot
     /// \param left The state from the left automaton.
     /// \param right The state from the right automaton.
     /// \param pool The pool from which the state was allocated.
-    /// These states are acquired by spot::state_product, and will
+    /// These states are acquired by twa_product, and will
     /// be destroyed on destruction.
     state_product(const state* left,
                   const state* right,

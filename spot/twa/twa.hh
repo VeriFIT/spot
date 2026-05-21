@@ -111,10 +111,11 @@ namespace spot
   };
 
   /// \ingroup twa_essentials
-  /// \brief Strict Weak Ordering for \c state*.
+  /// \brief Strict Weak Ordering for state pointers.
   ///
   /// This is meant to be used as a comparison functor for
-  /// STL \c map whose keys are of type \c state*.
+  /// STL \c map whose keys are state pointers.
+#ifndef SWIG
   ///
   /// For instance here is how one could declare
   /// a map of \c state*.
@@ -122,6 +123,7 @@ namespace spot
   ///   // Remember how many times each state has been visited.
   ///   std::map<spot::state*, int, spot::state_ptr_less_than> seen;
   /// \endcode
+#endif // !defined SWIG
   struct state_ptr_less_than
   {
     /// \brief Compare two state pointers using state::compare().
@@ -134,10 +136,11 @@ namespace spot
   };
 
   /// \ingroup twa_essentials
-  /// \brief An Equivalence Relation for \c state*.
+  /// \brief An Equivalence Relation for state pointers.
   ///
   /// This is meant to be used as a comparison functor for
-  /// an \c unordered_map whose keys are of type \c state*.
+  /// an \c unordered_map whose keys are state pointers.
+#ifndef SWIG
   ///
   /// For instance here is how one could declare
   /// a map of \c state*.
@@ -146,6 +149,7 @@ namespace spot
   ///   std::unordered_map<spot::state*, int, spot::state_ptr_hash,
   ///                                    spot::state_ptr_equal> seen;
   /// \endcode
+#endif // !defined SWIG
   struct state_ptr_equal
   {
     /// \brief Test two state pointers for equality via state::compare().
@@ -159,10 +163,11 @@ namespace spot
 
   /// \ingroup twa_essentials
   /// \ingroup hash_funcs
-  /// \brief Hash Function for \c state*.
+  /// \brief Hash Function for state pointers.
   ///
   /// This is meant to be used as a hash functor for
-  /// an \c unordered_map whose keys are of type \c state*.
+  /// an \c unordered_map whose keys are state pointers.
+#ifndef SWIG
   ///
   /// For instance here is how one could declare
   /// a map of \c state*.
@@ -171,6 +176,7 @@ namespace spot
   ///   std::unordered_map<spot::state*, int, spot::state_ptr_hash,
   ///                                    spot::state_ptr_equal> seen;
   /// \endcode
+#endif // !defined SWIG
   struct state_ptr_hash
   {
     /// \brief Hash a state pointer using state::hash().
@@ -277,11 +283,11 @@ namespace spot
   inline void shared_state_deleter(state* s) { s->destroy(); }
 
   /// \ingroup twa_essentials
-  /// \brief Strict Weak Ordering for \c shared_state
-  /// (shared_ptr<const state*>).
+  /// \brief Strict Weak Ordering for \c shared_state.
   ///
   /// This is meant to be used as a comparison functor for
   /// STL \c map whose keys are of type \c shared_state.
+#ifndef SWIG
   ///
   /// For instance here is how one could declare
   /// a map of \c shared_state.
@@ -289,6 +295,7 @@ namespace spot
   ///   // Remember how many times each state has been visited.
   ///   std::map<shared_state, int, spot::state_shared_ptr_less_than> seen;
   /// \endcode
+#endif // !defined SWIG
   struct state_shared_ptr_less_than
   {
     /// \brief Compare two shared states using state::compare().
@@ -302,11 +309,11 @@ namespace spot
   };
 
   /// \ingroup twa_essentials
-  /// \brief An Equivalence Relation for \c shared_state
-  /// (shared_ptr<const state*>).
+  /// \brief An Equivalence Relation for \c shared_state.
   ///
   /// This is meant to be used as a comparison functor for
   /// an \c unordered_map whose keys are of type \c shared_state.
+#ifndef SWIG
   ///
   /// For instance here is how one could declare
   /// a map of \c shared_state.
@@ -318,6 +325,7 @@ namespace spot
   /// \endcode
   ///
   /// \see shared_state_set
+#endif // !defined SWIG
   struct state_shared_ptr_equal
   {
     /// \brief Test two shared states for equality via state::compare().
@@ -332,11 +340,11 @@ namespace spot
 
   /// \ingroup twa_essentials
   /// \ingroup hash_funcs
-  /// \brief Hash Function for \c shared_state (shared_ptr<const state*>).
+  /// \brief Hash Function for \c shared_state.
   ///
   /// This is meant to be used as a hash functor for
-  /// an \c unordered_map whose keys are of type
-  /// \c shared_state.
+  /// an \c unordered_map whose keys are of type \c shared_state.
+#ifndef SWIG
   ///
   /// For instance here is how one could declare
   /// a map of \c shared_state.
@@ -348,6 +356,7 @@ namespace spot
   /// \endcode
   ///
   /// \see shared_state_set
+#endif // !defined SWIG
   struct state_shared_ptr_hash
   {
     /// \brief Hash a shared state using state::hash().
@@ -574,11 +583,11 @@ namespace spot
 
   /// \defgroup twa TωA (Transition-based ω-Automata)
   ///
-  /// Spot is centered around the spot::twa type.  This type and its
+  /// Spot is centered around the \ref twa type.  This type and its
   /// cousins are listed in \ref twa_essentials.  This is an
   /// abstract interface.  Its implementations are either
   /// \ref twa_representation or \ref twa_on_the_fly_algorithms.  Other
-  /// algorithms that work on spot::twa are listed in \ref twa_algorithms.
+  /// algorithms that work on \ref twa are listed in \ref twa_algorithms.
 
   /// \addtogroup twa_essentials Essential TωA types
   /// \ingroup twa
@@ -630,8 +639,8 @@ namespace spot
   /// state::destroy() to release it.
   ///
   /// If you want to work with a TωA that is explicitly stored as a
-  /// graph in memory, use the spot::twa_graph subclass instead.  A
-  /// twa_graph object can be used as a spot::twa (using the
+  /// graph in memory, use the \ref twa_graph subclass instead.  A
+  /// twa_graph object can be used as a twa (using the
   /// on-the-fly interface, even though nothing needs to be
   /// constructed), but it also offers a faster interface that does not
   /// use virtual methods.

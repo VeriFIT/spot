@@ -863,8 +863,8 @@ namespace spot
     public:
     /// \brief Create a formula from an fnode.
     ///
-    /// This constructor is mainly for internal use, as spot::fnode
-    /// object should usually not be manipulated from user code.
+    /// This constructor is mainly for internal use, as fnode
+    /// objects should usually not be manipulated from user code.
     explicit formula(const fnode* f) noexcept
       : ptr_(f)
       {
@@ -880,7 +880,7 @@ namespace spot
       {
       }
 
-    /// \brief Default initialize a formula to nullptr.
+    /// \brief Default initialize a formula to None.
     formula() noexcept
       : ptr_(nullptr)
       {

@@ -496,7 +496,7 @@ namespace spot
 
 
   /// \ingroup mtdfa
-  /// \brief "Semi-internal" class used to implement spot::ltlf_to_mtdfa()
+  /// \brief "Semi-internal" class used to implement ltlf_to_mtdfa()
   ///
   /// It is public only to make it possible to demonstrate the inner
   /// working of the translation.  Do not rely on the interface to be

@@ -33,7 +33,7 @@ namespace spot
     struct record_;
     struct trans_map_;
   public:
-    /// This class uses spot::ltl_to_tgba_fm to translate LTL
+    /// This class uses an LTL-to-TGBA translation to translate LTL
     /// formulas.  See that function for the meaning of these options.
     language_containment_checker(bdd_dict_ptr dict = make_bdd_dict(),
                                  bool exprop = false,

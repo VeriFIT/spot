@@ -78,7 +78,7 @@ namespace spot
   };
 
   /// \ingroup twa_representation
-  /// Set of states deriving from spot::state.
+  /// Set of states deriving from \ref state.
   class SPOT_API set_state final: public spot::state
   {
   public:

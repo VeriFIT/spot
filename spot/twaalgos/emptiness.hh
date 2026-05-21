@@ -39,7 +39,7 @@ namespace spot
   /// You can create an emptiness check either by instantiating it
   /// explicitly (calling one of the functions of
   /// \ref emptiness_check_algorithms), or indirectly via
-  /// spot::make_emptiness_check_instantiator().  The latter function
+  /// make_emptiness_check_instantiator().  The latter function
   /// allows user-options to influence the choice of the
   /// emptiness-check algorithm used, and the intermediate
   /// instantiator object can be used to query the properties of the
@@ -47,28 +47,28 @@ namespace spot
   ///
   /// All emptiness-check algorithms follow the same interface.
   /// Basically once you have constructed an instance of
-  /// spot::emptiness_check, you should call
-  /// spot::emptiness_check::check() to check the automaton.
+  /// emptiness_check, you should call
+  /// emptiness_check::check() to check the automaton.
   ///
-  /// If spot::emptiness_check::check() returns 0, then the automaton
+  /// If emptiness_check::check() returns 0, then the automaton
   /// was found empty.  Otherwise the automaton accepts some run.
   /// (Beware that some algorithms---those using bit-state
   /// hashing---may find the automaton to be empty even if it is not
   /// actually empty.)
   ///
-  /// When spot::emptiness_check::check() does not return 0, it
-  /// returns an instance of spot::emptiness_check_result.  You can
-  /// try to call spot::emptiness_check_result::accepting_run() to
+  /// When emptiness_check::check() does not return 0, it
+  /// returns an instance of emptiness_check_result.  You can
+  /// try to call emptiness_check_result::accepting_run() to
   /// obtain an accepting run.  For some emptiness-check algorithms,
-  /// spot::emptiness_check_result::accepting_run() will require some
+  /// emptiness_check_result::accepting_run() will require some
   /// extra computation.  Most emptiness-check algorithms are able to
   /// return such an accepting run, however this is not mandatory and
-  /// spot::emptiness_check_result::accepting_run() can return 0 (this
+  /// emptiness_check_result::accepting_run() can return 0 (this
   /// does not mean in any way that no accepting run exists).
   ///
   /// The acceptance run returned by
-  /// spot::emptiness_check_result::accepting_run(), if any, is of
-  /// type spot::twa_run.  See \ref twa_run for existing
+  /// emptiness_check_result::accepting_run(), if any, is of
+  /// type twa_run.  See \ref twa_run for existing
   /// operations on these objects.
   ///
   /// @{

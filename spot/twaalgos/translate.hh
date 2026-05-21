@@ -24,7 +24,7 @@
 namespace spot
 {
   /// \ingroup twa_ltl
-  /// \brief Translate an LTL formula into an optimized spot::tgba.
+  /// \brief Translate an LTL formula into an optimized \ref twa_graph.
   ///
   /// This class implements a three-step translation:
   /// - syntactic simplification of the formula
@@ -41,7 +41,7 @@ namespace spot
   /// Method set_level() may be used to specify the optimization level.
   ///
   /// The semantic of these three methods is inherited from the
-  /// spot::postprocessor class, but the optimization level is
+  /// postprocessor class, but the optimization level is
   /// additionally used to select which LTL simplifications to enable.
   ///
   /// Most of the techniques used to produce TGBA or BA are described
@@ -59,7 +59,7 @@ namespace spot
   /// in the doc/tl/ subdirectory of the Spot sources).
   ///
   /// For reference and documentation about the post-processing step,
-  /// see the documentation of the spot::postprocessor class.
+  /// see the documentation of the \ref postprocessor class.
   class SPOT_API translator: protected postprocessor
   {
   public:

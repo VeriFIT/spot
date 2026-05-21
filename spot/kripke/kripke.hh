@@ -158,7 +158,7 @@ namespace spot
   /// A Kripke structure is a graph in which each node (=state) is
   /// labeled by a conjunction of atomic proposition.
   ///
-  /// Such a structure can be seen as spot::tgba without
+  /// Such a structure can be seen as a \ref twa without
   /// any acceptance condition.
   ///
   /// A programmer that develops an instance of Kripke structure needs
@@ -173,7 +173,7 @@ namespace spot
   /// acceptance conditions) are supplied by this kripke class and
   /// need not be defined.
   ///
-  /// See also spot::kripke_succ_iterator.
+  /// See also \ref kripke_succ_iterator.
   class SPOT_API kripke: public fair_kripke
   {
   public:

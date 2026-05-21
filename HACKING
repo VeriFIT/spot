@@ -32,10 +32,10 @@ since the generated files they produce are distributed.)
     Linux distribution may ship a more recent org-mode package
     separately from emacs).
   Groff (a.k.a. GNU troff) >= 1.20
-  SWIG >= 3.0.2, preferably >= 4.0.1 (for its better modern C++ support)
+  SWIG >= 4.2.0  (older versions may have trouble with Doxygen support)
     If you use Macports you consider installing the swig-python package
     in addition to the swig package.
-  Doxygen >= 1.4.0
+  Doxygen >= 1.4.0  (preferably >= 1.10)
   R   used by some examples in the documentation
   Perl, with its Gettext module (it might be called something like
     liblocale-gettext-perl or p5-locale-gettext in your distribution)

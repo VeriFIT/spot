@@ -67,7 +67,7 @@ namespace spot
   /// labeled by a conjunction of atomic propositions, and a set of
   /// acceptance conditions.
   ///
-  /// Such a structure can be seen as spot::tgba by pushing all labels
+  /// Such a structure can be seen as a \ref twa by pushing all labels
   /// to the outgoing transitions.
   ///
   /// A programmer that develops an instance of Fair Kripke structure
@@ -82,7 +82,7 @@ namespace spot
   /// The other methods of the tgba interface are supplied by this
   /// class and need not be defined.
   ///
-  /// See also spot::fair_kripke_succ_iterator.
+  /// See also \ref fair_kripke_succ_iterator.
   class SPOT_API fair_kripke: public twa
   {
   public:

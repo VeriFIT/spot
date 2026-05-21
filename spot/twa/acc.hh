@@ -1472,7 +1472,7 @@ namespace spot
       /// specified in the HOA format.  (E.g. "Rabin 2", "parity max odd 3",
       /// "generalized-Rabin 4 2 1", etc.).
       ///
-      /// A spot::parse_error is thrown on syntax error.
+      /// A \ref parse_error is thrown on syntax error.
       acc_code(const char* input);
 
       /// \brief Build an empty acceptance formula.
