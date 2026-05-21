@@ -1313,6 +1313,24 @@ namespace spot
       fin_unit_one_split_improved() const;
       /// @}
 
+      /// \brief Split an acceptance conditions into disjuncts
+      /// according to mandatory fins.
+      ///
+      /// Let us assume that φ designate the current condition.
+      /// If the condition is not a disjunction, this simply
+      /// returns a pair (mafins(φ), φ).
+      ///
+      /// If φ is a disjunction, this should return
+      /// a list of pairs [(M₁,α₁), ..., (Mₙ,αₙ)] such that
+      ///   - Mᵢ = mafins(αᵢ)
+      ///   - for any i and j, Mᵢ and Mⱼ do not intersect
+      ///   - only the last Mₙ may be empty
+      ///   - αₙ is the only formula that can have Fin terms
+      ///     that are not mandatory fins.
+      ///   - Φ = α₁∨α₂∨...∨αₙ
+      std::vector<std::pair<acc_cond::mark_t, acc_cond::acc_code>>
+      mafins_split() const;
+
       /// \brief Help closing accepting or rejecting cycle.
       ///
       /// Assuming you have a partial cycle visiting all acceptance
@@ -2180,6 +2198,20 @@ namespace spot
     mark_t mafins() const
     {
       return code_.mafins();
+    }
+
+    /// \brief Split an acceptance condition into disjuncts
+    /// according to mandatory fins.
+    ///
+    /// \see acc_cond::acc_code::mafins_split
+    std::vector<std::pair<mark_t, acc_cond>> mafins_split() const
+    {
+      auto v = code_.mafins_split();
+      std::vector<std::pair<mark_t, acc_cond>> result;
+      result.reserve(v.size());
+      for (auto& [m, c] : v)
+        result.emplace_back(m, acc_cond(num_, c));
+      return result;
     }
 
     /// \brief Find a `Inf(i)` that is a unit clause.

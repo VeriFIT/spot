@@ -244,5 +244,52 @@ int main()
   auto cond3 =  spot::acc_cond::acc_code("Inf(0) & Inf(2) | Fin(2)");
   std::cout << cond3.unit_propagation() << '\n';
 
+  // mafins_split: print each result entry as "M alpha" on its own line.
+  auto print_mafins_split = [](const spot::acc_cond::acc_code& c)
+  {
+    for (auto& [m, alpha] : c.mafins_split())
+      std::cout << m << ' ' << alpha << '\n';
+  };
+
+  // Not a disjunction: single entry (mafins(φ), φ).
+  print_mafins_split(spot::acc_cond::acc_code("Fin(0) & Inf(1)"));
+  // t and f are also not disjunctions.
+  print_mafins_split(spot::acc_cond::acc_code("t"));
+  print_mafins_split(spot::acc_cond::acc_code("f"));
+
+  // Rabin-2: two clean disjuncts with disjoint mafins: two non-last entries.
+  print_mafins_split(spot::acc_cond::acc_code("Fin(0)&Inf(1) | Fin(2)&Inf(3)"));
+
+  // Two clean disjuncts with the same mafins: merged into one non-last entry.
+  print_mafins_split(spot::acc_cond::acc_code("Fin(0)&Inf(1) | Fin(0)&Inf(2)"));
+
+  // Clean + dirty sharing the same mandatory-fin bit: both collapse to last.
+  print_mafins_split(
+    spot::acc_cond::acc_code("Fin(0)&Inf(1) | Fin(0)&(Inf(1)|Fin(2))"));
+
+  // Clean + dirty with disjoint mafin bits:clean stays non-last.
+  print_mafins_split(
+    spot::acc_cond::acc_code("Fin(0)&Inf(1) | Fin(2)&(Inf(3)|Fin(4))"));
+
+  // Three-way transitivity chain G1={0}, G2={0,1}, G3={1}: only one can be
+  // non-last (G2 conflicts with both G1 and G3 which share bits with last).
+  print_mafins_split(
+    spot::acc_cond::acc_code(
+      "Fin(0)&Inf(5) | Fin(0)&Fin(1)&Inf(6) | Fin(1)&Inf(7)"));
+
+  // Larger example yielding 4 result pairs:
+  //   G1 {0}  : Fin(0)&Inf(7) and Fin(0)&Inf(8)   — merged (same mafins)
+  //   G2 {1,2}: Fin(1)&Fin(2)&Inf(9)              — multi-color mafins
+  //   G3 {3,4}: Fin(3)&Fin(4)&Inf(10)
+  //           | Fin(3)&Fin(4)&Inf(11)              — merged, multi-color
+  //   Last{5,6}: Fin(5)&Fin(6)&(Inf(12)|Fin(14))
+  //            | Fin(5)&Fin(6)&(Inf(13)|Fin(14))  — two dirty disjuncts
+  print_mafins_split(spot::acc_cond::acc_code(
+    "Fin(0)&Inf(7) | Fin(0)&Inf(8)"
+    " | Fin(1)&Fin(2)&Inf(9)"
+    " | Fin(3)&Fin(4)&Inf(10) | Fin(3)&Fin(4)&Inf(11)"
+    " | Fin(5)&Fin(6)&(Inf(12)|Fin(14))"
+    " | Fin(5)&Fin(6)&(Inf(13)|Fin(14))"));
+
   return 0;
 }

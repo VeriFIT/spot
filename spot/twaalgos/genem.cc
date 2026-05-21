@@ -23,7 +23,8 @@ namespace spot
 {
   namespace
   {
-    enum genem_version_t { spot28, atva19, spot29, spot210, spot211, spot212 };
+    enum genem_version_t { spot28, atva19, spot29, spot210, spot211,
+                           spot212, spot216 };
     static genem_version_t genem_version = spot29;
   }
 
@@ -31,6 +32,8 @@ namespace spot
   {
     if (emversion == nullptr || !strcasecmp(emversion, "spot29"))
       genem_version = spot29;
+    else if (!strcasecmp(emversion, "spot216"))
+      genem_version = spot216;
     else if (!strcasecmp(emversion, "spot212"))
       genem_version = spot212;
     else if (!strcasecmp(emversion, "spot211"))
@@ -44,7 +47,7 @@ namespace spot
     else
       throw std::invalid_argument("generic_emptiness_check version should be "
                                   "one of {spot28, atva19, spot29, spot210, "
-                                  "spot211, spot212}");
+                                  "spot211, spot212, spot216}");
   }
 
   namespace
@@ -160,6 +163,39 @@ namespace spot
             }
           while (!acc.is_f());
         }
+      else if (genem_version == spot216)
+        {
+          do
+            {
+              bool changed = false;
+              for (auto& [mafins, subacc]: acc.mafins_split())
+                {
+                  if (mafins)
+                    {
+                      if (!scc_split_check<EarlyStop, Extra>
+                          (si, scc, subacc, extra, mafins))
+                        if constexpr (EarlyStop)
+                          return false;
+                      continue;
+                    }
+                  // Only one pair of acc.mafins_split() can have
+                  // mafins == 0,
+                  assert(!changed);
+                  changed = true;
+
+                  auto [fo, fpart, rest] = subacc.fin_unit_one_split_improved();
+                  acc_cond::mark_t fo_m = {(unsigned) fo};
+                  if (!scc_split_check<EarlyStop, Extra>
+                      (si, scc, fpart, extra, fo_m))
+                    if constexpr (EarlyStop)
+                      return false;
+                  acc = rest;
+                }
+              if (!changed)
+                break;
+            }
+          while (!acc.is_f());
+        }
       else if (genem_version == spot29)
         do
           {
@@ -191,7 +227,7 @@ namespace spot
             acc = subacc.force_inf(fo_m);
           }
         while (!acc.is_f());
-      else
+      else                      // atva19 or spot28
         {
           for (const acc_cond& disjunct: acc.top_disjuncts())
             if (acc_cond::mark_t fu = disjunct.fin_unit())

@@ -3033,6 +3033,115 @@ namespace spot
     return mafins_rec(&back());
   }
 
+  std::vector<std::pair<acc_cond::mark_t, acc_cond::acc_code>>
+  acc_cond::acc_code::mafins_split() const
+  {
+    // If not a top-level disjunction, return [(mafins(φ), φ)].
+    if (empty())
+      return {
+        {mark_t(), *this}
+      };
+    const acc_word* pos = &back();
+    if (pos->sub.op != acc_op::Or)
+      return {{mafins_rec(pos), *this}};
+
+    // Extract all top-level disjuncts with their mafins.
+    auto start = pos - pos->sub.size;
+    --pos;
+    std::vector<acc_code> disjuncts;
+    std::vector<mark_t> mafins_list;
+    do
+      {
+        disjuncts.emplace_back(pos);
+        mafins_list.push_back(mafins_rec(pos));
+        pos -= pos->sub.size + 1;
+      }
+    while (pos > start);
+
+    unsigned n = disjuncts.size();
+
+    // Classify each disjunct:
+    //  - "clean" if all Fin terms are mandatory (fin_sets ⊆ mafins), with
+    //    non-empty mafins.  These candidates can appear as non-last αᵢ.
+    //  - everything else goes to the last group.
+    // Group clean disjuncts by their exact mafins value (same mafins → same
+    // group, and the merged formula is still clean).
+    std::map<mark_t, acc_code> clean_groups;
+    acc_code last_code = acc_code::f();
+    bool has_last = false;
+    // M_last tracks mafins of the last pool incrementally:
+    // mafins(a∨b) = mafins(a) ∩ mafins(b), so each addition intersects.
+    mark_t M_last{};
+
+    auto add_to_last = [&](acc_code code, mark_t m)
+    {
+      if (!has_last)
+        {
+          has_last = true;
+          M_last = m;
+          last_code = std::move(code);
+        }
+      else
+        {
+          M_last &= m;
+          last_code |= std::move(code);
+        }
+    };
+
+    for (unsigned i = 0; i < n; ++i)
+      {
+        mark_t mi = mafins_list[i];
+        // Dirty (has non-mandatory Fin terms) or has no mafins → last group.
+        mark_t fin_sets = disjuncts[i].used_inf_fin_sets().second;
+        if (!mi || (fin_sets - mi))
+          {
+            add_to_last(std::move(disjuncts[i]), mi);
+            continue;
+          }
+        // Clean disjunct with non-empty mafins: group by exact mafins.
+        auto it = clean_groups.find(mi);
+        if (it == clean_groups.end())
+          clean_groups.emplace(mi, std::move(disjuncts[i]));
+        else
+          it->second |= std::move(disjuncts[i]);
+      }
+
+    // Greedily assign clean groups to non-last positions, ensuring the mafins
+    // of all non-last groups are pairwise disjoint.
+    mark_t seen_bits{};
+    std::vector<std::pair<mark_t, acc_code>> result;
+    for (auto& [m, code] : clean_groups)
+      if (!(m & seen_bits))
+        {
+          seen_bits |= m;
+          result.push_back({m, std::move(code)});
+        }
+      else
+        add_to_last(std::move(code), m);
+
+    // Stabilize: an accepted group whose mafins intersect M_last would violate
+    // the pairwise-disjoint constraint (constraint 2) against the last entry.
+    // Move such groups to last; this can only shrink M_last, so it terminates.
+    bool changed = true;
+    while (changed)
+      {
+        changed = false;
+        for (auto it = result.begin(); it != result.end();)
+          if (it->first & M_last)
+            {
+              add_to_last(std::move(it->second), it->first);
+              it = result.erase(it);
+              changed = true;
+            }
+          else
+            ++it;
+      }
+
+    if (has_last)
+      result.push_back({last_code.mafins(), std::move(last_code)});
+    return result;
+  }
+
   acc_cond::mark_t acc_cond::acc_code::inf_unit() const
   {
     mark_t res = {};

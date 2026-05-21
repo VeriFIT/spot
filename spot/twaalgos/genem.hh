@@ -103,9 +103,14 @@ namespace spot
   ///   case complexity of EL-automata in the general case, but worsen
   ///   the complexity of Hyper-Rabin in particular.
   /// - "spot211" is another attempt at fixing worst case complexities.
-  ///    Compared to atva19, this improves the complexities for Rabin,
-  ///    GeneralizedRabin, and EL without worsening the complexity of
-  ///    Hyper-Rabin.
+  ///   Compared to atva19, this improves the complexities for Rabin,
+  ///   GeneralizedRabin, and EL without worsening the complexity of
+  ///   Hyper-Rabin.
+  /// - "spot212" is yet another improvement over "spot211" with
+  ///   finer handling of acceptance conditions containing repeated Fin(m),
+  ///   to avoid extra SCC decomposition.
+  /// - "spot216" is our last attempt.  It is supposed to have the right
+  ///   asymptotic complexities where it matters.
   SPOT_API void
   generic_emptiness_check_select_version(const char* emversion = nullptr);
 
