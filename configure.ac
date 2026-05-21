@@ -249,6 +249,16 @@ AX_CHECK_VALGRIND
 # to swig.
 AC_CHECK_PROGS([SWIG], [swig4.0 swig3.0 swig], [swig])
 
+# Enable SWIG's -doxygen flag only for SWIG >= 4.2.0.  Older versions
+# have a buggy Doxygen comment parser that causes syntax errors.
+SWIG_DOXYGEN=
+swig_version=$($SWIG -version 2>/dev/null | sed -n 's/SWIG Version //p')
+AS_VERSION_COMPARE([$swig_version], [4.2.0],
+  [],
+  [SWIG_DOXYGEN=-doxygen],
+  [SWIG_DOXYGEN=-doxygen])
+AC_SUBST([SWIG_DOXYGEN])
+
 AC_SUBST([CROSS_COMPILING], [$cross_compiling])
 
 AC_SUBST([GITPATCH], [$(if (git rev-parse) >/dev/null 2>&1; then
