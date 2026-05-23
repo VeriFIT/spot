@@ -1,5 +1,12 @@
 New in spot 2.15.1.dev  (not yet released)
 
+  Tools:
+
+  - genaut learned a new family of automata --el-empty=k,N.  It
+    generates a one-state, empty-language automaton, that has a
+    complex EL acceptance condition designed to challenge EL
+    emptiness-checking algorithms.
+
   Library:
 
   - spot::bdd_dict::ap_from_var(int var) is a new method that returns

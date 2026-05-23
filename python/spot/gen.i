@@ -121,35 +121,72 @@ def ltl_patterns(*args):
 # Override aut_pattern now(), because %feature("shadow") does not
 # seem to work correctly.  See https://github.com/swig/swig/issues/980
 def aut_pattern(pattern: 'spot::gen::aut_pattern_id', n: 'int',
+                m: 'int' = -1,
                 dict: 'spot::bdd_dict_ptr' = None) -> "spot::twa_graph_ptr":
-  return _gen.aut_pattern(pattern, n, dict or spot._bdd_dict)
+  if m < 0:
+    return _gen.aut_pattern(pattern, n, dict or spot._bdd_dict)
+  else:
+    return _gen.aut_pattern(pattern, n, m, dict or spot._bdd_dict)
 
 
 def aut_patterns(*args):
   """
   Generate automata patterns.
 
-  The arguments should be have one of these three forms:
+  For single-parameter patterns, arguments of
+  aut_patterns() should have one of these three forms:
     - (id, n)
     - (id, min, max)
     - id
   In the first case, the pattern id=n is generated.  In the second
   case, all pattern id=n for min<=n<=max are generated.  The
   third case is a shorthand for (id, 1, 10).
+
+  For two-parameter patterns, arguments of
+  aut_patterns() should have one of these four forms:
+    - (id, n1)
+    - (id, n1, n2)
+    - (id, min1, max1, min2, max2)
+    - id
+  In the first case, n2 is assumed to be equal to n1.  In the third
+  case, n2 is the second argument (not the max of a range).  In the
+  fourth case, all combinations are generated.  The last case is a
+  shorthand for (id, 1, 3, 1, 3).
   """
   for spec in args:
+    min2 = -1
+    max2 = -1
     if type(spec) is int:
       pat = spec
       min = 1
-      max = 10
-    else:
-      ls = len(spec)
-      if ls == 2:
-        pat, min, max = spec[0], spec[1], spec[1]
-      elif ls == 3:
-        pat, min, max = spec
+      argc = aut_pattern_argc(spec)
+      if argc == 1:
+        max = 10
       else:
-        raise RuntimeError("invalid pattern specification")
+        min2 = 1
+        max = max2 = 3
+    else:
+      argc = aut_pattern_argc(spec[0])
+      ls = len(spec)
+      if argc == 1:
+        if ls == 2:
+          pat, min, max = spec[0], spec[1], spec[1]
+        elif ls == 3:
+          pat, min, max = spec
+        else:
+          raise RuntimeError("invalid pattern specification " + str(spec))
+      else:
+        if ls == 2:
+          pat, min, max, min2, max2 = \
+            spec[0], spec[1], spec[1], spec[1], spec[1]
+        elif ls == 3:
+          pat, min, max, min2, max2 = \
+            spec[0], spec[1], spec[1], spec[2], spec[2]
+        elif ls == 5:
+          pat, min, max, min2, max2 = spec
+        else:
+          raise RuntimeError("invalid pattern specification " + str(spec))
     for n in range(min, max + 1):
-      yield aut_pattern(pat, n)
+      for m in range(min2, max2 + 1):
+        yield aut_pattern(pat, n, m)
 %}

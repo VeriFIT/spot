@@ -324,7 +324,80 @@ namespace spot
     }
 
 
+    namespace
+    {
+      // Compute Phi_A where marks contains the indices in A (0-indexed).
+      // Phi_{} = false
+      // Phi_A = OR_{i in A} (Fin(i) & (Phi_{A\{i}} | Inf(i)))
+      static acc_cond::acc_code
+      phi_A(const std::vector<unsigned>& marks)
+      {
+        if (marks.empty())
+          return acc_cond::acc_code::f();
+        acc_cond::acc_code result = acc_cond::acc_code::f();
+        for (size_t j = 0; j < marks.size(); ++j)
+          {
+            unsigned i = marks[j];
+            std::vector<unsigned> smaller;
+            smaller.reserve(marks.size() - 1);
+            for (size_t l = 0; l < marks.size(); ++l)
+              if (l != j)
+                smaller.push_back(marks[l]);
+            // Fin(i) & (Phi_{A\{i}} | Inf(i))
+            auto term = acc_cond::acc_code::fin({i})
+                        & (phi_A(smaller) | acc_cond::acc_code::inf({i}));
+            result = result | term;
+          }
+        return result;
+      }
+
+      static twa_graph_ptr
+      el_empty(unsigned k, unsigned n, bdd_dict_ptr dict)
+      {
+        if (k < 1)
+          throw std::runtime_error("el-empty: k must be at least 1");
+        if (n < 1)
+          throw std::runtime_error("el-empty: N must be at least 1");
+
+        auto aut = make_twa_graph(dict);
+        aut->new_states(1);
+        aut->set_init_state(0);
+
+        // Build acceptance condition Psi_{A}^{h} = Phi_A | Inf(h)
+        // where A = {0,...,k-1} and h = k (uses k+1 colors total).
+        // Color k never appears on any edge, so Inf(k) is always false
+        // and the automaton is empty.
+        std::vector<unsigned> A;
+        A.reserve(k);
+        for (unsigned i = 0; i < k; ++i)
+          A.push_back(i);
+        auto psi = phi_A(A) | acc_cond::acc_code::inf({k});
+        aut->set_acceptance(k + 1, psi);
+
+        // One unmarked self-loop.
+        aut->new_edge(0, 0, bddtrue);
+        // N marked self-loops for each color in {0,...,k-1}.
+        for (unsigned i = 0; i < k; ++i)
+          for (unsigned j = 0; j < n; ++j)
+            aut->new_edge(0, 0, bddtrue, {i});
+
+        aut->prop_state_acc(false);
+        aut->prop_universal(false);
+        aut->prop_complete(true);
+        aut->prop_inherently_weak(false);
+        aut->prop_stutter_invariant(true);
+        aut->prop_semi_deterministic(false);
+        return aut;
+      }
+    }
+
     twa_graph_ptr aut_pattern(aut_pattern_id pattern, int n, bdd_dict_ptr dict)
+    {
+      return aut_pattern(pattern, n, -1, dict);
+    }
+
+    twa_graph_ptr aut_pattern(aut_pattern_id pattern, int n, int m,
+                              bdd_dict_ptr dict)
     {
       if (n < 0)
         {
@@ -337,6 +410,21 @@ namespace spot
       switch (pattern)
         {
           // Keep this alphabetically-ordered!
+        case AUT_CYCLE_LOG_NBA:
+          return cycle_nba(n, false, dict);
+        case AUT_CYCLE_ONEHOT_NBA:
+          return cycle_nba(n, true, dict);
+        case AUT_CYCLIST_PROOF_DBA:
+          return cyclist_trace_or_proof(n, false, dict);
+        case AUT_CYCLIST_TRACE_NBA:
+          return cyclist_trace_or_proof(n, true, dict);
+        case AUT_EL_EMPTY:
+          {
+            if (m < 0)
+              throw std::runtime_error
+                ("el-empty requires two arguments k and N");
+            return el_empty(n, m, dict);
+          }
         case AUT_KS_NCA:
           return ks_nca(n, dict);
         case AUT_L_NBA:
@@ -345,14 +433,6 @@ namespace spot
           return l_dsa(n, dict);
         case AUT_M_NBA:
           return m_nba(n, dict);
-        case AUT_CYCLIST_TRACE_NBA:
-          return cyclist_trace_or_proof(n, true, dict);
-        case AUT_CYCLIST_PROOF_DBA:
-          return cyclist_trace_or_proof(n, false, dict);
-        case AUT_CYCLE_LOG_NBA:
-          return cycle_nba(n, false, dict);
-        case AUT_CYCLE_ONEHOT_NBA:
-          return cycle_nba(n, true, dict);
         case AUT_END:
           break;
         }
@@ -371,6 +451,7 @@ namespace spot
           "cyclist-proof-dba",
           "cycle-log-nba",
           "cycle-onehot-nba",
+          "el-empty",
         };
       // Make sure we do not forget to update the above table every
       // time a new pattern is added.
@@ -379,6 +460,50 @@ namespace spot
       if (pattern < AUT_BEGIN || pattern >= AUT_END)
         throw std::runtime_error("unsupported pattern");
       return class_name[pattern - AUT_BEGIN];
+    }
+
+    int aut_pattern_argc(aut_pattern_id pattern)
+    {
+      switch (pattern)
+        {
+          // Keep this alphabetically-ordered!
+        case AUT_CYCLE_LOG_NBA:
+        case AUT_CYCLE_ONEHOT_NBA:
+        case AUT_CYCLIST_PROOF_DBA:
+        case AUT_CYCLIST_TRACE_NBA:
+          return 1;
+        case AUT_EL_EMPTY:
+          return 2;
+        case AUT_KS_NCA:
+        case AUT_L_NBA:
+        case AUT_L_DSA:
+        case AUT_M_NBA:
+          return 1;
+        case AUT_END:
+          break;
+        }
+      throw std::runtime_error("unsupported pattern");
+    }
+
+    int aut_pattern_max(aut_pattern_id pattern)
+    {
+      switch (pattern)
+        {
+          // Keep this alphabetically-ordered!
+        case AUT_CYCLE_LOG_NBA:
+        case AUT_CYCLE_ONEHOT_NBA:
+        case AUT_CYCLIST_PROOF_DBA:
+        case AUT_CYCLIST_TRACE_NBA:
+        case AUT_EL_EMPTY:
+        case AUT_KS_NCA:
+        case AUT_L_NBA:
+        case AUT_L_DSA:
+        case AUT_M_NBA:
+          return 0;
+        case AUT_END:
+          break;
+        }
+      throw std::runtime_error("unsupported pattern");
     }
   }
 }

@@ -117,6 +117,21 @@ namespace spot
       /// propositions are used, but only one is positive (except on
       /// true self-loops).
       AUT_CYCLE_ONEHOT_NBA,
+      /// \brief One-state automaton used to benchmark emptiness checks.
+      ///
+      /// Generates \f$G_{k,N}\f$: a single-state automaton with an
+      /// empty alphabet, one unmarked self-loop, and \f$N\f$
+      /// self-loops for each color in \f$A = \{0,\ldots,k-1\}\f$.
+      /// The acceptance condition is \f$\Psi_A^k = \Phi_A \vee
+      /// \mathsf{Inf}(k)\f$, where \f$\Phi_A\f$ is defined
+      /// recursively as \f$\Phi_\emptyset = \mathsf{false}\f$ and
+      /// \f$\Phi_A = \bigvee_{i\in A}(\mathsf{Fin}(i) \wedge
+      /// (\Phi_{A\setminus\{i\}} \vee \mathsf{Inf}(i)))\f$.  Color
+      /// \f$k\f$ never appears on any edge, so the automaton is
+      /// empty.
+      ///
+      /// Requires \f$k \geq 1\f$ and \f$N \geq 1\f$.
+      AUT_EL_EMPTY,
       AUT_END
     };
 
@@ -133,11 +148,32 @@ namespace spot
     aut_pattern(aut_pattern_id pattern, int n,
                 spot::bdd_dict_ptr dict = make_bdd_dict());
 
+    /// \brief generate an automaton from a two-parameter pattern
+    ///
+    /// Like aut_pattern(pattern, n, dict) but for patterns that take
+    /// two integer arguments.  Use aut_pattern_argc() to check whether
+    /// a pattern takes one or two arguments.
+    SPOT_API twa_graph_ptr
+    aut_pattern(aut_pattern_id pattern, int n, int m,
+                spot::bdd_dict_ptr dict = make_bdd_dict());
+
     /// \brief convert an aut_pattern_it value into a name
     ///
     /// The returned name is suitable to be used as an option
     /// key for the genaut binary.
     SPOT_API const char* aut_pattern_name(aut_pattern_id pattern);
+
+    /// \brief return the number of arguments taken by a pattern
+    ///
+    /// Returns 1 for single-parameter patterns, 2 for two-parameter
+    /// patterns.
+    SPOT_API int aut_pattern_argc(aut_pattern_id pattern);
+
+    /// \brief return the maximum useful value for a pattern
+    ///
+    /// Returns 0 when the pattern has no obvious maximum (the user
+    /// should always supply an explicit range).
+    SPOT_API int aut_pattern_max(aut_pattern_id pattern);
 
     /// @}
     /// @}

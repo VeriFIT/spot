@@ -78,3 +78,37 @@ diff range1.hoa range2.hoa
 genaut --ks-nca=1..5 | autfilt -v --nth 3..5 > range1.hoa
 genaut --ks-nca=1..2 > range2.hoa
 diff range1.hoa range2.hoa
+
+# Tests for el-empty: 1 state, 1+k*N edges, k+1 acceptance sets
+# varying k=1..4 with N=1
+genaut --el-empty=1..4,1 --stats="%s,%e,%[s]a" > out
+cat > expected <<EOF
+1,2,2
+1,3,3
+1,4,4
+1,5,5
+EOF
+diff out expected
+
+# varying N=1..4 with k=2 (edges = 1+2*N, acceptance sets always 3)
+genaut --el-empty=2,1..4 --stats="%s,%e,%[s]a" > out
+cat > expected <<EOF
+1,3,3
+1,5,3
+1,7,3
+1,9,3
+EOF
+diff out expected
+
+# check that el-empty automata are complete and stutter-invariant
+genaut --el-empty=2,3 --hoa | grep 'complete'
+genaut --el-empty=2,3 --hoa | grep 'stutter-invariant'
+
+# check that el-empty automata are indeed empty (their language is empty)
+genaut --el-empty=1..3,2 | autfilt --is-empty -c | grep '^3$'
+
+# check error handling for out-of-range arguments
+genaut --el-empty=0,1 2>err && exit 1
+grep 'k must be at least 1' err
+genaut --el-empty=1,0 2>err && exit 1
+grep 'N must be at least 1' err

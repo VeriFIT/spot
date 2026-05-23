@@ -23,6 +23,7 @@
 #include <vector>
 #include <cstring>
 #include <cstdlib>
+#include <string>
 
 #include "common_setup.hh"
 #include "common_aoutput.hh"
@@ -64,6 +65,11 @@ static const argp_option options[] =
     { "cycle-onehot-nba", gen::AUT_CYCLE_ONEHOT_NBA, "RANGE", 0,
       "A cyclic NBA with N*N states and N atomic propositions, that "
       "should be simplifiable to a cyclic NBA with N states.", 0 },
+    { "el-empty", gen::AUT_EL_EMPTY, "RANGE[,RANGE]", 0,
+      "A one-state automaton G_{k,N} with empty language, used to "
+      "benchmark emptiness-checking algorithms.  The first argument is "
+      "k (number of colors), the second is N (number of edges per "
+      "color).  The acceptance condition uses k+1 colors.", 0 },
     RANGE_DOC,
   /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
@@ -74,6 +80,7 @@ struct job
 {
   gen::aut_pattern_id pattern;
   struct range range;
+  struct range range2;
 };
 
 typedef std::vector<job> jobs_t;
@@ -92,7 +99,26 @@ enqueue_job(int pattern, const char* range_str)
 {
   job j;
   j.pattern = static_cast<gen::aut_pattern_id>(pattern);
-  j.range = parse_range(range_str);
+  j.range2.min = -1;
+  j.range2.max = -1;
+  if (gen::aut_pattern_argc(j.pattern) == 2)
+    {
+      const char* comma = strchr(range_str, ',');
+      if (!comma)
+        {
+          j.range2 = j.range = parse_range(range_str);
+        }
+      else
+        {
+          std::string range1(range_str, comma);
+          j.range = parse_range(range1.c_str());
+          j.range2 = parse_range(comma + 1);
+        }
+    }
+  else
+    {
+      j.range = parse_range(range_str);
+    }
   jobs.push_back(j);
 }
 
@@ -111,11 +137,13 @@ parse_opt(int key, char* arg, struct argp_state*)
 }
 
 static void
-output_pattern(gen::aut_pattern_id pattern, int n)
+output_pattern(gen::aut_pattern_id pattern, int n, int n2)
 {
   process_timer timer;
   timer.start();
-  twa_graph_ptr aut = spot::gen::aut_pattern(pattern, n);
+  twa_graph_ptr aut = (n2 >= 0)
+    ? spot::gen::aut_pattern(pattern, n, n2)
+    : spot::gen::aut_pattern(pattern, n);
   timer.stop();
   automaton_printer printer;
   static unsigned serial = 0;
@@ -131,7 +159,15 @@ run_jobs()
       int n = j.range.min;
       for (;;)
         {
-          output_pattern(j.pattern, n);
+          int inc2 = (j.range2.max < j.range2.min) ? -1 : 1;
+          int n2 = j.range2.min;
+          for (;;)
+            {
+              output_pattern(j.pattern, n, n2);
+              if (n2 == j.range2.max)
+                break;
+              n2 += inc2;
+            }
           if (n == j.range.max)
             break;
           n += inc;
