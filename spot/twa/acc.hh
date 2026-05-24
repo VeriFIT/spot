@@ -19,7 +19,9 @@
 #pragma once
 
 #include <functional>
+#include <limits>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -438,9 +440,10 @@ namespace spot
     {
       mark_t mark; ///< A set of acceptance marks.
       struct {
-        acc_op op;             // Operator
+        acc_op op;           // Operator
         unsigned short size; // Size of the subtree (number of acc_word),
-                             // not counting this node.
+                             // not counting this word.
+                             // See also max_acc_formula_size_.
       } sub; ///< An operator node with its subtree size.
     };
 
@@ -596,6 +599,20 @@ namespace spot
         unsigned s = size();
         return s > 1
           && (*this)[s - 1].sub.op == acc_op::Fin && !((*this)[s - 2].mark);
+      }
+
+      /// \brief Maximum value storable in acc_word::sub.size.
+      ///
+      /// This must be updated if acc_word::sub.size changes type or
+      /// becomes a bit field (e.g., `unsigned int size:24` would
+      /// require changing this to `(1U << 24) - 1`).
+      static constexpr size_t max_acc_formula_size_ =
+        std::numeric_limits<decltype(acc_word{}.sub.size)>::max();
+
+      /// \brief Throw an exception when the acceptance formula is too large.
+      [[noreturn]] static void report_too_large_acceptance_formula_()
+      {
+        throw std::runtime_error("acceptance formula is too large");
       }
 
       /// \brief Construct the "false" acceptance condition.
@@ -972,9 +989,12 @@ namespace spot
         if (carry)
           (*this)[sz + (right_inf - &r[0])].mark |= carry;
 
-        acc_word w;
+        acc_word w = {};
         w.sub.op = acc_op::And;
-        w.sub.size = size();
+        auto new_size = size();
+        if (SPOT_UNLIKELY(new_size > max_acc_formula_size_))
+          report_too_large_acceptance_formula_();
+        w.sub.size = new_size;
         emplace_back(w);
         return *this;
       }
@@ -1077,9 +1097,12 @@ namespace spot
         insert(end(), &r[0], right_end + 1);
         if (carry)
           (*this)[sz + (right_fin - &r[0])].mark |= carry;
-        acc_word w;
+        acc_word w = {};
         w.sub.op = acc_op::Or;
-        w.sub.size = size();
+        auto new_size = size();
+        if (SPOT_UNLIKELY(new_size > max_acc_formula_size_))
+          report_too_large_acceptance_formula_();
+        w.sub.size = new_size;
         emplace_back(w);
         return *this;
       }
