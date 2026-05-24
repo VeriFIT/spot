@@ -426,7 +426,7 @@ namespace spot
     };
 
     /// \brief Operators for acceptance formulas.
-    enum class acc_op : unsigned short
+    enum class acc_op : unsigned
     { Inf, Fin, InfNeg, FinNeg, And, Or };
 
     /// \brief A "node" in an acceptance formulas.
@@ -440,10 +440,10 @@ namespace spot
     {
       mark_t mark; ///< A set of acceptance marks.
       struct {
-        acc_op op;           // Operator
-        unsigned short size; // Size of the subtree (number of acc_word),
-                             // not counting this word.
-                             // See also max_acc_formula_size_.
+        acc_op op:8;    // Operator (6 possible values, stored in 8 bits)
+        unsigned size:24; // Size of the subtree (number of acc_word),
+                          // not counting this word.
+                          // See also max_acc_formula_size_.
       } sub; ///< An operator node with its subtree size.
     };
 
@@ -603,11 +603,9 @@ namespace spot
 
       /// \brief Maximum value storable in acc_word::sub.size.
       ///
-      /// This must be updated if acc_word::sub.size changes type or
-      /// becomes a bit field (e.g., `unsigned int size:24` would
-      /// require changing this to `(1U << 24) - 1`).
-      static constexpr size_t max_acc_formula_size_ =
-        std::numeric_limits<decltype(acc_word{}.sub.size)>::max();
+      /// This must be updated if acc_word::sub.size changes its bit width.
+      /// The current layout uses a 24-bit field, so the maximum is 2^24 - 1.
+      static constexpr size_t max_acc_formula_size_ = (1U << 24) - 1;
 
       /// \brief Throw an exception when the acceptance formula is too large.
       [[noreturn]] static void report_too_large_acceptance_formula_()

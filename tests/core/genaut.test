@@ -105,7 +105,7 @@ genaut --el-empty=2,3 --hoa | grep 'complete'
 genaut --el-empty=2,3 --hoa | grep 'stutter-invariant'
 
 # check that el-empty automata are indeed empty (their language is empty)
-genaut --el-empty=1..6,2 | autfilt --is-empty -c | grep '^6$'
+genaut --el-empty=1..9,2 | autfilt --is-empty -c | grep '^9$'
 
 # check error handling for out-of-range arguments
 genaut --el-empty=0,1 2>err && exit 1
@@ -114,5 +114,5 @@ genaut --el-empty=1,0 2>err && exit 1
 grep 'N must be at least 1' err
 
 # check that large k raises an error (acceptance formula overflows)
-genaut --el-empty=7 2>err && exit 1
+genaut --el-empty=10 2>err && exit 1
 grep 'acceptance formula is too large' err
