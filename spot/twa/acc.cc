@@ -24,7 +24,6 @@
 #include <cctype>
 #include <cstring>
 #include <map>
-#include <numeric>
 #include <spot/twa/acc.hh>
 #include "spot/priv/bddalloc.hh"
 #include <spot/misc/minato.hh>
@@ -2968,13 +2967,12 @@ namespace spot
           propagated.push_back(acc_code(pos).unit_propagation());
           pos -= pos->sub.size + 1;
         }
-        result = std::accumulate(propagated.rbegin(), propagated.rend(), res,
-        [&](acc_cond::acc_code c1, acc_cond::acc_code c2)
-        {
+        for (auto it = propagated.rbegin(); it != propagated.rend(); ++it)
           if (is_and)
-            return c1 & c2;
-          return c1 | c2;
-        });
+            res &= *it;
+          else
+            res |= *it;
+        result = std::move(res);
       }
     }
     return result;
