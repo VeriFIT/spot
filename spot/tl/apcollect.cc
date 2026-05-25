@@ -520,7 +520,7 @@ namespace spot
                 bool neg = pol & 0b01;
                 formula ap = formula::ap_from_apid(apid);
                 bool is_input =
-                  (data_->ins_or_outs.find(ap) != data_->ins_or_outs.end())
+                  (data_->ins_or_outs.contains(ap))
                   == data_->is_inputs;
                 formula to = (is_input == neg)
                   ? spot::formula::tt() : spot::formula::ff();

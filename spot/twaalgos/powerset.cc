@@ -410,7 +410,7 @@ namespace spot
           {
             trans* t = &a->edge_data(i->succ);
             loop_a->new_edge(n - 1, n % loop_size, t->cond);
-            if (reject_.find(t) == reject_.end())
+            if (!reject_.contains(t))
               ts.insert(t);
           }
         assert(i == dfs_.end());

@@ -892,7 +892,7 @@ namespace spot
           label = "var" + std::to_string(var);
 
         bool outputnode = (!controllable.empty()
-                           && controllable.find(var) != controllable.end());
+                           && controllable.contains(var));
         const char* shape = outputnode ? "diamond" : "circle";
 
         os << "    B" << n.id() << " [shape=" << shape
@@ -1447,7 +1447,7 @@ namespace spot
             break;
           std::vector<formula> vec;
           for (const formula& sub: f)
-            if (removable.find(sub) == removable.end())
+            if (!removable.contains(sub))
               vec.push_back(sub);
           if (vec.size() == f.size())
             break;
@@ -1480,7 +1480,7 @@ namespace spot
             break;
           std::vector<formula> vec;
           for (const formula& sub: f)
-            if (removable.find(sub) == removable.end())
+            if (!removable.contains(sub))
               vec.push_back(sub);
           if (vec.size() == f.size())
             break;

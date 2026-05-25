@@ -31,13 +31,13 @@ namespace spot
       {
         if (bdd_high(one) == bddfalse)
           {
-            assert(binder.find(bdd_var(one)) != binder.end());
+            assert(binder.contains(bdd_var(one)));
             cubeset.set_false_var(cube, binder[bdd_var(one)]);
             one = bdd_low(one);
           }
         else
           {
-            assert(binder.find(bdd_var(one)) != binder.end());
+            assert(binder.contains(bdd_var(one)));
             cubeset.set_true_var(cube, binder[bdd_var(one)]);
             one = bdd_high(one);
           }
@@ -51,7 +51,7 @@ namespace spot
     bdd result = bddtrue;
     for (unsigned int i = 0; i < cubeset.size(); ++i)
       {
-        assert(reverse_binder.find(i) != reverse_binder.end());
+        assert(reverse_binder.contains(i));
         if (cubeset.is_false_var(cube, i))
           result &= bdd_nithvar(reverse_binder[i]);
         if (cubeset.is_true_var(cube, i))

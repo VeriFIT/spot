@@ -277,7 +277,7 @@ namespace spot
                       hash_set* set = bsi->second;
                       // Free the number associated to these states.
                       unsigned num = state_set_map[*set->begin()];
-                      assert(used_var.find(num) != used_var.end());
+                      assert(used_var.contains(num));
                       unsigned left = (used_var[num] -= set->size());
                       // Make sure LEFT does not become negative (hence bigger
                       // than SIZE when read as unsigned)

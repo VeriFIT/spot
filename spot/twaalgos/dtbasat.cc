@@ -600,7 +600,7 @@ namespace spot
               {
                 bool accept = false;
                 if (state_based)
-                  accept = acc_states.find(i) != acc_states.end();
+                  accept = acc_states.contains(i);
                 if (!accept)
                   accept = solution[satdict.transacc(i, j, k) - 1];
 

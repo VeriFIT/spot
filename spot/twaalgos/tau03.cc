@@ -349,7 +349,7 @@ namespace spot
 
       void add_new_state(const state* s, color c)
         {
-          assert(h.find(s) == h.end());
+          assert(!h.contains(s));
           h.emplace(std::piecewise_construct,
                     std::forward_as_tuple(s),
                     std::forward_as_tuple(c, acc_cond::mark_t({})));
@@ -361,7 +361,7 @@ namespace spot
 
       bool has_been_visited(const state* s) const
         {
-          return h.find(s) != h.end();
+          return h.contains(s);
         }
 
       enum { Has_Size = 1 };

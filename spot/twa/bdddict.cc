@@ -133,7 +133,7 @@ namespace spot
       return -1;
     int num = ssi->second;
     auto& r = bdd_map[num].refs;
-    if (r.find(me) == r.end())
+    if (!r.contains(me))
       return -1;
     return num;
   }
@@ -199,7 +199,7 @@ namespace spot
     for (auto& i: bdd_map)
       {
         ref_set& s = i.refs;
-        if (s.find(from_other) != s.end())
+        if (s.contains(from_other))
           s.insert(for_me);
       }
 
@@ -214,7 +214,7 @@ namespace spot
         if (i.type != var)
           continue;
         ref_set& s = i.refs;
-        if (s.find(from_other) != s.end())
+        if (s.contains(from_other))
           s.insert(for_me);
       }
   }

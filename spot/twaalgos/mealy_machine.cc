@@ -511,7 +511,7 @@ namespace
       }
 
       assert((bdd_lstate_.size() == used_var_.size())
-          || (bdd_lstate_.find(bddfalse) != bdd_lstate_.end()
+          || (bdd_lstate_.contains(bddfalse)
             && bdd_lstate_.size() == used_var_.size() + 1));
 
       // This vector links the tuple "C^(i-1), N^(i-1)" to the

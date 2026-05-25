@@ -538,7 +538,7 @@ namespace spot
 
       void add_new_state(const state* s, color c)
         {
-          assert(hc.find(s) == hc.end() && h.find(s) == h.end());
+          assert(!hc.contains(s) && !h.contains(s));
           if (c == CYAN)
             hc.insert(s);
           else

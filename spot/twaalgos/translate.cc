@@ -562,7 +562,7 @@ namespace spot
         atomic_prop_collect(to_work_on, &apset);
         alive_ap = "alive";
 
-        while (apset.find(formula::ap(alive_ap)) != apset.end())
+        while (apset.contains(formula::ap(alive_ap)))
           alive_ap.push_back('$');
 
         to_work_on = from_ltlf(to_work_on, alive_ap.c_str());

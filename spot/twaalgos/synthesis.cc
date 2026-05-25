@@ -65,7 +65,7 @@ namespace{
       for (const auto& e : aut->edges())
         {
           // Check if stored
-          if (cond_hash_.find(e.cond) != cond_hash_.end())
+          if (cond_hash_.contains(e.cond))
             continue;
 
           cond_hash_[e.cond] =

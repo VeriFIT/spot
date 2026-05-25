@@ -793,7 +793,7 @@ namespace spot
       auto& m = get_dict()->bdd_map;
       unsigned s = m.size();
       for (unsigned n = 0; n < s; ++n)
-        if (m[n].refs.find(this) != m[n].refs.end())
+        if (m[n].refs.contains(this))
           {
             aps_.emplace_back(m[n].f);
             bddaps_ &= bdd_ithvar(n);

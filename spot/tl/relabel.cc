@@ -539,14 +539,13 @@ namespace spot
 
         // This is Boolean cut-point?
         // We can only relabel it if all its children are cut-points.
-        if (c.find(f) != c.end())
+        if (c.contains(f))
           {
             unsigned fsz = f.size();
             assert(fsz > 0);    // A cut point has children
             if (fsz == 1
                 || (fsz == 2
-                    && ((c.find(f[0]) != c.end())
-                        == (c.find(f[1]) != c.end()))))
+                    && ((c.contains(f[0])) == (c.contains(f[1])))))
               return rename(f);
             if (fsz > 2)
               {
@@ -558,7 +557,7 @@ namespace spot
                 for (unsigned i = 0; i < fsz; ++i)
                   {
                     formula cf = f[i];
-                    cp[c.find(cf) != c.end()].push_back(cf);
+                    cp[c.contains(cf)].push_back(cf);
                   }
                 if (cp[0].empty()
                     || cp[1].empty())

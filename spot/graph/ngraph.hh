@@ -131,7 +131,7 @@ namespace spot
     /// Return true iff a state with the given name exists.
     bool has_state(name n) const
     {
-      return name_to_state.find(n) != name_to_state.end();
+      return name_to_state.contains(n);
     }
 
     /// Return all state names.

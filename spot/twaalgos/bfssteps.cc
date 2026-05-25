@@ -96,7 +96,7 @@ namespace spot
 
             // Common case: record backlinks and continue BFS
             // for unvisited states.
-            if (father.find(dest) == father.end())
+            if (!father.contains(dest))
               {
                 todo.emplace_back(dest);
                 father[dest] = s;

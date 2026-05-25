@@ -844,7 +844,7 @@ namespace spot
       {
         if (!si.is_useful_scc(si.scc_of(s)))
           continue;
-        if (pairs.find((*prod_pairs)[s]) == pairs.end())
+        if (!pairs.contains((*prod_pairs)[s]))
           continue;
         for (auto& e: prod->out(s))
           if (si.is_useful_scc(si.scc_of(e.dst)))
@@ -911,7 +911,7 @@ namespace spot
       {
         if (!si.is_useful_scc(si.scc_of(s)))
           continue;
-        if (pairs.find((*prod_pairs)[s]) == pairs.end())
+        if (!pairs.contains((*prod_pairs)[s]))
           continue;
         for (auto& e: prod->out(s))
           if (si.is_useful_scc(si.scc_of(e.dst)))

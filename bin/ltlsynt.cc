@@ -628,7 +628,7 @@ namespace
             for (const std::string& apstr: output_aps)
               {
                 spot::formula ap = spot::formula::ap(apstr);
-                if (removed_outputs.find(ap) == removed_outputs.end())
+                if (!removed_outputs.contains(ap))
                   sub_outs[0].insert(ap);
               }
           }

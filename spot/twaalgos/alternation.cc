@@ -315,7 +315,7 @@ namespace spot
         auto i =
           std::remove_if(ss.begin(), ss.end(),
                          [&] (unsigned s) {
-                           return to_remove.find(s) != to_remove.end();
+                           return to_remove.contains(s);
                          });
         ss.erase(i, ss.end());
         std::sort(ss.begin(), ss.end());

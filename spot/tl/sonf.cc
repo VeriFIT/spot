@@ -94,7 +94,7 @@ namespace spot
       [&used_aps, &added_aps, &prefix, &count]() noexcept -> std::string
     {
       std::string new_name = prefix + std::to_string(count++);
-      while (used_aps.find(new_name) != used_aps.end())
+      while (used_aps.contains(new_name))
         new_name = prefix + std::to_string(count++);
       used_aps.insert(new_name);
       added_aps.push_back(new_name);

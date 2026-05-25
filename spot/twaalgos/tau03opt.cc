@@ -519,7 +519,7 @@ namespace spot
 
       void add_new_state(const state* s, color c, const weight& w)
         {
-          assert(hc.find(s) == hc.end() && h.find(s) == h.end());
+          assert(!hc.contains(s) && !h.contains(s));
           assert(c == CYAN);
           (void)c;
           hc.emplace(std::piecewise_construct,

@@ -170,7 +170,7 @@ namespace spot
           // Keep only the non-marked NegClosure for which we
           // have not seen a similar NegClosureMarked.
           for (auto n: nlist)
-            if (nmset.find(n[0]) == nmset.end())
+            if (!nmset.contains(n[0]))
               v.emplace_back(n);
           res = formula::And(v);
         }

@@ -1566,7 +1566,7 @@ namespace spot
                   // without showing Fp instead of r(GFp) =
                   // r(Fp)X(GFp).  See the comment for the translation
                   // of G.
-                  if (implied.find(sub) != implied.end())
+                  if (implied.contains(sub))
                     continue;
                   // Propagate the recurring_ flag so that
                   // G(Fa & Fb) get optimized.  See the comment in
@@ -1798,7 +1798,7 @@ namespace spot
           t.symbolic &= all_promises_;
 
         // Register the reverse mapping if it is not already done.
-        if (b2f_.find(t.symbolic) == b2f_.end())
+        if (!b2f_.contains(t.symbolic))
           b2f_[t.symbolic] = f;
 
         return f2b_.emplace(f, t).first->second;

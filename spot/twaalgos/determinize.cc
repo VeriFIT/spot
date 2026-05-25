@@ -380,14 +380,14 @@ namespace spot
                   ss = stutter_path_.back().compute_succ(cs_, ap, color_);
                   mincolor = std::min(color_, mincolor);
                 }
-              bool in_seen = cs_.seen.find(*cycle_seed) != cs_.seen.end();
+              bool in_seen = cs_.seen.contains(*cycle_seed);
               for (auto it = cycle_seed + 1; it < stutter_path_.end(); ++it)
                 {
                   if (in_seen)
                     {
                       // if *cycle_seed is already in seen, replace
                       // it with a smaller state also in seen.
-                      if (cs_.seen.find(*it) != cs_.seen.end()
+                      if (cs_.seen.contains(*it)
                           && *it < *cycle_seed)
                         cycle_seed = it;
                     }
@@ -396,7 +396,7 @@ namespace spot
                       // if *cycle_seed is not in seen, replace it
                       // either with a state in seen or with a smaller
                       // state
-                      if (cs_.seen.find(*it) != cs_.seen.end())
+                      if (cs_.seen.contains(*it))
                         {
                           cycle_seed = it;
                           in_seen = true;

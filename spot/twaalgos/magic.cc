@@ -487,7 +487,7 @@ namespace spot
 
       void add_new_state(const state* s, color c)
         {
-          assert(h.find(s) == h.end());
+          assert(!h.contains(s));
           h.emplace(s, c);
         }
 

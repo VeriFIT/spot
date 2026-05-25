@@ -54,7 +54,7 @@ namespace spot
     const state* t;
     while ((t = next_state()))
       {
-        assert(seen.find(t) != seen.end());
+        assert(seen.contains(t));
         int tn = seen[t];
         twa_succ_iterator* si = aut_->succ_iter(t);
         process_state(t, tn, si);
@@ -292,7 +292,7 @@ namespace spot
   bool
   twa_reachable_iterator_depth_first_stack::on_stack(int sn) const
   {
-    return stack_.find(sn) != stack_.end();
+    return stack_.contains(sn);
   }
 
 

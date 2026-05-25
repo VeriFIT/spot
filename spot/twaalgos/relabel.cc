@@ -294,7 +294,7 @@ namespace spot
     // (E.g., if we relabel a&p0 into p0&p1 we should not unregister
     // p0)
     for (auto v: vars)
-      if (newvars.find(v) == newvars.end())
+      if (!newvars.contains(v))
         aut.unregister_ap(v);
 
     // If some of the edges were relabeled false, we need to clean the

@@ -124,7 +124,7 @@ namespace spot
           for (auto e: unknown)
             srcs.insert(aut->edge_storage(e).src);
           for (auto e: unknown)
-            if (srcs.find(aut->edge_storage(e).dst) == srcs.end())
+            if (!srcs.contains(aut->edge_storage(e).dst))
               remove.push_back(e);
           for (auto r: remove)
             unknown.erase(r);
