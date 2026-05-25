@@ -217,9 +217,8 @@ namespace spot
       /// Return iterator to first successor.
       successor_iterator begin() const
       {
-        unsigned first_edge = (state < graph->states_.size()) ?
-          graph->states_[state].first_edge : 0;
-        return successor_iterator(graph, first_edge);
+        SPOT_ASSERT(state < graph->states_.size());
+        return successor_iterator(graph, graph->states_[state].first_edge);
       }
 
       /// Return past-the-end sentinel.
