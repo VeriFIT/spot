@@ -50,19 +50,12 @@ namespace spot
 
   std::ostream& operator<<(std::ostream& os, acc_cond::mark_t m)
   {
-    auto a = m;
     os << '{';
-    unsigned level = 0;
     const char* comma = "";
-    while (a)
+    for (unsigned s : m.sets())
       {
-        if (a.has(0))
-          {
-            os << comma << level;
-            comma = ",";
-          }
-        a >>= 1;
-        ++level;
+        os << comma << s;
+        comma = ",";
       }
     os << '}';
     return os;
@@ -165,7 +158,6 @@ namespace spot
                 if (!top)
                   // Avoid extra parentheses if there is only one set
                   top = code[pos - 1].mark.is_singleton();
-                unsigned level = 0;
                 const char* and_ = "";
                 const char* and_next_ = []() {
                   // The lack of surrounding space in HTML and
@@ -185,17 +177,12 @@ namespace spot
                 if (!top)
                   os << '(';
                 const char* inf_ = (style == LATEX) ? "\\mathsf{Inf}(" : "Inf(";
-                while (a)
+                for (unsigned s : a.sets())
                   {
-                    if (a.has(0))
-                      {
-                        os << and_ << inf_ << negated_pre;
-                        set_printer(os, level);
-                        os << negated_post << ')';
-                        and_ = and_next_;
-                      }
-                    a >>= 1;
-                    ++level;
+                    os << and_ << inf_ << negated_pre;
+                    set_printer(os, s);
+                    os << negated_post << ')';
+                    and_ = and_next_;
                   }
                 if (!top)
                   os << ')';
@@ -220,26 +207,20 @@ namespace spot
                 if (!top)
                   // Avoid extra parentheses if there is only one set
                   top = code[pos - 1].mark.is_singleton();
-                unsigned level = 0;
                 const char* or_ = "";
                 if (!top)
                   os << '(';
                 const char* fin_ = (style == LATEX) ? "\\mathsf{Fin}(" : "Fin(";
-                while (a)
+                for (unsigned s : a.sets())
                   {
-                    if (a.has(0))
-                      {
-                        os << or_ << fin_ << negated_pre;
-                        set_printer(os, level);
-                        os << negated_post << ')';
-                        // The lack of surrounding space in HTML and
-                        // TEXT is on purpose: we want to distinguish
-                        // those grouped "Fin"s from other terms that
-                        // are ORed together.
-                        or_ = style == LATEX ? " \\lor " : "|";
-                      }
-                    a >>= 1;
-                    ++level;
+                    os << or_ << fin_ << negated_pre;
+                    set_printer(os, s);
+                    os << negated_post << ')';
+                    // The lack of surrounding space in HTML and
+                    // TEXT is on purpose: we want to distinguish
+                    // those grouped "Fin"s from other terms that
+                    // are ORed together.
+                    or_ = style == LATEX ? " \\lor " : "|";
                   }
                 if (!top)
                   os << ')';

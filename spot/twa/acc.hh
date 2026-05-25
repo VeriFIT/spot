@@ -405,18 +405,7 @@ namespace spot
 
       /// \brief Fill a container with the indices of the bits that are set.
       template<class iterator>
-      void fill(iterator here) const
-      {
-        auto a = *this;
-        unsigned level = 0;
-        while (a)
-          {
-            if (a.has(0))
-              *here++ = level;
-            ++level;
-            a >>= 1;
-          }
-      }
+      void fill(iterator here) const;
 
       /// Returns some iterable object that contains the used sets.
       spot::internal::mark_container sets() const;
@@ -2538,6 +2527,13 @@ namespace spot
   inline spot::internal::mark_container acc_cond::mark_t::sets() const
   {
     return {*this};
+  }
+
+  template<class iterator>
+  void acc_cond::mark_t::fill(iterator here) const
+  {
+    for (unsigned s : sets())
+      *here++ = s;
   }
 }
 
