@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <cctype>
 #include <cstring>
@@ -1309,15 +1310,21 @@ namespace spot
             {
               auto expect = pos->sub.op == acc_cond::acc_op::Or ?
                 acc_cond::acc_op::Inf : acc_cond::acc_op::Fin;
+              // all_colors is computed lazily: only on the first
+              // matching sibling, then reused for subsequent ones.
+              std::optional<acc_cond::mark_t> all_colors;
               for (auto p = pos - 1, pe = pos - pos->sub.size;
                    p >= pe; p -= p->sub.size + 1)
                 if (p->sub.op == expect)
                   {
-                    acc_cond::mark_t rem{};
-                    for (auto q = pos - 1; q >= pe; q -= q->sub.size + 1)
-                      if (p != q)
-                        rem |= gather_used_colors(q);
-                    rem &= used_once;
+                    if (!all_colors)
+                      {
+                        all_colors.emplace();
+                        for (auto q = pos - 1; q >= pe; q -= q->sub.size + 1)
+                          *all_colors |= gather_used_colors(q);
+                      }
+                    auto rem =
+                      (*all_colors - gather_used_colors(p)) & used_once;
                     if (rem)
                       patterns.emplace_back(p[-1].mark, rem);
                   }
