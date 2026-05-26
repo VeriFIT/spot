@@ -47,7 +47,7 @@ since the generated files they produce are distributed.)
   GraphViz
   Java >= 1.7 (needed to run PlantUML while generating the doc)
   wget or curl (needed to download PlantUML)
-  pdf2svg
+  pdf2svg (alternatively, pdftocairo from the poppler-utils package)
 
 The following additional tools are used if they are present, or
 only for certain operations (like releases):

@@ -161,25 +161,28 @@ PICTURES_EXTRA = \
 $(srcdir)/org/satmin.svg: org/satmin.tex
 	cd $(srcdir)/org && \
 	pdflatex satmin.tex && \
-	pdf2svg satmin.pdf satmin.svg && \
+	(pdf2svg satmin.pdf satmin.svg \
+	 || pdftocairo -svg satmin.pdf satmin.svg) && \
 	rm -f satmin.pdf satmin.aux satmin.log
 
 $(srcdir)/org/arch.svg: org/arch.tex
 	cd $(srcdir)/org && \
 	pdflatex arch.tex && \
-	pdf2svg arch.pdf arch.svg && \
+	(pdf2svg arch.pdf arch.svg || pdftocairo -svg arch.pdf arch.svg) && \
 	rm -f arch.pdf arch.aux arch.log
 
 $(srcdir)/org/hierarchy.svg: org/hierarchy.tex
 	cd $(srcdir)/org && \
 	pdflatex hierarchy.tex && \
-	pdf2svg hierarchy.pdf hierarchy.svg && \
+	(pdf2svg hierarchy.pdf hierarchy.svg \
+	 || pdftocairo -svg hierarchy.pdf hierarchy.svg) && \
 	rm -f hierarchy.pdf hierarchy.aux hierarchy.log
 
 $(srcdir)/org/ltlsynt.svg: org/ltlsynt.tex
 	cd $(srcdir)/org && \
 	pdflatex ltlsynt.tex && \
-	pdf2svg ltlsynt.pdf ltlsynt.svg && \
+	(pdf2svg ltlsynt.pdf ltlsynt.svg \
+	 || pdftocairo -svg ltlsynt.pdf ltlsynt.svg) && \
 	rm -f ltlsynt.pdf ltlsynt.aux ltlsynt.log
 
 $(srcdir)/org-stamp: $(ORG_FILES) $(configure_ac)

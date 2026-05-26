@@ -657,7 +657,7 @@ following figure:
   sed -e 's/{article}/{standalone}/' -e '/^\\enlarge/d' dot2tex.tex >dot2tex.tmp
   mv dot2tex.tmp dot2tex.tex
   latexmk --pdf dot2tex.tex
-  pdf2svg dot2tex.pdf dot2tex.svg
+  pdf2svg dot2tex.pdf dot2tex.svg || pdftocairo -svg dot2tex.pdf dot2tex.svg
   latexmk -C dot2tex.tex
   rm -f dot2tex.tex
 #+END_SRC
@@ -674,7 +674,7 @@ ltl2tgba -G -D '!a & FGa' --dot=sbarx | dot2tex --autosize --nominsize > out.tex
   sed -e 's/{article}/{standalone}/' -e '/^\\enlarge/d' dot2tex2.tex >dot2tex2.tmp
   mv dot2tex2.tmp dot2tex2.tex
   latexmk --pdf dot2tex2.tex
-  pdf2svg dot2tex2.pdf dot2tex2.svg
+  pdf2svg dot2tex2.pdf dot2tex2.svg || pdftocairo -svg dot2tex2.pdf dot2tex2.svg
   latexmk -C dot2tex2.tex
   rm -f dot2tex2.tex
 #+END_SRC
