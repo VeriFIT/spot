@@ -481,6 +481,7 @@ TESTS_python = \
   python/semidet.py \
   python/setacc.py \
   python/setxor.py \
+  python/simimpl.py \
   python/simplacc.py \
   python/simstate.py \
   python/sonf.py \
