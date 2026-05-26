@@ -626,6 +626,7 @@ namespace spot
       void setup_props(op o);
       void destroy_aux() const;
 
+#ifndef SWIG
       [[noreturn]] static void report_non_existing_child();
       [[noreturn]] static void report_too_many_children();
       [[noreturn]] static void
@@ -633,6 +634,7 @@ namespace spot
       [[noreturn]] static void report_min_invalid_arg();
       [[noreturn]] static void report_max_invalid_arg();
       [[noreturn]] static void report_apid_on_nonap();
+#endif
 
       static const fnode* unique(fnode*);
       static const fnode* multop_sorted(op o, std::vector<const fnode*>&& l);

@@ -590,18 +590,22 @@ namespace spot
           && (*this)[s - 1].sub.op == acc_op::Fin && !((*this)[s - 2].mark);
       }
 
+    private:
       /// \brief Maximum value storable in acc_word::sub.size.
       ///
       /// This must be updated if acc_word::sub.size changes its bit width.
       /// The current layout uses a 24-bit field, so the maximum is 2^24 - 1.
       static constexpr size_t max_acc_formula_size_ = (1U << 24) - 1;
 
+#ifndef SWIG
       /// \brief Throw an exception when the acceptance formula is too large.
       [[noreturn]] static void report_too_large_acceptance_formula_()
       {
         throw std::runtime_error("acceptance formula is too large");
       }
+#endif
 
+    public:
       /// \brief Construct the "false" acceptance condition.
       ///
       /// This corresponds to "f" in the HOA format.  Under this
