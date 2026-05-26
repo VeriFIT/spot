@@ -92,6 +92,7 @@ ORG_FILES = \
   org/spot.css \
   org/arch.tex \
   org/autcross.org \
+  org/autdo.org \
   org/autfilt.org \
   org/csv.org \
   org/citing.org \

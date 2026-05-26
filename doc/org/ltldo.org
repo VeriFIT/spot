@@ -674,7 +674,7 @@ option.  The argument is the maximum number of seconds that each
 command is allowed to run.
 
 When a timeout occurs a warning is printed on stderr, and no automaton
-(or statistic) is output by =ltdo= for this specific pair of
+(or statistic) is output by =ltldo= for this specific pair of
 command/formula.  The processing then continue with other formulas and
 tools.  Timeouts are not considered as errors, so they have no effect
 on the exit status of =ltldo=.  This behavior can be changed with

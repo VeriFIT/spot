@@ -1,0 +1,195 @@
+# -*- coding: utf-8 -*-
+#+TITLE: =autdo=
+#+DESCRIPTION: Spot command-line tool for running automata through other tools.
+#+INCLUDE: setup.org
+#+HTML_LINK_UP: tools.html
+#+PROPERTY: header-args:sh :results verbatim :exports both
+
+=autdo= runs ω-automata through one or more external tools, providing
+Spot's standard automaton input and output interface.  It is the
+automaton counterpart of [[file:ltldo.org][=ltldo=]].
+
+* Example
+
+The following command runs =autfilt= and =autfilt --complement= on a set of automata
+and outputs the results in HOA format as one-liners (=-Hl=).
+
+#+BEGIN_SRC sh
+ltl2tgba 'Ga' 'Fb' | autdo -Hl 'autfilt %H>%O' 'autfilt --complement %H>%O'
+#+END_SRC
+
+#+RESULTS:
+: HOA: v1 name: "Ga" States: 1 Start: 0 AP: 1 "a" acc-name: all Acceptance: 0 t properties: trans-labels explicit-labels state-acc deterministic stutter-invariant very-weak --BODY-- State: 0 [0] 0 --END--
+: HOA: v1 States: 2 Start: 0 AP: 1 "a" acc-name: co-Buchi Acceptance: 1 Fin(0) properties: trans-labels explicit-labels state-acc complete deterministic stutter-invariant very-weak --BODY-- State: 0 {0} [0] 0 [!0] 1 State: 1 [t] 1 --END--
+: HOA: v1 name: "Fb" States: 2 Start: 1 AP: 1 "b" acc-name: Buchi Acceptance: 1 Inf(0) properties: trans-labels explicit-labels state-acc complete deterministic stutter-invariant terminal very-weak --BODY-- State: 0 {0} [t] 0 State: 1 [0] 0 [!0] 1 --END--
+: HOA: v1 States: 2 Start: 1 AP: 1 "b" acc-name: co-Buchi Acceptance: 1 Fin(0) properties: trans-labels explicit-labels state-acc complete deterministic stutter-invariant very-weak --BODY-- State: 0 {0} [t] 0 State: 1 [0] 0 [!0] 1 --END--
+
+The result is one line per input and per tool, so four lines total.
+
+The above command specifies the =%H= (filename for the input automaton in HOA format)
+and =%O= (filename for the output automaton in any supported format) explicitly, however
+since =autdo= knows about =autfilt=, the =%H>%O= part will be automatically added
+if omitted.
+
+#+BEGIN_SRC sh
+ltl2tgba 'Ga' 'Fb' | autdo -Hl 'autfilt' 'autfilt --complement'
+#+END_SRC
+
+#+RESULTS:
+: HOA: v1 name: "Ga" States: 1 Start: 0 AP: 1 "a" acc-name: all Acceptance: 0 t properties: trans-labels explicit-labels state-acc deterministic stutter-invariant very-weak --BODY-- State: 0 [0] 0 --END--
+: HOA: v1 States: 2 Start: 0 AP: 1 "a" acc-name: co-Buchi Acceptance: 1 Fin(0) properties: trans-labels explicit-labels state-acc complete deterministic stutter-invariant very-weak --BODY-- State: 0 {0} [0] 0 [!0] 1 State: 1 [t] 1 --END--
+: HOA: v1 name: "Fb" States: 2 Start: 1 AP: 1 "b" acc-name: Buchi Acceptance: 1 Inf(0) properties: trans-labels explicit-labels state-acc complete deterministic stutter-invariant terminal very-weak --BODY-- State: 0 {0} [t] 0 State: 1 [0] 0 [!0] 1 --END--
+: HOA: v1 States: 2 Start: 1 AP: 1 "b" acc-name: co-Buchi Acceptance: 1 Fin(0) properties: trans-labels explicit-labels state-acc complete deterministic stutter-invariant very-weak --BODY-- State: 0 {0} [t] 0 State: 1 [0] 0 [!0] 1 --END--
+
+* Syntax for specifying tools to call
+
+The syntax for specifying how a tool should be called is the same as
+in [[file:autcross.org::#toolspec][=autcross=]].  Namely, the following sequences are available.
+
+#+BEGIN_SRC sh :exports results
+autdo --help | sed -n '/character sequences:/,/^$/p' | sed '1d;$d'
+#+END_SRC
+
+#+RESULTS:
+:   %%                         a single %
+:   %H,%S,%L                   filename for the input automaton in (H) HOA, (S)
+:                              Spin's neverclaim, or (L) LBTT's format
+:   %M, %[val]M                the name of the input automaton, with an optional
+:                              default value
+:   %O                         filename for the automaton output in HOA, never
+:                              claim, LBTT, or ltl2dstar's format
+
+Contrarily to =autcross=, it is not mandatory to specify an output
+filename using one of the sequence for that last line.  For instance,
+we could simply run an automaton through =cat= to compare different
+output syntaxes:
+
+#+BEGIN_SRC sh
+ltl2tgba 'Ga' | autdo 'cat %H %S %L'
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+HOA: v1
+name: "Ga"
+States: 1
+Start: 0
+AP: 1 "a"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic
+properties: stutter-invariant very-weak
+--BODY--
+State: 0
+[0] 0
+--END--
+never { /* Ga */
+accept_init:
+  if
+  :: (a) -> goto accept_init
+  fi;
+}
+
+1 0
+0 1 -1
+0 "a"
+-1
+
+#+end_example
+
+To simplify the use of some known tools, a set of predefined
+shorthands are available.  Those can be listed with the
+=--list-shorthands= option.
+
+#+BEGIN_SRC sh
+autdo --list-shorthands
+#+END_SRC
+#+RESULTS:
+#+begin_example
+If a COMMANDFMT does not use any %-sequence, and starts with one of
+the following regexes, then the string on the right is appended.
+
+  autfilt                                  %H>%O
+  dra2dpa                                  <%H>%O
+  dstar2tgba                               %H>%O
+  ltl2dstar                                -B %H %O
+  nba2l?dpa                                <%H>%O
+  seminator                                %H>%O
+  owl.* (ngba2ldba|nba(2dpa|2det|sim)|aut2parity|gfg-minimization)\b <%H>%O
+
+Any {name} and directory component is skipped for the purpose of
+matching those prefixes.  So for instance
+  '{AF} ~/mytools/autfilt-2.4 --remove-fin'
+will be changed into
+  '{AF} ~/mytools/autfilt-2.4 --remove-fin %H>%O'
+#+end_example
+
+
+* Computing statistics, and running as a portfolio
+
+=autdo= implements [[file:oaut.org][the common output options]] of other tools producing
+automata.  This include the =--stats= option for printing statistics
+instead of automata.
+
+Here is an example where we compare the output of =autfilt -G -D=
+(determinization to any acceptance condition) and =ltl2dstar=
+(determinisation to Rabin acceptance).
+
+#+BEGIN_SRC sh
+  ltl2tgba -B 'FGa | FGb' '(Ga -> Fb) & FGc' 'G(a -> Fb) & FGc' | \
+    autdo 'autfilt -G -D' 'ltl2dstar' \
+          --stats='%M: %T: %s states, %t trans, %a colors'
+#+END_SRC
+
+#+RESULTS:
+: F(Ga | Gb): autfilt -G -D: 3 states, 12 trans, 1 colors
+: F(Ga | Gb): ltl2dstar: 14 states, 56 trans, 6 colors
+: FGc & F(!a | b): autfilt -G -D: 2 states, 16 trans, 1 colors
+: FGc & F(!a | b): ltl2dstar: 3 states, 24 trans, 2 colors
+: FGc & G(!a | Fb): autfilt -G -D: 4 states, 32 trans, 2 colors
+: FGc & G(!a | Fb): ltl2dstar: 4 states, 32 trans, 2 colors
+
+Instead of outputting all results, =autdo= can be configured to output
+only the smallest automaton obtained for each input:
+
+#+BEGIN_SRC sh
+  ltl2tgba -B 'FGa | FGb' '(Ga -> Fb) & FGc' 'G(a -> Fb) & FGc' | \
+    autdo 'autfilt -G -D' 'ltl2dstar' \
+          --smallest \
+          --stats='%M: %T: %s states, %t trans, %a colors'
+#+END_SRC
+
+#+RESULTS:
+: F(Ga | Gb): autfilt -G -D: 3 states, 12 trans, 1 colors
+: FGc & F(!a | b): autfilt -G -D: 2 states, 16 trans, 1 colors
+: FGc & G(!a | Fb): autfilt -G -D: 4 states, 32 trans, 2 colors
+
+Therefore, =autdo --smallest proc1 proc2 proc3...= acts like a
+portfolio of automata processors, always returning the smallest
+produced automaton.
+
+The sorting criterion can be specified using =--smallest= or
+=--greatest=, optionally followed by a format string with
+=%=-sequences.  The default criterion is =%s,%e=, so the number of
+states will be compared first, and in case of equality the number of
+edges.
+
+
+* Controlling and measuring time
+
+The run time of each command can be restricted with the =-T NUM=
+option.  The argument is the maximum number of seconds that each
+command is allowed to run.
+
+When a timeout occurs a warning is printed on stderr, and no automaton
+(or statistic) is output by =autdo= for this specific pair of
+command/automaton.  The processing then continue with other automata and
+tools.  Timeouts are not considered as errors, so they have no effect
+on the exit status of =autdo=.  This behavior can be changed with
+option =--fail-on-timeout=, in which case timeouts are considered as
+errors.
+
+For each command (that does not terminate with a timeout) the runtime
+can be printed using the =%r= escape sequence.  This makes =autdo= an
+alternative to [[file:autcross.org][=autcross=]] for running benchmarks without any
+verification.

@@ -61,6 +61,7 @@ libcommon_a_SOURCES =				\
 
 bin_PROGRAMS = \
   autcross \
+  autdo \
   autfilt \
   dstar2tgba \
   genaut \
@@ -83,6 +84,7 @@ bin_PROGRAMS = \
 noinst_PROGRAMS = spot-x spot
 
 autcross_SOURCES = autcross.cc
+autdo_SOURCES = autdo.cc
 autfilt_SOURCES = autfilt.cc
 ltlfilt_SOURCES = ltlfilt.cc
 genaut_SOURCES = genaut.cc

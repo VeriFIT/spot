@@ -13,6 +13,7 @@ that are listed below.
 [SEE ALSO]
 .BR autfilt (1),
 .BR autcross (1),
+.BR autdo (1),
 .BR dstar2tgba (1),
 .BR genaut (1),
 .BR genltl (1),

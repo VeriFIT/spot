@@ -30,6 +30,9 @@ that name will be displayed by =autcross= when processing the automaton,
 and will appear in the CSV file if such a file is output.
 
 * Specifying the tools to test
+   :PROPERTIES:
+   :CUSTOM_ID: toolspec
+   :END:
 
 Each tool should be specified as a string that uses some of the
 following character sequences:
