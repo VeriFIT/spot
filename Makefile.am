@@ -17,10 +17,9 @@
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 if NEVER
-  # For Automake a, conditional directory
-  # is conditionally built, but unconditionally distributed.
-  # So using NEVER here ensures that `make all' will not
-  # recurse in bench/, but `make dist' will.
+  # For Automake, a conditional directory is conditionally built, but
+  # unconditionally distributed.  So using NEVER here ensures that
+  # `make all' will not recurse in bench/, but `make dist' will.
   NEVER_SUBDIRS = bench elisp
 endif
 
@@ -29,7 +28,7 @@ if USE_PYTHON
 endif
 
 DOC_SUBDIR = doc
-SUBDIRS = picosat buddy lib ltdl spot bin tests $(PYTHON_SUBDIR) $(DOC_SUBDIR) \
+SUBDIRS = picosat buddy lib ltdl spot bin $(PYTHON_SUBDIR) tests $(DOC_SUBDIR) \
 					$(NEVER_SUBDIRS)
 
 UTF8 = utf8/README.md utf8/LICENSE utf8/utf8.h	\
