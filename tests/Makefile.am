@@ -444,6 +444,7 @@ TESTS_python = \
   python/intrun.py \
   python/kripke.py \
   python/langmap.py \
+  python/lasso.py \
   python/ltl2tgba.test \
   python/ltlf.py \
   python/ltlf2dfa.py \

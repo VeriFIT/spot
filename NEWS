@@ -19,6 +19,10 @@ New in spot 2.15.1.dev  (not yet released)
 
   Library:
 
+  - spot::lasso_enumerator is a new class that lazily enumerates all
+    lasso-shaped accepted runs and words of an ω-automaton, within
+    user-supplied bounds on stem and cycle lengths.  (Issue #642.)
+
   - spot::bdd_dict::ap_from_var(int var) is a new method that returns
     the atomic proposition formula associated to a BDD variable number,
     or nullptr if the variable is not an atomic proposition.  This avoids

@@ -154,6 +154,7 @@
 #include <spot/twaalgos/isweakscc.hh>
 #include <spot/twaalgos/game.hh>
 #include <spot/twaalgos/langmap.hh>
+#include <spot/twaalgos/lasso.hh>
 #include <spot/twaalgos/simulation.hh>
 #include <spot/twaalgos/split.hh>
 #include <spot/twaalgos/sum.hh>
@@ -841,6 +842,7 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/mtdtwa.hh>
 %include <spot/twaalgos/relabel.hh>
 %include <spot/twaalgos/word.hh>
+%include <spot/twaalgos/lasso.hh>
 %template(list_bdd) std::list<bdd>;
 %include <spot/twaalgos/are_isomorphic.hh>
 %include <spot/twaalgos/toparity.hh>

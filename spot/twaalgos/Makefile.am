@@ -61,6 +61,7 @@ twaalgos_HEADERS = \
   isunamb.hh \
   isweakscc.hh \
   langmap.hh \
+  lasso.hh \
   lbtt.hh \
   ltl2taa.hh \
   ltl2tgba_fm.hh \
@@ -144,6 +145,7 @@ libtwaalgos_la_SOURCES = \
   game.cc \
   given.cc \
   langmap.cc \
+  lasso.cc \
   lbtt.cc \
   ltl2taa.cc \
   ltl2tgba_fm.cc \
