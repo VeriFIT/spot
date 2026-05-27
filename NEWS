@@ -14,6 +14,9 @@ New in spot 2.15.1.dev  (not yet released)
     complex EL acceptance condition designed to challenge EL
     emptiness-checking algorithms.
 
+  - autcross and autdo now recognize "kofola" as a shorthand, appending
+    "%H>%O" when no %-sequence is used in the command.
+
   Library:
 
   - spot::bdd_dict::ap_from_var(int var) is a new method that returns

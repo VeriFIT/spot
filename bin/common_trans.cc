@@ -77,6 +77,7 @@ static const shorthands_t shorthands_autproc[] = {
   SHORTHAND("autfilt", " %H>%O"),
   SHORTHAND("dra2dpa", " <%H>%O"),
   SHORTHAND("dstar2tgba", " %H>%O"),
+  SHORTHAND("kofola", " %H>%O"),
   SHORTHAND("ltl2dstar", " -B %H %O"),
   SHORTHAND("nba2l?dpa", " <%H>%O"),
   SHORTHAND("seminator", " %H>%O"),
