@@ -22,6 +22,7 @@
 #include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/isdet.hh>
+#include <spot/twaalgos/product.hh>
 
 namespace spot
 {
@@ -70,10 +71,15 @@ namespace spot
 
   bool are_equivalent(const_twa_graph_ptr left, const_twa_graph_ptr right)
   {
+    bool right_is_det = is_deterministic(right);
+    // If both automata are deterministic, use product_xor + is_empty
+    // which is more direct than the double containment check.
+    if (right_is_det && is_deterministic(left))
+      return product_xor(left, right)->is_empty();
     // Start with a deterministic automaton at right if possible to
     // avoid a determinization (in case the first containment check
     // fails).
-    if (!is_deterministic(right))
+    if (!right_is_det)
       std::swap(left, right);
     return contains(left, right) && contains(right, left);
   }

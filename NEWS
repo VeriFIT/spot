@@ -38,6 +38,11 @@ New in spot 2.15.1.dev  (not yet released)
     existential quantification performed during the translation, not
     afterwards.
 
+  - spot::are_equivalent() now uses product_xor() + is_empty() to
+    test equivalence of two deterministic automata, instead of using
+    two inclusion checks.  This is simpler and slightly faster.
+    (Issue #598.)
+
   - spot::from_ltlf() has a new overload from_ltlf(f, alive, algo)
     that accepts an integer algorithm selector.  algo=0 selects the
     original De Giacomo & Vardi (IJCAI'13) translation; algo=1 (the
