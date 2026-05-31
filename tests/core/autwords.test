@@ -173,3 +173,16 @@ a; a; cycle{a; !a}
 a; a; cycle{a; a}
 EOF
 diff words.txt expected
+
+# -F with CSV column extraction
+ltl2tgba --stats='%f,"%h",%d' FGa 'c U b' >csv.csv
+autwords -F csv.csv/2 --stem=0..1 --cycle=1..1 >output
+cat >expected <<EOF
+a; cycle{a}
+b; cycle{1}
+EOF
+diff output expected
+
+# -F with CSV column extraction (check count, both automata satisfiable)
+autwords -F csv.csv/2 --stem=0..1 --cycle=1..1 -c >output2
+test "`wc -l <output2`" -eq 2
