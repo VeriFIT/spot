@@ -30,6 +30,7 @@ logic (LTL & PSL).
 %{_bindir}/autcross
 %{_bindir}/autdo
 %{_bindir}/autfilt
+%{_bindir}/autwords
 %{_bindir}/dstar2tgba
 %{_bindir}/genaut
 %{_bindir}/genltl
@@ -47,6 +48,7 @@ logic (LTL & PSL).
 %{_mandir}/man1/autcross.1*
 %{_mandir}/man1/autdo.1*
 %{_mandir}/man1/autfilt.1*
+%{_mandir}/man1/autwords.1*
 %{_mandir}/man1/dstar2tgba.1*
 %{_mandir}/man1/genaut.1*
 %{_mandir}/man1/genltl.1*
@@ -170,6 +172,7 @@ chrpath --delete $RPM_BUILD_ROOT%{_libdir}/libspot.so.0.0.0
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/autcross
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/autdo
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/autfilt
+chrpath --delete $RPM_BUILD_ROOT%{_bindir}/autwords
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/dstar2tgba
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/genaut
 chrpath --delete $RPM_BUILD_ROOT%{_bindir}/genltl

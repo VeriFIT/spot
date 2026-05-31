@@ -1,0 +1,175 @@
+#!/bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. ./defs
+
+set -e
+
+# Basic enumeration: GFa with stem=0..2 cycle=1..2.
+# The first invocation uses 'run' so valgrind checks this code path once.
+ltl2tgba 'GFa' | run 0 autwords --stem=0..2 --cycle=1..2 >output
+cat >expected <<EOF
+cycle{a}
+cycle{!a; a}
+cycle{a; !a}
+cycle{a; a}
+!a; cycle{a}
+a; cycle{a}
+!a; cycle{!a; a}
+!a; cycle{a; !a}
+!a; cycle{a; a}
+a; cycle{!a; a}
+a; cycle{a; !a}
+a; cycle{a; a}
+!a; !a; cycle{a}
+!a; a; cycle{a}
+a; !a; cycle{a}
+a; a; cycle{a}
+!a; !a; cycle{!a; a}
+!a; !a; cycle{a; !a}
+!a; !a; cycle{a; a}
+!a; a; cycle{!a; a}
+!a; a; cycle{a; !a}
+!a; a; cycle{a; a}
+a; !a; cycle{!a; a}
+a; !a; cycle{a; !a}
+a; !a; cycle{a; a}
+a; a; cycle{!a; a}
+a; a; cycle{a; !a}
+a; a; cycle{a; a}
+EOF
+diff output expected
+
+# Empty language: an unsatisfiable formula → exit code 1, no output.
+ltl2tgba 'GFa & G!a' | autwords --stem=0..2 --cycle=1..2 >output && exit 1
+test ! -s output
+
+# Count mode: should print the exact count.
+ltl2tgba 'GFa' | autwords --stem=0..2 --cycle=1..2 --count >output
+test "`cat output`" -eq 28
+
+# --max-count: should output exactly N words with default bounds.
+ltl2tgba 'GFa & GFb' | autwords -n 3 >output
+cat >expected <<EOF
+cycle{a & b}
+cycle{!a & !b; a & b}
+cycle{a & !b; !a & b}
+EOF
+diff output expected
+
+# --max-count with --count: the count should equal N when enough words exist.
+ltl2tgba 'GFa & GFb' | autwords -n 3 -c >output
+test "`cat output`" -eq 3
+
+# Multiple automata on stdin: only the first (satisfiable one) produces words.
+ltl2tgba 'GFa' 'GFa & G!a' | autwords --stem=0..2 --cycle=1..2 >output
+cat >expected <<EOF
+cycle{a}
+cycle{!a; a}
+cycle{a; !a}
+cycle{a; a}
+!a; cycle{a}
+a; cycle{a}
+!a; cycle{!a; a}
+!a; cycle{a; !a}
+!a; cycle{a; a}
+a; cycle{!a; a}
+a; cycle{a; !a}
+a; cycle{a; a}
+!a; !a; cycle{a}
+!a; a; cycle{a}
+a; !a; cycle{a}
+a; a; cycle{a}
+!a; !a; cycle{!a; a}
+!a; !a; cycle{a; !a}
+!a; !a; cycle{a; a}
+!a; a; cycle{!a; a}
+!a; a; cycle{a; !a}
+!a; a; cycle{a; a}
+a; !a; cycle{!a; a}
+a; !a; cycle{a; !a}
+a; !a; cycle{a; a}
+a; a; cycle{!a; a}
+a; a; cycle{a; !a}
+a; a; cycle{a; a}
+EOF
+diff output expected
+
+# Multiple automata with --count: count from the first automaton only.
+ltl2tgba 'GFa' 'GFa & G!a' | autwords --stem=0..2 --cycle=1..2 -c >output
+test "`cat output`" -eq 28
+
+# Fa enumeration with stem=0..3 cycle=1..3.
+ltl2tgba 'Fa' > fa.hoa
+autwords -F fa.hoa --stem=0..3 --cycle=1..3 >output
+cat >expected <<EOF
+a; cycle{1}
+a; cycle{1; 1}
+a; 1; cycle{1}
+!a; a; cycle{1}
+a; cycle{1; 1; 1}
+a; 1; cycle{1; 1}
+!a; a; cycle{1; 1}
+a; 1; 1; cycle{1}
+!a; a; 1; cycle{1}
+!a; !a; a; cycle{1}
+a; 1; cycle{1; 1; 1}
+!a; a; cycle{1; 1; 1}
+a; 1; 1; cycle{1; 1}
+!a; a; 1; cycle{1; 1}
+!a; !a; a; cycle{1; 1}
+a; 1; 1; cycle{1; 1; 1}
+!a; a; 1; cycle{1; 1; 1}
+!a; !a; a; cycle{1; 1; 1}
+EOF
+diff output expected
+
+# --output: write to a file instead of stdout.
+ltl2tgba 'GFa' | autwords --stem=0..2 --cycle=1..2 -o words.txt
+cat >expected <<EOF
+cycle{a}
+cycle{!a; a}
+cycle{a; !a}
+cycle{a; a}
+!a; cycle{a}
+a; cycle{a}
+!a; cycle{!a; a}
+!a; cycle{a; !a}
+!a; cycle{a; a}
+a; cycle{!a; a}
+a; cycle{a; !a}
+a; cycle{a; a}
+!a; !a; cycle{a}
+!a; a; cycle{a}
+a; !a; cycle{a}
+a; a; cycle{a}
+!a; !a; cycle{!a; a}
+!a; !a; cycle{a; !a}
+!a; !a; cycle{a; a}
+!a; a; cycle{!a; a}
+!a; a; cycle{a; !a}
+!a; a; cycle{a; a}
+a; !a; cycle{!a; a}
+a; !a; cycle{a; !a}
+a; !a; cycle{a; a}
+a; a; cycle{!a; a}
+a; a; cycle{a; !a}
+a; a; cycle{a; a}
+EOF
+diff words.txt expected

@@ -342,6 +342,7 @@ TESTS_twa = \
   core/autcross4.test \
   core/autcross5.test \
   core/autdo.test \
+  core/autwords.test \
   core/complementation.test \
   core/randpsl.test \
   core/cycles.test \

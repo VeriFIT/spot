@@ -55,6 +55,11 @@ namespace spot
       throw std::invalid_argument
         ("lasso_enumerator: min_stem + min_cycle overflows");
     cur_total_ = min_stem + min_cycle;
+
+    // If the SCC of the initial state is not useful (cannot reach an
+    // accepting SCC), then no accepting run can exist.
+    if (!si_.is_useful_scc(si_.initial()))
+      done_ = true;
   }
 
   // Return the first outgoing edge of a state with a satisfiable label (0 if
@@ -202,7 +207,7 @@ namespace spot
     auto endpoint_ok = [this](unsigned state)
     {
       unsigned scc = si_.scc_of(state);
-      return !si_.is_trivial(scc) && !si_.is_rejecting_scc(scc);
+      return !si_.is_trivial(scc) && si_.is_useful_scc(scc);
     };
 
     while (true)

@@ -26,6 +26,7 @@ convman7 = ARGP_HELP_FMT=header-col=0 $(SHELL) "$(x_to_1)" \
 dist_man1_MANS = \
   autcross.1 \
   autdo.1 \
+  autwords.1 \
   autfilt.1 \
   dstar2tgba.1 \
   genaut.1 \
@@ -53,6 +54,9 @@ autcross.1: $(common_dep) $(srcdir)/autcross.x $(srcdir)/../autcross.cc
 
 autdo.1: $(common_dep) $(srcdir)/autdo.x $(srcdir)/../autdo.cc
 	$(convman) ../autdo$(EXEEXT) $(srcdir)/autdo.x $@
+
+autwords.1: $(common_dep) $(srcdir)/autwords.x $(srcdir)/../autwords.cc
+	$(convman) ../autwords$(EXEEXT) $(srcdir)/autwords.x $@
 
 autfilt.1: $(common_dep) $(srcdir)/autfilt.x $(srcdir)/../autfilt.cc
 	$(convman) ../autfilt$(EXEEXT) $(srcdir)/autfilt.x $@

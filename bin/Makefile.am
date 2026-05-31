@@ -63,6 +63,7 @@ bin_PROGRAMS = \
   autcross \
   autdo \
   autfilt \
+  autwords \
   dstar2tgba \
   genaut \
   genltl \
@@ -86,6 +87,7 @@ noinst_PROGRAMS = spot-x spot
 autcross_SOURCES = autcross.cc
 autdo_SOURCES = autdo.cc
 autfilt_SOURCES = autfilt.cc
+autwords_SOURCES = autwords.cc
 ltlfilt_SOURCES = ltlfilt.cc
 genaut_SOURCES = genaut.cc
 genaut_LDADD = $(top_builddir)/spot/gen/libspotgen.la $(LDADD)

@@ -14,6 +14,7 @@ that are listed below.
 .BR autfilt (1),
 .BR autcross (1),
 .BR autdo (1),
+.BR autwords (1),
 .BR dstar2tgba (1),
 .BR genaut (1),
 .BR genltl (1),

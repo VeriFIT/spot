@@ -55,6 +55,8 @@ static const argp_option options[] =
           " watch for bugs, and generate statistics.") },
     { DOC("autdo", "Wrap any tool that inputs ω-automata and possibly "
           "outputs ω-automata; provides Spot's I/O interface.") },
+    { DOC("autwords",
+          "Enumerate lasso-shaped words accepted by ω-automata.") },
     { DOC("ltlcross", "Cross-compare translators of LTL or PSL formulas "
           "into ω-automata, watch for bugs, and generate statistics.") },
     { DOC("ltldo", "Wrap any tool that inputs LTL or PSL formulas and possibly "

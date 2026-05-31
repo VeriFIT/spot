@@ -93,6 +93,7 @@ ORG_FILES = \
   org/arch.tex \
   org/autcross.org \
   org/autdo.org \
+  org/autwords.org \
   org/autfilt.org \
   org/csv.org \
   org/citing.org \

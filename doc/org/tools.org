@@ -62,6 +62,7 @@ corresponding commands are hidden.
 - [[file:autcross.org][=autcross=]] Cross-compare tools that process automata.
 - [[file:autdo.org][=autdo=]] Run automata through other tools using common [[file:ioaut.org][input]]
   and [[file:oaut.org][output]] interfaces.
+- [[file:autwords.org][=autwords=]] Enumerate lasso-shaped accepted words of ω-automata.
 
 * Man pages
 
@@ -73,6 +74,7 @@ convenience, you can browse their HTML versions:
 
 [[./man/autcross.1.html][=autcross=]](1),
 [[./man/autdo.1.html][=autdo=]](1),
+[[./man/autwords.1.html][=autwords=]](1),
 [[./man/autfilt.1.html][=autfilt=]](1),
 [[./man/dstar2tgba.1.html][=dstar2tgba=]](1),
 [[./man/genaut.1.html][=genaut=]](1),
