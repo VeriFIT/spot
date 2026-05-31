@@ -140,3 +140,100 @@ for i, f in enumerate(gen):
                   f"Semantic mismatch for {f!r}: old={old}, new={new}")
     tc.assertTrue(new.is_syntactic_obligation(),
                   f"Not syntactic obligation for {f!r}: {new}")
+
+# ---------- Tests for t_B (xor/<-> handling in LTL_B contexts) ----------
+#
+# t_B (the Bottom class) handles xor and <-> homomorphically, while
+# t_G and t_S must expand them into complex combinations involving
+# both t_G and t_S calls (mutual recursion).  Dispatch to t_B occurs
+# when a formula is both syntactic safety and syntactic guarantee
+# (i.e., belongs to LTL_B).
+#
+# The formulas below place xor/<-> under temporal operators that enter
+# t_G (F, right of U, left of M) or t_S (G, right of R, left of W).
+# Without the t_B dispatch, each xor/<-> would be expanded into a
+# combination of t_G/t_S calls; with t_B the translation stays compact.
+lcc3 = spot.language_containment_checker()
+
+# Wrapper components used by from_ltlf() to encode finite-trace semantics.
+# algo=1: And(t_O(f), alive, F(!alive), W(alive, G(!alive)))
+# algo=0: And(dv_aux(f), alive, U(alive, G(!alive)))
+_alv = spot.formula('alive')
+_nalv = spot.formula.Not(_alv)
+_f_nalv = spot.formula.F(_nalv)
+_w_alv_gnalv = spot.formula.W(_alv, spot.formula.G(_nalv))
+_u_alv_gnalv = spot.formula.U(_alv, spot.formula.G(_nalv))
+_new_wrapper = {_alv, _f_nalv, _w_alv_gnalv}
+_old_wrapper = {_alv, _u_alv_gnalv}
+
+def _strip_wrapper(res, wrapper_parts):
+    """Strip the finite-trace wrapper from a from_ltlf() result."""
+    if res.kind() == spot.op_And:
+        children = [res[i] for i in range(res.size())]
+        core = [c for c in children if c not in wrapper_parts]
+        if len(core) == 1:
+            return core[0]
+        # Flattened And: combine remaining children back into one.
+        return spot.formula.And(core)
+    return res
+
+tB_formulas = [
+    # xor/<-> under unary temporal operators: enter t_G or t_S
+    'F(a xor b)',                    # t_G dispatches to t_B
+    'F(X(a xor b))',                 # t_G dispatches X(a xor b) to t_B
+    'G(a <-> b)',                    # t_S dispatches to t_B
+    'G(X[!](a <-> b))',              # t_S dispatches X[!](a <-> b) to t_B
+    'F(a <-> b)',                    # t_G dispatches to t_B
+    'G(a xor b)',                    # t_S dispatches to t_B
+    # xor/<-> as arguments of binary temporal operators
+    '(a xor b) U c',                 # t_G(left side) dispatches to t_B
+    '(X(a xor b)) U c',              # t_G dispatches X(a xor b) to t_B
+    '(a <-> b) R c',                 # t_S(left side) dispatches to t_B
+    '(X[!](a <-> b)) R c',           # t_S dispatches X[!](a <-> b) to t_B
+    '(a xor b) W c',                 # t_S(left side) dispatches to t_B
+    '(X(a xor b)) W c',              # t_S dispatches X(a xor b) to t_B
+    '(a <-> b) M c',                 # t_G(left side) dispatches to t_B
+    'c U (a xor b)',                 # t_G(right side) dispatches to t_B
+    'c R (a <-> b)',                 # t_S(right side) dispatches to t_B
+    # Deeply nested xor: each level stays in LTL_B, so t_B avoids
+    # exponential expansion in t_G/t_S.
+    '(((a xor b) xor c) xor d) U e',
+    'F((a xor b) xor c)',
+    'G((a <-> b) <-> c)',
+    'F(X(a xor b) xor X(c xor d))',  # nested X inside xor: t_G → t_B
+    # xor/<-> under X: enters t_O directly (not t_G/t_S), but
+    # subformulas may enter t_G/t_S.
+    'X(G(a xor b))',                 # t_S dispatches to t_B
+    'X(F(a <-> b))',                 # t_G dispatches to t_B
+]
+
+for s in tB_formulas:
+    f = spot.formula(s)
+    old = spot.from_ltlf(f, 'alive', 0)   # DG&V
+    new = spot.from_ltlf(f, 'alive', 1)   # syntactic-obligation
+    tc.assertTrue(lcc3.equal(old, new),
+                  f"Semantic mismatch for {s!r}: old={old}, new={new}")
+    tc.assertTrue(new.is_syntactic_obligation(),
+                  f"Not syntactic obligation for {s!r}: {new}")
+    # For LTL_B formulas, the core translations should be structurally
+    # identical: only the finite-trace wrapper differs.
+    old_core = _strip_wrapper(old, _old_wrapper)
+    new_core = _strip_wrapper(new, _new_wrapper)
+    tc.assertEqual(old_core, new_core,
+                   f"Core mismatch for {s!r}: "
+                   f"dv_aux={old_core}, t_O={new_core}")
+
+# Demonstrate that t_B keeps the result compact for deeply nested xor.
+# Without t_B dispatch, each xor in t_G or t_S would be expanded into a
+# combination of t_G and t_S calls (doubling the formula at each level);
+# with t_B dispatch the translation stays comparable to the DG&V baseline.
+# A generous margin (2x + 20 chars) catches any exponential blow-up while
+# tolerating structural differences between the two algorithms.
+f = spot.formula('(((a xor b) xor c) xor d) U e')
+old = spot.from_ltlf(f, 'alive', 0)
+new = spot.from_ltlf(f, 'alive', 1)
+tc.assertLessEqual(len(str(new)), len(str(old)) * 2 + 20,
+                   f"t_B dispatch should prevent exponential blow-up: "
+                   f"new has {len(str(new))} chars, old has {len(str(old))}")
+tc.assertTrue(new.is_syntactic_obligation(),
+              f"Not syntactic obligation: {new}")

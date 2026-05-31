@@ -35,8 +35,8 @@ namespace spot
   ///               <code>dead</code> property on states representing the
   ///               end of finite computations.
   /// \param algo   translation algorithm to use:
-  ///               <b>1</b> (default) — syntactic-obligation translation
-  ///               that guarantees the result is a phi_O formula;
+  ///               <b>1</b> (default) — translation that guarantees
+  ///               the result is a syntactic-obligation formula;
   ///               <b>0</b> — original De Giacomo & Vardi (IJCAI'13)
   ///               translation \cite degiacomo.13.ijcai.
   ///

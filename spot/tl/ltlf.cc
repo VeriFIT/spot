@@ -78,13 +78,37 @@ namespace spot
         }
     }
 
-    // Forward declarations for the three mutually recursive helpers
+    // Forward declarations for the four mutually recursive helpers
     // that implement the syntactic-obligation translation.
+    static formula t_B(formula f, formula alv, formula nalv);
     static formula t_G(formula f, formula alv, formula nalv);
     static formula t_S(formula f, formula alv, formula nalv);
     static formula t_O(formula f, formula alv, formula nalv);
 
-    // t_G(f): phi_G translation — used in "alive &" contexts
+    // t_B(f): translation of bottom formulas
+    static formula t_B(formula f, formula alv, formula nalv)
+    {
+      if (f.is_boolean())
+        return f;
+      switch (f.kind())
+        {
+        case op::ap:
+        case op::tt:
+        case op::ff:
+          return f;
+        case op::strong_X:
+          return formula::X(formula::And(alv, t_B(f[0], alv, nalv)));
+        case op::X:
+          return formula::X(formula::Or(nalv, t_B(f[0], alv, nalv)));
+        default:
+          // And, Or, Not, Implies, Xor, Equiv: map homomorphically
+          // (LTL_B is closed under all of them).
+          return f.map([&alv, &nalv](formula g)
+                       { return t_B(g, alv, nalv); });
+        }
+    }
+
+    // t_G(f): LTL_G translation — used in "alive &" contexts
     // (F argument, right of U, left of M).
     static formula t_G(formula f, formula alv, formula nalv)
     {
@@ -134,7 +158,10 @@ namespace spot
             return formula::Implies(left, t_G(f[1], alv, nalv));
           }
         case op::Xor:
-          // phi_G is not closed under xor (only phi_B is), so we expand:
+          // LTL_G is not closed under xor (only LTL_B is), so we expand
+          // unless the formula belongs to LTL_B.
+          if (f.is_syntactic_safety() && f.is_syntactic_guarantee())
+            return t_B(f, alv, nalv);
           //   t_G(f xor g) = (t_G(f) & !t_S(g)) | (!t_S(f) & t_G(g))
           {
             formula ag0 = t_G(f[0], alv, nalv);
@@ -148,7 +175,10 @@ namespace spot
             return formula::Or(left, right);
           }
         case op::Equiv:
-          // phi_G is not closed under <->, so we expand:
+          // LTL_G is not closed under <->, so we expand unless the
+          // formula belongs to LTL_B.
+          if (f.is_syntactic_safety() && f.is_syntactic_guarantee())
+            return t_B(f, alv, nalv);
           //   t_G(f <-> g) = (t_G(f) & t_G(g)) | (!t_S(f) & !t_S(g))
           {
             formula ag0 = t_G(f[0], alv, nalv);
@@ -162,14 +192,14 @@ namespace spot
             return formula::Or(left, right);
           }
         default:
-          // And, Or, atoms (ap, tt, ff): map homomorphically (phi_G is
+          // And, Or, atoms (ap, tt, ff): map homomorphically (LTL_G is
           // closed under & and |).
           return f.map([&alv, &nalv](formula g)
                        { return t_G(g, alv, nalv); });
         }
     }
 
-    // t_S(f): phi_S translation — used in "!alive |" contexts
+    // t_S(f): LTL_S translation — used in "!alive |" contexts
     // (G argument, right of R, left of W).
     static formula t_S(formula f, formula alv, formula nalv)
     {
@@ -217,7 +247,10 @@ namespace spot
             return formula::Implies(left, t_S(f[1], alv, nalv));
           }
         case op::Xor:
-          // phi_S is not closed under xor (only phi_B is), so we expand:
+          // LTL_S is not closed under xor (only LTL_B is), so we
+          // expand unless the formula belongs to LTL_B.
+          if (f.is_syntactic_safety() && f.is_syntactic_guarantee())
+            return t_B(f, alv, nalv);
           //   t_S(f xor g) = (t_S(f) & !t_G(g)) | (!t_G(f) & t_S(g))
           {
             formula ag0 = t_G(f[0], alv, nalv);
@@ -231,7 +264,10 @@ namespace spot
             return formula::Or(left, right);
           }
         case op::Equiv:
-          // phi_S is not closed under <->, so we expand:
+          // LTL_S is not closed under <->, so we expand unless the formula
+          // belongs to LTL_B.
+          if (f.is_syntactic_safety() && f.is_syntactic_guarantee())
+            return t_B(f, alv, nalv);
           //   t_S(f <-> g) = (t_S(f) & t_S(g)) | (!t_G(f) & !t_G(g))
           {
             formula ag0 = t_G(f[0], alv, nalv);
@@ -245,14 +281,14 @@ namespace spot
             return formula::Or(left, right);
           }
         default:
-          // And, Or, atoms (ap, tt, ff): map homomorphically (phi_S is
+          // And, Or, atoms (ap, tt, ff): map homomorphically (LTL_S is
           // closed under & and |).
           return f.map([&alv, &nalv](formula g)
                        { return t_S(g, alv, nalv); });
         }
     }
 
-    // t_O(f): phi_O translation — the main syntactic-obligation translation.
+    // t_O(f): LTL_O translation — the main syntactic-obligation translation.
     static formula t_O(formula f, formula alv, formula nalv)
     {
       switch (f.kind())
