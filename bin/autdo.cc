@@ -80,7 +80,7 @@ static const argp_option more_o_format[] =
   {
     { "%#", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
       "serial number of the input automaton processed", 0 },
-    { "%T", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
+    { "%K", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
       "tool used for processing", 0 },
     { "%<", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
       "the part of the line before the automaton if it "
@@ -91,11 +91,11 @@ static const argp_option more_o_format[] =
     { nullptr, 0, nullptr, 0, nullptr, 0 }
   };
 
-// Merge our %-escape documentation into aoutput_o_format_argp.
+// Merge our %-escape documentation into aoutput_io_format_argp.
 static const struct argp*
 build_percent_list()
 {
-  const argp_option* iter = aoutput_o_format_argp.options;
+  const argp_option* iter = aoutput_io_format_argp.options;
   unsigned count = 0;
   while (iter->name || iter->doc)
     {
@@ -301,9 +301,9 @@ namespace
         best_printer(best_stream, best_format, aut_input),
         post(post)
     {
-      printer.add_stat('T', &cmdname);
+      printer.add_stat('K', &cmdname);
       printer.add_stat('#', &roundval);
-      best_printer.declare('T', &cmdname);
+      best_printer.declare('K', &cmdname);
       best_printer.declare('#', &roundval);
     }
 

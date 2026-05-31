@@ -111,3 +111,20 @@ FGa|1
 a U b|2
 EOF
 diff output expected
+
+# Test upper-case (input) vs lower-case (output) escape sequences:
+# %S,%T = input automaton stats; %s,%t = output automaton stats; %K = tool name.
+ltl2tgba 'GFa & GFb' |
+  autdo 'autfilt -B' --stats="%S,%T --[%K]-> %s,%t" >output
+cat >expected <<EOF
+1,4 --[autfilt -B]-> 3,12
+EOF
+diff output expected
+
+# Also verify that %E/%e (edges) and %a/%a (acc sets) work for input/output.
+ltl2tgba 'GFa & GFb' |
+  autdo 'autfilt -B' --stats="%E edges,%a acc --[%K]-> %e edges,%a acc" >output
+cat >expected <<EOF
+4 edges,1 acc --[autfilt -B]-> 8 edges,1 acc
+EOF
+diff output expected

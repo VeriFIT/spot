@@ -20,6 +20,12 @@ New in spot 2.15.1.dev  (not yet released)
   - autcross and autdo now recognize "kofola" as a shorthand, appending
     "%H>%O" when no %-sequence is used in the command.
 
+  - ltldo's --stats format string now documents the tool name under
+    "%K" instead of "%T", for consistency with autdo and with the
+    autfilt convention (where "%T" is the number of transitions in the
+    input).  The old "%T" sequence is still supported by ltldo, but
+    undocumented.
+
   Library:
 
   - spot::lasso_enumerator is a new class that lazily enumerates all

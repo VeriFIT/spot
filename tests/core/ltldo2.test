@@ -28,14 +28,14 @@ test 4 = `grep -c digraph output`
 
 
 test "ltl2tgba,4" = "`ltldo 'ltl2tgba -D' ltl2tgba \
-                      -f 'Ga | Gb | Gc' --stats='%T,%s' --smallest`"
+                      -f 'Ga | Gb | Gc' --stats='%K,%s' --smallest`"
 
 ltldo 'ltl2tgba -D' ltl2tgba -f 'Ga | Gb | Gc' --smallest=%n > aut1.hoa
 ltl2tgba -D 'Ga | Gb | Gc' > aut2.hoa
 diff aut1.hoa aut2.hoa
 
 test "ltl2tgba -D" = \
-  "`ltldo 'ltl2tgba -D' ltl2tgba -f 'Ga | Gb | Gc' --greatest=%e --stats=%T`"
+  "`ltldo 'ltl2tgba -D' ltl2tgba -f 'Ga | Gb | Gc' --greatest=%e --stats=%K`"
 
 
 ltldo --negate 'ltl2tgba -D' -f FGa --stats=%f,%s >out.csv

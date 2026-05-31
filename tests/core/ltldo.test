@@ -64,7 +64,7 @@ test "`echo 1,a,3,4 | ltldo -F-/2 ltl2tgba --stats='%<,%s,%>'`" = '1,2,3,4'
 
 genltl --and-gf=1..3 |
 run 0 ltldo "{tgba}ltl2tgba %f -H >%H" "{ba}ltl2tgba >%N %f -s" \
-	     --stats="%T,%#,%f,%s,%t,%e" >output
+	     --stats="%K,%#,%f,%s,%t,%e" >output
 cat output
 cat >expected <<EOF
 tgba,1,GFp1,1,2,2

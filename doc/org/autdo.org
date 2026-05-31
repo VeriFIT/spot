@@ -138,16 +138,19 @@ Here is an example where we compare the output of =autfilt -G -D=
 #+BEGIN_SRC sh
   ltl2tgba -B 'FGa | FGb' '(Ga -> Fb) & FGc' 'G(a -> Fb) & FGc' | \
     autdo 'autfilt -G -D' 'ltl2dstar' \
-          --stats='%M: %T: %s states, %t trans, %a colors'
+          --stats='%M: %K: %S->%s states, %T->%t trans, %A->%a colors'
 #+END_SRC
 
 #+RESULTS:
-: F(Ga | Gb): autfilt -G -D: 3 states, 12 trans, 1 colors
-: F(Ga | Gb): ltl2dstar: 14 states, 56 trans, 6 colors
-: FGc & F(!a | b): autfilt -G -D: 2 states, 16 trans, 1 colors
-: FGc & F(!a | b): ltl2dstar: 3 states, 24 trans, 2 colors
-: FGc & G(!a | Fb): autfilt -G -D: 4 states, 32 trans, 2 colors
-: FGc & G(!a | Fb): ltl2dstar: 4 states, 32 trans, 2 colors
+: F(Ga | Gb): autfilt -G -D: 3->3 states, 12->12 trans, 1->1 colors
+: F(Ga | Gb): ltl2dstar: 3->14 states, 12->56 trans, 1->6 colors
+: FGc & F(!a | b): autfilt -G -D: 3->2 states, 27->16 trans, 1->1 colors
+: FGc & F(!a | b): ltl2dstar: 3->3 states, 27->24 trans, 1->2 colors
+: FGc & G(!a | Fb): autfilt -G -D: 4->4 states, 29->32 trans, 1->2 colors
+: FGc & G(!a | Fb): ltl2dstar: 4->4 states, 29->32 trans, 1->2 colors
+
+As with [[file:autcross.org][=autcross=]], an upper-case specifier like =%S= usually refers
+to the input file, while =%s= refers to the output file.
 
 Instead of outputting all results, =autdo= can be configured to output
 only the smallest automaton obtained for each input:
@@ -156,13 +159,13 @@ only the smallest automaton obtained for each input:
   ltl2tgba -B 'FGa | FGb' '(Ga -> Fb) & FGc' 'G(a -> Fb) & FGc' | \
     autdo 'autfilt -G -D' 'ltl2dstar' \
           --smallest \
-          --stats='%M: %T: %s states, %t trans, %a colors'
+          --stats='%M: %K: %S->%s states, %T->%t trans, %A->%a colors'
 #+END_SRC
 
 #+RESULTS:
-: F(Ga | Gb): autfilt -G -D: 3 states, 12 trans, 1 colors
-: FGc & F(!a | b): autfilt -G -D: 2 states, 16 trans, 1 colors
-: FGc & G(!a | Fb): autfilt -G -D: 4 states, 32 trans, 2 colors
+: F(Ga | Gb): autfilt -G -D: 3->3 states, 12->12 trans, 1->1 colors
+: FGc & F(!a | b): autfilt -G -D: 3->2 states, 27->16 trans, 1->1 colors
+: FGc & G(!a | Fb): autfilt -G -D: 4->4 states, 29->32 trans, 1->2 colors
 
 Therefore, =autdo --smallest proc1 proc2 proc3...= acts like a
 portfolio of automata processors, always returning the smallest

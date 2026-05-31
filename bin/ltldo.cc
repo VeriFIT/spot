@@ -82,7 +82,7 @@ static const argp_option more_o_format[] =
   {
     { "%#", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
       "serial number of the formula translated", 0 },
-    { "%T", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
+    { "%K", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
       "tool used for translation", 0 },
     { "%f", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,
       "formula translated", 0 },
@@ -96,13 +96,13 @@ static const argp_option more_o_format[] =
   };
 
 // This is not very elegant, but we need to add the above %-escape
-// sequences to those of aoutput_o_format_argp for the --help output.
+// sequences to those of aoutput_io_format_argp for the --help output.
 // So far I've failed to instruct argp to merge those two lists into a
 // single block.
 static const struct argp*
 build_percent_list()
 {
-  const argp_option* iter = aoutput_o_format_argp.options;
+  const argp_option* iter = aoutput_io_format_argp.options;
   unsigned count = 0;
   while (iter->name || iter->doc)
     {
@@ -307,10 +307,12 @@ namespace
     explicit processor(spot::postprocessor& post)
       : runner(dict), best_printer(best_stream, best_format), post(post)
     {
-      printer.add_stat('T', &cmdname);
+      printer.add_stat('K', &cmdname);
+      printer.add_stat('T', &cmdname); // backward compatibility <2.16
       printer.add_stat('#', &roundval);
       printer.add_stat('f', &inputf);
-      best_printer.declare('T', &cmdname);
+      best_printer.declare('K', &cmdname);
+      best_printer.declare('T', &cmdname); // backward compatibility <2.16
       best_printer.declare('#', &roundval);
       best_printer.declare('f', &inputf);
     }

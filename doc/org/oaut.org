@@ -847,7 +847,7 @@ and CPU-time spent in =ltl2tgba=:
 
 #+BEGIN_SRC sh
 genltl --or-gf=1..8 |
-ltldo '{high}ltl2tgba' '{low}ltl2tgba --low' --stats='%T,%f,%r,%[p]R,%[c]R'
+ltldo '{high}ltl2tgba' '{low}ltl2tgba --low' --stats='%K,%f,%r,%[p]R,%[c]R'
 #+END_SRC
 #+RESULTS:
 #+begin_example
