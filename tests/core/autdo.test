@@ -45,21 +45,21 @@ test 2 = `grep -c '^HOA:' output`
 
 # Test timeout handling: should produce no automata (tools time out), no error.
 ltl2tgba 'Ga' |
-  run 0 autdo -T 1 'sleep 10; autfilt %H>%O' >output 2>stderr
+  autdo -T 1 'sleep 10; autfilt %H>%O' >output 2>stderr
 test -z "$(cat output)"
 grep -q 'timeout' stderr
 
 # Test --fail-on-timeout: timed-out tool is an error, but --errors=warn
 # prevents hard abort.
 ltl2tgba 'Ga' |
-  run 0 autdo -T 1 'sleep 10; autfilt %H>%O' \
+  autdo -T 1 'sleep 10; autfilt %H>%O' \
     --fail-on-timeout --errors=warn >output 2>stderr
 test -z "$(cat output)"
 grep -q 'timeout' stderr
 
 # Test --errors=ignore: non-zero exit does not abort.
 ltl2tgba 'Ga' |
-  run 0 autdo --errors=ignore \
+  autdo --errors=ignore \
     'autfilt --unknown-option %H>%O' >output 2>/dev/null
 test -z "$(cat output)"
 
@@ -74,5 +74,40 @@ ltl2tgba 'Ga' 'Fb' |
 cat >expected <<EOF
 1: Ga
 2: Fb
+EOF
+diff output expected
+
+# Test -F option: read automata from a file.
+ltl2tgba 'Ga' >aut.in
+run 0 autdo -F aut.in 'autfilt %H>%O' >output
+test 1 = `grep -c '^HOA:' output`
+
+# Test -F with a pipe (read from stdin using -).
+ltl2tgba 'Fb' | autdo -F - 'autfilt %H>%O' >output
+test 1 = `grep -c '^HOA:' output`
+
+# Test -F with --stats: serial number should be correct.
+ltl2tgba 'Ga' 'Fb' >aut.in
+autdo -F aut.in --stats '%F,%#: %M' 'autfilt %H>%O' >output
+cat >expected <<EOF
+aut.in,1: Ga
+aut.in,2: Fb
+EOF
+diff output expected
+
+# Test -F with CSV column extraction (FILENAME/N reads column N from CSV).
+# The "%h" format specifier contains quotes, so it must be quoted in the
+# CSV output to produce a proper RFC 4180 CSV file.
+ltl2tgba --stats='%f,"%h",%d' FGa 'a U b' >csv.csv
+autdo -F csv.csv/2 'autfilt %H>%O' >output
+test 2 = `grep -c '^HOA:' output`
+
+# Test -F with CSV column extraction and --stats: verify %< captures
+# the prefix (the part of the CSV line before the extracted column).
+ltl2tgba --stats='%f,"%h",%d' FGa 'a U b' >csv.csv
+autdo -F csv.csv/2 --stats '%<|%#' 'autfilt %H>%O' >output
+cat >expected <<EOF
+FGa|1
+a U b|2
 EOF
 diff output expected

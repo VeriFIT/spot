@@ -51,6 +51,10 @@ enum {
 static const argp_option options[] =
   {
     /**************************************************/
+    { nullptr, 0, nullptr, 0, "Input:", 1 },
+    { "file", 'F', "FILENAME", 0,
+      "process automata from FILENAME", 0 },
+    /**************************************************/
     { nullptr, 0, nullptr, 0, "Error handling:", 4 },
     { "errors", OPT_ERRORS, "abort|warn|ignore", 0,
       "how to deal with tools returning with non-zero exit codes or "
@@ -165,6 +169,9 @@ parse_opt(int key, char* arg, struct argp_state*)
       best_type = -1;
       if (arg)
         best_format = arg;
+      break;
+    case 'F':
+      jobs.emplace_back(arg, job_type::AUT_FILENAME);
       break;
     case 'n':
       opt_max_count = to_pos_int(arg, "-n/--max-count");
