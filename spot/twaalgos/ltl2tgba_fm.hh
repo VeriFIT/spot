@@ -93,4 +93,174 @@ namespace spot
                  const output_aborter* aborter = nullptr,
                  bool label_with_ltl = false,
                  bool force_obligation = false);
+
+  /// \ingroup twa_ltl
+  /// \brief A single successor edge from a formula-state.
+  struct SPOT_API fm_edge
+  {
+    bdd cond;              ///< Condition on atomic propositions.
+    formula dst;           ///< Destination formula-state.
+    acc_cond::mark_t acc;  ///< Acceptance marks, using negated-Inf semantics;
+                           ///< see \ref acc_semantics for details.
+  };
+
+  /// \ingroup twa_ltl
+  /// \brief On-the-fly LTL→TGBA explorer.
+  ///
+  /// Encapsulates the data structures from ltl_to_tgba_fm() so that
+  /// successors of a formula-state can be computed without building
+  /// the full automaton.  Two views are provided:
+  ///
+  ///   - succ_as_bdd(): a symbolic BDD view (cached, no exprop)
+  ///   - succ_as_edges(): an explicit edge list (exprop, simplification,
+  ///     canonicalization, and branching postponement applied here)
+  ///
+  /// The class also exposes accessors so that a client can decompose
+  /// the BDD returned by succ_as_bdd() on its own if needed.
+  ///
+  /// \section acc_semantics Acceptance condition semantics
+  ///
+  /// This class does not own a twa_graph; it receives one from the
+  /// caller (\a aut) and uses it only to call register_ap() as new
+  /// atomic propositions are discovered, and to update its acceptance
+  /// condition as new colors are allocated.  The acceptance condition
+  /// of \a aut is therefore mutated during the lifetime of the
+  /// explorer.
+  ///
+  /// The Couvreur translation internally encodes promises P(…) using
+  /// negated Inf sets: the acceptance condition of \a aut effectively
+  /// represents Inf(!0)&Inf(!1)&…&Inf(!(N-1)), a form Spot does not
+  /// directly support.  The acceptance marks returned in
+  /// fm_edge::acc therefore correspond to this negated semantics.
+  ///
+  /// Because the number of acceptance sets N grows during exploration
+  /// (each new promise allocates a fresh color), the marks cannot be
+  /// complemented on-the-fly; complementation must wait until
+  /// exploration is complete and the final N is known.  At that point,
+  /// build a proper TGBA by complementing each edge's mark with
+  /// respect to N and setting the acceptance condition to
+  /// generalized-Büchi:
+  /// \code
+  ///   auto& acc = aut->acc();
+  ///   for (auto& e: aut->edges())
+  ///     e.acc = acc.comp(e.acc);
+  ///   acc.set_generalized_buchi();
+  /// \endcode
+  /// This is exactly what ltl_to_tgba_fm() does before returning the
+  /// completed automaton.
+  class SPOT_API ltl_to_tgba_fm_otf final
+  {
+  public:
+    /// \brief Bundle the boolean options for translation.
+    struct options
+    {
+      /// Use all property combinations to reduce nondeterminism.
+      bool exprop = false;
+      /// Merge states with the same symbolic representation.
+      bool symb_merge = true;
+      /// Merge transitions with the same label leaving the same state.
+      bool branching_postponement = false;
+      /// Suppress acceptance conditions from incoming transitions of
+      /// unstable states.
+      bool fair_loop_approx = false;
+      /// Restrict to unambiguous transitions.
+      bool unambiguous = false;
+      /// Force the result to satisfy the obligation property.
+      bool force_obligation = false;
+      options() {}
+    };
+
+    /// \brief Constructor.
+    ///
+    /// Normalizes the formula, initializes the BDD variable mappings,
+    /// and prepares all internal data structures.
+    ///
+    /// \param f          the LTL/PSL formula
+    /// \param aut        the automaton being built, used only to call
+    ///                   register_ap(); the explorer never adds states
+    ///                   or edges itself
+    /// \param opts       translation options
+    /// \param simplifier optional LTL simplifier (owned by caller)
+    /// \param unobs      optional set of unobservable events
+    ltl_to_tgba_fm_otf(formula f, twa_graph_ptr aut,
+                options opts = options(),
+                tl_simplifier* simplifier = nullptr,
+                const atomic_prop_set* unobs = nullptr);
+
+    ~ltl_to_tgba_fm_otf();
+
+    // Non-copyable, non-movable.
+    ltl_to_tgba_fm_otf(const ltl_to_tgba_fm_otf&) = delete;
+    ltl_to_tgba_fm_otf& operator=(const ltl_to_tgba_fm_otf&) = delete;
+
+    // ---- State interface ----
+
+    /// The initial formula-state (canonicalized if symb_merge is on).
+    formula init_state() const;
+
+    /// The original formula after normalization and quantifier extraction,
+    /// but before canonicalization.  Useful for property checks on the
+    /// resulting automaton.
+    formula orig_formula() const;
+
+    // ---- Symbolic successor view ----
+
+    /// Translate \a s into a single BDD representing all its successors.
+    ///
+    /// This calls the internal formula_canonicalizer and caches the
+    /// result.  The returned BDD uses three variable families:
+    ///
+    ///   - var_set():  atomic propositions (edge conditions)
+    ///   - next_set(): destination encoding (one variable per formula)
+    ///   - a_set():    acceptance promises (one variable per promise)
+    ///
+    /// \note exprop and branching_postponement are NOT applied here;
+    ///       they only affect succ_as_edges().
+    bdd succ_as_bdd(formula s);
+
+    // ---- Explicit successor view ----
+
+    /// Decompose the successors of \a s into individual edges.
+    ///
+    /// Internally calls succ_as_bdd(), then extracts edges via
+    /// minato_isop (with minterm iteration when exprop is enabled).
+    /// Applies simplification, canonicalization (symb_merge), and
+    /// branching postponement.  Promises are converted to mark_t.
+    ///
+    /// The acceptance marks returned in fm_edge::acc use negated
+    /// Inf semantics; see the class-level documentation for how to
+    /// convert them to proper generalized-Büchi marks.
+    ///
+    /// Results are NOT cached.
+    std::vector<fm_edge> succ_as_edges(formula s);
+
+    // ---- Accessors for interpreting succ_as_bdd() results ----
+
+    /// Variable set: atomic propositions.
+    const bdd& var_set() const;
+
+    /// Variable set: Next variables (destination encoding).
+    const bdd& next_set() const;
+
+    /// Variable set: acceptance promises.
+    const bdd& a_set() const;
+
+    /// Convert a cube over next_set() into a formula.
+    formula conj_bdd_to_formula(bdd cube) const;
+
+    /// Convert a cube over a_set() into acceptance marks.
+    acc_cond::mark_t bdd_to_mark(bdd a) const;
+
+    /// Register a new Next variable for \a f and return its BDD
+    /// variable index.
+    int register_next_variable(formula f);
+
+    /// The BDD dictionary.
+    const bdd_dict_ptr& get_dict() const;
+
+  private:
+    struct impl;
+    std::unique_ptr<impl> impl_;
+  };
+
 }

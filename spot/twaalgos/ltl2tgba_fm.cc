@@ -26,6 +26,7 @@
 #include <memory>
 #include <utility>
 #include <algorithm>
+#include <set>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/quantify.hh>
 #include <spot/twa/bddprint.hh>
@@ -49,7 +50,7 @@ namespace spot
     // Leave recurring to false on first call.
     typedef std::set<formula> formula_set;
     void
-    implied_subformulae(formula f, formula_set& rec, bool recurring = false)
+    implied_subformulas(formula f, formula_set& rec, bool recurring = false)
     {
       if (!f.is(op::And))
         {
@@ -69,13 +70,13 @@ namespace spot
             rec.insert(sub);
           if (sub.is(op::G))
             {
-              implied_subformulae(sub[0], rec, true);
+              implied_subformulas(sub[0], rec, true);
             }
           else if (sub.is(op::W))
             {
               // f W 0 = Gf
               if (sub[1].is_ff())
-                implied_subformulae(sub[0], rec, true);
+                implied_subformulas(sub[0], rec, true);
             }
           else
             while (sub.is(op::R, op::M))
@@ -87,7 +88,7 @@ namespace spot
                   {
                     assert(b.is(op::R)); // because 0 M g = 0
                     // 0 R f = Gf
-                    implied_subformulae(sub, rec, true);
+                    implied_subformulas(sub, rec, true);
                     break;
                   }
                 rec.insert(sub);
@@ -968,17 +969,17 @@ namespace spot
       auto namer = a->create_namer<formula>();
 
       typedef std::set<formula> set_type;
-      set_type formulae_to_translate;
+      set_type formulas_to_translate;
 
-      formulae_to_translate.insert(f);
+      formulas_to_translate.insert(f);
       namer->new_state(f);
       //a->set_init_state(f);
 
-      while (!formulae_to_translate.empty())
+      while (!formulas_to_translate.empty())
         {
           // Pick one formula.
-          formula now = *formulae_to_translate.begin();
-          formulae_to_translate.erase(formulae_to_translate.begin());
+          formula now = *formulas_to_translate.begin();
+          formulas_to_translate.erase(formulas_to_translate.begin());
 
           // Translate it
           bdd res = translate_ratexp(now, dict_);
@@ -995,7 +996,7 @@ namespace spot
 
               if (!namer->has_state(dest))
                 {
-                  formulae_to_translate.insert(dest);
+                  formulas_to_translate.insert(dest);
                   namer->new_state(dest);
                 }
               namer->new_edge(now, dest, label);
@@ -1551,7 +1552,7 @@ namespace spot
           case op::And:
             {
               formula_set implied;
-              implied_subformulae(node, implied);
+              implied_subformulas(node, implied);
 
               bdd res = bddtrue;
               for (auto sub: node)
@@ -1764,7 +1765,7 @@ namespace spot
 
                     // Handle a Miyano-Hayashi style unrolling for
                     // rational operators.  Marked nodes correspond to
-                    // subformulae in the Miyano-Hayashi set.
+                    // subformulas in the Miyano-Hayashi set.
                     dest =  d_.mt.simplify_mark(dest);
 
                     if (dest.is_marked())
@@ -1893,66 +1894,79 @@ namespace spot
     typedef std::vector<transition> dest_map;
   }
 
-  twa_graph_ptr
-  ltl_to_tgba_fm(formula f2, const bdd_dict_ptr& dict,
-                 bool exprop, bool symb_merge, bool branching_postponement,
-                 bool fair_loop_approx, const atomic_prop_set* unobs,
-                 tl_simplifier* simplifier, bool unambiguous,
-                 const output_aborter* aborter, bool label_with_ltl,
-                 bool force_obligation)
-  {
-    tl_simplifier* s = simplifier;
 
-    // Simplify the formula, if requested.
+  // ---- ltl_to_tgba_fm_otf implementation ----------------------------------
+
+  struct ltl_to_tgba_fm_otf::impl
+  {
+    ltl_to_tgba_fm_otf::options opts;
+    twa_graph_ptr aut;
+    tl_simplifier* simplifier = nullptr;
+    tl_simplifier* dest_simplifier = nullptr;
+    bool owns_simplifier = false;
+    const atomic_prop_set* unobs = nullptr;
+
+    std::unique_ptr<translate_dict> d;
+    std::unique_ptr<formula_canonicalizer> fc;
+
+    bdd all_promises = bddtrue;
+    bdd observable_events = bddfalse;
+    bdd unobservable_events = bddfalse;
+    bdd all_events = bddfalse;
+
+    formula init_state;
+    formula orig_f;
+  };
+
+  ltl_to_tgba_fm_otf::ltl_to_tgba_fm_otf(formula f, twa_graph_ptr aut,
+                           options opts,
+                           tl_simplifier* simplifier,
+                           const atomic_prop_set* unobs)
+    : impl_(new impl)
+  {
+    impl_->opts = opts;
+    impl_->aut = aut;
+    impl_->unobs = unobs;
+
+    // Simplify / normalize the formula.
+    tl_simplifier* s = simplifier;
     if (s)
       {
-        // This will normalize the formula regardless of the
-        // configuration of the simplifier.
-        f2 = s->simplify(f2);
+        f = s->simplify(f);
       }
     else
       {
-        // Otherwise, at least normalize the formula.  We want all the
-        // negations on the atomic propositions.  We also suppress
-        // logic abbreviations such as <=>, =>, or XOR, since they
-        // would involve negations at the BDD level.
-        s = new tl_simplifier(dict);
-        f2 = s->negative_normal_form(f2, false);
+        s = new tl_simplifier(aut->get_dict());
+        f = s->negative_normal_form(f, false);
+        impl_->owns_simplifier = true;
       }
-    assert(f2.is_in_nenoform());
+    impl_->simplifier = s;
+    impl_->dest_simplifier = simplifier;
+    assert(f.is_in_nenoform());
 
-    typedef std::set<formula> set_type;
-    set_type formulae_to_translate;
-
-    assert(dict == s->get_dict());
-
-
-    twa_graph_ptr a = make_twa_graph(dict);
-    auto namer = a->create_namer<formula>();
-
+    // Extract quantifiers.
     std::pair<quantifier_list, formula> q =
-      extract_quantifier_list(f2, dict, a);
-    f2 = q.second;
+      extract_quantifier_list(f, aut->get_dict(), aut);
+    f = q.second;
     for (auto p: q.first)
       if (SPOT_UNLIKELY(p.first))
         throw std::runtime_error
-          ("ltl2tgba_fm: does not support universal quantification");
+          ("ltl_to_tgba_fm_otf: does not support universal quantification");
 
-    // Even if the input is a persistence formula, the unambiguous option might
-    // cause the resulting automaton not to be weak.  For instance formulas
-    // such as "FGa | FGb" (note: not "F(Ga | Gb)") will introduce terms like
-    // "FGb&GF!a" that are not syntactic persistence.
-    bool one_set_enough = force_obligation || (unambiguous
-                                               ? f2.is_syntactic_obligation()
-                                               : f2.is_syntactic_persistence());
-    translate_dict d(a, s, exprop, one_set_enough, unambiguous);
+    // Determine whether a single acceptance set is enough.
+    bool one_set_enough = opts.force_obligation
+      || (opts.unambiguous
+          ? f.is_syntactic_obligation()
+          : f.is_syntactic_persistence());
 
-    // Compute the set of all promises that can possibly occur inside
-    // the formula.  These are the right-hand sides of U or F
-    // operators.
+    // Create the translation dictionary.
+    impl_->d.reset(new translate_dict(impl_->aut, s, opts.exprop,
+                                       one_set_enough, opts.unambiguous));
+
+    // Compute the set of all promises.
     bdd all_promises = bddtrue;
-    if (fair_loop_approx || unobs)
-      f2.traverse([&all_promises, &d](formula f)
+    if (opts.fair_loop_approx || unobs)
+      f.traverse([&all_promises, &d = *impl_->d](formula f)
                   {
                     if (f.is(op::F))
                       all_promises &=
@@ -1965,32 +1979,33 @@ namespace spot
                         bdd_ithvar(d.register_a_variable(f));
                     return f.is_boolean();
                   });
+    impl_->all_promises = all_promises;
 
-    formula_canonicalizer fc(d, fair_loop_approx, all_promises,
-                             std::move(q.first));
+    // Create the formula canonicalizer.
+    impl_->fc.reset(new formula_canonicalizer(*impl_->d,
+                                               opts.fair_loop_approx,
+                                               all_promises,
+                                               std::move(q.first)));
 
-    // These are used when atomic propositions are interpreted as
-    // events.  There are two kinds of events: observable events are
-    // those used in the formula, and unobservable events or other
-    // events that can occur at anytime.  All events exclude each
-    // other.
-    bdd observable_events = bddfalse;
-    bdd unobservable_events = bddfalse;
+    // Compute event BDDs when unobs is set.
     if (unobs)
       {
+        bdd observable_events = bddfalse;
+        bdd unobservable_events = bddfalse;
         bdd neg_events = bddtrue;
-        auto aps = std::unique_ptr<atomic_prop_set>(atomic_prop_collect(f2));
+        auto aps = std::unique_ptr<atomic_prop_set>(atomic_prop_collect(f));
         for (auto pi: *aps)
           {
-            int p = d.register_proposition(pi);
+            int p = impl_->d->register_proposition(pi);
             bdd pos = bdd_ithvar(p);
             bdd neg = bdd_nithvar(p);
-            observable_events = (observable_events & neg) | (neg_events & pos);
+            observable_events = (observable_events & neg)
+              | (neg_events & pos);
             neg_events &= neg;
           }
         for (auto pi: *unobs)
           {
-            int p = d.register_proposition(pi);
+            int p = impl_->d->register_proposition(pi);
             bdd pos = bdd_ithvar(p);
             bdd neg = bdd_nithvar(p);
             unobservable_events = ((unobservable_events & neg)
@@ -1998,50 +2013,103 @@ namespace spot
             observable_events &= neg;
             neg_events &= neg;
           }
+        impl_->observable_events = observable_events;
+        impl_->unobservable_events = unobservable_events;
+        impl_->all_events = observable_events | unobservable_events;
       }
-    bdd all_events = observable_events | unobservable_events;
 
-    auto orig_f = f2;
+    // Save the original formula (before canonicalization) for property checks.
+    impl_->orig_f = f;
 
-    // This is in case the initial state is equivalent to true...
-    if (symb_merge)
-      f2 = fc.canonicalize(f2);
+    // Canonicalize the initial state.
+    if (opts.symb_merge)
+      f = impl_->fc->canonicalize(f);
 
-    formulae_to_translate.insert(f2);
-    a->set_init_state(namer->new_state(f2));
+    impl_->init_state = f;
+  }
+
+  ltl_to_tgba_fm_otf::~ltl_to_tgba_fm_otf()
+  {
+    if (impl_->owns_simplifier)
+      delete impl_->simplifier;
+  }
+
+  formula
+  ltl_to_tgba_fm_otf::init_state() const
+  {
+    return impl_->init_state;
+  }
+
+  formula
+  ltl_to_tgba_fm_otf::orig_formula() const
+  {
+    return impl_->orig_f;
+  }
+
+  bdd
+  ltl_to_tgba_fm_otf::succ_as_bdd(formula s)
+  {
+    const translate_dict::translated& t = impl_->fc->translate(s);
+    bdd res = t.symbolic;
+
+    if (res == bddfalse)
+      return bddfalse;
+
+    // Handle exclusive events.
+    if (impl_->unobs)
+      {
+        res &= impl_->observable_events;
+        int n = impl_->d->register_next_variable(s);
+        res |= impl_->unobservable_events & bdd_ithvar(n)
+          & impl_->all_promises;
+      }
+
+    return res;
+  }
+
+  std::vector<fm_edge>
+  ltl_to_tgba_fm_otf::succ_as_edges(formula s)
+  {
+    bdd res = succ_as_bdd(s);
+
+    if (res == bddfalse)
+      return {};
 
     dest_map dests;
-    while (!formulae_to_translate.empty())
+
+    // Compute all outgoing arcs.
+    // If EXPROP is set, we will refine the symbolic
+    // representation of the successors for all combinations of
+    // the atomic properties involved in the formula.
+    // VAR_SET is the set of these properties.
+    // ALL_PROPS is the satisfiable combinations of VAR_SET to consider.
+    bdd var_set = bddtrue;
+    bdd all_props = bddtrue;
+    if (impl_->opts.exprop)
       {
-        if (aborter && aborter->too_large(a))
-          {
-            a->release_formula_namer(namer, false);
-            if (!simplifier)
-              delete s;
-            return nullptr;
-          }
+        var_set = bdd_existcomp(bdd_support(res), impl_->d->var_set);
+        all_props = bdd_existcomp(res, impl_->d->var_set);
+      }
 
-        // Pick one formula.
-        formula now = *formulae_to_translate.begin();
-        formulae_to_translate.erase(formulae_to_translate.begin());
-
-        // Translate it into a BDD to simplify it.
-        const translate_dict::translated& t = fc.translate(now);
-        bdd res = t.symbolic;
-
-        if (res == bddfalse)
-          continue;
-
-        // Handle exclusive events.
-        if (unobs)
-          {
-            res &= observable_events;
-            int n = d.register_next_variable(now);
-            res |= unobservable_events & bdd_ithvar(n) & all_promises;
-          }
-
-        // We used to factor only Next and A variables while computing
-        // prime implicants, with
+    for (bdd one_prop_set: minterms_of(all_props, var_set))
+      {
+        // Compute prime implicants.
+        // The reason we use prime implicants and not bdd_satone()
+        // is that we do not want to get any negation in front of Next
+        // or Acc variables.  We wouldn't know what to do with these.
+        // We never added negations in front of these variables when
+        // we built the BDD, so prime implicants will not "invent" them.
+        //
+        // FIXME: minato_isop is quite expensive, and I (=adl)
+        // don't think we really care that much about getting the
+        // smallest sum of products that minato_isop strives to
+        // compute.  Given that Next and Acc variables should
+        // always be positive, maybe there is a faster way to
+        // compute the successors?  E.g. using bdd_satone() and
+        // ignoring negated Next and Acc variables.
+        //
+        // Historical note: We used to factor only Next and A variables
+        // while computing prime implicants, with
         //    minato_isop isop(res, d.next_set & d.a_set);
         // in order to obtain transitions with formulas of atomic
         // proposition directly, but unfortunately this led to strange
@@ -2052,161 +2120,201 @@ namespace spot
         // Of course both formulas are logically equivalent, but the
         // latter is "more deterministic" than the former, so it should
         // be preferred.
-        //
-        // Therefore we now factor all variables.  This may lead to more
-        // transitions than necessary (e.g.,  r(f + g) = f + g  will be
-        // coded as two transitions), but we later merge all transitions
-        // with same source/destination and acceptance conditions.  This
-        // is the goal of the `dests' hash.
-        //
-        // Note that this is still not optimal.  For instance it is
-        // better to encode `f U g' as
-        //     r(f U g) = g + a(g).r(X(f U g)).f.!g
-        // because that leads to a deterministic automaton.  In order
-        // to handle this, we take the conditions of any transition
-        // going to true (it's `g' here), and remove it from the other
-        // transitions.
-        //
-        // In `exprop' mode, considering all possible combinations of
-        // outgoing propositions generalizes the above trick.
-        dests.clear();
-
-        // Compute all outgoing arcs.
-        // If EXPROP is set, we will refine the symbolic
-        // representation of the successors for all combinations of
-        // the atomic properties involved in the formula.
-        // VAR_SET is the set of these properties.
-        // ALL_PROPS is the satisfiable combinations of VAR_SET to consider.
-        bdd var_set = bddtrue;
-        bdd all_props = bddtrue;
-        if (exprop)
+        minato_isop isop(bdd_restrict(res, one_prop_set));
+        bdd cube;
+        while ((cube = isop.next()) != bddfalse)
           {
-            var_set = bdd_existcomp(bdd_support(res), d.var_set);
-            all_props = bdd_existcomp(res, d.var_set);
-          }
+            bdd dest_bdd = bdd_existcomp(cube, impl_->d->next_set);
+            formula dest = impl_->d->conj_bdd_to_formula(dest_bdd);
 
-        for (bdd one_prop_set: minterms_of(all_props, var_set))
-          {
-            // Compute prime implicants.
-            // The reason we use prime implicants and not bdd_satone()
-            // is that we do not want to get any negation in front of Next
-            // or Acc variables.  We wouldn't know what to do with these.
-            // We never added negations in front of these variables when
-            // we built the BDD, so prime implicants will not "invent" them.
-            //
-            // FIXME: minato_isop is quite expensive, and I (=adl)
-            // don't think we really care that much about getting the
-            // smallest sum of products that minato_isop strives to
-            // compute.  Given that Next and Acc variables should
-            // always be positive, maybe there is a faster way to
-            // compute the successors?  E.g. using bdd_satone() and
-            // ignoring negated Next and Acc variables.
-            minato_isop isop(bdd_restrict(res, one_prop_set));
-            bdd cube;
-            while ((cube = isop.next()) != bddfalse)
+            // Simplify the formula, if requested.
+            if (impl_->dest_simplifier)
               {
-                bdd dest_bdd = bdd_existcomp(cube, d.next_set);
-                formula dest = d.conj_bdd_to_formula(dest_bdd);
-
-                // Simplify the formula, if requested.
-                if (simplifier)
-                  {
-                    dest = simplifier->simplify(dest);
-                    // Ignore the arc if the destination reduces to false.
-                    if (dest.is_ff())
-                      continue;
-                  }
-
-                // If we already know a state with the same
-                // successors, use it in lieu of the current one.
-                if (symb_merge)
-                  dest = fc.canonicalize(dest);
-
-                bdd conds =
-                  exprop ? one_prop_set : bdd_existcomp(cube, d.var_set);
-                bdd promises = bdd_existcomp(cube, d.a_set);
-                dests.emplace_back(transition(dest, conds, promises));
+                dest = impl_->dest_simplifier->simplify(dest);
+                if (dest.is_ff())
+                  continue;
               }
-          }
 
-        assert(dests.size() > 0);
-        if (branching_postponement && dests.size() > 1)
-          {
-            std::sort(dests.begin(), dests.end(), postponement_cmp);
-            // Iterate over all dests, and merge the destination of
-            // transitions with identical labels.
-            dest_map::iterator out = dests.begin();
-            dest_map::const_iterator in = out;
-            do
-              {
-                transition t = *in;
-                while (++in != dests.end()
-                       && t.cond == in->cond && t.prom == in->prom)
-                  t.dest = formula::Or(t.dest, in->dest);
-                *out++ = t;
-              }
-            while (in != dests.end());
-            dests.erase(out, dests.end());
-          }
-        std::sort(dests.begin(), dests.end());
-        // If we have some transitions to true, they are the first
-        // ones.  Remove the sum of their conditions from other
-        // transitions.  It might sounds that this is not needed when
-        // exprop is used, but in fact it is complementary.
-        //
-        // Consider
-        //   f = r(X(1) R p) = p.(1 + r(X(1) R p))
-        // with exprop the two outgoing arcs would be
-        //         p               p
-        //     f ----> 1       f ----> f
-        //
-        // where in fact we could output
-        //         p
-        //     f ----> 1
-        //
-        // because there is no point in looping on f if we can go to 1.
-        if (dests.front().dest.is_tt())
-          {
-            dest_map::iterator i = dests.begin();
-            bdd c = bddfalse;
-            while (i != dests.end() && i->dest.is_tt())
-              c |= i++->cond;
-            if (c != bddfalse)
-              for (; i != dests.end(); ++i)
-                i->cond -= c;
-          }
+            // Canonicalize if symb_merge is enabled.
+            if (impl_->opts.symb_merge)
+              dest = impl_->fc->canonicalize(dest);
 
-        // Create transitions in the automaton
+            bdd conds =
+              impl_->opts.exprop
+              ? one_prop_set
+              : bdd_existcomp(cube, impl_->d->var_set);
+            bdd promises = bdd_existcomp(cube, impl_->d->a_set);
+            dests.emplace_back(transition(dest, conds, promises));
+          }
+      }
+
+    assert(dests.size() > 0);
+
+    // Branching postponement.
+    if (impl_->opts.branching_postponement && dests.size() > 1)
+      {
+        std::sort(dests.begin(), dests.end(), postponement_cmp);
+        dest_map::iterator out = dests.begin();
+        dest_map::const_iterator in = out;
+        do
+          {
+            transition t = *in;
+            while (++in != dests.end()
+                   && t.cond == in->cond && t.prom == in->prom)
+              t.dest = formula::Or(t.dest, in->dest);
+            *out++ = t;
+          }
+        while (in != dests.end());
+        dests.erase(out, dests.end());
+      }
+
+    std::sort(dests.begin(), dests.end());
+
+    // Remove conditions already covered by transitions to true.
+    // If we have some transitions to true, they are the first
+    // ones.  Remove the sum of their conditions from other
+    // transitions.  It might sounds that this is not needed when
+    // exprop is used, but in fact it is complementary.
+    //
+    // Consider
+    //   f = r(X(1) R p) = p.(1 + r(X(1) R p))
+    // with exprop the two outgoing arcs would be
+    //         p               p
+    //     f ----> 1       f ----> f
+    //
+    // where in fact we could output
+    //         p
+    //     f ----> 1
+    //
+    // because there is no point in looping on f if we can go to 1.
+    if (dests.front().dest.is_tt())
+      {
+        dest_map::iterator i = dests.begin();
+        bdd c = bddfalse;
+        while (i != dests.end() && i->dest.is_tt())
+          c |= i++->cond;
+        if (c != bddfalse)
+          for (; i != dests.end(); ++i)
+            i->cond -= c;
+      }
+
+    // Build the result vector, merging transitions with same dest+prom.
+    std::vector<fm_edge> edges;
+    {
+      dest_map::const_iterator in = dests.begin();
+      do
         {
-          dest_map::const_iterator in = dests.begin();
-          do
+          transition t = *in;
+          while (++in != dests.end()
+                 && t.prom == in->prom && t.dest == in->dest)
+            t.cond |= in->cond;
+          if (t.cond != bddfalse)
             {
-              // Merge transitions with same destination and
-              // acceptance.
-              transition t = *in;
-              while (++in != dests.end()
-                     && t.prom == in->prom && t.dest == in->dest)
-                t.cond |= in->cond;
-              // Actually create the transition
-              if (t.cond != bddfalse)
-                {
-                  // When translating LTL for an event-based logic
-                  // with unobservable events, the 1 state should
-                  // accept all events, even unobservable events.
-                  if (unobs && t.dest.is_tt() && now.is_tt())
-                    t.cond = all_events;
+              // When translating LTL for an event-based logic
+              // with unobservable events, the 1 state should
+              // accept all events.
+              if (impl_->unobs && t.dest.is_tt() && s.is_tt())
+                t.cond = impl_->all_events;
 
-                  // Will this be a new state?
-                  if (!namer->has_state(t.dest))
-                    {
-                      formulae_to_translate.insert(t.dest);
-                      namer->new_state(t.dest);
-                    }
-                  namer->new_edge(now, t.dest, t.cond, d.bdd_to_mark(t.prom));
-                }
+              edges.push_back({t.cond, t.dest,
+                               impl_->d->bdd_to_mark(t.prom)});
             }
-          while (in != dests.end());
         }
+      while (in != dests.end());
+    }
+
+    return edges;
+  }
+
+  const bdd&
+  ltl_to_tgba_fm_otf::var_set() const
+  {
+    return impl_->d->var_set;
+  }
+
+  const bdd&
+  ltl_to_tgba_fm_otf::next_set() const
+  {
+    return impl_->d->next_set;
+  }
+
+  const bdd&
+  ltl_to_tgba_fm_otf::a_set() const
+  {
+    return impl_->d->a_set;
+  }
+
+  formula
+  ltl_to_tgba_fm_otf::conj_bdd_to_formula(bdd cube) const
+  {
+    return impl_->d->conj_bdd_to_formula(cube);
+  }
+
+  acc_cond::mark_t
+  ltl_to_tgba_fm_otf::bdd_to_mark(bdd a) const
+  {
+    return impl_->d->bdd_to_mark(a);
+  }
+
+  int
+  ltl_to_tgba_fm_otf::register_next_variable(formula f)
+  {
+    return impl_->d->register_next_variable(f);
+  }
+
+  const bdd_dict_ptr&
+  ltl_to_tgba_fm_otf::get_dict() const
+  {
+    return impl_->d->dict;
+  }
+
+
+  twa_graph_ptr
+  ltl_to_tgba_fm(formula f2, const bdd_dict_ptr& dict,
+                 bool exprop, bool symb_merge, bool branching_postponement,
+                 bool fair_loop_approx, const atomic_prop_set* unobs,
+                 tl_simplifier* simplifier, bool unambiguous,
+                 const output_aborter* aborter, bool label_with_ltl,
+                 bool force_obligation)
+  {
+    twa_graph_ptr a = make_twa_graph(dict);
+    auto namer = a->create_namer<formula>();
+
+    ltl_to_tgba_fm_otf::options opts;
+    opts.exprop = exprop;
+    opts.symb_merge = symb_merge;
+    opts.branching_postponement = branching_postponement;
+    opts.fair_loop_approx = fair_loop_approx;
+    opts.unambiguous = unambiguous;
+    opts.force_obligation = force_obligation;
+
+    ltl_to_tgba_fm_otf expl(f2, a, opts, simplifier, unobs);
+
+    formula init = expl.init_state();
+    std::set<formula> formulas_to_translate;
+    formulas_to_translate.insert(init);
+    a->set_init_state(namer->new_state(init));
+
+    while (!formulas_to_translate.empty())
+      {
+        if (aborter && aborter->too_large(a))
+          {
+            a->release_formula_namer(namer, false);
+            return nullptr;
+          }
+
+        formula now = *formulas_to_translate.begin();
+        formulas_to_translate.erase(formulas_to_translate.begin());
+
+        for (auto& e: expl.succ_as_edges(now))
+          {
+            if (!namer->has_state(e.dst))
+              {
+                formulas_to_translate.insert(e.dst);
+                namer->new_state(e.dst);
+              }
+            namer->new_edge(now, e.dst, e.cond, e.acc);
+          }
       }
 
     auto& acc = a->acc();
@@ -2215,9 +2323,10 @@ namespace spot
 
     acc.set_generalized_buchi();
 
+    formula orig_f = expl.orig_formula();
     if (orig_f.is_syntactic_stutter_invariant())
       a->prop_stutter_invariant(true);
-    // We cannot assume weak automata if the unambibuous construction
+    // We cannot assume weak automata if the unambiguous construction
     // is used.
     //
     // In an obligation formula such as (b W Ga)&F!a, initial state is
@@ -2239,12 +2348,9 @@ namespace spot
           a->prop_terminal(true);
       }
 
-    // This gives each state a name of label_with_ltl is set.
+    // This gives each state a name if label_with_ltl is set.
     a->release_formula_namer(namer, label_with_ltl);
 
-    if (!simplifier)
-      // This should not be deleted before we have registered all propositions.
-      delete s;
     return a;
   }
 

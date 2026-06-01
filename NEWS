@@ -61,6 +61,11 @@ New in spot 2.15.1.dev  (not yet released)
     SPOT_FROM_LTLF environment variable to pick the algorithm
     (defaulting to 1).
 
+  - spot::ltl_to_tgba_fm_otf is a new class that exposes the core
+    Couvreur/FM LTL-to-TGBA translation as an on-the-fly explorer.
+    The existing spot::ltl_to_tgba_fm() has been refactored to use
+    this class.
+
   Bug fixes:
 
   - Acceptance formulas that are too large to be stored internally now
