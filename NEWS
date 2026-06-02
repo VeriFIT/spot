@@ -66,6 +66,10 @@ New in spot 2.15.1.dev  (not yet released)
     The existing spot::ltl_to_tgba_fm() has been refactored to use
     this class.
 
+  - spot::ltl_satisfiable() (introduced in 2.15) has been rewritten
+    to use the above on-the-fly explorer. Note that this functions is
+    what is used by 'ltlfilt --satisfiable'.  (Issue #626.)
+
   Bug fixes:
 
   - Acceptance formulas that are too large to be stored internally now

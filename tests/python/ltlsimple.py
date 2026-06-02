@@ -208,5 +208,65 @@ tc.assertEqual(repr(spot.formula.apid_map()),
 
 tc.assertEqual(str(spot.formula.ap_from_apid(0)), 'a')
 
-tc.assertTrue(spot.ltl_satisfiable('(!a U a) & FGa'))
-tc.assertFalse(spot.ltl_satisfiable('(!a U Ga) & GF!a'))
+# ----------------------------------------------------------------------
+# Satisfiability tests
+# ----------------------------------------------------------------------
+
+satisfiability_tests = [
+    ('a', True),
+    ('Xa', True),
+    ('Fa', True),
+    ('Ga', True),
+    ('a U b', True),
+    ('a R b', True),
+    ('a W b', True),
+    ('a M b', True),
+    ('FGa', True),
+    ('GFa', True),
+    ('G(a U b)', True),
+    ('F(a R b)', True),
+    ('a | b', True),
+    ('Fa | Gb', True),
+    ('(a U b) | (c R d)', True),
+    ('Ga | F!a', True),
+    ('FGa | GFb', True),
+    ('GFa & GFb', True),
+    ('GFa & GFb & GFc', True),
+    ('G(a -> Fb)', True),
+    ('GFa & (b U c)', True),
+    ('Ga & GFb', True),
+    ('FGb & GFb', True),
+    ('(!a U a) & FGa', True),
+    ('(!a U Ga) & GF!a', False),
+    ('FGa | GFb', True),
+    ('FG(a | b)', True),
+    ('G(a | Fb)', True),
+    ('(a U !a) & (!a U a)', True),  # witness: [!a, a]
+    ('(a & X!a) | (!a & Xa)', True),
+    ('(a -> Xb) & (b -> Xa) & Fa', True),
+    ('a U (b R c)', True),
+    ('G(a | b) & F!a', True),
+    ('F(a & X!a)', True),
+    ('0', False),
+    ('a & !a', False),
+    ('G a & F !a', False),
+    ('F a & G !a', False),
+    ('a U b & a U !b & G!a', False),
+    ('G(!a & !b) & a U b', False),
+    ('(G a & F !a) | (G b & F !b)', False),
+    ('GFa & FG!a', False),
+    ('(!a U Ga) & GF!a', False),
+    ('GFa & GF!a & G(a -> b) & FG!b', False),
+    ('GFa & GFb & FG!a', False),
+    ('G(a | b) & FG!a & FG!b', False),
+    ('GFa & G(a <-> b) & FG!b', False),
+    ('G!a & Fa', False),
+    ('G!c & a U (b R c)', False),
+    ('G(a <-> X!a) & FGa', False),
+]
+
+for fstr, expected in satisfiability_tests:
+    tc.assertEqual(spot.ltl_satisfiable(fstr), expected,
+                   f"ltl_satisfiable('{fstr}') should be {expected}")
+    tc.assertEqual(spot.translate(fstr).is_empty(), not expected,
+                   f"translate('{fstr}').is_empty() should be {not expected}")
