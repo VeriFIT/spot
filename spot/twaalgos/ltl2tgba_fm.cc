@@ -252,6 +252,87 @@ namespace spot
         return res;
       }
 
+      /// \brief Decompose a cube from minato_isop into its three components.
+      ///
+      /// Iterates over the literals of the cube once, classifying each
+      /// BDD variable as belonging to \c a_set (acceptance), \c next_set
+      /// (destination formulas), or \c var_set (atomic propositions).
+      /// The condition BDD is built from the bottom up for efficiency.
+      struct split_result
+      {
+        bdd cond;
+        formula dest;
+        acc_cond::mark_t acc;
+      };
+
+      split_result split_cube_as_cond_dest_and_acc(bdd cube) const
+      {
+        acc_cond::mark_t acc = {};
+        std::vector<formula> dest_formulas;
+        // Collect condition literals as encoded ints: a positive
+        // literal for variable v is stored as v, a negative literal
+        // as ~v.  Testing the sign tells the polarity.
+        // Built from the bottom up afterwards for BDD efficiency.
+        std::vector<int> cond_literals;
+
+        while (cube != bddtrue)
+          {
+            int v = bdd_var(cube);
+            bdd high = bdd_high(cube);
+            bool positive = (high != bddfalse);
+            cube = positive ? high : bdd_low(cube);
+
+            auto bm_it = bm.find(v);
+            if (bm_it != bm.end())
+              {
+                // a_set variable: accumulate acceptance marks.
+                if (positive)
+                  acc.set(bm_it->second);
+              }
+            else if (v < static_cast<int>(next_formula_map.size())
+                     && next_formula_map[v])
+              {
+                // next_set variable: collect for destination formula.
+                formula f = next_formula_map[v];
+                if (!positive)
+                  f = formula::Not(f);
+                dest_formulas.push_back(f);
+              }
+            else
+              {
+                // var_set variable: accumulate for condition BDD.
+                if (positive)
+                  cond_literals.push_back(v);
+                else
+                  cond_literals.push_back(~v);
+              }
+          }
+
+        // Build the condition BDD from the bottom up (highest var first).
+        bdd cond = bddtrue;
+        for (auto it = cond_literals.rbegin();
+             it != cond_literals.rend(); ++it)
+          {
+            int lit = *it;
+            if (lit >= 0)
+              cond &= bdd_ithvar(lit);
+            else
+              cond &= bdd_nithvar(~lit);
+          }
+
+        // Build the destination formula.
+        formula dest = formula::tt();
+        if (!dest_formulas.empty())
+          {
+            if (dest_formulas.size() == 1)
+              dest = dest_formulas[0];
+            else
+              dest = formula::And(std::move(dest_formulas));
+          }
+
+        return {cond, dest, acc};
+      }
+
       int
       register_a_variable(formula f)
       {
@@ -1856,10 +1937,10 @@ namespace spot
     struct transition
     {
       formula dest;
-      bdd prom;
+      acc_cond::mark_t prom;
       bdd cond;
 
-      transition(formula dest, bdd cond, bdd prom)
+      transition(formula dest, bdd cond, acc_cond::mark_t prom)
         : dest(dest), prom(prom), cond(cond)
       {
       }
@@ -1870,19 +1951,20 @@ namespace spot
           return true;
         if (other.dest < dest)
           return false;
-        if (prom.id() < other.prom.id())
+        if (prom < other.prom)
           return true;
-        if (prom.id() > other.prom.id())
+        if (other.prom < prom)
           return false;
         return cond.id() < other.cond.id();
       }
     };
 
-    bool postponement_cmp(const transition& lhs, const transition& rhs) noexcept
+    bool postponement_cmp(const transition& lhs,
+                          const transition& rhs) noexcept
     {
-      if (lhs.prom.id() < rhs.prom.id())
+      if (lhs.prom < rhs.prom)
         return true;
-      if (lhs.prom.id() > rhs.prom.id())
+      if (rhs.prom < lhs.prom)
         return false;
       if (lhs.cond.id() < rhs.cond.id())
         return true;
@@ -2124,8 +2206,14 @@ namespace spot
         bdd cube;
         while ((cube = isop.next()) != bddfalse)
           {
-            bdd dest_bdd = bdd_existcomp(cube, impl_->d->next_set);
-            formula dest = impl_->d->conj_bdd_to_formula(dest_bdd);
+            auto [cond, dest, acc] =
+              impl_->d->split_cube_as_cond_dest_and_acc(cube);
+
+            // When exprop is enabled, the condition is the full
+            // minterm, not just the AP variables appearing in the
+            // cube (which may be a subset after bdd_restrict).
+            if (impl_->opts.exprop)
+              cond = one_prop_set;
 
             // Simplify the formula, if requested.
             if (impl_->dest_simplifier)
@@ -2139,12 +2227,7 @@ namespace spot
             if (impl_->opts.symb_merge)
               dest = impl_->fc->canonicalize(dest);
 
-            bdd conds =
-              impl_->opts.exprop
-              ? one_prop_set
-              : bdd_existcomp(cube, impl_->d->var_set);
-            bdd promises = bdd_existcomp(cube, impl_->d->a_set);
-            dests.emplace_back(transition(dest, conds, promises));
+            dests.emplace_back(transition(dest, cond, acc));
           }
       }
 
@@ -2216,8 +2299,7 @@ namespace spot
               if (impl_->unobs && t.dest.is_tt() && s.is_tt())
                 t.cond = impl_->all_events;
 
-              edges.push_back({t.cond, t.dest,
-                               impl_->d->bdd_to_mark(t.prom)});
+              edges.push_back({t.cond, t.dest, t.prom});
             }
         }
       while (in != dests.end());
@@ -2242,15 +2324,15 @@ namespace spot
     // them preserves exactly the set of reachable (acc, dst) pairs.
     res = bdd_exist(res, impl_->d->var_set);
 
-    std::set<fm_simple_edge> seen;
+    std::vector<fm_simple_edge> edges;
 
     minato_isop isop(res);
     bdd cube;
     while ((cube = isop.next()) != bddfalse)
       {
-        auto [dest_bdd, promises] =
-          bdd_splitcube(cube, impl_->d->next_set);
-        formula dest = impl_->d->conj_bdd_to_formula(dest_bdd);
+        auto [cond, dest, acc] =
+          impl_->d->split_cube_as_cond_dest_and_acc(cube);
+        (void) cond; // unused in this path
 
         // Simplify the formula, if requested.
         if (impl_->dest_simplifier)
@@ -2264,11 +2346,10 @@ namespace spot
         if (impl_->opts.symb_merge)
           dest = impl_->fc->canonicalize(dest);
 
-        acc_cond::mark_t acc = impl_->d->bdd_to_mark(promises);
-        seen.insert({acc, dest});
+        edges.push_back({acc, dest});
       }
 
-    return {seen.begin(), seen.end()};
+    return edges;
   }
 
   const bdd&

@@ -115,15 +115,6 @@ namespace spot
   {
     acc_cond::mark_t acc;  ///< Acceptance marks, using negated-Inf semantics.
     formula dst;           ///< Destination formula-state.
-
-    bool operator<(const fm_simple_edge& o) const noexcept
-    {
-      if (dst.id() < o.dst.id())
-        return true;
-      if (o.dst.id() < dst.id())
-        return false;
-      return acc < o.acc;
-    }
   };
 
   /// \ingroup twa_ltl
