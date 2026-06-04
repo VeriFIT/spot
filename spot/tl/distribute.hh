@@ -27,5 +27,10 @@ namespace spot
   ///
   /// Convert a formula like X(a | X(b | X(c & Xd)))
   /// into X(a) | XX(b) | (XXX(c) & XXXXd)
-  SPOT_API formula distribute_next(formula f, int level = 0);
+  ///
+  /// If some of the X operators in the chain are X[!] (strong next),
+  /// the corresponding operators in the output will be X[!] as well,
+  /// making this transformation suitable for both LTL (infinite
+  /// semantics) and LTLf (finite semantics).
+  SPOT_API formula distribute_next(formula f);
 }

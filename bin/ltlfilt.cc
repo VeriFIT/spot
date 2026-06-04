@@ -40,6 +40,7 @@
 #include <spot/tl/length.hh>
 #include <spot/tl/relabel.hh>
 #include <spot/tl/unabbrev.hh>
+#include <spot/tl/distribute.hh>
 #include <spot/tl/remove_x.hh>
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/exclusive.hh>
@@ -72,6 +73,7 @@ enum {
   OPT_DEFINE,
   OPT_DELTA1,
   OPT_DELTA2,
+  OPT_DISTRIBUTE_X,
   OPT_DROP_ERRORS,
   OPT_EQUIVALENT_TO,
   OPT_EXCLUSIVE_AP,
@@ -230,6 +232,8 @@ static const argp_option options[] =
       "match syntactic-persistence formulas", 0 },
     { "sigma2", OPT_SIGMA2, nullptr, 0, "match Σ₂ formulas", 0 },
     { "delta2", OPT_DELTA2, nullptr, 0, "match Δ₂ formulas", 0 },
+    { "distribute-X", OPT_DISTRIBUTE_X, nullptr, 0,
+      "distribute X (and X[!]) operators over Boolean operators", 0 },
     { "syntactic-stutter-invariant", OPT_SYNTACTIC_SI, nullptr, 0,
       "match stutter-invariant formulas syntactically (LTL-X or siPSL)", 0 },
     { "nox", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
@@ -378,6 +382,7 @@ static int opt_max_count = -1;
 static long int match_count = 0;
 static const char* from_ltlf = nullptr;
 static const char* sonf = nullptr;
+static bool opt_distribute_x = false;
 static bool to_delta2 = false;
 static bool satisfiable = false;
 
@@ -484,6 +489,9 @@ parse_opt(int key, char* arg, struct argp_state*)
       break;
     case OPT_DELTA2:
       delta2 = true;
+      break;
+    case OPT_DISTRIBUTE_X:
+      opt_distribute_x = true;
       break;
     case OPT_DROP_ERRORS:
       error_style = drop_errors;
@@ -785,6 +793,9 @@ namespace
               opt->output_sonf->ostream() << '\n';
             }
         }
+
+      if (opt_distribute_x)
+        f = spot::distribute_next(f);
 
       if (to_delta2)
         f = spot::to_delta2(f);

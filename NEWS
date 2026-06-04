@@ -26,6 +26,9 @@ New in spot 2.15.1.dev  (not yet released)
     input).  The old "%T" sequence is still supported by ltldo, but
     undocumented.
 
+  - ltlfilt learned a --distribute-X option that distributes X and
+    X[!] operators over Boolean connectives.
+
   Library:
 
   - spot::lasso_enumerator is a new class that lazily enumerates all
@@ -69,6 +72,9 @@ New in spot 2.15.1.dev  (not yet released)
   - spot::ltl_satisfiable() (introduced in 2.15) has been rewritten
     to use the above on-the-fly explorer. Note that this functions is
     what is used by 'ltlfilt --satisfiable'.  (Issue #626.)
+
+  - spot::distribute_next() is a new function that distributes X and
+    X[!] operators over Boolean connectives in a formula.
 
   Bug fixes:
 

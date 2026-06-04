@@ -1,0 +1,95 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Test --distribute-X
+
+. ./defs || exit 1
+
+set -e
+
+cat >in <<\EOF
+X(a | b)
+X(a & b)
+X(a | Xb | XXc)
+Xa
+a U b
+X(Fa)
+X[!](a | b)
+X[!](a & b)
+X[!](X[!]a | b)
+X(a | X[!](b & c))
+X(a) | Xb
+X(X[!]a | X[!]b)
+X[!](X(a | b))
+X(X[!](X(a | b)))
+X((a & b) | (c & d))
+X(a & (b | c))
+X((a | b) & (c | d))
+X[!]((a & b) | (c & d))
+X[!](a & (b | c))
+X(X[!]((a & b) | (c & d)))
+X[!]X[!]a
+X[!]X[!]X[!]a
+X[!](a & X[!]b)
+X(Ga | Fb)
+X(Fa & Gb)
+X[!](Ga | Fb)
+X(G(a | b))
+X(a U (b | c))
+X[!](a U b)
+X(0)
+a & b
+EOF
+
+cat >exp <<\EOF
+Xa | Xb
+Xa & Xb
+Xa | XXb | XXXc
+Xa
+a U b
+XFa
+X[!]a | X[!]b
+X[!]a & X[!]b
+X[!]b | X[!]X[!]a
+Xa | (XX[!]b & XX[!]c)
+Xa | Xb
+XX[!]a | XX[!]b
+X[!]Xa | X[!]Xb
+XX[!]Xa | XX[!]Xb
+(Xa & Xb) | (Xc & Xd)
+Xa & (Xb | Xc)
+(Xa | Xb) & (Xc | Xd)
+(X[!]a & X[!]b) | (X[!]c & X[!]d)
+X[!]a & (X[!]b | X[!]c)
+(XX[!]a & XX[!]b) | (XX[!]c & XX[!]d)
+X[!]X[!]a
+X[!]X[!]X[!]a
+X[!]a & X[!]X[!]b
+XGa | XFb
+XFa & XGb
+X[!]Ga | X[!]Fb
+XG(a | b)
+X(a U (b | c))
+X[!](a U b)
+X(0)
+a & b
+EOF
+
+run 0 ltlfilt --distribute-X in > out
+diff exp out
