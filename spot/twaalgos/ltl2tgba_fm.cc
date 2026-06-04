@@ -2226,6 +2226,51 @@ namespace spot
     return edges;
   }
 
+  std::vector<fm_simple_edge>
+  ltl_to_tgba_fm_otf::succ_as_acc_and_dest(formula s)
+  {
+    bdd res = succ_as_bdd(s);
+
+    if (res == bddfalse)
+      return {};
+
+    // Existentially quantify atomic propositions away, so that the
+    // BDD only contains variables representing formulas (next_set)
+    // and acceptance marks (a_set).  Since we do not compute BDD
+    // conditions, there is no need to iterate over all combinations
+    // of atomic propositions (exprop); existentially quantifying
+    // them preserves exactly the set of reachable (acc, dst) pairs.
+    res = bdd_exist(res, impl_->d->var_set);
+
+    std::set<fm_simple_edge> seen;
+
+    minato_isop isop(res);
+    bdd cube;
+    while ((cube = isop.next()) != bddfalse)
+      {
+        auto [dest_bdd, promises] =
+          bdd_splitcube(cube, impl_->d->next_set);
+        formula dest = impl_->d->conj_bdd_to_formula(dest_bdd);
+
+        // Simplify the formula, if requested.
+        if (impl_->dest_simplifier)
+          {
+            dest = impl_->dest_simplifier->simplify(dest);
+            if (dest.is_ff())
+              continue;
+          }
+
+        // Canonicalize if symb_merge is enabled.
+        if (impl_->opts.symb_merge)
+          dest = impl_->fc->canonicalize(dest);
+
+        acc_cond::mark_t acc = impl_->d->bdd_to_mark(promises);
+        seen.insert({acc, dest});
+      }
+
+    return {seen.begin(), seen.end()};
+  }
+
   const bdd&
   ltl_to_tgba_fm_otf::var_set() const
   {

@@ -105,6 +105,28 @@ namespace spot
   };
 
   /// \ingroup twa_ltl
+  /// \brief A simplified successor edge without condition.
+  ///
+  /// This is a lighter variant of fm_edge that omits the BDD condition
+  /// on atomic propositions.  It is useful for on-the-fly emptiness
+  /// checks where the condition is known to be bddtrue (e.g., after
+  /// realizability simplification has removed all atomic propositions).
+  struct SPOT_API fm_simple_edge
+  {
+    acc_cond::mark_t acc;  ///< Acceptance marks, using negated-Inf semantics.
+    formula dst;           ///< Destination formula-state.
+
+    bool operator<(const fm_simple_edge& o) const noexcept
+    {
+      if (dst.id() < o.dst.id())
+        return true;
+      if (o.dst.id() < dst.id())
+        return false;
+      return acc < o.acc;
+    }
+  };
+
+  /// \ingroup twa_ltl
   /// \brief On-the-fly LTL→TGBA explorer.
   ///
   /// Encapsulates the data structures from ltl_to_tgba_fm() so that
@@ -233,6 +255,27 @@ namespace spot
     ///
     /// Results are NOT cached.
     std::vector<fm_edge> succ_as_edges(formula s);
+
+    /// \brief Decompose the successors of \a s into edges without conditions.
+    ///
+    /// This is a lighter variant of succ_as_edges() that omits the BDD
+    /// condition on atomic propositions.  It is useful for on-the-fly
+    /// emptiness checks where the condition is known to be bddtrue (e.g.,
+    /// after realizability simplification has removed all atomic
+    /// propositions).  Skipping the condition computation avoids
+    /// unnecessary BDD work.
+    ///
+    /// Internally calls succ_as_bdd(), existentially quantifies all
+    /// atomic propositions away (so the BDD only contains Next and
+    /// acceptance variables), then extracts (acc, dst) pairs via
+    /// minato_isop.  Applies simplification and canonicalization
+    /// (symb_merge), but skips branching postponement and all
+    /// condition-related post-processing.  The \c exprop option is
+    /// ignored: since no conditions are extracted, there is no need to
+    /// iterate over all combinations of atomic propositions.
+    ///
+    /// Results are NOT cached.
+    std::vector<fm_simple_edge> succ_as_acc_and_dest(formula s);
 
     // ---- Accessors for interpreting succ_as_bdd() results ----
 

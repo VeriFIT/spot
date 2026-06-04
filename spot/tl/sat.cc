@@ -75,20 +75,21 @@ namespace spot
       std::stack<std::pair<formula, unsigned>> todo;
       // Live states, ordered by DFS discovery (needed for dead marking)
       std::vector<formula> live;
-      // Cache edge lists, since succ_as_edges() is expensive
+      // Cache edge lists, since succ_as_acc_and_dest() is expensive
       robin_hood::unordered_node_map<formula,
-                                     std::vector<fm_edge>> edge_cache;
+                                     std::vector<fm_simple_edge>> edge_cache;
 
       int num = 1; // DFS order counter
 
       // Retrieve the edge list for a formula-state (cached).
       auto get_edges =
-        [&](formula s) -> const std::vector<fm_edge>&
+        [&](formula s) -> const std::vector<fm_simple_edge>&
         {
           auto it = edge_cache.find(s);
           if (it != edge_cache.end())
             return it->second;
-          return edge_cache.emplace(s, expl.succ_as_edges(s)).first->second;
+          return edge_cache.emplace(s,
+                    expl.succ_as_acc_and_dest(s)).first->second;
         };
 
       // Push the initial state.
@@ -134,9 +135,6 @@ namespace spot
 
           const auto& edge = edges[edge_idx];
           ++edge_idx; // advance the iterator for the next iteration
-
-          // succ_as_edges() should filter out bddfalse.
-          assert(edge.cond != bddfalse);
 
           formula dest = edge.dst;
           acc_cond::mark_t edge_acc = edge.acc;
