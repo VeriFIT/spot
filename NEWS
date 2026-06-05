@@ -76,6 +76,11 @@ New in spot 2.15.1.dev  (not yet released)
   - spot::distribute_next() is a new function that distributes X and
     X[!] operators over Boolean connectives in a formula.
 
+  - Repetition bounds used by the operators [*i..j], [=i..j],
+    [->i..j], [:*i..j], F[i..j], G[i..j], X[i], X[!][i] etc. are now
+    stored as 16-bit values instead of 8-bit values, allowing bounds
+    up to 65534 (instead of 254).  (Issue #485.)
+
   Bug fixes:
 
   - Acceptance formulas that are too large to be stored internally now

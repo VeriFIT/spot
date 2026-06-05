@@ -30,8 +30,8 @@ cat >input <<EOF
 /2/3/4/5 a + b /6/7/8/
 a - b
 {a[*9999999999]}
-{a ##[1:255] b}
-{a ##255 b}
+{a ##[1:65535] b}
+{a ##65535 b}
 EOF
 
 run 1 ../ltl2text input |
@@ -72,17 +72,20 @@ ignoring trailing garbage
 value too large ignored
 
 Closure(@6 #0 [Star(@5 #0 0.. ["a"])])
->>> {a ##[1:255] b}
-            ^^^
-255 exceeds maximum supported repetition (254)
+>>> {a ##[1:65535] b}
+            ^^^^^
+65535 exceeds maximum supported repetition (65534)
 
-Closure(@12 #0 [Concat(@11 #0 ["a", Star(@9 #0 0..253 [tt(@1 #0)]), "b"])])
->>> {a ##255 b}
-       ^^^^^
-255 exceeds maximum supported repetition (254)
+Closure(@12 #0 [Concat(@11 #0 ["a", Star(@9 #0 0..65533 [tt(@1 #0)]), "b"])])
+>>> {a ##65535 b}
+       ^^^^^^^
+65535 exceeds maximum supported repetition (65534)
 
-Closure(@17 #0 [Concat(@16 #0 ["a", Star(@15 #0 253..253 [tt(@1 #0)]), "b"])])
 EOF
+# work around the 80-column limit
+E1='Closure(@17 #0 [Concat(@16 #0 ["a", '
+E2='Star(@15 #0 65533..65533 [tt(@1 #0)]), "b"])])'
+echo "$E1$E2">> expected
 
 diff output expected
 
@@ -114,6 +117,6 @@ a & (, a & 0
 {a[=8..1];b}, {a[=1..8];b}
 {a[->8..1];b}, {a[->1..8];b}
 {a[->..0];b}, {a[->0..1];b}
-{a[->2..300];b}, {a[->2..254];b}
+{a[->2..70000];b}, {a[->2..65534];b}
 EOF
 run 0 ../equals -E recover.txt

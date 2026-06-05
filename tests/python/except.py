@@ -234,27 +234,27 @@ else:
     report_missing_exception()
 
 try:
-    spot.formula_Star(spot.formula("a"), 10, 333)
+    spot.formula_Star(spot.formula("a"), 10, 66333)
 except OverflowError as e:
-    tc.assertIn("333", str(e))
-    tc.assertIn("254", str(e))
+    tc.assertIn("66333", str(e))
+    tc.assertIn("65534", str(e))
 else:
     report_missing_exception()
 
 try:
-    spot.formula_FStar(spot.formula("a"), 333, 400)
+    spot.formula_FStar(spot.formula("a"), 66333, 500000)
 except OverflowError as e:
-    tc.assertIn("333", str(e))
-    tc.assertIn("254", str(e))
+    tc.assertIn("66333", str(e))
+    tc.assertIn("65534", str(e))
 else:
     report_missing_exception()
 
 try:
-    spot.formula_nested_unop_range(spot.op_F, spot.op_Or, 333, 400,
+    spot.formula_nested_unop_range(spot.op_F, spot.op_Or, 66333, 500000,
                                    spot.formula("a"))
 except OverflowError as e:
-    tc.assertIn("333", str(e))
-    tc.assertIn("254", str(e))
+    tc.assertIn("66333", str(e))
+    tc.assertIn("65534", str(e))
 else:
     report_missing_exception()
 

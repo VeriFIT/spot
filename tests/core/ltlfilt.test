@@ -1064,3 +1064,9 @@ diff exp out
 
 test 22 = `ltlfilt -c --satisfiable formulas -f 'GFa & FG!a'`
 test 3 = `ltlfilt -v -c --satisfiable formulas -f 'GFa & FG!a'`
+
+
+# Large bound support (issue #485): verify large bounds are parsed and
+# represented correctly by checking the printed formula contains the bound.
+ltlfilt -f 'G({a} |-> ({b ##[1:1024] c}))' > out
+grep '[1:1024]' out

@@ -200,9 +200,9 @@ namespace spot
       }
 
       /// \see formula::unbounded
-      static constexpr uint8_t unbounded()
+      static constexpr uint16_t unbounded()
       {
-        return UINT8_MAX;
+        return UINT16_MAX;
       }
 
       /// \see formula::ap
@@ -649,22 +649,7 @@ namespace spot
 
       template<class iter>
       fnode(op o, iter begin, iter end, bool saturated = false)
-        // Clang has some optimization where is it able to combine the
-        // 4 movb initializing op_,ap_id_,saturated_ into a single
-        // movl.  Also it can optimize the three byte-comparisons of
-        // is_Kleene_star() into a single masked 32-bit comparison.
-        // The latter optimization triggers warnings from valgrind if
-        // min&max (aka ap_id_) are not initialized.  So to benefit
-        // from the initialization optimization and the
-        // is_Kleene_star() optimization in Clang, we always
-        // initialize ap_id_ with this compiler.  Do not do it the
-        // rest of the time, since the optimization is not done.
-        : op_(o),
-#if __llvm__
-        saturated_(saturated), ap_id_(0)
-#else
-        saturated_(saturated)
-#endif
+        : op_(o), saturated_(saturated)
       {
         size_t s = std::distance(begin, end);
         if (SPOT_UNLIKELY(s > (size_t) UINT16_MAX))
@@ -682,7 +667,7 @@ namespace spot
       {
       }
 
-      fnode(op o, const fnode* f, uint8_t min, uint8_t max,
+      fnode(op o, const fnode* f, unsigned min, unsigned max,
             bool saturated = false)
         : op_(o), saturated_(saturated), size_(1)
       {
@@ -707,19 +692,19 @@ namespace spot
 
       op op_;                      // operator
       mutable uint8_t saturated_;
+      mutable uint16_t refs_ = 0;  // reference count - 1;
+      uint16_t size_;              // number of children
+      size_t id_;                  // also used as hash.
       struct range_t
       {
-        uint8_t min;     // range minimum (for star-like operators)
-        uint8_t max;     // range maximum;
+        uint16_t min;     // range minimum (for star-like operators)
+        uint16_t max;     // range maximum;
       };
       union
       {
         range_t range_;
         uint16_t ap_id_;           // id for atomic proposition
       };
-      uint16_t size_;              // number of children
-      mutable uint16_t refs_ = 0;  // reference count - 1;
-      size_t id_;                  // also used as hash.
       static size_t next_id_;
 
       struct ltl_prop
@@ -1055,7 +1040,7 @@ namespace spot
     /////////////////////////
 
     /// Unbounded constant to use as end of range for bounded operators.
-    static constexpr uint8_t unbounded()
+    static constexpr unsigned unbounded()
     {
       return fnode::unbounded();
     }

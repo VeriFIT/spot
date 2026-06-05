@@ -24,6 +24,7 @@
 #include <map>
 #include <set>
 #include <cstring>
+#include <cstdint>
 #include <string_view>
 #include <algorithm>
 #include <spot/misc/bareword.hh>
@@ -38,6 +39,17 @@ extern "C" int strverscmp(const char *s1, const char *s2);
 
 namespace spot
 {
+
+#if UINTPTR_MAX == 0xffffffffffffffff && UINT_MAX == 0xffffffff
+  // An fnode is expected to fit on 32 bytes on 64-bit architectures where
+  // size_t/pointers are 64 bits, and unsigned is 32 bits.
+  static_assert(sizeof(fnode) == 32, "fnode layout changed unexpectedly");
+#elif UINTPTR_MAX == 0xffffffff && UINT_MAX == 0xffffffff
+  // When size_t/pointers are 32bits and unsigned are 32 bits
+  // the expected size of fnode is 24 bytes.
+  static_assert(sizeof(fnode) == 24, "fnode layout changed unexpectedly");
+#endif
+
   namespace
   {
     typedef std::vector<const fnode*> vec;
@@ -116,6 +128,8 @@ namespace spot
         if (SPOT_UNLIKELY(o == op::Star || o == op::FStar))
           {
             h ^= f->min();
+            h *= fnv<size_t>::prime;
+            h ^= f->max();
             h *= fnv<size_t>::prime;
           }
         for (auto child: *f)
