@@ -1272,8 +1272,8 @@ namespace spot
       if (o == op::Star || !child->accepts_eword())
         return child;
 
-    //   - Exp[*i..j][*k..l] = Exp[*ik..jl] if i*(k+1)<=jk+1.
-    //   - Exp[:*i..j][:*k..l] = Exp[:*ik..jl] if i*(k+1)<=jk+1.
+    //   - Exp[*i..j][*k..l] = Exp[*ik..jl] if k=l or i*(k+1)<=jk+1.
+    //   - Exp[:*i..j][:*k..l] = Exp[:*ik..jl] if k=l or i*(k+1)<=jk+1.
     if (child->is(o))
       {
         unsigned i = child->min();
@@ -1284,9 +1284,10 @@ namespace spot
         //               ...
         //            finally between i*max and j*max
         //
-        // We can merge these intervals into [i*min..j*max] iff the
-        // first are adjacent or overlap, i.e. iff
-        //   i*(min+1) <= j*min+1.
+        // We can merge these intervals into [i*min..j*max] iff we
+        // have a single count (min==max) or the intervals are
+        // adjacent or overlap, i.e. iff
+        //   min==max or i*(min+1) <= j*min+1.
         // (Because i<=j, this entails that the other intervals also
         // overlap).
 
@@ -1307,7 +1308,8 @@ namespace spot
           }
         else
           {
-            if ((i * (min + 1) <= (j * min) + 1)
+            if ((min == max
+                 || i * (min + 1) <= (j * min) + 1)
                 // cannot simplify if the bound overflows
                 && (min < unbounded()
                     && (max == unbounded()

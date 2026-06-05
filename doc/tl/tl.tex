@@ -823,7 +823,7 @@ $b_1$, $b_2$ are assumed to be Boolean formulas.
   \0\STAR{0..\mvar{j}} &\equiv \eword  &
   \0\STAR{\mvar{i}..\mvar{j}} &\equiv \0 \text{~if~}i>0 \\
   \eword\STAR{\var{i}..\mvar{j}} &\equiv \eword&
-  f\STAR{\mvar{i}..\mvar{j}}\STAR{\mvar{k}..\mvar{l}} &\equiv f\STAR{\mvar{ik}..\mvar{jl}}\text{~if~}i(k+1)\le jk+1 \\
+  f\STAR{\mvar{i}..\mvar{j}}\STAR{\mvar{k}..\mvar{l}} &\equiv f\STAR{\mvar{ik}..\mvar{jl}}\text{~if~}k=l\lor i(k+1)\le jk+1 \\
   f\STAR{0}&\equiv \eword &
   f\STAR{1}&\equiv f\\
   b\FSTAR{0..\mvar{j}} &\equiv \1  &
@@ -831,7 +831,7 @@ $b_1$, $b_2$ are assumed to be Boolean formulas.
   \eword\FSTAR{0..\mvar{j}} &\equiv \1&
   \eword\FSTAR{\mvar{i}..\mvar{j}} &\equiv \0\text{~if~}i>0 \\
   &&
-  f\FSTAR{\mvar{i}..\mvar{j}}\FSTAR{\mvar{k}..\mvar{l}} &\equiv f\FSTAR{\mvar{ik}..\mvar{jl}}\text{~if~}i(k+1)\le jk+1 \\
+  f\FSTAR{\mvar{i}..\mvar{j}}\FSTAR{\mvar{k}..\mvar{l}} &\equiv f\FSTAR{\mvar{ik}..\mvar{jl}}\text{~if~}k=l\lor i(k+1)\le jk+1 \\
   f\FSTAR{0}&\equiv \1 & f\FSTAR{1}&\equiv f\text{~if~}\varepsilon\nVDash f\\
   \FIRSTMATCH\code(b\code) &\equiv b & \FIRSTMATCH\code(f\code) &\equiv \eword\text{~if~}\varepsilon\VDash f \\
                                     && \FIRSTMATCH\code(\FIRSTMATCH\code(f\code)\code) &\equiv \FIRSTMATCH\code(f\code)

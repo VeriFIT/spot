@@ -184,7 +184,12 @@ main(int argc, char** argv)
             f1.dump(std::cout) << std::endl;
 #endif
 
-            exit_code |= f1 != f2;
+            if (f1 != f2)
+              {
+                exit_code = 1;
+                std::cerr << "f1=" << f1
+                          << "\nis not equal to\nf2=" << f2 << '\n';
+              }
 
 #if (!defined(REDUC) && !defined(REDUC_TAU) && !defined(REDUC_TAUSTR))
             spot::tl_simplifier simp;
