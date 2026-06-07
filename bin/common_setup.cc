@@ -27,6 +27,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <error.h>
+#include <exitfail.h>
 #include <spot/misc/tmpfile.hh>
 
 static void
@@ -35,7 +36,7 @@ display_version(FILE *stream, struct argp_state*)
   fputs(program_name, stream);
   fputs(" (" PACKAGE_NAME ") " PACKAGE_VERSION "\n\
 \n\
-Copyright (C) 2025 by the Spot authors, see the AUTHORS File for details.\n\
+Copyright (C) 2026 by the Spot authors, see the AUTHORS File for details.\n\
 License GPLv3+: \
 GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\n\
 This is free software: you are free to change and redistribute it.\n\
@@ -99,7 +100,8 @@ setup(char** argv)
 
   argp_program_version_hook = display_version;
 
-  argp_err_exit_status = 2;
+  argp_err_exit_status = 2;     // for argp
+  exit_failure = 2;             // for XARGMATCH, close_stdout
 
   if (getenv("SPOT_OOM_ABORT"))
     std::set_new_handler(bad_alloc_handler);

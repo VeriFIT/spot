@@ -154,6 +154,26 @@ ltldo ': %s; true>%O' --errors=warn -f GFa 2>stderr
 test $? = 0
 grep ':.*empty input' stderr
 
+ltldo 'exit 3 >%O; : %s' --errors=abort -f GFa 2>stderr && exit 1
+test $? = 2
+cat stderr
+grep 'returned exit code 3' stderr
+ltldo 'exit 3 >%O; : %s' --errors=warn -f GFa 2>stderr
+test $? = 0
+grep 'returned exit code 3' stderr
+
+# Truncated HOA (--ABORT--): --errors=abort (default) should fail
+ltldo -f Ga 'echo "HOA: v1 --ABORT--" %f>%O' 2>err && exit 1
+grep 'aborted its output' err
+
+# Truncated HOA (--ABORT--): --errors=warn should warn without failing
+ltldo -f Ga 'echo "HOA: v1 --ABORT--" %f>%O' --errors=warn 2>err
+grep 'aborted its output' err
+
+# Truncated HOA (--ABORT--): --errors=ignore should be silent
+ltldo -f Ga 'echo "HOA: v1 --ABORT--" %f>%O' --errors=ignore 2>err >out
+test -z "$(cat out)"
+test -z "$(cat err)"
 
 ltldo '{name} foo/bar/ltl2baextended' -f GFa 2>stderr && exit 1
 grep % stderr && exit 1
@@ -187,3 +207,8 @@ for i in lcr-*; do
            exit 2;;
     esac
 done
+
+# --list-shorthands for translator tools
+ltldo --list-shorthands >out
+grep 'ltl2tgba' out
+grep 'ltl2ba' out

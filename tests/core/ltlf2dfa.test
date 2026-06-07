@@ -184,6 +184,40 @@ diff out2.hoa exp2.hoa
 ltlf2dfa -F- --minimize=no --translation=direct --simplify=false >out2.hoa <in
 diff out2.hoa exp2.hoa
 
+# --negate
+ltlf2dfa -f 'a U b' --negate --minimize=no >out.hoa
+grep 'name: "!(a U b)"' out.hoa
+
+# --simplify-formula=yes
+ltlf2dfa -f 'a U b' --simplify-formula=yes >out.hoa
+grep 'HOA:' out.hoa
+
+# --mtdfa-dot
+ltlf2dfa -f 'a U b' --mtdfa-dot >out.dot
+grep 'digraph' out.dot
+
+# --mtdfa-stats=nodes
+ltlf2dfa -f 'a U b' --mtdfa-stats=nodes >out
+grep 'internal nodes:' out
+
+# -d (DOT output with option)
+ltlf2dfa -f 'a U b' -dB >out.dot
+grep 'digraph' out.dot
+
+# -d without option (default DOT)
+ltlf2dfa -f 'a U b' -d >out.dot
+grep 'digraph' out.dot
+
+# -H with explicit option
+ltlf2dfa -f 'a U b' -Hl >out.hoa
+grep 'HOA:.*--END--' out.hoa
+
+# --composition=ap
+ltlf2dfa -f '(a U b) & (c R d)' --translation=compositional \
+         --composition=ap >out.hoa
+grep 'States: 4' out.hoa
+
+# -q
 ltlf2dfa GFa -q >out
 test "" = "`cat out`"
 

@@ -161,3 +161,7 @@ cat >expected <<EOF
 0
 EOF
 diff out expected
+
+# --dump-priorities for Boolean formulas
+randltl -B --dump-priorities 0 >out
+grep 'Use --boolean-priorities' out

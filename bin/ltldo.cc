@@ -237,9 +237,9 @@ namespace
         }
       else if (WIFSIGNALED(es))
         {
+          problem = true;
           if (errors_opt != errors_ignore)
             {
-              problem = true;
               es = WTERMSIG(es);
               std::cerr << program_name << ": execution of command \"" << cmd
                         << "\" terminated by signal " << es << ".\n";
@@ -247,9 +247,9 @@ namespace
         }
       else if (WIFEXITED(es) && WEXITSTATUS(es) != 0)
         {
+          problem = true;
           if (errors_opt != errors_ignore)
             {
-              problem = true;
               es = WEXITSTATUS(es);
               std::cerr << program_name << ": execution of command \"" << cmd
                         << "\" returned exit code " << es << ".\n";
@@ -260,18 +260,25 @@ namespace
           auto aut = spot::parse_aut(output.val()->name(), dict,
                                      spot::default_environment::instance(),
                                      opt_parse);
-          if (!aut->errors.empty() && errors_opt != errors_ignore)
+          if (!aut->errors.empty())
             {
               problem = true;
-              std::cerr << program_name << ": failed to parse the automaton "
-                "produced by \"" << cmd << "\".\n";
-              aut->format_errors(std::cerr);
+              if (errors_opt != errors_ignore)
+                {
+                  std::cerr << program_name
+                            << ": failed to parse the automaton "
+                    "produced by \"" << cmd << "\".\n";
+                  aut->format_errors(std::cerr);
+                }
             }
-          else if (aut->aborted && errors_opt != errors_ignore)
+          else if (aut->aborted)
             {
               problem = true;
-              std::cerr << program_name << ": command \"" << cmd
-                        << "\" aborted its output.\n";
+              if (errors_opt != errors_ignore)
+                {
+                  std::cerr << program_name << ": command \"" << cmd
+                            << "\" aborted its output.\n";
+                }
             }
           else
             {

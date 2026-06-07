@@ -172,4 +172,103 @@ run 1 ltlfsynt -f '!(F(!i -> u) <-> (Fo R Gu))' --ins=i --unob=u
 run 1 ltlfsynt -f 'X(Xi xor Gi) <-> (Gi U (o & Fu))' \
                -f 'Gi R !X!((i -> o) xor (o <-> XXu))'
 
+# --verbose: verify output goes to stderr
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --verbose >out 2>verbose.out
+grep 'using Mealy semantics' verbose.out
+grep 'translation to MTDFA' verbose.out
+grep 'Mealy machine' verbose.out
+
+# --semantics=Moore with --verbose
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --semantics=Moore --verbose \
+  >out 2>verbose-moore.out
+grep 'using Moore semantics' verbose-moore.out
+
+# --backprop=trival-states with --realizability
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --trans=full \
+  --backprop=trival-states --real >out 2>verbose-bp.out
+grep 'REALIZABLE' out
+
+# --dot=game output
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --dot=game >out.dot
+grep 'digraph' out.dot
+
+# --translation=full with --unobservables should error
+# (the unobs AP must appear in the formula for the error to trigger)
+ltlfsynt -f 'G(u & i -> X o)' --outs=o --ins=i --unobs=u \
+  --trans=full 2>err && exit 1
+grep 'does not support.*unobserv' err
+
+# --translation=compositional with --unobservables should error
+ltlfsynt -f 'G(u & i -> X o)' --outs=o --ins=i --unobs=u \
+  --trans=compositional 2>err && exit 1
+grep 'does not support.*unobserv' err
+
+# --trans=restricted works with --unobs (only full/compositional check)
+ltlfsynt -f 'G(u & i -> X o)' --outs=o --ins=i --unobs=u --trans=restricted >out
+grep 'REALIZABLE' out
+
+# --translation=direct with --one-step=no
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --trans=direct --one-step=no >out
+grep 'REALIZABLE' out
+
+# --translation=direct --minimize=yes (covers minimize path for restricted)
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --trans=direct --minimize=yes >out
+grep 'REALIZABLE' out
+
+# --simplify-formula=no (covers the opt_simplify_ltl == false path)
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --trans=direct \
+  --simplify-formula=no >out
+grep 'REALIZABLE' out
+
+# --aiger output
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i --aiger >out.aig
+grep 'aag' out.aig
+
+# -q (quiet) mode: no output, just exit status
+ltlfsynt -q -f 'G(i -> o)' --outs=o --ins=i >out
+test -z "$(cat out)"
+
+# --hide-status
+ltlfsynt -f 'G(i -> o)' --outs=o --ins=i --hide-status >out
+test -z "$(cat out)" || grep 'HOA' out
+
+# --verbose with --trans=direct-full --real (covers full translation verbose)
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i --trans=full \
+  --verbose --real >out 2>verbose-full.out
+grep 'starting full translation' verbose-full.out
+
+# --verbose with --trans=compositional and --composition=ap
+ltlfsynt -f 'G(i <-> o) & G(j <-> k)' --outs=o,k --ins=i,j \
+  --trans=compositional --composition=ap --verbose --real \
+  >out 2>verbose-comp.out
+grep 'AP-based ordering' verbose-comp.out
+
+# --verbose with --trans=restricted and --minimize=yes --real
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i --trans=restricted \
+  --minimize=yes --verbose --real >out 2>verbose-min.out
+grep 'minimization of MTDFA' verbose-min.out
+
+# --decompose=yes --verbose with a formula having multiple output groups
+ltlfsynt -f '(G(i1 <-> o1)) & (G(i2 <-> o2))' \
+  --outs=o1,o2 --ins=i1,i2 --decompose=yes --verbose --real \
+  >out 2>verbose-decomp.out
+grep -E 'subformulas|decomposition' verbose-decomp.out
+
+# --verbose with --aiger
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i --aiger --verbose \
+  >out.aig 2>verbose-aig.out
+grep 'AIG circuit' verbose-aig.out
+
+# --polarity=before-decompose --verbose
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i \
+  --polarity=before-decompose --verbose --real \
+  >out 2>verbose-pol.out
+grep 'using Mealy' verbose-pol.out
+
+# --global-equivalence=before-decompose --verbose
+ltlfsynt -f 'G(i <-> o) & G(j <-> k)' --outs=o,k --ins=i,j \
+  --global-equivalence=before-decompose --verbose --real \
+  >out 2>verbose-geq.out
+grep 'using Mealy' verbose-geq.out
+
 :

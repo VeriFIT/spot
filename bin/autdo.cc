@@ -252,18 +252,25 @@ namespace
           auto aut = spot::parse_aut(output.val()->name(), dict,
                                      spot::default_environment::instance(),
                                      opt_parse);
-          if (!aut->errors.empty() && errors_opt != errors_ignore)
+          if (!aut->errors.empty())
             {
               problem = true;
-              std::cerr << program_name << ": failed to parse the automaton "
-                "produced by \"" << cmd << "\".\n";
-              aut->format_errors(std::cerr);
+              if (errors_opt != errors_ignore)
+                {
+                  std::cerr << program_name
+                            << ": failed to parse the automaton "
+                    "produced by \"" << cmd << "\".\n";
+                  aut->format_errors(std::cerr);
+                }
             }
-          else if (aut->aborted && errors_opt != errors_ignore)
+          else if (aut->aborted)
             {
               problem = true;
-              std::cerr << program_name << ": command \"" << cmd
-                        << "\" aborted its output.\n";
+              if (errors_opt != errors_ignore)
+                {
+                  std::cerr << program_name << ": command \"" << cmd
+                            << "\" aborted its output.\n";
+                }
             }
           else
             {

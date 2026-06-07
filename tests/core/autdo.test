@@ -38,6 +38,29 @@ ltl2tgba -D 'GFa & GFb' |
   autdo --greatest 'autfilt' 'autfilt -B' >output
 test 1 = `grep -c '^HOA:' output`
 
+# --smallest with custom format string
+ltl2tgba 'Ga' | autdo --smallest='%e' 'autfilt' 'autfilt --tgba' >output
+test 1 = `grep -c '^HOA:' output`
+
+# --errors=ignore: non-zero exit from tool does not abort
+ltl2tgba 'Ga' |
+  autdo --errors=ignore 'false %H>%O' >output 2>/dev/null
+test -z "$(cat output)"
+
+# --errors=warn: non-zero exit warns but does not abort
+ltl2tgba 'Ga' |
+  autdo --errors=warn 'false %H>%O' >output 2>warn.err
+test -z "$(cat output)"
+grep -E 'exit code|failed to run' warn.err
+
+# Register many tools to trigger tool_spec copy on vector reallocation
+ltl2tgba 'Ga' | autdo --errors=ignore \
+  'autfilt %H>%O' 'autfilt --tgba %H>%O' \
+  'autfilt -B %H>%O' 'autfilt -C %H>%O' \
+  'autfilt --small %H>%O' 'autfilt --high %H>%O' \
+  'autfilt -S %H>%O' 'autfilt -D %H>%O' >output 2>/dev/null
+test 8 = `grep -c '^HOA:' output`
+
 # --max-count: limit output to N automata.
 ltl2tgba 'Ga' 'Fb' 'a U b' |
   autdo -n 2 'autfilt %H>%O' >output
@@ -112,6 +135,11 @@ a U b|2
 EOF
 diff output expected
 
+# --list-shorthands for automata tools
+autdo --list-shorthands >out
+grep 'autfilt' out
+grep 'dstar2tgba' out
+
 # Test upper-case (input) vs lower-case (output) escape sequences:
 # %S,%T = input automaton stats; %s,%t = output automaton stats; %K = tool name.
 ltl2tgba 'GFa & GFb' |
@@ -128,3 +156,60 @@ cat >expected <<EOF
 4 edges,1 acc --[autfilt -B]-> 8 edges,1 acc
 EOF
 diff output expected
+
+# --errors=abort with failing tool (default behavior - non-zero exit)
+ltl2tgba 'Ga' | autdo 'false %H>%O' 2>err && exit 1
+grep -E 'exit code|failed to run' err
+
+# --greatest with custom format (%e instead of default %s,%e)
+ltl2tgba -D 'GFa & GFb' |
+  autdo --greatest='%e' 'autfilt' 'autfilt -B' >output
+test 1 = `grep -c '^HOA:' output`
+
+# --fail-on-timeout with --errors=abort (default, should hard-fail)
+ltl2tgba 'Ga' |
+  autdo -T 1 'sleep 10; autfilt %H>%O' --fail-on-timeout >output 2>err && exit 1
+grep 'timeout' err
+
+# Unparseable automaton from tool: --errors=abort (default) should fail
+ltl2tgba 'Ga' | autdo 'echo "garbage" %H>%O' 2>err && exit 1
+cat err
+grep 'failed to parse' err
+
+# Unparseable automaton: --errors=warn should warn but continue
+ltl2tgba 'Ga' |
+  autdo --errors=warn 'echo "garbage" %H>%O' >output 2>err
+test -z "$(cat output)"
+grep 'failed to parse' err
+
+# Unparseable automaton: --errors=ignore should silently skip
+ltl2tgba 'Ga' |
+    autdo --errors=ignore 'echo "garbage" %H>%O' >output 2>/dev/null
+test -z "$(cat output)"
+
+# Truncated HOA (--ABORT--): --errors=abort (default) should fail
+ltl2tgba 'Ga' | autdo 'echo "HOA: v1 --ABORT--" %H>%O' 2>err && exit 1
+grep 'aborted its output' err
+
+# Truncated HOA (--ABORT--): --errors=warn should warn but continue
+ltl2tgba 'Ga' |
+  autdo --errors=warn 'echo "HOA: v1 --ABORT--" %H>%O' >output 2>err
+test -z "$(cat output)"
+grep 'aborted its output' err
+
+# Truncated HOA (--ABORT--): --errors=ignore should silently skip
+ltl2tgba 'Ga' | autdo --errors=ignore \
+                      'echo "HOA: v1 --ABORT--" %H>%O' >output 2>err
+test -z "$(cat output)"
+test -z "$(cat err)"
+
+# The following message appears only if run from a tty.
+if (: > /dev/tty) >/dev/null 2>&1 ; then
+    autdo </dev/tty 2>stderr && exit 1
+    grep 'No automaton to process' stderr
+fi
+
+autdo - 2>stderr && exit 1
+grep 'No tool to run' stderr
+
+:

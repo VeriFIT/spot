@@ -181,4 +181,12 @@ diff out-B4 expect-B4
 echo | ltlmix 2>err && exit 1
 grep 'the set of subformulas to build from is empty' err
 
+# --dump-priorities with -L (LTL output)
+ltlmix -L -fGa --dump-priorities >out
+grep 'Use --ltl-priorities' out
+
+# --dump-priorities with -B (Boolean output)
+ltlmix -B -fGa --dump-priorities >out
+grep 'Use --boolean-priorities' out
+
 :

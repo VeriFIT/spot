@@ -302,3 +302,12 @@ digraph "aut.dsa" {
 EOF
 
 diff expected stdout
+
+# -x with invalid option
+dstar2tgba -x 'foo==bar' aut.dsa 2>err && exit 1
+grep 'failed to parse.*options' err
+
+# -x with unused option
+dstar2tgba -x 'tbadet=1' aut.dsa >out.hoa 2>stderr && exit 1
+grep 'option.*was not used' stderr
+grep 'HOA:' out.hoa
