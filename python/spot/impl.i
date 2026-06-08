@@ -117,6 +117,7 @@
 #include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/dbranch.hh>
 #include <spot/twaalgos/deadends.hh>
+#include <spot/twaalgos/dependent.hh>
 #include <spot/twaalgos/degen.hh>
 #include <spot/twaalgos/dot.hh>
 #include <spot/twaalgos/dualize.hh>
@@ -770,6 +771,7 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/complete.hh>
 %include <spot/twaalgos/dbranch.hh>
 %include <spot/twaalgos/deadends.hh>
+%include <spot/twaalgos/dependent.hh>
 %include <spot/twaalgos/degen.hh>
 %include <spot/twaalgos/determinize.hh>
 %include <spot/twaalgos/dot.hh>
