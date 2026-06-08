@@ -48,7 +48,7 @@ namespace spot
   /// \cond DEPRECATED
   /// \ingroup twa_misc
   /// \brief Deprecated 3-argument form; the third argument is now ignored.
-  SPOT_DEPRECATED("is third argument of is_terminal_automaton()"
+  SPOT_DEPRECATED("the third argument of is_terminal_automaton()"
                   " is now ignored") // Deprecated in Spot 2.12
   SPOT_API bool
   is_terminal_automaton(const const_twa_graph_ptr& aut,
