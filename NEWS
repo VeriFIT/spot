@@ -81,6 +81,12 @@ New in spot 2.15.1.dev  (not yet released)
     stored as 16-bit values instead of 8-bit values, allowing bounds
     up to 65534 (instead of 254).  (Issue #485.)
 
+  Deprecation notices:
+
+  - spot::collect_aps_with_polarities() is deprecated; use
+    spot::collect_apids_with_polarities() instead, it is available
+    since Spot 2.15.
+
   Bug fixes:
 
   - Acceptance formulas that are too large to be stored internally now
@@ -91,6 +97,12 @@ New in spot 2.15.1.dev  (not yet released)
 
   - The condition to apply the trivial simplification
     f[*i..j][*k..l] = f[*ik..jl] was not capturing the cases where k=l.
+
+  Removed functions:
+
+  - spot::is_bare_word() and spot::quote_unless_bare_word()
+    [misc/bareword.hh].  These functions were never used anywhere
+    in the library or tools.
 
   Removed functions (deprecated since Spot 2.9 or earlier):
 

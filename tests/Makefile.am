@@ -423,6 +423,7 @@ TESTS_python = \
   python/aliases.py \
   python/aiger.py \
   python/alternating.py \
+  python/apcollect.py \
   python/bdddict.py \
   python/bdditer.py \
   python/bddnqueen.py \

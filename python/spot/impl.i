@@ -580,6 +580,7 @@ namespace std {
   %template(vectorofvectorofformulas) vector<vector<spot::formula>>;
   %template(setunsigned) set<unsigned>;
   %template(relabeling_map) map<spot::formula, spot::formula>;
+  %template(map_formula_unsignedchar) map<spot::formula, unsigned char>;
 }
 
 // Some function take a vector of strings as pointers, and we want

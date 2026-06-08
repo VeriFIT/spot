@@ -70,6 +70,7 @@ namespace spot
   atomic_prop_set collect_literals(formula f);
 
 
+  /// \cond DEPRECATED
   /// \brief Collect the APs occurring in f, along with their polarities
   ///
   /// This function records each atomic proposition occurring in f
@@ -79,8 +80,11 @@ namespace spot
   /// polarity, 0b10 is positive polarity, and 0b11 is both.
   ///
   /// If the formula is quantified, this ignores quantifiers.
+  SPOT_DEPRECATED("deprecated since Spot 2.16: use "
+    "collect_apids_with_polarities() instead (available since 2.15)")
   SPOT_API std::map<formula, unsigned char>
   collect_aps_with_polarities(formula f);
+  /// \endcond
 
   /// \brief Collect the APs occurring in f, along with their polarities
   ///
