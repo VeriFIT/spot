@@ -239,6 +239,45 @@ namespace spot
                              const std::vector<unsigned>& initial_partition);
   /// @}
 
+
+  /// \ingroup mtdswa
+  /// \brief Combine two MTDSwAs to intersect their languages
+  SPOT_API
+  mtdswa_ptr product(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2);
+
+  /// \ingroup mtdswa
+  /// \brief Combine two MTDSwAs to sum their languages
+  SPOT_API
+  mtdswa_ptr product_or(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2);
+
+  /// \ingroup mtdswa
+  /// \brief Combine two MTDSwAs to build the exclusive sum of their languages
+  ///
+  /// The results will recognize words that are there only in one of
+  /// \a swa1 or \a swa2.  If the resulting automaton has an empty language,
+  /// then the two input automata were equivalent.
+  SPOT_API
+  mtdswa_ptr product_xor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2);
+
+  /// \ingroup mtdswa
+  /// \brief Combine two MTDSwAs to keep words that are handled
+  /// similarly in both operands.
+  ///
+  /// The results will recognize words that are recognized by \a
+  /// swa1 and \a swa2, or that are rejected by both.
+  SPOT_API
+  mtdswa_ptr product_xnor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2);
+
+  /// \ingroup mtdswa
+  /// \brief Combine two MTDSwAs to build an implication.
+  ///
+  /// The results will recognize words that are rejected by \a swa1 or
+  /// accepted by \a swa2.
+  SPOT_API
+  mtdswa_ptr product_implies(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2);
+
+
+
   /// \ingroup mtdswa
   /// \brief "Semi-internal" for translating LTL using MTBDDs
   ///

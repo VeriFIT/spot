@@ -463,6 +463,7 @@ TESTS_python = \
   python/minato.py \
   python/misc-ec.py \
   python/mtdfa.py \
+  python/mtdswa.py \
   python/mtdswa-to-twa.py \
   python/optionmap.py \
   python/origstate.py \

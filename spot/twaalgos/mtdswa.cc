@@ -85,6 +85,55 @@ namespace spot
       return prod;
     }
 
+    static int size_estimate_product(int left_states,
+                                     int right_states,
+                                     int sum_aps)
+    {
+      if (right_states > left_states)
+        std::swap(left_states, right_states);
+      left_states /= 4;
+      ++left_states;
+      int prod1 = left_states * right_states;
+      if (prod1 / left_states != right_states) // overflow
+        return INT_MAX / 16;
+      int prod2 = prod1 * sum_aps;
+      if ((sum_aps > 0) && ((prod2 / sum_aps != prod1) || // overflow
+                            prod2 > (INT_MAX / 16)))
+        return INT_MAX / 16;
+      if (prod2 < (1 << 14))
+        return 1 << 14;
+      return prod2;
+    }
+
+    static int size_estimate_product(const mtdswa_ptr& left,
+                                     const mtdswa_ptr& right)
+    {
+      // Compute the number of atomic propositions in the product.
+      // The logic is similar to std::set_union except we only
+      // count the number of elements in the union.
+      auto lbegin = left->aps.begin();
+      auto lend = left->aps.end();
+      auto rbegin = right->aps.begin();
+      auto rend = right->aps.end();
+      int apsz = 0;
+      while (lbegin != lend && rbegin != rend)
+        {
+          ++apsz;
+          bool adv_left = *lbegin <= *rbegin;
+          bool adv_right = *rbegin <= *lbegin;
+          lbegin += adv_left;
+          rbegin += adv_right;
+        }
+      // Parentheses are important here, because rend should not be
+      // added to (lend - lbegin) in theory even if it's ok in
+      // practice..  (Compile the STL in debug mode will catch this.)
+      apsz += (lend - lbegin) + (rend - rbegin);
+
+      return size_estimate_product(left->num_roots(),
+                                   right->num_roots(),
+                                   apsz);
+    }
+
     void outset(std::ostream& os, int v)
     {
       constexpr int MAX_BULLET = 20;
@@ -3090,5 +3139,391 @@ namespace spot
       }
     return res;
   }
+
+
+
+  //////////////////////////////////////////////////////////////////////
+  //                 Boolean operations on MTDSwAs                    //
+  //////////////////////////////////////////////////////////////////////
+
+  namespace
+  {
+
+    typedef std::pair<unsigned, unsigned> product_state;
+
+    struct product_state_hash
+    {
+      size_t
+      operator()(product_state s) const noexcept
+      {
+        return wang32_hash(s.first ^ wang32_hash(s.second));
+      }
+    };
+  }
+
+  inline std::pair<bdd, formula>
+  bdd_and_formula_from_state(unsigned s, const mtdswa_ptr& swa)
+  {
+    if (s == -2U)
+      return {bddfalse, formula::ff()};
+    if (s == -1U)
+      return {bddtrue, formula::tt()};
+    if (s >= swa->names.size())
+      return {swa->states[s], nullptr};
+    return {swa->states[s], swa->names[s]};
+  }
+
+  struct product_data
+    {
+      // A cache for the BDD terminals (as ints) in the product automaton
+      // associated to a pair of states of the original automata.
+      std::unordered_map<product_state, int,
+                         product_state_hash> pair_to_terminal_map;
+      // Used to store the product states that still need to be processed.
+      // When new states are created, they are added here.
+      std::queue<product_state> todo;
+
+      unsigned leaf_to_state(int b, int v) const
+      {
+        if (b == 0)  // terminal bddfalse
+          return -2U;
+        if (b == 1)  // terminal bddtrue
+          return -1U;
+        return v;
+      }
+
+      int pair_to_terminal(unsigned left, unsigned right)
+      {
+        // If a terminal for this pair exists then return it.
+        if (auto it = pair_to_terminal_map.find({left, right});
+            it != pair_to_terminal_map.end())
+          {
+            return it->second;
+          }
+        // Otherwise create a new one, cache it and return it.
+        unsigned new_id = pair_to_terminal_map.size();
+        product_state ps{left, right};
+        int res = bdd_terminal_as_int(new_id);
+        pair_to_terminal_map.emplace(ps, res);
+        todo.emplace(ps);
+        return res;
+      }
+
+      // Maps pairs of states from the original automata to terminals
+      // in the product automaton.
+      int pair_to_terminal_bdd(unsigned left, unsigned right)
+      {
+        // (bddfalse, bddfalse) is always mapped to bddfalse (0), bddtrue to 1.
+        if (SPOT_UNLIKELY(left == -2U && right == -2U))
+          return 0;
+        else if (SPOT_UNLIKELY(left == -1U && right == -1U))
+          return 1;
+        else
+          return pair_to_terminal(left, right);
+      }
+    }
+    the_product_data;
+
+    // Compute the colors of a product state.
+    static acc_cond::mark_t
+    colors_of_product_state(mtdswa_ptr swa1, mtdswa_ptr swa2,
+                            product_state s, unsigned swa1_max_color)
+    {
+      // If both states are constants, then the product state simply points to
+      // a constant.  Its colors are irrelevant, so we return the empty color.
+      if (SPOT_UNLIKELY((s.first == -2U || s.first == -1U)
+                        && (s.second == -2U || s.second == -1U)))
+        {
+          return acc_cond::mark_t{};
+        }
+      // (term, false) : keep the colors of term, and add rejecting colors
+      // for swa2's false, shifted properly.
+      else if (s.second == -2U)
+        {
+          return swa1->colors[s.first]
+                 | (swa2->acc.unsat_mark().second << swa1_max_color);
+        }
+      // (false, term) : keep the colors of term, shifted properly, and
+      // add rejecting colors for swa1's false.
+      else if (s.first == -2U)
+        {
+          return swa1->acc.unsat_mark().second
+                 | (swa2->colors[s.second] << swa1_max_color);
+        }
+      // (term, true) : keep the colors of term, and add accepting colors
+      // for swa2's true, shifted properly. TODO verif si unsatifiable :
+      else if (s.second == -1U)
+        {
+          return swa1->colors[s.first]
+                 | (swa2->acc.sat_mark().second << swa1_max_color);
+        }
+      // (true, term) : keep the colors of term, shifted properly, and
+      // add accepting colors for swa1's true.
+      else if (s.first == -1U)
+        {
+          return swa1->acc.sat_mark().second
+                 | (swa2->colors[s.second] << swa1_max_color);
+        }
+      // (term1, term2) : return the union of the colors of term1 and term2,
+      // shifting the colors of term2 properly.
+      else
+        {
+          return swa1->colors[s.first]
+                 | (swa2->colors[s.second] << swa1_max_color);
+        }
+    }
+
+    // Combine two leaves of the product automaton with AND.
+    static int leaf_combine_and(int left, int left_term,
+                                int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 || right == 0))
+        return 0;
+      unsigned ls = the_product_data.leaf_to_state(left, left_term);
+      unsigned rs = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs);
+    }
+
+    // Combine two leaves of the product automaton with OR.
+    static int leaf_combine_or(int left, int left_term,
+                               int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 1 || right == 1))
+        return 1;
+      unsigned ls = the_product_data.leaf_to_state(left, left_term);
+      unsigned rs = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs);
+    }
+
+    // Combine two leaves of the product automaton with IMPLIES.
+    static int leaf_combine_implies(int left, int left_term,
+                                    int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 || right == 1))
+        return 1;
+      unsigned ls = the_product_data.leaf_to_state(left, left_term);
+      unsigned rs = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs);
+    }
+
+    // Combine two leaves of the product automaton with EQUIV (XNOR).
+    static int leaf_combine_equiv(int left, int left_term,
+                                  int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 || left == 1))
+        {
+          if (left == right)
+            return 1;
+          if ((left ^ right) == 1)
+            return 0;
+        }
+      unsigned ls = the_product_data.leaf_to_state(left, left_term);
+      unsigned rs = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs);
+    }
+
+    // Combine two leaves of the product automaton with XOR.
+    static int leaf_combine_xor(int left, int left_term,
+                                int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 || left == 1))
+        {
+          if (left == right)
+            return 0;
+          if ((left ^ right) == 1)
+            return 1;
+        }
+      unsigned ls = the_product_data.leaf_to_state(left, left_term);
+      unsigned rs = the_product_data.leaf_to_state(right, right_term);
+      return the_product_data.pair_to_terminal_bdd(ls, rs);
+    }
+
+    // Create a product of two MTDSwAs with the given operator.
+    static mtdswa_ptr
+    product_mtdswa_aux(const mtdswa_ptr& swa1,
+                      const mtdswa_ptr& swa2, op o,
+                      bddExtCache* cache, int hash_key)
+    {
+      if (swa1->get_dict() != swa2->get_dict())
+        throw std::runtime_error
+          ("product_mtdswa_aux: MTDSwAs should share their dictionaries");
+      // Prepare the function to combine two leaves of the product automaton.
+      int (*combine)(int, int, int, int);
+      int applyop_shortcut = -1;
+      switch (o)
+        {
+        case op::And:
+          combine = leaf_combine_and;
+          applyop_shortcut = bddop_and_zero;
+          break;
+        case op::Or:
+          combine = leaf_combine_or;
+          applyop_shortcut = bddop_or_one;
+          break;
+        case op::Implies:
+          combine = leaf_combine_implies;
+          applyop_shortcut = bddop_imp_one;
+          break;
+        case op::Equiv:
+          combine = leaf_combine_equiv;
+          applyop_shortcut = -1;
+          break;
+        case op::Xor:
+          combine = leaf_combine_xor;
+          applyop_shortcut = -1;
+          break;
+        default:
+          throw std::runtime_error("product_mtdswa_aux: unsupported operator");
+        }
+      // Create result automaton, and register all propositions.
+      bdd_dict_ptr dict = swa1->get_dict();
+      mtdswa_ptr res = std::make_shared<mtdswa>(dict);
+      dict->register_all_propositions_of(swa1, res);
+      dict->register_all_propositions_of(swa2, res);
+
+      // We will construct the states of the product automaton on-the-fly.
+      // The colors of swa2 will be shifted by the maximum color of swa1,
+      // to avoid collisions.
+      acc_cond::mark_t swa1_used_colors{};
+      for (const auto& c: swa1->colors)
+        swa1_used_colors |= c;
+      unsigned swa1_max_color
+      = std::max(swa1_used_colors.max_set(),
+                 swa1->acc.get_acceptance().used_sets().max_set());
+
+      // This will initialize TODO with the initial state of the product.
+      std::queue<product_state>& todo = the_product_data.todo;
+      (void) the_product_data.pair_to_terminal(0, 0);
+
+      while (!todo.empty())
+        {
+          product_state s = todo.front();
+          todo.pop();
+
+          // Construct state of the product automaton corresponding to the pair
+          auto [left, left_f] = bdd_and_formula_from_state(s.first, swa1);
+          auto [right, right_f] = bdd_and_formula_from_state(s.second, swa2);
+          bdd b = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
+                                       applyop_shortcut);
+          res->states.push_back(b);
+          res->colors.push_back(colors_of_product_state(swa1, swa2, s,
+                                                        swa1_max_color));
+          // Construct name of the product state if both states have names.
+          if (left_f && right_f)
+            switch (o)
+              {
+              case op::And:
+                res->names.push_back(formula::And(left_f, right_f));
+                break;
+              case op::Or:
+                res->names.push_back(formula::Or(left_f, right_f));
+                break;
+              case op::Implies:
+                res->names.push_back(formula::Implies(left_f, right_f));
+                break;
+              case op::Equiv:
+                res->names.push_back(formula::Equiv(left_f, right_f));
+                break;
+              case op::Xor:
+                res->names.push_back(formula::Xor(left_f, right_f));
+                break;
+              default:
+                SPOT_UNREACHABLE();
+              }
+        }
+
+      // Construct new acceptance condition.
+      switch (o)
+        {
+        case op::And:
+          res->acc = acc_cond{swa1->acc.get_acceptance()
+                              & (swa2->acc.get_acceptance()
+                                 << swa1_max_color)};
+          break;
+        case op::Or:
+          res->acc = acc_cond{swa1->acc.get_acceptance()
+                              | (swa2->acc.get_acceptance()
+                                 << swa1_max_color)};
+          break;
+        case op::Implies:
+          res->acc = acc_cond{(swa1->acc.get_acceptance().complement())
+                              | (swa2->acc.get_acceptance()
+                                 << swa1_max_color)};
+          break;
+        case op::Equiv:
+          res->acc = acc_cond{(swa1->acc.get_acceptance()
+                               & (swa2->acc.get_acceptance() << swa1_max_color))
+                              | ((swa1->acc.get_acceptance().complement())
+                                 & ((swa2->acc.get_acceptance()
+                                      << swa1_max_color).complement()))};
+          break;
+        case op::Xor:
+          res->acc = acc_cond{(swa1->acc.get_acceptance()
+                               & ((swa2->acc.get_acceptance()
+                                   << swa1_max_color).complement()))
+                              | ((swa1->acc.get_acceptance().complement())
+                                 & (swa2->acc.get_acceptance()
+                                    << swa1_max_color))};
+          break;
+        default:
+          SPOT_UNREACHABLE();
+        }
+
+      // Combine the sorted list of atomic propositions from SWA1 and SWA2
+      // keeping the result sorted.
+      res->aps.reserve(swa1->aps.size() + swa2->aps.size());
+      std::set_union(swa1->aps.begin(), swa1->aps.end(),
+                     swa2->aps.begin(), swa2->aps.end(),
+                     std::back_inserter(res->aps));
+
+      the_product_data.pair_to_terminal_map.clear();
+      return res;
+    }
+
+    mtdswa_ptr product(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+      mtdswa_ptr res = product_mtdswa_aux(swa1, swa2, op::And, &cache, 0);
+      bdd_extcache_done(&cache);
+      return res;
+    }
+
+    mtdswa_ptr product_or(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+      mtdswa_ptr res = product_mtdswa_aux(swa1, swa2, op::Or, &cache, 0);
+      bdd_extcache_done(&cache);
+      return res;
+    }
+
+    mtdswa_ptr product_implies(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+      mtdswa_ptr res = product_mtdswa_aux(swa1, swa2, op::Implies, &cache, 0);
+      bdd_extcache_done(&cache);
+      return res;
+    }
+
+    mtdswa_ptr product_xnor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+      mtdswa_ptr res = product_mtdswa_aux(swa1, swa2, op::Equiv, &cache, 0);
+      bdd_extcache_done(&cache);
+      return res;
+    }
+
+    mtdswa_ptr product_xor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+    {
+      bddExtCache cache;
+      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+      mtdswa_ptr res = product_mtdswa_aux(swa1, swa2, op::Xor, &cache, 0);
+      bdd_extcache_done(&cache);
+      return res;
+    }
+
 
 }
