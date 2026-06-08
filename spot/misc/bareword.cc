@@ -19,33 +19,9 @@
 #include "config.h"
 #include <spot/misc/bareword.hh>
 #include <ctype.h>
-#include <spot/misc/escape.hh>
 
 namespace spot
 {
-  bool
-  is_bare_word(const char* str)
-  {
-    // Bare words cannot be empty and should start with a letter.
-    if (!*str
-        || !(isalpha(*str) || *str == '_' || *str == '.'))
-      return false;
-    // The remaining of the word must be alphanumeric.
-    while (*++str)
-      if (!(isalnum(*str) || *str == '_' || *str == '.'))
-        return false;
-    return true;
-  }
-
-  std::string
-  quote_unless_bare_word(const std::string& str)
-  {
-    if (is_bare_word(str.c_str()))
-      return str;
-    else
-      return "\"" + escape_str(str) + "\"";
-  }
-
   // This is for Spin 5.  Spin 6 has a relaxed parser that can
   // accept any parenthesized block as an atomic proposition.
   bool is_spin_ap(const char* str)

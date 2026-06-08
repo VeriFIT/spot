@@ -28,17 +28,6 @@ namespace spot
 
   /// \ingroup misc_tools
   /// @{
-  /// \brief Whether a word is bare.
-  ///
-  /// Bare words should start with a letter, an underscore, or a dot,
-  /// and consist solely of alphanumeric characters, underscores, and
-  /// dots.
-  SPOT_API bool is_bare_word(const char* str);
-
-  /// \brief Double-quote words that are not bare.
-  /// \see is_bare_word
-  SPOT_API std::string quote_unless_bare_word(const std::string& str);
-
   /// \brief Whether a word can be used as an atomic proposition for Spin 5.
   ///
   /// In Spin 5 (hence in ltl2ba and ltl3ba as well) atomic
