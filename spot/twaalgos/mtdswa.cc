@@ -243,7 +243,7 @@ namespace spot
                   for (auto [b, t]: all_paths_mt_of(states[i]))
                     if (t == bddtrue)
                       {
-                        res->new_edge(ni, true_state(), b, colors[ni]);
+                        res->new_edge(ni, true_state(), b, colors[i]);
                       }
                     else if (t == bddfalse)
                       {
@@ -257,20 +257,20 @@ namespace spot
                             so_far_complete = false;
                             continue;
                           }
-                        res->new_edge(ni, dst, b, colors[ni]);
+                        res->new_edge(ni, dst, b, colors[i]);
                       }
                 else
                   for (auto [b, t]: paths_mt_of(states[i]))
                     if (t == bddtrue)
                       {
-                        res->new_edge(ni, true_state(), b, colors[ni]);
+                        res->new_edge(ni, true_state(), b, colors[i]);
                       }
                     else
                       {
                         int dst = new_num[bdd_get_terminal(t)];
                         if (dst < 0) // edge going to a sink
                           continue;
-                        res->new_edge(ni, dst, b, colors[ni]);
+                        res->new_edge(ni, dst, b, colors[i]);
                       }
               }
             res->prop_complete(so_far_complete);
