@@ -64,6 +64,7 @@
 #define CACHEID_COMMON      0x8
 #define CACHEID_SHORTDIST   0x9
 #define CACHEID_SHORTBDD    0xA
+#define CACHEID_HASDEP      0xB
 /* Do not go above 0xF here, CACHEID_RESTRICT will be combined with
    other bits higher than that. */
 
@@ -4131,6 +4132,78 @@ RETURN  {* The quantified BDD. *}
 BDD bdd_uniquecomp(BDD r, BDD var)
 {
    return quantify(r, var, bddop_xor, 1, CACHEID_UNIQUEC);
+}
+
+
+/*=== DEPENDENT VARIABLE TEST =============================================*/
+
+static int have_collision_rec(BDD left, BDD right, int zlevel);
+
+/*
+NAME    {* bdd\_has\_dependent\_var *}
+SECTION {* operator *}
+SHORT   {* test if a variable is dependent *}
+PROTO   {* int bdd_have_dependent_var(BDD left, BDD right, int z) *}
+DESCR   {* Tests whether variable {\tt z} is dependent on the remaining
+           variables when comparing transitions labeled {\tt left}
+           and {\tt right}.  A variable {\tt z} is dependent if there is no
+           assignments of left and right where {\tt z} has different values
+           while all other variables are equal. *}
+RETURN  {* 1 if {\tt z} is dependent, 0 if a collision exists. *}
+*/
+int bdd_have_dependent_var(BDD left, BDD right, int z)
+{
+   int zlevel = bdd_var2level(z);
+   /* Returns 1 (true) if z is dependent, i.e., no collision found */
+   return !have_collision_rec(left, right, zlevel);
+}
+
+static int have_collision_rec(BDD left, BDD right, int zlevel)
+{
+   if (left == bddfalse || right == bddfalse)
+      return 0;
+
+   if (left > right)
+     {
+       BDD tmp = left;
+       left = right;
+       right = tmp;
+     }
+
+   int lv = LEVEL(left);
+   int rv = LEVEL(right);
+   int cacheid = (zlevel << 4) | CACHEID_HASDEP;
+
+   BddCacheData *entry =
+     BddCache_lookup(&misccache, TRIPLE(left, right, cacheid));
+   if (entry->i.a == left && entry->i.b == right && entry->i.c == cacheid)
+      return entry->i.res;
+
+   int result = 0;
+
+   if (lv == zlevel && rv == zlevel) {
+      /* Both have reached z: check (L0 & R1) | (L1 & R0) satisfiable */
+      result = bdd_have_common_assignment(LOW(left), HIGH(right)) ||
+               bdd_have_common_assignment(HIGH(left), LOW(right));
+   } else if (lv > zlevel && rv > zlevel) {
+      /* Both past z: no collision */
+      result = 0;
+   } else if (lv < rv) {
+      result = have_collision_rec(LOW(left), right, zlevel) ||
+               have_collision_rec(HIGH(left), right, zlevel);
+   } else if (lv > rv) {
+      result = have_collision_rec(left, LOW(right), zlevel) ||
+               have_collision_rec(left, HIGH(right), zlevel);
+   } else {
+      result = have_collision_rec(LOW(left), LOW(right), zlevel) ||
+               have_collision_rec(HIGH(left), HIGH(right), zlevel);
+   }
+
+   entry->i.a = left;
+   entry->i.b = right;
+   entry->i.c = cacheid;
+   entry->i.res = result;
+   return result;
 }
 
 

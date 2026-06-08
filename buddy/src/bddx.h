@@ -473,6 +473,7 @@ BUDDY_API BDD      bdd_appall(BDD, BDD, int, BDD);
 BUDDY_API BDD      bdd_appallcomp(BDD, BDD, int, BDD);
 BUDDY_API BDD      bdd_appuni(BDD, BDD, int, BDD);
 BUDDY_API BDD      bdd_appunicomp(BDD, BDD, int, BDD);
+BUDDY_API int      bdd_have_dependent_var(BDD, BDD, int);
 BUDDY_API BDD      bdd_support(BDD);
 BUDDY_API BDD      bdd_satone(BDD);
 BUDDY_API BDD      bdd_satoneset(BDD, BDD, BDD);
@@ -798,6 +799,7 @@ protected:
    friend bdd      bdd_appallcomp(const bdd &, const bdd &, int, const bdd &);
    friend bdd      bdd_appuni(const bdd &, const bdd &, int, const bdd &);
    friend bdd      bdd_appunicomp(const bdd &, const bdd &, int, const bdd &);
+   friend int      bdd_have_dependent_var(const bdd &, const bdd &, int);
    friend bdd      bdd_replace(const bdd &, bddPair*);
    friend bdd      bdd_compose(const bdd &, const bdd &, int);
    friend bdd      bdd_veccompose(const bdd &, bddPair*);
@@ -1231,6 +1233,9 @@ inline bdd bdd_unique(const bdd &r, const bdd &var)
 
 inline bdd bdd_uniquecomp(const bdd &r, const bdd &var)
 { return bdd_uniquecomp(r.root, var.root); }
+
+inline int bdd_have_dependent_var(const bdd &left, const bdd &right, int z)
+{ return bdd_have_dependent_var(left.root, right.root, z); }
 
 inline bdd bdd_appex(const bdd &l, const bdd &r, int op, const bdd &var)
 { return bdd_appex(l.root, r.root, op, var.root); }
