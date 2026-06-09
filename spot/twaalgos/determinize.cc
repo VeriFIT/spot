@@ -23,7 +23,6 @@
 #include <utility>
 #include <set>
 #include <map>
-#include <cmath>
 #include <spot/misc/clz.hh>
 #include <spot/misc/bddlt.hh>
 #include <spot/twaalgos/sccinfo.hh>
@@ -387,8 +386,7 @@ namespace spot
                     {
                       // if *cycle_seed is already in seen, replace
                       // it with a smaller state also in seen.
-                      if (cs_.seen.contains(*it)
-                          && *it < *cycle_seed)
+                      if (cs_.seen.contains(*it) && *it < *cycle_seed)
                         cycle_seed = it;
                     }
                   else
@@ -644,8 +642,6 @@ namespace spot
     };
   }
 
-  std::vector<char> find_scc_paths(const scc_info& scc);
-
   safra_state
   safra_state::compute_succ(const compute_succs& cs,
                             const bdd& ap, unsigned& color) const
@@ -819,10 +815,20 @@ namespace spot
     color = finalize_construction(s.braces_, cs, topbrace);
   }
 
+  // operator< is used only in the stutter-invariance code path
+  // (compute_succs::iterator::compute_()) as a tiebreaker between two
+  // safra_states that belong to the same stuttering cycle.  The
+  // ordering prefers states that are likely to produce a smaller
+  // deterministic automaton: fewer tracked automaton states (nodes)
+  // comes first, then fewer pending acceptance braces, then lexical
+  // ordering of braces/nodes as a deterministic fallback.
   bool
   safra_state::operator<(const safra_state& other) const
   {
-    // FIXME: what is the right, if any, comparison to perform?
+    if (nodes_.size() != other.nodes_.size())
+      return nodes_.size() < other.nodes_.size();
+    if (braces_.size() != other.braces_.size())
+      return braces_.size() < other.braces_.size();
     return braces_ == other.braces_ ? nodes_ < other.nodes_
                                     : braces_ < other.braces_;
   }
@@ -1075,7 +1081,7 @@ namespace spot
     // Green and red colors work in pairs, so the number of parity conditions is
     // necessarily even.
     sets += sets & 1;
-    // Acceptance is now min(odd) since we can emit Red on paths 0 with new opti
+    // Acceptance is now min(odd) since we can emit Red on paths 0.
     res->set_acceptance(sets, acc_cond::acc_code::parity_min_odd(sets));
     res->prop_universal(true);
     res->prop_state_acc(false);
