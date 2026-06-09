@@ -276,7 +276,9 @@ namespace spot
   SPOT_API
   mtdswa_ptr product_implies(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2);
 
-
+  /// \ingroup mtdswa
+  /// \brief Complement an MTDSwA.
+  SPOT_API mtdswa_ptr complement(const mtdswa_ptr& swa);
 
   /// \ingroup mtdswa
   /// \brief "Semi-internal" for translating LTL using MTBDDs

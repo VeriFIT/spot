@@ -3159,21 +3159,21 @@ namespace spot
         return wang32_hash(s.first ^ wang32_hash(s.second));
       }
     };
-  }
 
-  inline std::pair<bdd, formula>
-  bdd_and_formula_from_state(unsigned s, const mtdswa_ptr& swa)
-  {
-    if (s == -2U)
-      return {bddfalse, formula::ff()};
-    if (s == -1U)
-      return {bddtrue, formula::tt()};
-    if (s >= swa->names.size())
-      return {swa->states[s], nullptr};
-    return {swa->states[s], swa->names[s]};
-  }
 
-  struct product_data
+    inline std::pair<bdd, formula>
+    bdd_and_formula_from_state(unsigned s, const mtdswa_ptr& swa)
+    {
+      if (s == -2U)
+        return {bddfalse, formula::ff()};
+      if (s == -1U)
+        return {bddtrue, formula::tt()};
+      if (s >= swa->names.size())
+        return {swa->states[s], nullptr};
+      return {swa->states[s], swa->names[s]};
+    }
+
+    struct product_data
     {
       // A cache for the BDD terminals (as ints) in the product automaton
       // associated to a pair of states of the original automata.
@@ -3203,13 +3203,13 @@ namespace spot
       acc_cond::mark_t swa2_sat_{};
       bool swa1_taut_ = false;
       bool swa1_unsatis_ = false;
-    bool swa2_taut_ = false;
-    bool swa2_unsatis_ = false;
+      bool swa2_taut_ = false;
+      bool swa2_unsatis_ = false;
 
-    // Type for a color strategy: a const member function of product_data
-    // that computes colors for a product state under a specific
-    // degenerate-acceptance scenario.
-    using color_strategy_t
+      // Type for a color strategy: a const member function of product_data
+      // that computes colors for a product state under a specific
+      // degenerate-acceptance scenario.
+      using color_strategy_t
       = acc_cond::mark_t (product_data::*)(product_state) const;
 
       unsigned leaf_to_state(int b, int v) const
@@ -3307,18 +3307,18 @@ namespace spot
       {
         if (s.second == -2U)
           return swa1_->colors[s.first]
-                 | (swa2_unsat_ << swa1_max_color_);
+            | (swa2_unsat_ << swa1_max_color_);
         if (s.first == -2U)
           return swa1_unsat_
-                 | (swa2_->colors[s.second] << swa1_max_color_);
+            | (swa2_->colors[s.second] << swa1_max_color_);
         if (s.second == -1U)
           return swa1_->colors[s.first]
-                 | (swa2_sat_ << swa1_max_color_);
+            | (swa2_sat_ << swa1_max_color_);
         if (s.first == -1U)
           return swa1_sat_
-                 | (swa2_->colors[s.second] << swa1_max_color_);
+            | (swa2_->colors[s.second] << swa1_max_color_);
         return swa1_->colors[s.first]
-               | (swa2_->colors[s.second] << swa1_max_color_);
+          | (swa2_->colors[s.second] << swa1_max_color_);
       }
 
       // Used when both sides are degenerate: the acceptance is
@@ -3384,7 +3384,7 @@ namespace spot
       {
         if (s.first == -2U)
           return swa1_unsat_
-                 | (swa2_->colors[s.second] << swa1_max_color_);
+            | (swa2_->colors[s.second] << swa1_max_color_);
         return swa2_->colors[s.second] << swa1_max_color_;
       }
       acc_cond::mark_t
@@ -3392,18 +3392,18 @@ namespace spot
       {
         if (s.first == -2U)
           return swa1_unsat_
-                 | (swa2_->colors[s.second] << swa1_max_color_);
+            | (swa2_->colors[s.second] << swa1_max_color_);
         return swa1_sat_
-               | (swa2_->colors[s.second] << swa1_max_color_);
+          | (swa2_->colors[s.second] << swa1_max_color_);
       }
       acc_cond::mark_t
       colors_swa1_taut_implies(product_state s) const
       {
         if (s.first == -2U)
           return swa2_sat_
-                 | (swa2_->colors[s.second] << swa1_max_color_);
+            | (swa2_->colors[s.second] << swa1_max_color_);
         return (swa2_->colors[s.second] << swa1_max_color_)
-               | status_mark_;
+          | status_mark_;
       }
       acc_cond::mark_t
       colors_swa1_taut_equiv_xor(product_state s) const
@@ -3411,7 +3411,7 @@ namespace spot
         if (s.first == -2U)
           return swa2_->colors[s.second] << swa1_max_color_;
         return (swa2_->colors[s.second] << swa1_max_color_)
-               | status_mark_;
+          | status_mark_;
       }
 
       // --- swa1 unsatisfiable (f) strategies ---
@@ -3419,7 +3419,7 @@ namespace spot
       colors_swa1_unsat_and(product_state s) const
       {
         return swa1_unsat_
-               | (swa2_->colors[s.second] << swa1_max_color_);
+          | (swa2_->colors[s.second] << swa1_max_color_);
       }
       acc_cond::mark_t
       colors_swa1_unsat_or_xor(product_state s) const
@@ -3430,19 +3430,18 @@ namespace spot
       colors_swa1_unsat_implies(product_state s) const
       {
         return swa2_sat_
-               | (swa2_->colors[s.second] << swa1_max_color_);
+          | (swa2_->colors[s.second] << swa1_max_color_);
       }
       acc_cond::mark_t
       colors_swa1_unsat_equiv(product_state s) const
       {
         if (s.first == -2U)
           return swa2_sat_
-                 | (swa2_->colors[s.second] << swa1_max_color_);
+            | (swa2_->colors[s.second] << swa1_max_color_);
         return (swa2_->colors[s.second] << swa1_max_color_)
-               | status_mark_;
+          | status_mark_;
       }
-    }
-    the_product_data;
+    } the_product_data;
 
     // Combine two leaves of the product automaton with AND.
     static int leaf_combine_and(int left, int left_term,
@@ -3619,378 +3618,412 @@ namespace spot
       return res;
     }
 
-    mtdswa_ptr product(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+    static mtdswa_ptr
+    complement_aux(const mtdswa_ptr& swa, bddExtCache* cache, int hash_key)
     {
-      bddExtCache cache;
-      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
-      the_product_data.setup(swa1, swa2, op::And);
-      mtdswa_ptr res;
-      product_data::color_strategy_t cs;
-      if (the_product_data.swa2_taut_
-        && !the_product_data.swa1_taut_
-        && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_taut_and;
-          res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
-          // AND(A, t) = A.
-          res->acc = acc_cond{swa1->acc.get_acceptance()};
-        }
-      else if (the_product_data.swa2_unsatis_
-         && !the_product_data.swa1_taut_
-         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_unsat_and;
-          res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
-          // AND(A, f) = f.
-          res->acc = acc_cond{acc_cond::acc_code::f()};
-        }
-      else if (the_product_data.swa1_taut_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_taut_and;
-          res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
-          // AND(t, B) = B.
-          res->acc = acc_cond{swa2->acc.get_acceptance()
-                              << the_product_data.swa1_max_color_};
-        }
-      else if (the_product_data.swa1_unsatis_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_unsat_and;
-          res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
-          // AND(f, B) = f.
-          res->acc = acc_cond{acc_cond::acc_code::f()};
-        }
-      else
-        {
-          bool both_degen = (the_product_data.swa1_taut_
-                             || the_product_data.swa1_unsatis_);
-          cs = (both_degen
-                ? &product_data::colors_both_degenerate
-                : &product_data::colors_general);
-          res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
-          if (SPOT_UNLIKELY(both_degen))
-            // Both sides degenerate: AND(t,t)=t, otherwise f.
-            res->acc = acc_cond{((the_product_data.swa1_taut_
-                                  && the_product_data.swa2_taut_)
-                                 ? acc_cond::acc_code::t()
-                                 : acc_cond::acc_code::f())};
-          else
-            res->acc = acc_cond{swa1->acc.get_acceptance()
-                                & (swa2->acc.get_acceptance()
-                                   << the_product_data.swa1_max_color_)};
-        }
-      bdd_extcache_done(&cache);
+      unsigned n = swa->names.size();
+      unsigned ns = swa->states.size();
+
+      bdd_dict_ptr dict = swa->get_dict();
+      mtdswa_ptr res = std::make_shared<mtdswa>(dict);
+      dict->register_all_propositions_of(swa, res);
+      res->names.reserve(n);
+      res->states.reserve(ns);
+      res->colors = swa->colors;
+      res->aps = swa->aps;
+      res->acc = acc_cond{swa->acc.get_acceptance().complement()};
+
+      // Replace bddtrue by bddfalse and vice versa.
+      for (unsigned i = 0; i < ns; ++i)
+        res->states.push_back(bdd_mt_apply1(swa->states[i],
+                                            [](int v){ return v; },
+                                            bddtrue, bddfalse, cache,
+                                            hash_key));
+      for (unsigned i = 0; i < n; ++i)
+        res->names.push_back(formula::Not(swa->names[i]));
       return res;
     }
+  }
 
-    mtdswa_ptr product_or(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
-    {
-      bddExtCache cache;
-      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
-      the_product_data.setup(swa1, swa2, op::Or);
-      mtdswa_ptr res;
-      product_data::color_strategy_t cs;
-      if (the_product_data.swa2_taut_
+  mtdswa_ptr product(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+    the_product_data.setup(swa1, swa2, op::And);
+    mtdswa_ptr res;
+    product_data::color_strategy_t cs;
+    if (the_product_data.swa2_taut_
         && !the_product_data.swa1_taut_
         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_taut_or;
-          res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
-          // OR(A, t): override A|t→t with just A.
-          res->acc = acc_cond{swa1->acc.get_acceptance()};
-        }
-      else if (the_product_data.swa2_unsatis_
-         && !the_product_data.swa1_taut_
-         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_unsat_or_implies_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
-          // OR(A, f) = A.
-          res->acc = acc_cond{swa1->acc.get_acceptance()};
-        }
-      else if (the_product_data.swa1_taut_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_taut_or;
-          res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
-          // OR(t, B): override t|B→t with just B.
-          res->acc = acc_cond{swa2->acc.get_acceptance()
-                              << the_product_data.swa1_max_color_};
-        }
-      else if (the_product_data.swa1_unsatis_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_unsat_or_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
-          // OR(f, B) = B.
-          res->acc = acc_cond{swa2->acc.get_acceptance()
-                              << the_product_data.swa1_max_color_};
-        }
-      else
-        {
-          bool both_degen = (the_product_data.swa1_taut_
-                             || the_product_data.swa1_unsatis_);
-          cs = (both_degen
-                ? &product_data::colors_both_degenerate
-                : &product_data::colors_general);
-          res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
-          if (SPOT_UNLIKELY(both_degen))
-            // Both sides degenerate: OR(t,_)=t, OR(_,t)=t, OR(f,f)=f.
-            res->acc = acc_cond{((the_product_data.swa1_taut_
-                                  || the_product_data.swa2_taut_)
-                                 ? acc_cond::acc_code::t()
-                                 : acc_cond::acc_code::f())};
-          else
-            res->acc = acc_cond{swa1->acc.get_acceptance()
-                                | (swa2->acc.get_acceptance()
-                                   << the_product_data.swa1_max_color_)};
-        }
-      bdd_extcache_done(&cache);
-      return res;
-    }
+      {
+        cs = &product_data::colors_swa2_taut_and;
+        res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
+        // AND(A, t) = A.
+        res->acc = acc_cond{swa1->acc.get_acceptance()};
+      }
+    else if (the_product_data.swa2_unsatis_
+             && !the_product_data.swa1_taut_
+             && !the_product_data.swa1_unsatis_)
+      {
+        cs = &product_data::colors_swa2_unsat_and;
+        res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
+        // AND(A, f) = f.
+        res->acc = acc_cond{acc_cond::acc_code::f()};
+      }
+    else if (the_product_data.swa1_taut_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_taut_and;
+        res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
+        // AND(t, B) = B.
+        res->acc = acc_cond{swa2->acc.get_acceptance()
+                            << the_product_data.swa1_max_color_};
+      }
+    else if (the_product_data.swa1_unsatis_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_unsat_and;
+        res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
+        // AND(f, B) = f.
+        res->acc = acc_cond{acc_cond::acc_code::f()};
+      }
+    else
+      {
+        bool both_degen = (the_product_data.swa1_taut_
+                           || the_product_data.swa1_unsatis_);
+        cs = (both_degen
+              ? &product_data::colors_both_degenerate
+              : &product_data::colors_general);
+        res = product_mtdswa_aux(swa1, swa2, op::And, cs, &cache, 0);
+        if (SPOT_UNLIKELY(both_degen))
+          // Both sides degenerate: AND(t,t)=t, otherwise f.
+          res->acc = acc_cond{((the_product_data.swa1_taut_
+                                && the_product_data.swa2_taut_)
+                               ? acc_cond::acc_code::t()
+                               : acc_cond::acc_code::f())};
+        else
+          res->acc = acc_cond{swa1->acc.get_acceptance()
+                              & (swa2->acc.get_acceptance()
+                                 << the_product_data.swa1_max_color_)};
+      }
+    bdd_extcache_done(&cache);
+    return res;
+  }
 
-    mtdswa_ptr product_implies(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
-    {
-      bddExtCache cache;
-      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
-      the_product_data.setup(swa1, swa2, op::Implies);
-      mtdswa_ptr res;
-      product_data::color_strategy_t cs;
-      auto inf_st = acc_cond::acc_code::inf(the_product_data.status_mark_);
-      auto fin_st = acc_cond::acc_code::fin(the_product_data.status_mark_);
-      if (the_product_data.swa2_taut_
+  mtdswa_ptr product_or(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+    the_product_data.setup(swa1, swa2, op::Or);
+    mtdswa_ptr res;
+    product_data::color_strategy_t cs;
+    if (the_product_data.swa2_taut_
         && !the_product_data.swa1_taut_
         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_taut_implies;
-          res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
-          // IMPLIES(A, t): alive→true, dead→!A.
-          // = Inf(status) | !A.acc.
-          res->acc = acc_cond{inf_st
-                              | swa1->acc.get_acceptance().complement()};
-        }
-      else if (the_product_data.swa2_unsatis_
-         && !the_product_data.swa1_taut_
-         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_unsat_or_implies_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
-          // IMPLIES(A, f) = !A.
-          res->acc = acc_cond{swa1->acc.get_acceptance().complement()};
-        }
-      else if (the_product_data.swa1_taut_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_taut_implies;
-          res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
-          // IMPLIES(t, B): alive→B, dead→true.
-          // = Fin(status) | B.acc.
-          res->acc = acc_cond{fin_st
+      {
+        cs = &product_data::colors_swa2_taut_or;
+        res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
+        // OR(A, t): override A|t→t with just A.
+        res->acc = acc_cond{swa1->acc.get_acceptance()};
+      }
+    else if (the_product_data.swa2_unsatis_
+             && !the_product_data.swa1_taut_
+             && !the_product_data.swa1_unsatis_)
+      {
+        cs = &product_data::colors_swa2_unsat_or_implies_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
+        // OR(A, f) = A.
+        res->acc = acc_cond{swa1->acc.get_acceptance()};
+      }
+    else if (the_product_data.swa1_taut_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_taut_or;
+        res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
+        // OR(t, B): override t|B→t with just B.
+        res->acc = acc_cond{swa2->acc.get_acceptance()
+                            << the_product_data.swa1_max_color_};
+      }
+    else if (the_product_data.swa1_unsatis_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_unsat_or_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
+        // OR(f, B) = B.
+        res->acc = acc_cond{swa2->acc.get_acceptance()
+                            << the_product_data.swa1_max_color_};
+      }
+    else
+      {
+        bool both_degen = (the_product_data.swa1_taut_
+                           || the_product_data.swa1_unsatis_);
+        cs = (both_degen
+              ? &product_data::colors_both_degenerate
+              : &product_data::colors_general);
+        res = product_mtdswa_aux(swa1, swa2, op::Or, cs, &cache, 0);
+        if (SPOT_UNLIKELY(both_degen))
+          // Both sides degenerate: OR(t,_)=t, OR(_,t)=t, OR(f,f)=f.
+          res->acc = acc_cond{((the_product_data.swa1_taut_
+                                || the_product_data.swa2_taut_)
+                               ? acc_cond::acc_code::t()
+                               : acc_cond::acc_code::f())};
+        else
+          res->acc = acc_cond{swa1->acc.get_acceptance()
                               | (swa2->acc.get_acceptance()
                                  << the_product_data.swa1_max_color_)};
-        }
-      else if (the_product_data.swa1_unsatis_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_unsat_implies;
-          res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
-          // IMPLIES(f, B) = t.
-          res->acc = acc_cond{acc_cond::acc_code::t()};
-        }
-      else
-        {
-          bool both_degen = (the_product_data.swa1_taut_
-                             || the_product_data.swa1_unsatis_);
-          cs = (both_degen
-                ? &product_data::colors_both_degenerate
-                : &product_data::colors_general);
-          res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
-          if (SPOT_UNLIKELY(both_degen))
-            // Both sides degenerate: IMPLIES(f,_)=t, IMPLIES(_,t)=t,
-            // IMPLIES(t,f)=f.
-            res->acc = acc_cond{((!the_product_data.swa1_taut_
-                                  || the_product_data.swa2_taut_)
-                                 ? acc_cond::acc_code::t()
-                                 : acc_cond::acc_code::f())};
-          else
-            res->acc
-              = acc_cond{(swa1->acc.get_acceptance().complement())
-                         | (swa2->acc.get_acceptance()
-                            << the_product_data.swa1_max_color_)};
-        }
-      bdd_extcache_done(&cache);
-      return res;
-    }
+      }
+    bdd_extcache_done(&cache);
+    return res;
+  }
 
-    mtdswa_ptr product_xnor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
-    {
-      bddExtCache cache;
-      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
-      the_product_data.setup(swa1, swa2, op::Equiv);
-      mtdswa_ptr res;
-      product_data::color_strategy_t cs;
-      auto inf_st = acc_cond::acc_code::inf(the_product_data.status_mark_);
-      auto fin_st = acc_cond::acc_code::fin(the_product_data.status_mark_);
-      if (the_product_data.swa2_taut_
+  mtdswa_ptr product_implies(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+    the_product_data.setup(swa1, swa2, op::Implies);
+    mtdswa_ptr res;
+    product_data::color_strategy_t cs;
+    auto inf_st = acc_cond::acc_code::inf(the_product_data.status_mark_);
+    auto fin_st = acc_cond::acc_code::fin(the_product_data.status_mark_);
+    if (the_product_data.swa2_taut_
         && !the_product_data.swa1_taut_
         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_taut_equiv_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
-          // EQUIV(A, t): alive→A, dead→!A.
-          res->acc = acc_cond{(inf_st & swa1->acc.get_acceptance())
-                              | (fin_st
-                                 & swa1->acc.get_acceptance().complement())};
-        }
-      else if (the_product_data.swa2_unsatis_
-         && !the_product_data.swa1_taut_
-         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_unsat_equiv;
-          res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
-          // EQUIV(A, f): alive→!A, dead→true.
-          // = Fin(status) | !A.acc.
-          res->acc = acc_cond{fin_st
-                              | swa1->acc.get_acceptance().complement()};
-        }
-      else if (the_product_data.swa1_taut_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_taut_equiv_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
-          // EQUIV(t, B): alive→B, dead→!B.
-          auto acc2 = swa2->acc.get_acceptance()
-                      << the_product_data.swa1_max_color_;
-          res->acc = acc_cond{(inf_st & acc2)
-                              | (fin_st & acc2.complement())};
-        }
-      else if (the_product_data.swa1_unsatis_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_unsat_equiv;
-          res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
-          // EQUIV(f, B): alive→!B, dead→true.
-          // = Fin(status) | !B.acc.
-          res->acc = acc_cond{fin_st
-                              | (swa2->acc.get_acceptance()
-                                 << the_product_data.swa1_max_color_)
-                                  .complement()};
-        }
-      else
-        {
-          bool both_degen = (the_product_data.swa1_taut_
-                             || the_product_data.swa1_unsatis_);
-          cs = (both_degen
-                ? &product_data::colors_both_degenerate
-                : &product_data::colors_general);
-          res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
-          if (SPOT_UNLIKELY(both_degen))
-            // Both sides degenerate: EQUIV(t,t)=t, EQUIV(f,f)=t,
-            // EQUIV(t,f)=f.
-            res->acc = acc_cond{((the_product_data.swa1_taut_
-                                  == the_product_data.swa2_taut_)
-                                 ? acc_cond::acc_code::t()
-                                 : acc_cond::acc_code::f())};
-          else
-            {
-              auto A = swa1->acc.get_acceptance();
-              auto B = swa2->acc.get_acceptance()
-                       << the_product_data.swa1_max_color_;
-              res->acc = acc_cond{(A & B)
-                                  | (A.complement() & B.complement())};
-            }
-        }
-      bdd_extcache_done(&cache);
-      return res;
-    }
+      {
+        cs = &product_data::colors_swa2_taut_implies;
+        res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
+        // IMPLIES(A, t): alive→true, dead→!A.
+        // = Inf(status) | !A.acc.
+        res->acc = acc_cond{inf_st
+                            | swa1->acc.get_acceptance().complement()};
+      }
+    else if (the_product_data.swa2_unsatis_
+             && !the_product_data.swa1_taut_
+             && !the_product_data.swa1_unsatis_)
+      {
+        cs = &product_data::colors_swa2_unsat_or_implies_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
+        // IMPLIES(A, f) = !A.
+        res->acc = acc_cond{swa1->acc.get_acceptance().complement()};
+      }
+    else if (the_product_data.swa1_taut_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_taut_implies;
+        res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
+        // IMPLIES(t, B): alive→B, dead→true.
+        // = Fin(status) | B.acc.
+        res->acc = acc_cond{fin_st
+                            | (swa2->acc.get_acceptance()
+                               << the_product_data.swa1_max_color_)};
+      }
+    else if (the_product_data.swa1_unsatis_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_unsat_implies;
+        res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
+        // IMPLIES(f, B) = t.
+        res->acc = acc_cond{acc_cond::acc_code::t()};
+      }
+    else
+      {
+        bool both_degen = (the_product_data.swa1_taut_
+                           || the_product_data.swa1_unsatis_);
+        cs = (both_degen
+              ? &product_data::colors_both_degenerate
+              : &product_data::colors_general);
+        res = product_mtdswa_aux(swa1, swa2, op::Implies, cs, &cache, 0);
+        if (SPOT_UNLIKELY(both_degen))
+          // Both sides degenerate: IMPLIES(f,_)=t, IMPLIES(_,t)=t,
+          // IMPLIES(t,f)=f.
+          res->acc = acc_cond{((!the_product_data.swa1_taut_
+                                || the_product_data.swa2_taut_)
+                               ? acc_cond::acc_code::t()
+                               : acc_cond::acc_code::f())};
+        else
+          res->acc
+            = acc_cond{(swa1->acc.get_acceptance().complement())
+                       | (swa2->acc.get_acceptance()
+                          << the_product_data.swa1_max_color_)};
+      }
+    bdd_extcache_done(&cache);
+    return res;
+  }
 
-    mtdswa_ptr product_xor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
-    {
-      bddExtCache cache;
-      bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
-      the_product_data.setup(swa1, swa2, op::Xor);
-      mtdswa_ptr res;
-      product_data::color_strategy_t cs;
-      auto inf_st = acc_cond::acc_code::inf(the_product_data.status_mark_);
-      auto fin_st = acc_cond::acc_code::fin(the_product_data.status_mark_);
-      if (the_product_data.swa2_taut_
+  mtdswa_ptr product_xnor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+    the_product_data.setup(swa1, swa2, op::Equiv);
+    mtdswa_ptr res;
+    product_data::color_strategy_t cs;
+    auto inf_st = acc_cond::acc_code::inf(the_product_data.status_mark_);
+    auto fin_st = acc_cond::acc_code::fin(the_product_data.status_mark_);
+    if (the_product_data.swa2_taut_
         && !the_product_data.swa1_taut_
         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_taut_equiv_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
-          // XOR(A, t): alive→!A, dead→A.
-          res->acc = acc_cond{(inf_st
-                               & swa1->acc.get_acceptance().complement())
-                              | (fin_st & swa1->acc.get_acceptance())};
-        }
-      else if (the_product_data.swa2_unsatis_
-         && !the_product_data.swa1_taut_
-         && !the_product_data.swa1_unsatis_)
-        {
-          cs = &product_data::colors_swa2_unsat_or_implies_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
-          // XOR(A, f) = A.
-          res->acc = acc_cond{swa1->acc.get_acceptance()};
-        }
-      else if (the_product_data.swa1_taut_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_taut_equiv_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
-          // XOR(t, B): alive→!B, dead→B.
-          auto acc2 = swa2->acc.get_acceptance()
-                      << the_product_data.swa1_max_color_;
-          res->acc = acc_cond{(inf_st & acc2.complement())
-                              | (fin_st & acc2)};
-        }
-      else if (the_product_data.swa1_unsatis_
-         && !the_product_data.swa2_taut_
-         && !the_product_data.swa2_unsatis_)
-        {
-          cs = &product_data::colors_swa1_unsat_or_xor;
-          res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
-          // XOR(f, B) = B.
-          res->acc = acc_cond{swa2->acc.get_acceptance()
-                              << the_product_data.swa1_max_color_};
-        }
-      else
-        {
-          bool both_degen = (the_product_data.swa1_taut_
-                             || the_product_data.swa1_unsatis_);
-          cs = (both_degen
-                ? &product_data::colors_both_degenerate
-                : &product_data::colors_general);
-          res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
-          if (SPOT_UNLIKELY(both_degen))
-            // Both sides degenerate: XOR(t,t)=f, XOR(f,f)=f,
-            // XOR(t,f)=t.
-            res->acc = acc_cond{((the_product_data.swa1_taut_
-                                  != the_product_data.swa2_taut_)
-                                 ? acc_cond::acc_code::t()
-                                 : acc_cond::acc_code::f())};
-          else
-            {
-              auto A = swa1->acc.get_acceptance();
-              auto B = swa2->acc.get_acceptance()
-                       << the_product_data.swa1_max_color_;
-              res->acc = acc_cond{(A & B.complement())
-                                  | (A.complement() & B)};
-            }
-        }
-      bdd_extcache_done(&cache);
-      return res;
-    }
+      {
+        cs = &product_data::colors_swa2_taut_equiv_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
+        // EQUIV(A, t): alive→A, dead→!A.
+        res->acc = acc_cond{(inf_st & swa1->acc.get_acceptance())
+                            | (fin_st
+                               & swa1->acc.get_acceptance().complement())};
+      }
+    else if (the_product_data.swa2_unsatis_
+             && !the_product_data.swa1_taut_
+             && !the_product_data.swa1_unsatis_)
+      {
+        cs = &product_data::colors_swa2_unsat_equiv;
+        res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
+        // EQUIV(A, f): alive→!A, dead→true.
+        // = Fin(status) | !A.acc.
+        res->acc = acc_cond{fin_st
+                            | swa1->acc.get_acceptance().complement()};
+      }
+    else if (the_product_data.swa1_taut_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_taut_equiv_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
+        // EQUIV(t, B): alive→B, dead→!B.
+        auto acc2 = swa2->acc.get_acceptance()
+          << the_product_data.swa1_max_color_;
+        res->acc = acc_cond{(inf_st & acc2)
+                            | (fin_st & acc2.complement())};
+      }
+    else if (the_product_data.swa1_unsatis_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_unsat_equiv;
+        res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
+        // EQUIV(f, B): alive→!B, dead→true.
+        // = Fin(status) | !B.acc.
+        res->acc = acc_cond{fin_st
+                            | (swa2->acc.get_acceptance()
+                               << the_product_data.swa1_max_color_)
+                            .complement()};
+      }
+    else
+      {
+        bool both_degen = (the_product_data.swa1_taut_
+                           || the_product_data.swa1_unsatis_);
+        cs = (both_degen
+              ? &product_data::colors_both_degenerate
+              : &product_data::colors_general);
+        res = product_mtdswa_aux(swa1, swa2, op::Equiv, cs, &cache, 0);
+        if (SPOT_UNLIKELY(both_degen))
+          // Both sides degenerate: EQUIV(t,t)=t, EQUIV(f,f)=t,
+          // EQUIV(t,f)=f.
+          res->acc = acc_cond{((the_product_data.swa1_taut_
+                                == the_product_data.swa2_taut_)
+                               ? acc_cond::acc_code::t()
+                               : acc_cond::acc_code::f())};
+        else
+          {
+            auto A = swa1->acc.get_acceptance();
+            auto B = swa2->acc.get_acceptance()
+              << the_product_data.swa1_max_color_;
+            res->acc = acc_cond{(A & B)
+                                | (A.complement() & B.complement())};
+          }
+      }
+    bdd_extcache_done(&cache);
+    return res;
+  }
 
+  mtdswa_ptr product_xor(const mtdswa_ptr& swa1, const mtdswa_ptr& swa2)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_product(swa1, swa2), true);
+    the_product_data.setup(swa1, swa2, op::Xor);
+    mtdswa_ptr res;
+    product_data::color_strategy_t cs;
+    auto inf_st = acc_cond::acc_code::inf(the_product_data.status_mark_);
+    auto fin_st = acc_cond::acc_code::fin(the_product_data.status_mark_);
+    if (the_product_data.swa2_taut_
+        && !the_product_data.swa1_taut_
+        && !the_product_data.swa1_unsatis_)
+      {
+        cs = &product_data::colors_swa2_taut_equiv_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
+        // XOR(A, t): alive→!A, dead→A.
+        res->acc = acc_cond{(inf_st
+                             & swa1->acc.get_acceptance().complement())
+                            | (fin_st & swa1->acc.get_acceptance())};
+      }
+    else if (the_product_data.swa2_unsatis_
+             && !the_product_data.swa1_taut_
+             && !the_product_data.swa1_unsatis_)
+      {
+        cs = &product_data::colors_swa2_unsat_or_implies_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
+        // XOR(A, f) = A.
+        res->acc = acc_cond{swa1->acc.get_acceptance()};
+      }
+    else if (the_product_data.swa1_taut_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_taut_equiv_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
+        // XOR(t, B): alive→!B, dead→B.
+        auto acc2 = swa2->acc.get_acceptance()
+          << the_product_data.swa1_max_color_;
+        res->acc = acc_cond{(inf_st & acc2.complement())
+                            | (fin_st & acc2)};
+      }
+    else if (the_product_data.swa1_unsatis_
+             && !the_product_data.swa2_taut_
+             && !the_product_data.swa2_unsatis_)
+      {
+        cs = &product_data::colors_swa1_unsat_or_xor;
+        res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
+        // XOR(f, B) = B.
+        res->acc = acc_cond{swa2->acc.get_acceptance()
+                            << the_product_data.swa1_max_color_};
+      }
+    else
+      {
+        bool both_degen = (the_product_data.swa1_taut_
+                           || the_product_data.swa1_unsatis_);
+        cs = (both_degen
+              ? &product_data::colors_both_degenerate
+              : &product_data::colors_general);
+        res = product_mtdswa_aux(swa1, swa2, op::Xor, cs, &cache, 0);
+        if (SPOT_UNLIKELY(both_degen))
+          // Both sides degenerate: XOR(t,t)=f, XOR(f,f)=f,
+          // XOR(t,f)=t.
+          res->acc = acc_cond{((the_product_data.swa1_taut_
+                                != the_product_data.swa2_taut_)
+                               ? acc_cond::acc_code::t()
+                               : acc_cond::acc_code::f())};
+        else
+          {
+            auto A = swa1->acc.get_acceptance();
+            auto B = swa2->acc.get_acceptance()
+              << the_product_data.swa1_max_color_;
+            res->acc = acc_cond{(A & B.complement())
+                                | (A.complement() & B)};
+          }
+      }
+    bdd_extcache_done(&cache);
+    return res;
+  }
 
+  mtdswa_ptr complement(const mtdswa_ptr& swa)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, 0, true);
+    mtdswa_ptr res = complement_aux(swa, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
 }

@@ -370,3 +370,25 @@ test_mtdswa_products()
 test_degenerate_products()
 test_degenerate_products_swa1()
 test_degenerate_with_colors()
+
+# Tests products functions and complement for MTDSwAs.
+for i in range(len(formulas)):
+    mcomp = spot.complement(mtdswas[i])
+    acomp = spot.complement(twas[i])
+    # Check that the two complements are equivalent.
+    pxor = spot.product_xor(mcomp.as_twa(True, True, True), acomp)
+    tc.assertTrue(pxor.is_empty(), "Complement of MTDSwA "
+                  + "is not equivalent to complement of DTWA: "
+                  + f"{formulas[i]}")
+
+    for j in range(i, len(formulas)):
+        # Test all products that exist for both twas and mtdswas.
+        for prod in [spot.product, spot.product_or, spot.product_xor,
+                        spot.product_xnor]:
+            m12 = prod(mtdswas[i], mtdswas[j])
+            a12 = prod(twas[i], twas[j])
+            # Check that the two products are equivalent.
+            pxor = spot.product_xor(m12.as_twa(True, True, True), a12)
+            tc.assertTrue(pxor.is_empty(), "Product of MTDSwAs "
+                            + "is not equivalent to product of DTWAs: "
+                            + f"{formulas[i]} {prod.__name__} {formulas[j]}")

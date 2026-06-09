@@ -147,8 +147,9 @@ New in spot 2.15.1.dev  (not yet released)
 
   - randomize() now preserves more named properties.  (Issue #532.)
 
-  - Products of mtdswa are now implemented for various Boolean
-    operators.
+  - Boolean operations over mtdswa_ptr have been implemented as
+    product(), product_or(), product_xor(), product_nxor(),
+    product_implies(), compement().
 
   Deprecation notices:
 
