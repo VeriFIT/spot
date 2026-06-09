@@ -658,8 +658,8 @@ namespace spot
     static mtdfa_ptr
     complement_aux(const mtdfa_ptr& dfa, bddExtCache* cache, int hash_key)
     {
-      unsigned n = dfa->states.size();
-      unsigned ns = dfa->names.size();
+      unsigned ns = dfa->states.size();
+      unsigned n = dfa->names.size();
 
       bdd_dict_ptr dict = dfa->get_dict();
       mtdfa_ptr res = std::make_shared<mtdfa>(dict);
@@ -667,13 +667,12 @@ namespace spot
       res->names.reserve(n);
       res->states.reserve(ns);
       res->aps = dfa->aps;
-
-      for (unsigned i = 0; i < n; ++i)
+      for (unsigned i = 0; i < ns; ++i)
         res->states.push_back(bdd_mt_apply1(dfa->states[i], complement_term,
                                             bddtrue, bddfalse, cache,
                                             hash_key));
 
-      for (unsigned i = 0; i < ns; ++i)
+      for (unsigned i = 0; i < n; ++i)
         res->names.push_back(formula::Not(dfa->names[i]));
       return res;
     }
