@@ -134,6 +134,16 @@ namespace spot
                                    apsz);
     }
 
+    static int size_estimate_quantify(const mtdswa_ptr& aut)
+    {
+      // quantify_mtdswa_aux first combines a set of state BDDs with
+      // bdd_mt_apply2_leaves().  The cache therefore needs to accommodate the
+      // this phase, so we use the product-style estimate.
+      return size_estimate_product(aut->num_roots(),
+                                   aut->num_roots(),
+                                   aut->aps.size());
+    }
+
     void outset(std::ostream& os, int v)
     {
       constexpr int MAX_BULLET = 20;
@@ -3557,7 +3567,7 @@ namespace spot
       // to avoid collisions.
       the_product_data.setup(swa1, swa2, o);
 
-      // This will initialize TODO with the initial state of the product.
+      // This will initialize todo with the initial state of the product.
       std::queue<product_state>& todo = the_product_data.todo;
       (void) the_product_data.pair_to_terminal(0, 0);
 
@@ -4026,4 +4036,432 @@ namespace spot
     bdd_extcache_done(&cache);
     return res;
   }
+
+
+  namespace
+  {
+    // Used to renumber states.
+    static std::vector<int> renum;
+
+    static int trim_renumber(int bdd, int term)
+    {
+      // bddtrue and bddfalse are left unchanged.
+      if (bdd == 0 || bdd == 1)
+        return bdd;
+      assert((unsigned) term < renum.size());
+      int newterm = renum[term];
+      // Renumbered state.
+      if (newterm != -1)
+        return bdd_terminal_as_int(newterm);
+      return 0;
+    }
+
+    // Light version of trim_mtdswa that only removes inaccessible states.
+    void trim_dead_states(mtdswa_ptr swa, bddExtCache* cache, int hash_key)
+    {
+      // Do a BFS from the initial state, and mark all accessible states.
+      unsigned n = swa->num_roots();
+      std::vector<bool> accessible(n, false);
+      std::queue<int> q;
+      q.push(0);
+      accessible[0] = true;
+      while (!q.empty())
+        {
+          int s = q.front();
+          q.pop();
+          // Mark all leaves rechable from s as accessible.
+          for (bdd term : leaves_of(swa->states[s]))
+            {
+              if (SPOT_UNLIKELY(term != bddfalse && term != bddtrue))
+                {
+                  int next = bdd_get_terminal(term);
+                  if (!accessible[next])
+                    {
+                      // Only continue the BFS from states that are not
+                      // already marked as accessible.
+                      accessible[next] = true;
+                      q.push(next);
+                    }
+                }
+            }
+        }
+      // Compute renumbering of states.
+      renum = std::vector<int>(n, -1);
+      int newnum = 0;
+      for (unsigned s = 0; s < n; ++s)
+        {
+          if (accessible[s])
+            {
+              // This state is kept, and gets new number newnum.
+              renum[s] = newnum;
+              ++newnum;
+            }
+        }
+
+      // Apply renumbering and remove inaccessible states.
+      std::vector<bdd> new_states;
+      std::vector<formula> new_names;
+      std::vector<acc_cond::mark_t> new_colors;
+      new_states.reserve(newnum);
+      new_names.reserve(newnum);
+      new_colors.reserve(newnum);
+
+      // Renumber the states
+      for (unsigned s = 0; s < n; ++s)
+        if (renum[s] != -1)
+          {
+            bdd new_state = bdd_mt_apply1_leaves(swa->states[s],
+                                                 trim_renumber,
+                                                 cache, hash_key);
+            new_states.push_back(new_state);
+            new_colors.push_back(swa->colors[s]);
+            if (s < swa->names.size())
+              new_names.push_back(swa->names[s]);
+          }
+      swa->states = new_states;
+      swa->names = new_names;
+      swa->colors = new_colors;
+    }
+
+    typedef std::set<unsigned> quantify_state;
+
+    struct quantify_state_hash
+    {
+      size_t
+      operator()(const quantify_state s) const noexcept
+      {
+        std::size_t seed = 0;
+        for (int x : s)
+          {
+            seed ^= wang32_hash(x) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+          }
+        return seed;
+      }
+    };
+
+    struct quantify_data
+      {
+        // A cache for the BDD terminals (as ints) in the product automaton
+        // associated to a set of states of the original automata.
+        std::unordered_map<quantify_state, int,
+                           quantify_state_hash> set_to_terminal_map;
+        // Maps terminal values of the quantified automaton to the corresponding
+        // set of states of the original automaton.
+        std::vector<quantify_state> terminal_to_set_map;
+        // Used to store the product states that still need to be processed.
+        // When new states are created, they are added here.
+        std::queue<quantify_state> todo;
+        // The value of the first terminal created for a set of states.  Set to
+        // max terminal value of the original automaton + 1 to avoid collisions.
+        unsigned state_offset;
+
+
+        // Maps a set of states from the original automaton to terminals in
+        // the quantified automaton.
+        int set_to_terminal(const quantify_state& s)
+        {
+          // If a terminal for this set exists then return it.
+          if (auto it = set_to_terminal_map.find(s);
+              it != set_to_terminal_map.end())
+            {
+              return it->second;
+            }
+          // Otherwise create a new one, cache it and return it.
+          unsigned new_id = state_offset + set_to_terminal_map.size();
+          terminal_to_set_map.push_back(s);
+          int res = bdd_terminal_as_int(new_id);
+          set_to_terminal_map.emplace(s, res);
+          todo.emplace(s);
+          return res;
+        }
+
+        // Adds the state(s) correponding to a terminal value to the given set.
+        void add_state_to_set(quantify_state& s, unsigned v) const
+        {
+          if (v < state_offset)
+            {
+              // State from the original automaton.
+              s.insert(v);
+            }
+          else
+            {
+              // State from the quantified automaton, corresponding to a set of
+              // states from the original automaton.
+              quantify_state st = terminal_to_set_map[v - state_offset];
+              s.insert(st.begin(), st.end());
+            }
+        }
+
+      }
+      the_quantify_data;
+
+    // Compute the and of the colors of a set of states in a weak mtdswa.
+    static inline acc_cond::mark_t
+    colors_of_qstate_and(mtdswa_ptr swa, quantify_state state)
+    {
+      for (unsigned s: state)
+        {
+          if (!swa->acc.accepting(swa->colors[s]))
+            return swa->acc.unsat_mark().second;
+        }
+      return swa->acc.sat_mark().second;
+    }
+
+    // Compute the or of the colors of a set of states in a weak mtdswa.
+    static inline acc_cond::mark_t
+    colors_of_qstate_or(mtdswa_ptr swa, quantify_state state)
+    {
+      for (unsigned s: state)
+        {
+          if (swa->acc.accepting(swa->colors[s]))
+            return swa->acc.sat_mark().second;
+        }
+      return swa->acc.unsat_mark().second;
+    }
+
+    // Combine two leaves of the automaton with AND.
+    static int quant_leaf_combine_and(int left, int left_term,
+                                int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 1 && right == 1))
+        return 1;
+      if (SPOT_UNLIKELY(left == 0 || right == 0))
+        return 0;
+      quantify_state s;
+      if (left != 1)
+        the_quantify_data.add_state_to_set(s, left_term);
+      if (right != 1)
+        the_quantify_data.add_state_to_set(s, right_term);
+
+      if (s.empty())
+        return 1;
+      return the_quantify_data.set_to_terminal(s);
+    }
+
+    // Combine two leaves of the automaton with OR.
+    static int quant_leaf_combine_or(int left, int left_term,
+                                int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 && right == 0))
+        return 0;
+      if (SPOT_UNLIKELY(left == 1 || right == 1))
+        return 1;
+      quantify_state s;
+      if (left != 0)
+        the_quantify_data.add_state_to_set(s, left_term);
+      if (right != 0)
+        the_quantify_data.add_state_to_set(s, right_term);
+
+      if (s.empty())
+        return 0;
+      return the_quantify_data.set_to_terminal(s);
+    }
+
+    static int quant_leaf_combine1(int bdd, int term)
+    {
+      if (SPOT_UNLIKELY(bdd == 0))
+        return 0;
+      if (SPOT_UNLIKELY(bdd == 1))
+        return 1;
+      return the_quantify_data.set_to_terminal({(unsigned)term});
+    }
+
+    // temporary
+    static int unshift_terminals(int bdd, int term)
+    {
+      if (SPOT_UNLIKELY(bdd == 0))
+        return 0;
+      if (SPOT_UNLIKELY(bdd == 1))
+        return 1;
+      return bdd_terminal_as_int(term - the_quantify_data.state_offset);
+    }
+
+
+    // Combines a queue of BDDs with the given operator and combine function.
+    // combine1 is used when the queue has only one element.
+    static bdd applyn_leaves(std::queue<bdd>& q, op o,
+                             int (*combine)(int, int, int, int),
+                             int (*combine1)(int, int),
+                             bddExtCache* cache, int hash_key,
+                             int applyop_shortcut)
+    {
+      // If empty queue, return the neutral element of the operator.
+      if (SPOT_UNLIKELY(q.empty()))
+        {
+          switch (o)
+            {
+            case op::And:
+              return bddtrue;
+            case op::Or:
+              return bddfalse;
+            default:
+              throw std::runtime_error("applyn_leaves: unsupported operator");
+            }
+        }
+      // If only one element in the queue, apply combine1 to it.
+      if (q.size() == 1)
+        {
+          bdd s = q.front();
+          q.pop();
+          return bdd_mt_apply1_leaves(s, combine1, cache, hash_key);
+        }
+      // Otherwise, apply combine pairwise until only one BDD is left,
+      // which is the result.
+      while (q.size() > 1)
+        {
+          bdd left = q.front();
+          q.pop();
+          bdd right = q.front();
+          q.pop();
+          bdd res = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
+                                       applyop_shortcut);
+          q.push(res);
+        }
+      bdd s = q.front();
+      q.pop();
+      return s;
+    }
+
+
+    // Quantify the given variable in a weak mtdswa.
+    static mtdswa_ptr
+    quantify_mtdswa_aux(const mtdswa_ptr& swa, int var, op o,
+                        bddExtCache* cache, int quant_hash, int apply_hash)
+    {
+      // Prepare the function to combine two leaves of the product automaton.
+      int (*combine)(int, int, int, int);
+      int applyop_shortcut = -1;
+      switch (o)
+        {
+        case op::And:
+          combine = quant_leaf_combine_and;
+          applyop_shortcut = bddop_and_zero;
+          break;
+        case op::Or:
+          combine = quant_leaf_combine_or;
+          applyop_shortcut = bddop_or_one;
+          break;
+        default:
+          throw std::runtime_error("product_mtdswa_aux: unsupported operator");
+        }
+      // Create result automaton, and register all propositions.
+      bdd_dict_ptr dict = swa->get_dict();
+      mtdswa_ptr res = std::make_shared<mtdswa>(dict);
+      dict->register_all_propositions_of(swa, res);
+      res->aps = swa->aps;
+      res->acc = swa->acc;
+
+      // The terminal ids of states in the quantified automaton will be shifted
+      // by the max terminal value of the original automaton.
+      the_quantify_data.state_offset = swa->states.size();
+      // This will initialize todo with the initial state of the quantification.
+      std::queue<quantify_state>& todo = the_quantify_data.todo;
+      (void) the_quantify_data.set_to_terminal(quantify_state{0});
+
+      while (!todo.empty())
+        {
+          quantify_state state = todo.front();
+          todo.pop();
+
+          // 1 - Combine all states in s with the operator and adjust names.
+          std::queue<bdd> q;
+          unsigned ns = swa->names.size();
+          formula combined_f = o == op::And ? formula::tt() : formula::ff();
+          for (unsigned s: state)
+          {
+            q.push(swa->states[s]);
+            // Combine names if not null.
+            formula f = s < ns ? swa->names[s] : nullptr;
+            if (combined_f)
+            {
+              if (f)
+              {
+                switch (o)
+                  {
+                  case op::And:
+                    combined_f = formula::And(combined_f, f);
+                    break;
+                  case op::Or:
+                    combined_f = formula::Or(combined_f, f);
+                    break;
+                  default:
+                    SPOT_UNREACHABLE();
+                  }
+              }
+              else
+                combined_f = nullptr;
+            }
+          }
+          // Combine all states in the quantify_state with the operator.
+          bdd b = applyn_leaves(q, o, combine, quant_leaf_combine1, cache,
+                                apply_hash, applyop_shortcut);
+
+          // 2 - Quantify the given variables in the resulting BDD.
+          bdd_mt_quantify_prepare(bdd_ithvar(var));
+          bdd qb = bdd_mt_quantify(b, [](int v){ return v; }, combine, cache,
+                                   quant_hash, apply_hash, applyop_shortcut);
+          // Unshift the terminal values of the resulting BDD to match
+          // the new state ids.
+          qb = bdd_mt_apply1_leaves(qb, unshift_terminals, cache, apply_hash);
+
+          res->states.push_back(qb);
+
+          // Compute the colors of the quantified state.
+          acc_cond::mark_t col = o == op::And
+                                 ? colors_of_qstate_and(swa, state)
+                                 : colors_of_qstate_or(swa, state);
+          res->colors.push_back(col);
+
+          // Construct name of the quantified state.
+          formula var_ap = swa->get_dict()->ap_from_var(var);
+          if (combined_f && var_ap)
+            switch (o)
+              {
+              case op::And:
+                res->names.push_back(formula::forall(var_ap, combined_f));
+                break;
+              case op::Or:
+                res->names.push_back(formula::exists(var_ap, combined_f));
+                break;
+              default:
+                SPOT_UNREACHABLE();
+              }
+        }
+      the_quantify_data.set_to_terminal_map.clear();
+      the_quantify_data.terminal_to_set_map.clear();
+      return res;
+    }
+  }
+
+
+  mtdswa_ptr quantify_exists(const mtdswa_ptr& swa, formula var, bool trim)
+  {
+    auto it = swa->get_dict()->var_map.find(var);
+    if (it == swa->get_dict()->var_map.end())
+      return swa; // Variable not found, return the original automaton.
+    int ivar = it->second;
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
+    mtdswa_ptr res = quantify_mtdswa_aux(swa, ivar, op::Or, &cache, 0, 1);
+    if (trim)
+      trim_dead_states(res, &cache, 2);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdswa_ptr quantify_forall(const mtdswa_ptr& swa, formula var, bool trim)
+  {
+    auto it = swa->get_dict()->var_map.find(var);
+    if (it == swa->get_dict()->var_map.end())
+      return swa; // Variable not found, return the original automaton.
+    int ivar = it->second;
+    bddExtCache cache;
+    bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
+    mtdswa_ptr res = quantify_mtdswa_aux(swa, ivar, op::And, &cache, 0, 1);
+    if (trim)
+      trim_dead_states(res, &cache, 2);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
 }

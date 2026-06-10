@@ -281,6 +281,16 @@ namespace spot
   SPOT_API mtdswa_ptr complement(const mtdswa_ptr& swa);
 
   /// \ingroup mtdswa
+  /// \brief Existentially quantify a variable in a *weak* MTDSwA.
+  SPOT_API mtdswa_ptr
+  quantify_exists(const mtdswa_ptr& swa, formula var, bool trim = true);
+
+  /// \ingroup mtdswa
+  /// \brief Universally quantify a variable in a *weak* MTDSwA.
+  SPOT_API mtdswa_ptr
+  quantify_forall(const mtdswa_ptr& swa, formula var, bool trim = true);
+
+  /// \ingroup mtdswa
   /// \brief "Semi-internal" for translating LTL using MTBDDs
   ///
   /// It is public only to make it possible to demonstrate the inner

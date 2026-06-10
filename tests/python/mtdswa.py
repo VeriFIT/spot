@@ -392,3 +392,43 @@ for i in range(len(formulas)):
             tc.assertTrue(pxor.is_empty(), "Product of MTDSwAs "
                             + "is not equivalent to product of DTWAs: "
                             + f"{formulas[i]} {prod.__name__} {formulas[j]}")
+
+# ==============================================================================
+# Test quantification functions for MTDSwAs.
+# ==============================================================================
+
+obligations = [
+    "true",
+    "p2",
+    "p2 -> p0",
+    "p0 | Xp1",
+    "Gp0",
+    "Xp0 xor (!p2 | G((p1 | p2) xor Xp1))",
+    "Gp1 <-> p2Up0",
+    "Gp0 xor Fp2",
+    "F(p1 & XFp0) -> (!p1 U p2)",
+    "(p0 U p1) & Fp0 & Gp1 & Fp2"
+]
+
+oblimtdswas = [spot.obligation_to_mtdswa(spot.formula(f)) for f in obligations]
+oblimtdswas_ex = [spot.obligation_to_mtdswa(spot.formula("\\exists p0: " + f))
+                  for f in obligations]
+oblimtdswas_fa = [spot.obligation_to_mtdswa(spot.formula("\\forall p0: " + f))
+                  for f in obligations]
+
+for i in range(len(obligations)):
+    # Test existential quantification.
+    m_ex = spot.quantify_exists(oblimtdswas[i], spot.formula.ap('p0'))
+    pxor = spot.product_xor(m_ex, oblimtdswas_ex[i])
+    tc.assertTrue(pxor.as_twa().is_empty(),
+                  "Existential quantification of MTDSwA "
+                  + "is not equivalent to LTL existential quantification: "
+                  + f"{obligations[i]}")
+
+    # Test universal quantification.
+    m_fa = spot.quantify_forall(oblimtdswas[i], spot.formula.ap('p0'))
+    pxor = spot.product_xor(m_fa, oblimtdswas_fa[i])
+    tc.assertTrue(pxor.as_twa().is_empty(),
+                  "Universal quantification of MTDSwA "
+                  + "is not equivalent to LTL universal quantification: "
+                  + f"{obligations[i]}")
