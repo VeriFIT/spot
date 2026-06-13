@@ -47,7 +47,8 @@ tl_HEADERS =					\
   sat.hh					\
   snf.hh					\
   sonf.hh					\
-  unabbrev.hh
+  unabbrev.hh					\
+  unitprop.hh
 
 noinst_LTLIBRARIES = libtl.la
 libtl_la_SOURCES =				\
@@ -75,4 +76,5 @@ libtl_la_SOURCES =				\
   sat.cc					\
   snf.cc					\
   sonf.cc					\
-  unabbrev.cc
+  unabbrev.cc					\
+  unitprop.cc

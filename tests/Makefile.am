@@ -504,6 +504,7 @@ TESTS_python = \
   python/_synthesis.ipynb \
   python/toparity.py \
   python/trival.py \
+  python/unitprop.py \
   python/tra2tba.py \
   python/twagraph.py \
   python/toweak.py \

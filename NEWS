@@ -76,6 +76,11 @@ New in spot 2.15.1.dev  (not yet released)
   - spot::distribute_next() is a new function that distributes X and
     X[!] operators over Boolean connectives in a formula.
 
+  - spot::unit_propagate() is a new function that simplifies an LTL
+    formula by propagating unit facts through the formula tree in a
+    single top-down pass.  See the "Unit Propagation" section of
+    doc/tl/tl.pdf for details.  (Issue #606.)
+
   - Repetition bounds used by the operators [*i..j], [=i..j],
     [->i..j], [:*i..j], F[i..j], G[i..j], X[i], X[!][i] etc. are now
     stored as 16-bit values instead of 8-bit values, allowing bounds

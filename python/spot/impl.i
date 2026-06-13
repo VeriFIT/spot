@@ -99,6 +99,7 @@
 #include <spot/tl/remove_x.hh>
 #include <spot/tl/relabel.hh>
 #include <spot/tl/sat.hh>
+#include <spot/tl/unitprop.hh>
 
 #include <spot/twa/bddprint.hh>
 #include <spot/twa/formula2bdd.hh>
@@ -691,6 +692,7 @@ namespace std {
 %include <spot/tl/remove_x.hh>
 %include <spot/tl/relabel.hh>
 %include <spot/tl/sat.hh>
+%include <spot/tl/unitprop.hh>
 
 %include <spot/twa/taatgba.hh>
 %include <spot/twa/twaproduct.hh>

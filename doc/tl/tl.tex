@@ -2185,6 +2185,155 @@ are pure eventualities ($e$) or that are purely universal ($u$).
 \text{if~} & f \simp\NOT g    &  & \text{~then~} & \F(f) \AND \G(g \OR e) & \equiv f \M (g \OR e)  \\
 \end{alignat*}
 
+
+\section{Unit Propagation}\label{sec:unitprop}
+
+This simplification is implemented by \texttt{unit\_propagate()} in
+\texttt{spot/tl/unitprop.hh}.  It is vaguely inspired by
+unit-propagation in SAT solvers, hence its name.   The main
+ideas come from the following four rules:
+\begin{itemize}
+\item in a formula $\G(\alpha)\land \varphi$, any occurrence of
+      $\alpha$ in $\varphi$ can be replaced by $\1$,
+\item in a formula $\F(\alpha)\lor \varphi$, any occurrence of
+      $\alpha$ in $\varphi$ can be replaced by $\0$,
+\item in a formula $\alpha\land \varphi$, any occurrence of
+      $\alpha$ in $\varphi$ \emph{that still happens in the current step} can be replaced by $\1$,
+\item in a formula $\alpha\lor \varphi$, any occurrence of
+  $\alpha$ in $\varphi$ \emph{that still happens in the current step} can be replaced by $\0$
+\end{itemize}
+
+Here are examples of simplifications illustrating the above four rules:
+\begin{align*}
+  \G(a \U b) \AND \G\F(c \XOR (a \U b)) &\equiv \G(a \U b) \AND \G\F(\NOT c) \\
+  \F(a) \OR (a U b) &\equiv \F(a) \OR b \\
+  a \AND (a \OR b)             &\equiv a \\
+  (a \U b) \OR b              &\equiv a \U b
+\end{align*}
+
+To understand the fourth example, consider that $(a \U b)$ is
+equivalent to $b \OR (a \AND \X(a \U b))$ so it can contribute to the
+fourth rule with $\alpha=(a \U b)$ or with $\alpha=b$.
+
+\medskip\noindent
+\textbf{Data structures.}
+The algorithm maintains four multisets of subformulas (with integer
+multiplicities) during a single top-down traversal:
+\[
+  \mathcal{T}_G,\mathcal{T}_L,\mathcal{F}_G,\mathcal{F}_L : \text{Formula} \to \N
+\]
+$\mathcal{T}_G$ and $\mathcal{T}_L$ store subformulas known to be true
+(respectively globally and locally); $\mathcal{F}_G$ and
+$\mathcal{F}_L$ store formulas known to be false.  A formula $\varphi$
+is \emph{known true} if $\mathcal{T}_G(\varphi)>0$ or
+$\mathcal{T}_L(\varphi)>0$, and \emph{known false} if
+$\mathcal{F}_G(\varphi)>0$ or $\mathcal{F}_L(\varphi)>0$.  At each
+node, if the formula itself is a known fact it is replaced by the
+corresponding Boolean constant ($\1$ or $\0$).
+
+\medskip\noindent
+\textbf{Fact extraction.}
+Two mutually recursive functions $T(\varphi,\ell)$ and $F(\varphi,\ell)$,
+with $\ell\in\{L,G\}$, return multisets of \emph{tagged facts}
+$(\psi,S)$ where $S\in\{\mathcal{T}_G,\mathcal{T}_L,\mathcal{F}_G,\mathcal{F}_L\}$
+is the destination multiset:
+\begin{align*}
+  T(\1,\ell) &= \emptyset &
+  F(\1,\ell) &= \emptyset \\
+  T(\0,\ell) &= \emptyset &
+  F(\0,\ell) &= \emptyset \\
+  T(a,\ell) &= \{(a,\mathcal{T}_\ell)\} \quad\text{(for atomic $a$)} &
+  F(a,\ell) &= \{(a,\mathcal{F}_\ell)\} \\
+  T(\NOT\psi,\ell) &= \{(\NOT\psi,\mathcal{T}_\ell)\} \cup F(\psi,\ell) &
+  F(\NOT\psi,\ell) &= \{(\NOT\psi,\mathcal{F}_\ell)\} \cup T(\psi,\ell) \\
+  T(\psi_1\AND\dots\AND\psi_n,\ell) &=
+    \{(\psi_1\AND\dots\AND\psi_n,\mathcal{T}_\ell)\} \cup \bigcup_i T(\psi_i,\ell) &
+  F(\psi_1\OR\dots\OR\psi_n,\ell) &=
+    \{(\psi_1\OR\dots\OR\psi_n,\mathcal{F}_\ell)\} \cup \bigcup_i F(\psi_i,\ell) \\
+  T(\G\psi,\ell) &= \{(\G\psi,\mathcal{T}_\ell)\} \cup T(\psi,G) &
+  F(\F\psi,\ell) &= \{(\F\psi,\mathcal{F}_\ell)\} \cup F(\psi,G) \\
+  T(\alpha\R\beta,\ell) &= \{(\alpha\R\beta,\mathcal{T}_\ell)\} \cup T(\beta,\ell) &
+  F(\alpha\U\beta,\ell) &= \{(\alpha\U\beta,\mathcal{F}_\ell)\} \cup F(\beta,\ell) \\
+  T(\alpha\M\beta,\ell) &= \{(\alpha\M\beta,\mathcal{T}_\ell)\} \cup T(\beta,\ell) &
+  F(\alpha\W\beta,\ell) &= \{(\alpha\W\beta,\mathcal{F}_\ell)\} \cup F(\beta,\ell) \\
+  T(\varphi,\ell) &= \{(\varphi,\mathcal{T}_\ell)\} \quad\text{(otherwise)} &
+  F(\varphi,\ell) &= \{(\varphi,\mathcal{F}_\ell)\} \quad\text{(otherwise)}
+\end{align*}
+A tagged fact $(\psi,S)$ is applied to the context by incrementing
+$S(\psi)$ (and removed by decrementing); when the multiplicity
+reaches $0$ the fact is erased.
+
+\medskip\noindent
+\textbf{Processing $\AND$ and $\OR$.}
+For $\varphi_1\AND\dots\AND\varphi_n$:
+\begin{enumerate}
+  \item Compute $C_i = T(\varphi_i,L)$ for each child.  Add all $C_i$
+    to the context so that siblings see each other's facts.
+  \item For each $i$ from $1$ to $n$:
+    \begin{itemize}
+      \item Remove $C_i$ from the context (to prevent $\varphi_i$
+        from simplifying itself).
+      \item Recursively simplify $\varphi_i$ to $\psi_i$.
+      \item If $\psi_i=\1$, drop $C_i$ permanently (do not re-add).
+      \item If $\psi_i=\0$, return $\0$ (short-circuit).
+      \item Otherwise keep $\psi_i$ and re-add $C_i$.
+    \end{itemize}
+  \item Remove any remaining contributions from the context.
+\end{enumerate}
+For $\OR$, the dual: use $F(\varphi_i,L)$, drop on $\0$, short-circuit
+on $\1$.  If no children change, the original is returned.  If all are
+dropped, the result is $\1$ ($\AND$) or $\0$ ($\OR$).
+
+\medskip\noindent
+\textbf{Implications.}
+$\alpha\IMPLIES\beta$ uses a two-step sequential simplification:
+\begin{enumerate}
+  \item Collect $F(\beta,L)$; apply to context.  Simplify $\alpha$;
+    remove the facts.
+  \item Collect $T(\alpha',L)$ where $\alpha'$ is the result of step~1.
+    Apply to context; simplify $\beta$; remove.
+\end{enumerate}
+
+\medskip\noindent
+\textbf{Temporal operators.}
+Subformulas whose top-level operator is
+$\X$, $\F$, $\G$, $\U$, $\W$, $\R$, or $\M$,
+are simplified with the following rules:
+\begin{align*}
+  \X\varphi &\equiv \1 \text{ if } \varphi\in\mathcal{T}_G &
+  \X\varphi &\equiv \0 \text{ if } \varphi\in\mathcal{F}_G \\
+  \F\varphi &\equiv \1 \text{ if } \varphi\in\mathcal{T}_G\cup\mathcal{T}_L &
+  \F\varphi &\equiv \0 \text{ if } \varphi\in\mathcal{F}_G \\
+  \G\varphi &\equiv \0 \text{ if } \varphi\in\mathcal{F}_G\cup\mathcal{F}_L &
+  \G\varphi &\equiv \1 \text{ if } \varphi\in\mathcal{T}_G \\
+  \alpha\U\beta &\equiv \1 \text{ if } \beta\in\mathcal{T}_G\cup\mathcal{T}_L &
+  \alpha\U\beta &\equiv \0 \text{ if } \beta\in\mathcal{F}_G \\
+  \alpha\W\beta &\equiv \1 \text{ if } \beta\in\mathcal{T}_G\cup\mathcal{T}_L &
+  \alpha\W\beta &\equiv \1 \text{ if } \alpha\in\mathcal{T}_G \\
+  \alpha\R\beta &\equiv \0 \text{ if } \beta\in\mathcal{F}_G\cup\mathcal{F}_L &
+  \alpha\R\beta &\equiv \1 \text{ if } \beta\in\mathcal{T}_G \\
+  \alpha\M\beta &\equiv \0 \text{ if } \beta\in\mathcal{F}_G\cup\mathcal{F}_L &
+  \alpha\M\beta &\equiv \0 \text{ if } \alpha\in\mathcal{F}_G
+\end{align*}
+The rules $\F\varphi\equiv\0$ when $\varphi\in\mathcal{F}_G$ and
+$\G\varphi\equiv\1$ when $\varphi\in\mathcal{T}_G$ are not implemented
+as explicit shortcuts: they occur automatically because the top-level
+check in the recursive simplification replaces any formula that belongs
+to $\mathcal{T}_G\cup\mathcal{T}_L$ (resp. $\mathcal{F}_G\cup\mathcal{F}_L$)
+by $\1$ (resp. $\0$), and the formula constructors handle $\F\0=\0$
+and $\G\1=\1$.
+Similarly the $\X$ rules are not implemented explicitly; they also
+follow from the top-level check plus the constructors $\X\1=\1$, $\X\0=\0$.
+
+If the above rules do not apply, their operands are simplified
+recursively, but with local sets $\mathcal{T}_L$ and $\mathcal{F}_L$
+cleared (saved before the recursive call and restored after).  Global
+facts $\mathcal{T}_G$ and $\mathcal{F}_G$ persist.
+
+For $\XOR$ and $\EQUIV$, local facts are also cleared before
+processing the operands, since these operators mix polarities.
+
+
 \appendix
 \chapter{Defining LTL with only one of $\U$, $\W$, $\R$, or $\M$}
 \label{sec:ltl-equiv}
