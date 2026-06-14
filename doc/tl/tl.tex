@@ -1641,6 +1641,19 @@ b))\OR(a\AND b))$ if `\verb|nenoform_stop_on_boolean|' is unset, while
 it will produce $\G\F(\NOT(a \XOR b))$ if
 `\verb|nenoform_stop_on_boolean|' is set.
 
+If the option `\verb|keep_top_xor|' is set, the $\XOR$ and $\EQUIV$
+operators are kept as-is at the top level of the formula during
+negative normal form conversion (i.e., when not under a temporal
+operator such as $\X$, $\F$, $\G$, $\U$, $\W$, $\R$, or $\M$).  Under
+temporal operators they are expanded according to the above rules,
+i.e., $\XOR$ and $\EQUIV$ are rewritten into $\AND$ and $\OR$ as
+usual.  For instance calling
+`\verb|tl_simplifier::negative_normal_form|' on
+$\X(a \EQUIV b)$ will always produce $\X(((\NOT a)\AND(\NOT b))\OR(a\AND
+b))$ regardless of `\verb|keep_top_xor|', but calling it on
+$(\X a) \EQUIV (\X b)$ will keep the $\EQUIV$ operator when
+`\verb|keep_top_xor|' is set, and expand it otherwise.
+
 \section{Simplifications}
 
 The `\verb|tl_simplifier::simplify|' method performs several kinds of
