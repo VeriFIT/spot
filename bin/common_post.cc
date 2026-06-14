@@ -252,17 +252,17 @@ parse_opt_post(int key, char* arg, struct argp_state*)
       break;
     case OPT_HIGH:
       level = spot::postprocessor::High;
-      simplification_level = 3;
+      simplification_opts = spot::tl_simplifier_options(3);
       level_set = true;
       break;
     case OPT_LOW:
       level = spot::postprocessor::Low;
-      simplification_level = 1;
+      simplification_opts = spot::tl_simplifier_options(1);
       level_set = true;
       break;
     case OPT_MEDIUM:
       level = spot::postprocessor::Medium;
-      simplification_level = 2;
+      simplification_opts = spot::tl_simplifier_options(2);
       level_set = true;
       break;
     case OPT_SMALL:

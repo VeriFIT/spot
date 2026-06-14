@@ -427,7 +427,7 @@ namespace spot
     int opt_tree_size_max_;
     bool opt_unique_;
     bool opt_wf_;
-    int opt_simpl_level_;
+    tl_simplifier_options simplify_opts_;
     tl_simplifier simpl_;
 
     int output_;

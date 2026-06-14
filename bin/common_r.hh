@@ -70,7 +70,6 @@
       "basics, event-univ, synt-impl, containment-checks, "             \
       "containment-checks-stronger", 0 }
 
-extern int simplification_level;
 extern spot::tl_simplifier_options simplification_opts;
 
 void parse_r(const char* arg);

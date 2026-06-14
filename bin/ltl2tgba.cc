@@ -182,7 +182,7 @@ main(int argc, char** argv)
       const argp ap = { options, parse_opt, "[FORMULA...]",
                         argp_program_doc, children, nullptr, nullptr };
 
-      simplification_level = 3;
+      simplification_opts = spot::tl_simplifier_options(3);
 
       if (int err = argp_parse(&ap, argc, argv, ARGP_NO_HELP, nullptr, nullptr))
         exit(err);

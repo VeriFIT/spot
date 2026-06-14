@@ -546,6 +546,22 @@ namespace spot
     update_sums();
   }
 
+  namespace
+  {
+    tl_simplifier_options
+    load_simpl_options(const option_map& opts)
+    {
+      tl_simplifier_options r(0); // start with all-false
+      if (!r.load_from_option_map(opts, "simplification"))
+        {
+          int level = opts.get("simplification_level", 3);
+          if (level > 0)
+            r = tl_simplifier_options(level);
+        }
+      return r;
+    }
+  }
+
   randltlgenerator::randltlgenerator(atomic_prop_set aprops,
                                      const option_map& opts,
                                      char* opt_pL,
@@ -553,8 +569,8 @@ namespace spot
                                      char* opt_pB,
                                      const atomic_prop_set* subs,
                                      std::function<bool(formula)> is_output)
-    : opt_simpl_level_(opts.get("simplification_level", 3)),
-      simpl_(tl_simplifier_options{opt_simpl_level_})
+    : simplify_opts_(load_simpl_options(opts)),
+      simpl_(simplify_opts_)
   {
     aprops_ = aprops;
     output_ = opts.get("output", randltlgenerator::LTL);
@@ -664,7 +680,7 @@ namespace spot
             f = formula::And(f, GF_n());
           }
 
-        if (opt_simpl_level_)
+        if (simplify_opts_.is_enabled())
           f = simpl_.simplify(f);
 
         if (opt_unique_ && !unique_set_.insert(f).second)

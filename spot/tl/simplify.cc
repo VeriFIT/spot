@@ -36,6 +36,7 @@
 #include <spot/tl/relabel.hh>
 #include <spot/twa/formula2bdd.hh>
 #include <spot/misc/minato.hh>
+#include <spot/misc/optionmap.hh>
 #include <cassert>
 #include <memory>
 #include <unordered_set>
@@ -4278,6 +4279,71 @@ namespace spot
     delete c;
   }
 
+  void tl_simplifier_options::save_to_option_map(option_map& om,
+                                                 const char* prefix) const
+  {
+    std::string p = prefix;
+    auto set = [&](const char* field, int val)
+      {
+        om.set((p + '_' + field).c_str(), val);
+      };
+
+    set("reduce_basics", reduce_basics);
+    set("synt_impl", synt_impl);
+    set("event_univ", event_univ);
+    set("containment_checks", containment_checks);
+    set("containment_checks_stronger", containment_checks_stronger);
+    set("nenoform_stop_on_boolean", nenoform_stop_on_boolean);
+    set("reduce_size_strictly", reduce_size_strictly);
+    set("boolean_to_isop", boolean_to_isop);
+    set("favor_event_univ", favor_event_univ);
+    set("keep_top_xor", keep_top_xor);
+    set("unit_prop", unit_prop);
+    set("containment_max_states", static_cast<int>(containment_max_states));
+    set("containment_max_ops", static_cast<int>(containment_max_ops));
+  }
+
+  bool tl_simplifier_options::load_from_option_map(const option_map& om,
+                                                   const char* prefix)
+  {
+    std::string p = prefix;
+    auto get = [&](const char* field, int def)
+      {
+        return om.get((p + '_' + field).c_str(), def);
+      };
+
+    bool loaded = false;
+    int v;
+    if ((v = get("reduce_basics", -1)) >= 0)
+      { reduce_basics = v != 0; loaded = true; }
+    if ((v = get("synt_impl", -1)) >= 0)
+      { synt_impl = v != 0; loaded = true; }
+    if ((v = get("event_univ", -1)) >= 0)
+      { event_univ = v != 0; loaded = true; }
+    if ((v = get("containment_checks", -1)) >= 0)
+      { containment_checks = v != 0; loaded = true; }
+    if ((v = get("containment_checks_stronger", -1)) >= 0)
+      { containment_checks_stronger = v != 0; loaded = true; }
+    if ((v = get("nenoform_stop_on_boolean", -1)) >= 0)
+      { nenoform_stop_on_boolean = v != 0; loaded = true; }
+    if ((v = get("reduce_size_strictly", -1)) >= 0)
+      { reduce_size_strictly = v != 0; loaded = true; }
+    if ((v = get("boolean_to_isop", -1)) >= 0)
+      { boolean_to_isop = v != 0; loaded = true; }
+    if ((v = get("favor_event_univ", -1)) >= 0)
+      { favor_event_univ = v != 0; loaded = true; }
+    if ((v = get("keep_top_xor", -1)) >= 0)
+      { keep_top_xor = v != 0; loaded = true; }
+    if ((v = get("unit_prop", -1)) >= 0)
+      { unit_prop = v != 0; loaded = true; }
+
+    if ((v = get("containment_max_states", -1)) >= 0)
+      { containment_max_states = static_cast<unsigned>(v); loaded = true; }
+    if ((v = get("containment_max_ops", -1)) >= 0)
+      { containment_max_ops = static_cast<unsigned>(v); loaded = true; }
+
+    return loaded;
+  }
 
   formula normalize_quantifiers(formula f)
   {

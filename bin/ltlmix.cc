@@ -341,7 +341,8 @@ main(int argc, char* argv[])
           opts.set("tree_size_min", opt_tree_size.min);
           opts.set("tree_size_max", opt_tree_size.max);
           opts.set("seed", opt_seed);
-          opts.set("simplification_level", 0);
+          spot::tl_simplifier_options sopt(0);
+          sopt.save_to_option_map(opts, "simplification");
           opts.set("unique", opt_unique);
           opts.set("literals", opt_literal);
           return opts;

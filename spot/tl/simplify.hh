@@ -25,9 +25,12 @@
 
 namespace spot
 {
+  // forward declaration
+  class option_map;
+
   /// \brief Options controlling which simplification passes the tl_simplifier
   /// applies.
-  class tl_simplifier_options
+  class SPOT_API tl_simplifier_options
   {
   public:
     /// \brief Construct with individual option flags.
@@ -111,6 +114,26 @@ namespace spot
     /// If greater than 0, maximal number of terms in a multop to perform
     /// containment checks on this multop.
     unsigned containment_max_ops = 16;
+
+    /// Return true if any simplification option is enabled.
+    bool is_enabled() const
+    {
+      return reduce_basics || synt_impl || event_univ
+        || containment_checks || containment_checks_stronger
+        || nenoform_stop_on_boolean || reduce_size_strictly
+        || boolean_to_isop || favor_event_univ || keep_top_xor
+        || unit_prop;
+    }
+
+    /// Save this set of options into \a om with keys prefixed by \a prefix.
+    /// All fields are stored as integers.
+    void save_to_option_map(option_map& om, const char* prefix) const;
+
+    /// Load options from \a om with keys prefixed by \a prefix.
+    /// Only keys that exist in \a om are updated; missing keys leave
+    /// the corresponding field unchanged.
+    /// \return true if \a om contained at least one key with the given prefix.
+    bool load_from_option_map(const option_map& om, const char* prefix);
   };
 
   // fwd declaration to hide technical details.

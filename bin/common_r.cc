@@ -23,7 +23,6 @@
 
 #include <sstream>
 
-int simplification_level = 0;
 spot::tl_simplifier_options simplification_opts(0);
 
 // -- option name → enum index mapping for XARGMATCH --
@@ -98,18 +97,15 @@ apply_level(simplify_opt idx)
     {
     case SO_LEVEL_0:
       simplification_opts = spot::tl_simplifier_options(0);
-      simplification_level = 0;
       break;
     case SO_LEVEL_1:
       simplification_opts.reduce_basics = true;
       simplification_opts.event_univ = true;
-      simplification_level = 1;
       break;
     case SO_LEVEL_2:
       simplification_opts.reduce_basics = true;
       simplification_opts.event_univ = true;
       simplification_opts.synt_impl = true;
-      simplification_level = 2;
       break;
     case SO_LEVEL_3:
       simplification_opts.reduce_basics = true;
@@ -117,7 +113,6 @@ apply_level(simplify_opt idx)
       simplification_opts.synt_impl = true;
       simplification_opts.containment_checks = true;
       simplification_opts.containment_checks_stronger = true;
-      simplification_level = 3;
       break;
     default:
       break;
@@ -129,8 +124,8 @@ parse_r(const char* arg)
 {
   if (!arg)
     {
-      simplification_level = 3;
       simplification_opts = spot::tl_simplifier_options(3);
+
       return;
     }
 
@@ -219,16 +214,5 @@ parse_r(const char* arg)
 bool
 simplification_is_enabled()
 {
-  return simplification_level > 0
-    || simplification_opts.reduce_basics
-    || simplification_opts.synt_impl
-    || simplification_opts.event_univ
-    || simplification_opts.containment_checks
-    || simplification_opts.containment_checks_stronger
-    || simplification_opts.nenoform_stop_on_boolean
-    || simplification_opts.reduce_size_strictly
-    || simplification_opts.boolean_to_isop
-    || simplification_opts.favor_event_univ
-    || simplification_opts.keep_top_xor
-    || simplification_opts.unit_prop;
+  return simplification_opts.is_enabled();
 }
