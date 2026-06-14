@@ -203,7 +203,7 @@ static const argp_option options[] =
       "interpreted as a regex if enclosed in slashes", 0 },
     { "unobservable-inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     DECLARE_OPT_R,
-    LEVEL_DOC(4),
+    SIMPLIFY_OPTION_DOC(4),
     /**************************************************/
     { nullptr, 0, nullptr, 0,
       "Filtering options (matching is done after transformation):", 5 },
@@ -764,12 +764,12 @@ namespace
       if (remove_x)
         {
           // If simplification are enabled, we do them before and after.
-          if (simplification_level)
+          if (simplification_is_enabled())
             f = simpl.simplify(f);
           f = spot::remove_x(f);
         }
 
-      if (simplification_level || boolean_to_isop)
+      if (simplification_is_enabled() || boolean_to_isop)
         f = simpl.simplify(f);
 
       if (nnf)
@@ -1066,11 +1066,13 @@ main(int argc, char** argv)
       if (relabeling == IOApRelabeling || opt->output_part)
         process_io_options();
 
-      if (boolean_to_isop && simplification_level == 0)
-        simplification_level = 1;
-      spot::tl_simplifier_options tlopt(simplification_level);
-      tlopt.boolean_to_isop = boolean_to_isop;
-      spot::tl_simplifier simpl(tlopt, opt->dict);
+      if (boolean_to_isop)
+        {
+          simplification_opts.boolean_to_isop = true;
+          // --boolean-to-isop needs reduce_basics.
+          simplification_opts.reduce_basics = true;
+        }
+      spot::tl_simplifier simpl(simplification_opts, opt->dict);
 
       ltl_processor processor(simpl);
       if (processor.run())

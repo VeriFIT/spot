@@ -997,9 +997,7 @@ diff out out.2
 
 test a = `ltlfilt -r2 -f a`
 ltlfilt -r4 -f a 2>err && exit 1
-grep "invalid simplification level '4'" err
-ltlfilt -ra -f a 2>err && exit 1
-grep "invalid simplification level 'a'" err
+grep "invalid argument '4' for '--simplify'" err
 
 ltlfilt --ignore-errors -f 'F' > out 2> out && exit 1
 test $? = 1

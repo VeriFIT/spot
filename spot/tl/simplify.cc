@@ -29,6 +29,7 @@
 #include <spot/priv/robin_hood.hh>
 #include <spot/tl/contain.hh>
 #include <spot/tl/print.hh>
+#include <spot/tl/unitprop.hh>
 #include <spot/tl/snf.hh>
 #include <spot/tl/length.hh>
 #include <spot/tl/apcollect.hh>
@@ -4187,6 +4188,8 @@ namespace spot
   formula
   tl_simplifier::simplify(formula f)
   {
+    if (cache_->options.unit_prop)
+      f = unit_propagate(f);
     if (!f.is_in_nenoform())
       f = negative_normal_form(f, false);
     return simplify_recursively(f, cache_);

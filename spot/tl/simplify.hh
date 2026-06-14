@@ -40,7 +40,8 @@ namespace spot
                           bool reduce_size_strictly = false,
                           bool boolean_to_isop = false,
                           bool favor_event_univ = false,
-                          bool keep_top_xor = false)
+                          bool keep_top_xor = false,
+                          bool unit_prop = false)
       : reduce_basics(basics),
         synt_impl(synt_impl),
         event_univ(event_univ),
@@ -50,7 +51,8 @@ namespace spot
         reduce_size_strictly(reduce_size_strictly),
         boolean_to_isop(boolean_to_isop),
         favor_event_univ(favor_event_univ),
-        keep_top_xor(keep_top_xor)
+        keep_top_xor(keep_top_xor),
+        unit_prop(unit_prop)
     {
     }
 
@@ -99,6 +101,10 @@ namespace spot
     /// &,|, and X operators.  Only rewrite Xor and Equiv under
     /// temporal operators.
     bool keep_top_xor;
+    /// Enable unit-propagation-based simplification (see
+    /// spot::unit_propagate) as a first pass before recursive
+    /// rewriting.
+    bool unit_prop;
     /// If greater than 0, bound the number of states used by automata
     /// in containment checks.
     unsigned containment_max_states = 0;

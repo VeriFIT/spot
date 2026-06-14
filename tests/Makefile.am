@@ -178,6 +178,7 @@ TESTS_tl = \
   core/ltlgrind.test \
   core/ltlcrossgrind.test \
   core/ltlfilt.test \
+  core/simplifyr.test \
   core/distribute-X.test \
   core/exclusive-ltl.test \
   core/ltlf2dfa.test \

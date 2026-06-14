@@ -75,14 +75,18 @@ ltlfilt --help | sed -n '/Transformation options.*:/,/^$/p' | sed '1d;$d'
                              propositions.
       --from-ltlf[=alive]    transform LTLf (finite LTL) to LTL by introducing
                              some 'alive' proposition
-      --ins=PROPS            comma-separated list of input atomic propositions
-                             to use with --relabel=io, interpreted as a regex
-                             if enclosed in slashes
+      --ins=PROPS, --inputs=PROPS
+                             comma-separated list of input atomic propositions
+                             to use with --relabel=io or --save-part-file,
+                             interpreted as a regex if enclosed in slashes
       --negate               negate each formula
       --nnf                  rewrite formulas in negative normal form
-      --outs=PROPS           comma-separated list of output atomic propositions
-                             to use with --relabel=io, interpreted as a regex
-                             if enclosed in slashes
+      --outs=PROPS, --outputs=PROPS
+                             comma-separated list of output atomic propositions
+                             to use with --relabel=io or --save-part-file,
+                             interpreted as a regex if enclosed in slashes
+      --part-file=FILENAME   file containing the partition of atomic
+                             propositions to use with --relabel=io
       --relabel[=abc|pnn|io] relabel all atomic propositions, alphabetically
                              unless specified otherwise
       --relabel-bool[=abc|pnn]   relabel Boolean subexpressions that do not
@@ -96,8 +100,14 @@ ltlfilt --help | sed -n '/Transformation options.*:/,/^$/p' | sed '1d;$d'
                              an alias for --unabbreviate=WM)
       --remove-x             remove X operators (valid only for
                              stutter-insensitive properties)
-  -r, --simplify[=LEVEL]     simplify formulas according to LEVEL (see below);
-                             LEVEL is set to 3 if omitted
+  -r, --simplify[=[=OPTION[,...]]]
+                             simplify formulas according to OPTION (see below);
+                             defaults to 3 if omitted.  Options are separated
+                             by commas; prefix an option with '!' to disable
+                             it.  Use digits 0-3 to set option groups at once.
+      --save-part-file[=FILENAME]
+                             file containing the partition of atomic
+                             propositions, readable by --part-file
       --sonf[=PREFIX]        rewrite formulas in suffix operator normal form
       --sonf-aps[=FILENAME]  when used with --sonf, output the newly introduced
                              atomic propositions
@@ -107,9 +117,15 @@ ltlfilt --help | sed -n '/Transformation options.*:/,/^$/p' | sed '1d;$d'
                              where 'e', 'i', and '^' stand respectively for
                              <->, ->, and xor.  If no argument is passed, the
                              subset "eFGiMW^" is used.
+      --unobservable-ins=PROPS, --unobservable-inputs=PROPS
+                             comma-separated list of unobservable and
+                             uncontrollable atomic propositions, to use with
+                             --relabel=io or --save-part-file, interpreted as a
+                             regex if enclosed in slashes
 #+end_example
 
 As with [[file:randltl.org][=randltl=]], the =-r= option can be used to simplify formulas.
+With no argument it defaults to level 3, like =-r3=:
 
 #+BEGIN_SRC sh
 ltlfilt --lbt-input -F scheck.ltl -r
@@ -119,6 +135,81 @@ ltlfilt --lbt-input -F scheck.ltl -r
 : p3 | Xp7 | Fp6
 : Fp1 & XX(XFp5 U (p0 U XXp3))
 : p0 U (p1 & (p0 | p5))
+
+Named simplification options can also be used.  For instance,
+=-runit-propagation= enables only unit-propagation-based simplification:
+
+#+BEGIN_SRC sh
+ltlfilt -runit-propagation -f '(a | b) -> b'
+#+END_SRC
+#+RESULTS:
+: !a | b
+
+Multiple options can be combined with commas.  The list of supported
+option is available in the output of =ltlfilt --help=:
+
+#+BEGIN_SRC sh :exports results
+ltlfilt --help | sed -n '/Simplification options.*:/,/^$/p'
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+ Simplification options (pass these to -r or --simplify):
+    0                        disable all options
+    1                        basics, event-univ
+    2                        basics, event-univ, synt-impl
+    3                        basics, event-univ, synt-impl, containment-checks,
+                             containment-checks-stronger
+    basics                   basic rewriting rules
+    boolean-to-isop          rewrite Boolean subformulas in ISOP form
+    containment-checks       language containment checks
+    containment-checks-stronger   stronger containment checks
+    event-univ               eventuality / universality rules
+    favor-event-univ         favor eventuality / universality rules
+    keep-top-xor             keep Xor/Equiv at top level
+    nenoform-stop-on-boolean do not push negations into Boolean subformulas
+    reduce-size-strictly     disable rules that increase formula size
+    synt-impl                syntactic implication rules
+    unit-propagation         unit-propagation-based simplification
+
+#+end_example
+
+
+
+
+  For example,
+  =-r3,unit-propagation= first enables all level-3 simplifications and
+  additionally the unit propagation pass:
+
+  ,#+BEGIN_SRC sh
+  ltlfilt -r3,unit-propagation -f 'G(a) & (a | b)'
+#+END_SRC
+#+RESULTS:
+: Ga
+
+Options can be disabled by prefixing them with =!=.  For instance,
+=-r1,!event-univ= enables level-1 simplifications but disables
+eventuality/universality rules:
+
+#+BEGIN_SRC sh
+ltlfilt -r1 -f 'F(a) W F(b)'
+ltlfilt -r1,'!event-univ' -f 'F(a) W F(b)'
+#+END_SRC
+#+RESULTS:
+: F(b | GFa)
+: Fa W Fb
+
+Option names can be abbreviated as long as the prefix is unambiguous:
+=-runit= is equivalent to =-runit-propagation=.
+
+#+BEGIN_SRC sh
+ltlfilt -runit -f '(a | b) -> b'
+#+END_SRC
+#+RESULTS:
+: !a | b
+
+See =--help= for the full list of simplification options and the
+defaults enabled at each level.
 
 You may notice that operands of n-ary operators such as =&= or =|= can
 be reordered by =ltlfilt= even when the formula is not changed

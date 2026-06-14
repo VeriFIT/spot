@@ -1,0 +1,112 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Check the -r option of ltlfilt (also used by randltl)
+# Tests: level digits via XARGMATCH, named options, ! prefix, !digit error,
+#        0 to disable all, abbreviation, backward compat
+
+. ./defs || exit 1
+
+set -e
+
+check()
+{
+  echo "$1" > exp
+  shift
+  ltlfilt "$@" > out
+  diff -u exp out
+}
+
+# -- backward compatibility: plain -r3 --
+check a -r3 -f 'a & (a | b)'
+
+# -- backward compatibility: -r0 means no simplification --
+check 'a & (a | b)' -r0 -f 'a & (a | b)'
+
+# -- named option: unit-propagation --
+check Ga -r3,unit-propagation -f 'G(a) & (a | b)'
+
+# -- named option alone (no level digit) --
+check Ga -runit-propagation -f 'G(a) & (a | b)'
+
+# -- abbreviation: -runit matches unit-propagation --
+check a -runit -f 'a & (a | b)'
+
+# -- ! prefix: disable and re-enable the same option --
+check 'a & (a | b)' -runit-propagation,'!unit-propagation' -f 'a & (a | b)'
+
+# -- Test the above test: -runit-propagation alone simplifies (proves
+# !unit-propagation does disable) --
+check a -runit-propagation -f 'a & (a | b)'
+
+# -- 0 resets everything (even after level 3) --
+check 'a & (a | b)' -r3,0 -f 'a & (a | b)'
+
+# -- 0 then named option: simplification enabled --
+check a -r0,unit-propagation -f 'a & (a | b)'
+
+# =============================================================
+# Ordering tests: options are applied in user-specified order.
+# =============================================================
+
+# -- ordering: 3 then !event-univ => event-univ ends up OFF --
+check 'Fa W Fb' -r3,'!event-univ' -f 'F(a) W F(b)'
+
+# -- ordering: !event-univ then 3 => event-univ ends up ON (re-enabled) --
+check 'F(b | GFa)' -r'!event-univ',3 -f 'F(a) W F(b)'
+
+# -- ordering: !unit-propagation then unit-propagation => unit-prop ON --
+check a -r'!unit-propagation',unit-propagation -f 'a & (a | b)'
+
+# -- ordering: 0 then 3 => level 3 enabled --
+check a -r0,3 -f 'a & (a | b)'
+
+# -- error: ! prefix on digit --
+ltlfilt -r'!3' -f a 2>stderr && exit 1
+grep "cannot prefix '!' to digit" stderr
+
+# -- error: ! prefix on 0 --
+ltlfilt -r'!0' -f a 2>stderr && exit 1
+grep "cannot prefix '!' to digit" stderr
+
+# -- error: unknown option --
+ltlfilt -rbadoption -f a 2>stderr && exit 1
+grep "invalid argument 'badoption' for '--simplify'" stderr
+grep 'Valid arguments are:' stderr
+grep 'basics' stderr
+grep 'unit-propagation' stderr
+
+# -- error: ambiguous abbreviation (con matches containment-* twice) --
+ltlfilt -rcon -f a 2>stderr && exit 1
+grep "ambiguous argument 'con' for '--simplify'" stderr
+
+# -- verify that help text describes options --
+ltlfilt --help > out 2>&1
+grep 'Simplification options' out
+grep 'unit-propagation-based simplification' out
+grep '  0.*disable all simplifications' out
+grep '  1.*basics, event-univ' out
+grep '  2.*basics, event-univ, synt-impl' out
+grep '  3.*basics, event-univ, synt-impl, containment' out
+
+# -- verify that the error messages go to stderr --
+ltlfilt -rbad -f a 2>stderr && exit 1
+test -s stderr || exit 1
+
+:

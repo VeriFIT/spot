@@ -23,24 +23,55 @@
 
 #define OPT_R 'r'
 
-#define DECLARE_OPT_R                                                        \
-    { "simplify", OPT_R, "LEVEL", OPTION_ARG_OPTIONAL,                        \
-      "simplify formulas according to LEVEL (see below); LEVEL is "        \
-      "set to 3 if omitted", 0 }
+#define DECLARE_OPT_R                                                   \
+    { "simplify", OPT_R, "OPTIONS[,...]", OPTION_ARG_OPTIONAL,          \
+      "simplify formulas according to OPTIONS (see below); defaults to " \
+      "3 if omitted.  Options are separated by commas; prefix an "      \
+      "option with '!' to disable it.  Use digits 0-3 to set option "   \
+      "groups at once.", 0 }
 
-#define LEVEL_DOC(g)                                                \
-    { nullptr, 0, nullptr, 0,                                        \
-      "The simplification LEVEL may be set as follows.", g },        \
-    { "  0", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                \
-      "No rewriting", 0 },                                        \
-    { "  1", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                \
-      "basic rewritings and eventual/universal rules", 0 },        \
-    { "  2", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                \
-      "additional syntactic implication rules", 0 },                \
-    { "  3", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                \
-      "better implications using containment", 0 }
+// Documentation entries for the simplification options, for inclusion
+// in the argp_options array.  'g' is the group number.
+#define SIMPLIFY_OPTION_DOC(g)                                          \
+    { nullptr, 0, nullptr, 0,                                           \
+      "Simplification options (pass these to -r or --simplify):", g },  \
+    { "  basics", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,             \
+      "basic rewriting rules", 0 },                                     \
+    { "  synt-impl", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,          \
+      "syntactic implication rules", 0 },                               \
+    { "  event-univ", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,         \
+      "eventuality / universality rules", 0 },                          \
+    { "  containment-checks", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE, \
+      "language containment checks", 0 },                               \
+    { "  containment-checks-stronger", 0, nullptr,                      \
+      OPTION_DOC | OPTION_NO_USAGE,                                     \
+      "stronger containment checks", 0 },                               \
+    { "  nenoform-stop-on-boolean", 0, nullptr,                         \
+      OPTION_DOC | OPTION_NO_USAGE,                                     \
+      "do not push negations into Boolean subformulas", 0 },            \
+    { "  reduce-size-strictly", 0, nullptr,                             \
+      OPTION_DOC | OPTION_NO_USAGE,                                     \
+      "disable rules that increase formula size", 0 },                  \
+    { "  boolean-to-isop", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,    \
+      "rewrite Boolean subformulas in ISOP form", 0 },                  \
+    { "  favor-event-univ", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,   \
+      "favor eventuality / universality rules", 0 },                    \
+    { "  keep-top-xor", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,       \
+      "keep Xor/Equiv at top level", 0 },                               \
+    { "  unit-propagation", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,   \
+      "unit-propagation-based simplification", 0 },                     \
+    { "  0", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                  \
+      "disable all simplifications", 0 },                               \
+    { "  1", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                  \
+      "basics, event-univ", 0 },                                        \
+    { "  2", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                  \
+      "basics, event-univ, synt-impl", 0 },                             \
+    { "  3", 0, nullptr, OPTION_DOC | OPTION_NO_USAGE,                  \
+      "basics, event-univ, synt-impl, containment-checks, "             \
+      "containment-checks-stronger", 0 }
 
 extern int simplification_level;
+extern spot::tl_simplifier_options simplification_opts;
 
 void parse_r(const char* arg);
-spot::tl_simplifier_options simplifier_options();
+bool simplification_is_enabled();

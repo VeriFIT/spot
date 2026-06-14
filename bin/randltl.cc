@@ -90,7 +90,7 @@ static const argp_option options[] =
       "allow duplicate formulas to be output", 0 },
     DECLARE_OPT_R,
     RANGE_DOC,
-    LEVEL_DOC(3),
+    SIMPLIFY_OPTION_DOC(3),
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Adjusting probabilities:", 4 },
     { "dump-priorities", OPT_DUMP_PRIORITIES, nullptr, 0,

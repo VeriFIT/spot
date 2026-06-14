@@ -26,6 +26,14 @@ New in spot 2.15.1.dev  (not yet released)
     input).  The old "%T" sequence is still supported by ltldo, but
     undocumented.
 
+  - ltlfilt's and randltl's -r/--simplify option now accepts named
+    simplification options such as basics, synt-impl, event-univ,
+    containment-checks, containment-checks-stronger,
+    nenoform-stop-on-boolean, reduce-size-strictly, boolean-to-isop,
+    favor-event-univ, keep-top-xor, and a new unit-propagation.
+    Multiple options can be combined with commas, prefixed with '!' to
+    disable.  The historical levels 0-3 remain supported.
+
   - ltlfilt learned a --distribute-X option that distributes X and
     X[!] operators over Boolean connectives.
 
@@ -80,6 +88,10 @@ New in spot 2.15.1.dev  (not yet released)
     formula by propagating unit facts through the formula tree in a
     single top-down pass.  See the "Unit Propagation" section of
     doc/tl/tl.pdf for details.  (Issue #606.)
+
+  - spot::tl_simplifier_options has a new option unit_prop that, when
+    enabled, runs spot::unit_propagate() as a first pass before the
+    usual recursive rewriting.  (Issue #606.)
 
   - Repetition bounds used by the operators [*i..j], [=i..j],
     [->i..j], [:*i..j], F[i..j], G[i..j], X[i], X[!][i] etc. are now

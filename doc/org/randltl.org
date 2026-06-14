@@ -167,6 +167,11 @@ randltl -n 5 a b c --tree-size=22..30 -r
 : 0
 : 1
 
+The =-r= option also accepts named simplification options and
+comma-separated combinations, such as =-runit-propagation= or
+=-r3,!event-univ=.  See the =--help= output for the full list of
+simplification options.
+
 The generator build the syntax tree recursively from its root, by
 considering all operators that could be used for a given tree size (for
 example a tree-size of 2 disables binary operators).  A /priority/ is
