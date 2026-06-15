@@ -2494,7 +2494,8 @@ namespace spot
 
       auto trans = create_translator(gi);
 
-      trans.set_pref(postprocessor::Deterministic | postprocessor::Complete);
+      trans.set_pref(postprocessor::Deterministic | postprocessor::Complete
+               | (gi.moore ? postprocessor::SBAcc : 0));
       if (combin < 2)
         trans.set_type(postprocessor::Buchi);
       else
@@ -2538,31 +2539,49 @@ namespace spot
       right_bdd = bdd_and(right_bdd, g_bdd);
       neg_right_bdd = bdd_and(neg_right_bdd, g_bdd);
 
-      scc_info si(res, scc_info_options::NONE);
-
       bool is_true_acc = ((combin < 2) && res->acc().is_t())
                 || ((combin > 1) && res->acc().is_f());
-      auto prop_vector = propagate_marks_vector(res);
-      auto& ev = res->edge_vector();
-      for (unsigned i = 1; i < ev.size(); ++i)
-      {
-        auto &edge = ev[i];
-        if (si.scc_of(edge.src) == si.scc_of(edge.dst))
+      if (gi.moore)
         {
-          if (edge.acc || is_true_acc)
-            edge.cond &= right_bdd;
-          // If we have a GF and an edge is not colored but prop_vector says
-          // that this edge could be colored, it means that we can do what we
-          // want
-          else if (!prop_vector[i])
-            edge.cond &= neg_right_bdd;
-          else
-            edge.cond &= g_bdd;
+          // For Moore all accepting states should have
+          // outgoing edges labeled by b, regardless of whether
+          // those edges are moving to other BDDs.
+          auto& ev = res->edge_vector();
+          for (unsigned i = 1; i < ev.size(); ++i)
+            {
+              auto &edge = ev[i];
+              if (edge.acc || is_true_acc)
+                edge.cond &= right_bdd;
+              else
+                edge.cond &= neg_right_bdd;
+              edge.acc = {};
+            }
         }
-        else
-          edge.cond &= g_bdd;
-        edge.acc = {};
-      }
+      else
+        {
+          scc_info si(res, scc_info_options::NONE);
+          auto prop_vector = propagate_marks_vector(res);
+          auto& ev = res->edge_vector();
+          for (unsigned i = 1; i < ev.size(); ++i)
+            {
+              auto &edge = ev[i];
+              if (si.scc_of(edge.src) == si.scc_of(edge.dst))
+                {
+                  if (edge.acc || is_true_acc)
+                    edge.cond &= right_bdd;
+                  // If we have a GF and an edge is not colored but
+                  // prop_vector says that this edge could be colored,
+                  // it means that we can do what we want
+                  else if (!prop_vector[i])
+                    edge.cond &= neg_right_bdd;
+                  else
+                    edge.cond &= g_bdd;
+                }
+              else
+                edge.cond &= g_bdd;
+              edge.acc = {};
+            }
+        }
       res->set_acceptance(acc_cond::acc_code::t());
       res->prop_weak(true);
       if (res->prop_terminal().is_false())

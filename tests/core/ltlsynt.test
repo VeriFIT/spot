@@ -1527,11 +1527,13 @@ diff out exp
 
 cat >exp <<EOF
 REALIZABLE
-aag 2 2 0 2 0
+aag 4 2 2 2 0
 2
 4
-2
-4
+6 3
+8 5
+7
+9
 i0 a
 i1 b
 o0 o1
@@ -1684,6 +1686,50 @@ ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
 ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
         --ins='a,b' --outs='o1,o2' --simplify=bisim \
         --verify --aiger 2>&1 | grep -F 'Circuit was verified'
+
+# ============================================================
+# Moore: bypass path with state-based Büchi acceptance
+# ============================================================
+
+ltlsynt -f 'GFa <-> GFb' --sem=Moore --ins=a --outs=b --verify 2>&1 \
+        | grep -F 'Strategy was verified'
+ltlsynt -f 'GFa <-> GFb' --sem=Moore --ins=a --outs=b \
+        --algo=ds --verify 2>&1 | grep -F 'Strategy was verified'
+
+ltlsynt -f 'GFa <-> GFb' --sem=Moore --ins=a --outs=b --verbose --real 2>out
+sed 's/ [0-9.e-]* seconds/ X seconds/g' out >outx
+cat >exp <<EOF
+there are 1 subformulas
+trying to create strategy directly for GFa <-> GFb
+direct strategy was found.
+EOF
+diff outx exp
+
+ltlsynt -f 'GFa <-> GFb' --sem=Moore --ins=a --outs=b --aiger >out
+cat >exp <<EOF
+REALIZABLE
+aag 2 1 1 1 0
+2
+4 3
+5
+i0 a
+o0 b
+EOF
+diff out exp
+
+ltlsynt -f 'Fa <-> FGb' --sem=Moore --ins=a --outs=b --realizability
+ltlsynt -f 'Fa <-> FGb' --sem=Moore --ins=a --outs=b --verify 2>&1 \
+        | grep -F 'Strategy was verified'
+ltlsynt -f 'Fa <-> FGb' --sem=Moore --ins=a --outs=b --aiger --verify >out
+grep -F 'REALIZABLE' out
+grep -F 'Circuit was verified' out
+grep -F 'aag' out
+
+# --- (GFa <-> GFb) & G(c <-> d): bypass with global invariant ---
+ltlsynt -f '(GFa <-> GFb) & G(c <-> d)' --sem=Moore \
+        --ins=a,c --outs=b,d --realizability && exit 1
+ltlsynt -f '(GFa <-> GFb) & G(c <-> d)' --sem=Moore \
+        --ins=a,c --outs=b,d --verify 2>&1 && exit 1
 
 # Test new print option
 cat >expected <<EOF
