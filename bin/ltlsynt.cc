@@ -96,8 +96,7 @@ static const argp_option options[] =
     { "from-pgame", OPT_FROM_PGAME, "FILENAME", 0,
       "Read a parity game in Extended HOA format instead of building it.",
       0 },
-    // This option is not yet supported.  Un-hide it once available.
-    { "semantics", OPT_SEMANTICS, "Moore|Mealy", OPTION_HIDDEN,
+    { "semantics", OPT_SEMANTICS, "Moore|Mealy", 0,
       "Whether to work under Mealy (input-first) or Moore "
       "(output-first) semantics.  The default is Mealy.", 0 },
     /**************************************************/
@@ -498,9 +497,11 @@ namespace
   is_valid_strategy(const spot::formula& f, spot::twa_graph_ptr solution)
   {
     const char* incomplete_machine =
-        "Strategy is not an input-complete Mealy machine";
+        opt_semantics == semantics_moore
+        ? "Strategy is not an output-complete Moore machine"
+        : "Strategy is not an input-complete Mealy machine";
     const char* nondeterministic_machine =
-        "Strategy is not an input-deterministic Mealy machine";
+        "Strategy is not an input-deterministic machine";
 
     unsigned num_states = solution->num_states();
     if (num_states == 0)
@@ -522,19 +523,51 @@ namespace
               "get_synthesis_outputs(): synthesis-outputs not defined") == 0);
       return "Outputs are not defined";
     }
-    for (unsigned state = 0; state < num_states; ++state)
-    {
-      bdd bdd_state_cond = bddfalse;
-      for (const auto &edge : solution->out(state))
+    // For Moore: we check output-consistency (all edges from a state
+    // must agree on the output), plus input-completeness and
+    // input-determinism.
+    // For Mealy: we check input-completeness and input-determinism.
+    if (opt_semantics == semantics_moore)
       {
-        bdd edge_cond = bdd_exist(edge.cond, bdd_outs);
-        if (bdd_have_common_assignment(edge_cond, bdd_state_cond))
-          return nondeterministic_machine;
-        bdd_state_cond |= edge_cond;
+        bdd bdd_ins = bdd_exist(solution->ap_vars(), bdd_outs);
+        for (unsigned state = 0; state < num_states; ++state)
+        {
+          bdd bdd_state_input = bddfalse;
+          bdd output_cond = bddfalse;
+          for (const auto &edge : solution->out(state))
+          {
+            bdd edge_out = bdd_exist(edge.cond, bdd_ins);
+            bdd edge_in = bdd_exist(edge.cond, bdd_outs);
+            // Output consistency: all edges from a state must agree on output
+            if (output_cond == bddfalse)
+              output_cond = edge_out;
+            else if (edge_out != output_cond)
+              return "Strategy has inconsistent output (not a Moore machine)";
+            // Input determinism: no two edges share an input assignment
+            if (bdd_have_common_assignment(edge_in, bdd_state_input))
+              return nondeterministic_machine;
+            bdd_state_input |= edge_in;
+          }
+          if (bdd_state_input != bddtrue)
+            return incomplete_machine;
+        }
       }
-      if (bdd_state_cond != bddtrue)
-        return incomplete_machine;
-    }
+    else
+      {
+        for (unsigned state = 0; state < num_states; ++state)
+        {
+          bdd bdd_state_cond = bddfalse;
+          for (const auto &edge : solution->out(state))
+          {
+            bdd edge_cond = bdd_exist(edge.cond, bdd_outs);
+            if (bdd_have_common_assignment(edge_cond, bdd_state_cond))
+              return nondeterministic_machine;
+            bdd_state_cond |= edge_cond;
+          }
+          if (bdd_state_cond != bddtrue)
+            return incomplete_machine;
+        }
+      }
     return nullptr;
   }
 
@@ -545,7 +578,7 @@ namespace
                 const std::vector<std::string>& unobs_aps)
   {
     if (opt_semantics == semantics_moore)
-      error(2, 0, "Moore semantics are not supported yet");
+      gi->moore = true;
     spot::formula f = original_f;
     if (opt_csv)              // reset benchmark data
       gi->bv = spot::synthesis_info::bench_var();
@@ -582,6 +615,8 @@ namespace
           {
             if (want_game())
               opt |= spot::realizability_simplifier::global_equiv_output_only;
+            else if (opt_semantics == semantics_moore)
+              opt |= spot::realizability_simplifier::global_equiv_moore;
             else
               opt |= spot::realizability_simplifier::global_equiv;
           }
@@ -743,6 +778,8 @@ namespace
             {
               if (want_game())
                 opt |= spot::realizability_simplifier::global_equiv_output_only;
+              else if (opt_semantics == semantics_moore)
+                opt |= spot::realizability_simplifier::global_equiv_moore;
               else
                 opt |= spot::realizability_simplifier::global_equiv;
             }
@@ -834,8 +871,8 @@ namespace
           auto spptr =
             arena->get_named_prop<std::vector<bool>>("state-player");
           assert(spptr);
-          assert((spptr->at(arena->get_init_state_number()) == false)
-                 && "Env needs first turn");
+          assert((spptr->at(arena->get_init_state_number()) == gi->moore)
+                 && "incorrect first player");
 #endif
           if (gi->bv)
             {

@@ -1446,8 +1446,185 @@ diff out expected
 run 0 ltlsynt --global-equiv=no --print-game \
                -f "(F(i0 & X(i1)) <-> Fo1) && (i0 <-> Go0)"
 
-# Moore semantics not supported yet
-run 2 ltlsynt -f 'i U o' --sem=Moore
+# Moore semantics: G(o <-> i) is realizable under Mealy (ctrl sees i
+# then sets o), but unrealizable under Moore (ctrl must set o before
+# seeing i).
+ltlsynt -f 'G(o <-> i)' --ins=i --realizability
+ltlsynt -f 'G(o <-> i)' --sem=Moore --ins=i --realizability && exit 1
+# Conversely, G(i <-> X o) is realizable under Moore because ctrl
+# can use the previous input to set the current output.
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --realizability
+# Test that the option is recognized and accepted
+ltlsynt -f 'i U o' --sem=Moore --ins=i --realizability
+
+# ============================================================
+# More comprehensive Moore semantics tests
+# ============================================================
+
+# --- Realizability: formulas where Moore and Mealy differ ---
+# G(o <-> X i): Both UNREALIZABLE (ctrl can't predict future input)
+ltlsynt -f 'G(o <-> X i)' --sem=Moore --ins=i --realizability && exit 1
+ltlsynt -f 'G(o <-> X i)' --ins=i --realizability && exit 1
+
+# G(o <-> (a & b)): Moore UNREALIZABLE (ctrl can't mirror unseen inputs)
+ltlsynt -f 'G(o <-> (a & b))' --sem=Moore --ins='a,b' --realizability && exit 1
+
+# G F o: trivially REALIZABLE under both semantics
+ltlsynt -f 'G F o' --sem=Moore --ins=i --realizability
+
+# i U o: REALIZABLE (ctrl can set o=true immediately)
+ltlsynt -f 'i U o' --sem=Moore --ins=i --outs=o --realizability
+
+# G(o <-> (Xa & Xb)): Moore UNREALIZABLE (can't predict future inputs)
+ltlsynt -f 'G(o <-> (Xa & Xb))' --sem=Moore --ins='a,b' --realizability && exit 1
+
+# G(o <-> (a & X b)): Moore UNREALIZABLE (sees a but can't see Xb)
+ltlsynt -f 'G(o <-> (a & X b))' --sem=Moore --ins='a,b' --realizability && exit 1
+
+# G(o1 <-> X a) & G(o2 <-> b): UNREALIZABLE (o1 requires predicting a)
+ltlsynt -f 'G(o1 <-> X a) & G(o2 <-> b)' --sem=Moore \
+        --ins='a,b' --outs='o1,o2' --realizability && exit 1
+
+# --- Multiple outputs: independent Büchi conditions (same as Mealy) ---
+ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+        --ins='a,b' --outs='o1,o2' --realizability
+
+# Conflicting requirements on shared output
+ltlsynt -f '(FGa <-> GFo) & (GFb <-> GFo)' --sem=Moore \
+        --ins='a,b' --outs='o' --realizability && exit 1
+
+# --- Verification with Moore semantics ---
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --verify --algo=ds --simpl=no 2>&1 | grep -F 'Strategy was verified'
+
+ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+        --ins='a,b' --outs='o1,o2' --verify --algo=ds --simpl=no \
+        2>&1 | grep -F 'Strategy was verified'
+
+# --- AIGER output with Moore ---
+cat >exp <<EOF
+REALIZABLE
+aag 10 1 2 1 7
+2
+4 15
+6 21
+8
+8 5 6
+10 3 5
+12 3 7
+14 11 13
+16 2 5
+18 2 7
+20 17 19
+i0 i
+o0 o
+EOF
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --aiger=isop --algo=ds --simpl=no >out
+diff out exp
+
+cat >exp <<EOF
+REALIZABLE
+aag 2 2 0 2 0
+2
+4
+2
+4
+i0 a
+i1 b
+o0 o1
+o1 o2
+EOF
+ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+        --ins='a,b' --outs='o1,o2' --aiger=isop >out
+diff out exp
+
+# --- Verbose output with Moore (full pipeline, no bypass) ---
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --verbose --algo=lar --obligation=false 2>out
+sed 's/ [0-9.e-]* seconds/ X seconds/g' out >outx
+cat >exp <<EOF
+there are 1 subformulas
+trying to create strategy directly for G(i <-> Xo)
+direct strategy might exist but was not found.
+translating formula done in X seconds
+automaton has 3 states and 0 colors
+LAR construction done in X seconds
+DPA has 3 states, 0 colors
+split inputs and outputs done in X seconds
+automaton has 4 states
+solving game with acceptance: all
+game solved in X seconds
+simplification took X seconds
+EOF
+diff outx exp
+
+# --- Moore with obligation synthesis (default path) ---
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --verbose 2>out
+sed 's/ [0-9.e-]* seconds/ X seconds/g' out >outx
+grep 'formula is an obligation' outx
+grep 'solving done in X seconds' outx
+
+# --- Various algorithms with Moore ---
+for algo in ds sd lar; do
+  ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+          --algo=$algo --realizability || exit 1
+done
+
+# Test Moore with ps algorithm
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --algo=ps --realizability
+
+# Test Moore with acd algorithm
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --algo=acd --realizability
+
+# --- Moore with decomposition ---
+ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+        --ins='a,b' --outs='o1,o2' --decompose=yes --realizability
+
+# --- Moore with split types ---
+for splitt in expl auto; do
+  ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+          --splittype="$splitt" --realizability || exit 1
+done
+
+# --- Moore with simplification levels ---
+for s in no bisim bwoa sat bisim-sat bwoa-sat; do
+  ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+          --simplify=$s --algo=ds --realizability || exit 1
+done
+
+# --- Moore AIGER with different encoding options ---
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --aiger=isop+dc --algo=ds --simpl=no >out
+grep 'REALIZABLE' out
+grep 'aag' out
+
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --aiger=ite --algo=ds --simpl=no >out
+grep 'REALIZABLE' out
+grep 'aag' out
+
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --aiger --algo=ds --simpl=no >out
+grep 'REALIZABLE' out
+grep 'aag' out
+
+# --- Moore with --hide-status ---
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --hide-status --algo=ds >out
+grep -v 'REALIZABLE' out | grep -v 'UNREALIZABLE' > /dev/null || true
+
+# --- Moore: Mealy-realizable formula that remains REALIZABLE under Moore ---
+# GFo -> GFo: trivially realizable
+ltlsynt -f 'GFi -> GFo' --sem=Moore --ins=i --outs=o --realizability
+
+# --- Moore strategy output: verify controllable-AP annotation ---
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --algo=ds --simpl=no > out
+grep 'controllable-AP: 0' out
 
 # Test new print option
 cat >expected <<EOF

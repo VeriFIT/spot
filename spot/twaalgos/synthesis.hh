@@ -120,6 +120,7 @@ namespace spot
           sp{splittype::AUTO},
           bv{},
           verbose_stream{nullptr},
+          moore{false},
           dict(make_bdd_dict())
     {
     }
@@ -131,6 +132,7 @@ namespace spot
     std::optional<bench_var> bv; ///< Benchmarking data.
     std::ostream* verbose_stream; ///< Verbose output stream.
     option_map opt; ///< Additional options.
+    bool moore; ///< Use Moore (output-first) semantics instead of Mealy.
     bdd_dict_ptr dict; ///< BDD dictionary.
   };
 
@@ -141,19 +143,21 @@ namespace spot
   /// \brief make each transition a 2-step transition, transforming
   ///        the graph into an alternating arena
   ///
-  /// Given a set of atomic propositions I, split each transition
-  ///     p -- cond --> q                cond in 2^2^AP
-  /// into a set of transitions of the form
-  ///     p -- {a} --> (p,a) -- o --> q
-  /// for each a in cond ∪ 2^2^I
-  /// and where o = (cond & a) ∪ 2^2^O.
-  ///
-  /// By definition, the states p are deterministic,
-  /// only the states of the form
-  /// (p,a) may be non-deterministic.
   /// This function is used to transform an automaton into a turn-based game in
   /// the context of LTL reactive synthesis.
-  /// The player of inputs (aka environment) plays first.
+  ///
+  /// Given a set of atomic propositions I, split each transition
+  ///     p -- cond --> q                cond in 2^2^(I∪O)
+  /// into a set of transitions whose form depend on the synthesis semantics
+  /// used.   For Mealy semantics we want transitions of the form:
+  ///     p -- i₁ --> (p,i₁) -- o₁ --> q
+  ///     p -- i₂ --> (p,i₂) -- o₂ --> q
+  ///     ...
+  /// where iᵢ∈2^2^I, oᵢ∈2^2^O, and cond = Or(iᵢ∧oᵢ, i=1..n).
+  /// For Moore semantics, we want
+  ///     p -- o₁ --> (p,o₁) -- i₁ --> q
+  ///     p -- o₂ --> (p,o₂) -- i₂ --> q
+  ///     ...
   ///
   /// \param aut          automaton to be transformed
   /// \param output_bdd   conjunction of all output AP, all APs not present
@@ -161,6 +165,8 @@ namespace spot
   /// \param complete_env Whether the automaton should be complete for the
   ///                     environment, i.e. the player of inputs
   /// \param sp           Defines which splitting algo to use
+  /// \param moore        If true, use Moore (output-first) semantics:
+  ///                     the controller plays first
   /// \note This function also computes the state players
   /// \note If the automaton is to be completed, sink states will
   ///       be added for both env and player if necessary
@@ -168,7 +174,8 @@ namespace spot
   split_2step(const const_twa_graph_ptr& aut,
               const bdd& output_bdd, bool complete_env = true,
               synthesis_info::splittype sp
-                = synthesis_info::splittype::AUTO);
+                = synthesis_info::splittype::AUTO,
+              bool moore = false);
 
   /// \ingroup synthesis
   /// \brief Like split_2step but relying on the named property
@@ -176,7 +183,8 @@ namespace spot
   SPOT_API twa_graph_ptr
   split_2step(const const_twa_graph_ptr& aut, bool complete_env = true,
               synthesis_info::splittype sp
-                            = synthesis_info::splittype::AUTO);
+                            = synthesis_info::splittype::AUTO,
+              bool moore = false);
 
   /// \ingroup synthesis
   /// \brief Like split_2step but allows to fine-tune the splitting

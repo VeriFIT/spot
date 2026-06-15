@@ -53,14 +53,22 @@ namespace{
   // restriction
   struct small_cacher_t
   {
-    //e to e_in and support
+    //e to e_in and support (or e_out and support for Moore)
     std::unordered_map<bdd, std::pair<bdd, bdd>, bdd_hash> cond_hash_;
+    // The BDD we exist-quantify: output_bdd for Mealy (restrict to input),
+    // input_bdd for Moore (restrict to output).
+    bdd restrict_bdd_;
 
-    void fill(const const_twa_graph_ptr& aut, bdd output_bdd)
+    void fill(const const_twa_graph_ptr& aut, bdd output_bdd,
+              bool moore = false)
     {
       cond_hash_.reserve(aut->num_edges()/5+1);
       // 20% is about lowest number of different edge conditions
       // for benchmarks taken from syntcomp
+
+      restrict_bdd_ = (moore
+                       ? bdd_exist(aut->ap_vars(), output_bdd)
+                       : output_bdd);
 
       for (const auto& e : aut->edges())
         {
@@ -70,12 +78,13 @@ namespace{
 
           cond_hash_[e.cond] =
               std::pair<bdd, bdd>(
-                  bdd_exist(e.cond, output_bdd),
-                  bdd_exist(bdd_support(e.cond), output_bdd));
+                  bdd_exist(e.cond, restrict_bdd_),
+                  bdd_exist(bdd_support(e.cond), restrict_bdd_));
         }
     }
 
-    // Get the condition restricted to input and support of a condition
+    // Get the condition restricted to input (Mealy) or output (Moore)
+    // and its support
     const std::pair<bdd, bdd>& operator[](const bdd& econd) const
     {
       return cond_hash_.at(econd);
@@ -139,11 +148,12 @@ namespace{
 
   // Improved apply strat, that reduces the number of edges/states
   // while keeping the needed edge-properties
-  // Note, this only deals with deterministic strategies
-  // Note, assumes that env starts playing
+  // Note, this deals with deterministic strategies
+  // Note, assumes that env starts playing if moore=false,
+  // and ctrl starts playing if moore=true
   twa_graph_ptr
   apply_strategy(const const_twa_graph_ptr& arena,
-                 bool unsplit, bool keep_acc)
+                 bool unsplit, bool keep_acc, bool moore)
   {
     const region_t& win = get_state_winners(arena);
     const strategy_t& strat = get_strategy(arena);
@@ -154,8 +164,8 @@ namespace{
       throw std::runtime_error("Player does not win initial state, strategy "
                                "is not applicable");
 
-    assert((sp[arena->get_init_state_number()] == false)
-           && "Env needs to have first turn!");
+    assert((sp[arena->get_init_state_number()] == moore)
+           && "incorrect first player");
     (void)sp;
 
     assert(std::none_of(arena->edges().begin(), arena->edges().end(),
@@ -208,15 +218,19 @@ namespace{
                        unsigned,
                        dca_hash,
                        dca_equal> p_map;
+    // Track intermediate env states for Moore
+    std::vector<unsigned> moore_env_states;
 
     constexpr unsigned unseen_mark = std::numeric_limits<unsigned>::max();
+    // For Mealy (env-first): env_map maps env states to local states
+    // For Moore  (ctrl-first): maps ctrl (original) states to local states
     std::vector<unsigned> env_map(arena->num_states(), unseen_mark);
     strat_split->set_init_state(strat_split->new_state());
     env_map[arena->get_init_state_number()] =
         strat_split->get_init_state_number();
 
     // The states in the new graph are qualified local
-    // Get a local environment state
+    // Get a local state (env for Mealy, ctrl for Moore)
     auto get_sel = [&](unsigned s)
       {
         if (SPOT_UNLIKELY(env_map[s] == unseen_mark))
@@ -239,32 +253,74 @@ namespace{
         return ns;
       };
 
-    while (!todo.empty())
+    if (moore)
       {
-        unsigned src_env = todo.top();
-        unsigned src_envl = get_sel(src_env);
-        todo.pop();
-        // All env edges
-        for (const auto& e_env : arena->out(src_env))
+        // Moore semantics: ctrl (first player) owns initial state.
+        // Loop: ctrl (original) -> env (intermediate) -> ctrl (next).
+        // For each ctrl state, create ONE output edge to a single
+        // intermediate env state, which has edges for each possible
+        // environment input.
+        while (!todo.empty())
           {
-            // Get the corresponding strat
-            const auto& e_strat = arena->edge_storage(strat[e_env.dst]);
-            // Check if already explored
-            if (env_map[e_strat.dst] == unseen_mark)
-              todo.push(e_strat.dst);
-            unsigned dst_envl = get_sel(e_strat.dst);
-            // The new env edge, player is constructed automatically
+            unsigned src_ctrl = todo.top();
+            unsigned src_ctrll = get_sel(src_ctrl);
+            todo.pop();
+            // Get the ctrl strategy for this state
+            const auto& e_strat = arena->edge_storage(strat[src_ctrl]);
             auto used_acc = keep_acc ? e_strat.acc : acc_cond::mark_t({});
-            strat_split->new_edge(src_envl,
-                                  get_spl(dst_envl, e_strat.cond, used_acc),
-                                  e_env.cond, used_acc);
+            // Create a single intermediate env state
+            unsigned env_state = strat_split->new_state();
+            moore_env_states.push_back(env_state);
+            // e_strat.dst is an env state, iterate its outgoing edges
+            for (const auto& e_env : arena->out(e_strat.dst))
+              {
+                // Check if already explored
+                if (env_map[e_env.dst] == unseen_mark)
+                  todo.push(e_env.dst);
+                unsigned dst_ctrll = get_sel(e_env.dst);
+                strat_split->new_edge(env_state, dst_ctrll,
+                                      e_env.cond, used_acc);
+              }
+            // One ctrl edge to the single env state
+            strat_split->new_edge(src_ctrll, env_state,
+                                  e_strat.cond, used_acc);
+          }
+      }
+    else
+      {
+        // Mealy semantics: env plays first.
+        // Loop: env (original) -> ctrl (intermediate) -> env (next)
+        while (!todo.empty())
+          {
+            unsigned src_env = todo.top();
+            unsigned src_envl = get_sel(src_env);
+            todo.pop();
+            // All env edges
+            for (const auto& e_env : arena->out(src_env))
+              {
+                // Get the corresponding strat
+                const auto& e_strat = arena->edge_storage(strat[e_env.dst]);
+                // Check if already explored
+                if (env_map[e_strat.dst] == unseen_mark)
+                  todo.push(e_strat.dst);
+                unsigned dst_envl = get_sel(e_strat.dst);
+                // The new env edge, player is constructed automatically
+                auto used_acc = keep_acc ? e_strat.acc : acc_cond::mark_t({});
+                strat_split->new_edge(src_envl,
+                                      get_spl(dst_envl, e_strat.cond, used_acc),
+                                      e_env.cond, used_acc);
+              }
           }
       }
     // All states exists, we can try to further merge them
     // Specialized merge
-    std::vector<bool> spnew(strat_split->num_states(), false);
+    std::vector<bool> spnew(strat_split->num_states(), moore);
     for (const auto& p : p_map)
-      spnew[p.second] = true;
+      spnew[p.second] = !moore;
+    // For Moore, the intermediate env states are not in p_map.
+    if (moore)
+      for (unsigned s : moore_env_states)
+        spnew[s] = false;
 
     // Sorting edges in place
     auto comp_edge = [](const auto& e1, const auto& e2)
@@ -437,7 +493,7 @@ namespace{
 
     strat_split->defrag_states(remap, st);
 
-    alternate_players(strat_split, false, false);
+    alternate_players(strat_split, moore, false);
     // What we do now depends on whether we unsplit or not
     if (unsplit)
       {
@@ -457,7 +513,8 @@ namespace spot
   {
   twa_graph_ptr
   split_2step_expl_impl(const const_twa_graph_ptr& aut,
-                        const bdd& output_bdd, bool complete_env)
+                        const bdd& output_bdd, bool complete_env,
+                        bool moore = false)
   {
     assert(!aut->get_named_prop<region_t>("state-player")
            && "aut is already split!");
@@ -488,73 +545,62 @@ namespace spot
           split->acc().set_acceptance(acc_cond::acc_code::t());
       }
 
-    bdd input_bdd = bddtrue;
-    {
-      bdd allbdd = aut->ap_vars();
-      while (allbdd != bddtrue)
-        {
-          bdd l = bdd_ithvar(bdd_var(allbdd));
-          if (not bdd_implies(output_bdd, l))
-            // Input
-            input_bdd &= l;
-          allbdd = bdd_high(allbdd);
-          assert(allbdd != bddfalse);
-        }
-    }
+    // The "letter BDD" is the BDD over which we enumerate minterms.
+    // For Moore: we enumerate output letters instead of input letters.
+    bdd letter_bdd = moore ? output_bdd : bdd_exist(aut->ap_vars(), output_bdd);
 
-    // The environment has all states
-    // with num <= aut->num_states();
-    // So we can first loop over the aut
-    // and then deduce the owner
+    // Original states (indices 0..aut->num_states()-1) are the first player's.
+    // Intermediate states (created below) are the second player's.
+    // We first loop over the original states and then deduce ownership.
 
-    // a sort of hash-map for all new intermediate stat
-    // second is the color of the incoming env trans
+    // a sort of hash-map for all new intermediate states
+    // second is the color of the incoming transition
     std::unordered_multimap<size_t,
-                            std::pair<unsigned, acc_cond::mark_t>> env_hash;
-    env_hash.reserve((int) (1.5 * aut->num_states()));
+                            std::pair<unsigned, acc_cond::mark_t>> interm_hash;
+    interm_hash.reserve((int) (1.5 * aut->num_states()));
     // a local map for edges leaving the current src
     // this avoids creating and then combining edges for each minterm
     // Note there are usually "few" edges leaving a state
     // and map has shown to be faster than unordered_map for
     // syntcomp examples
-    std::map<unsigned, std::pair<unsigned, bdd>> env_edge_hash;
-    typedef std::map<unsigned, std::pair<unsigned, bdd>>::mapped_type eeh_t;
+    std::map<unsigned, std::pair<unsigned, bdd>> interm_edge_hash;
+    typedef std::map<unsigned, std::pair<unsigned, bdd>>::mapped_type ieh_t;
 
     small_cacher_t small_cacher;
-    small_cacher.fill(aut, output_bdd);
+    small_cacher.fill(aut, output_bdd, moore);
 
     // Cache vector for all outgoing edges of this states
     std::vector<e_info_t> e_cache;
 
     // Vector of destinations actually reachable for a given
-    // minterm in ins
+    // minterm in ins (or outs for Moore)
     // Automatically "almost" sorted due to the sorting of e_cache
     std::vector<const e_info_t*> dests;
 
-    // If a completion is demanded we might have to create sinks
-    // Sink controlled by player
-    unsigned sink_con = -1u;
-    unsigned sink_env = -1u;
-    auto get_sink_con_state = [&split, &sink_con, &sink_env,
-                               um = unsat_mark, hu = has_unsat]
-                              (bool create = true)
+    // If a completion is demanded we might have to create sinks.
+    // The sink pair alternates: first player -> second player -> first player.
+    // For Mealy: first=env, second=ctrl.
+    // For Moore: first=ctrl, second=env.
+    unsigned sink_first = -1u;   // First player's sink state
+    unsigned sink_second = -1u;  // Second player's sink state
+    auto ensure_sinks = [&split, &sink_first, &sink_second,
+                         um = unsat_mark, hu = has_unsat]()
       {
         assert(hu);
-        if (SPOT_UNLIKELY((sink_con == -1u) && create))
+        if (SPOT_UNLIKELY(sink_first == -1u))
           {
-            sink_con = split->new_state();
-            sink_env = split->new_state();
-            split->new_edge(sink_con, sink_env, bddtrue, um);
-            split->new_edge(sink_env, sink_con, bddtrue, um);
+            sink_first = split->new_state();
+            sink_second = split->new_state();
+            split->new_edge(sink_first, sink_second, bddtrue, um);
+            split->new_edge(sink_second, sink_first, bddtrue, um);
           }
-        return sink_con;
       };
 
     // Loop over all states
     const auto n_states = aut->num_states();
     for (unsigned src = 0; src < n_states; ++src)
       {
-        env_edge_hash.clear();
+        interm_edge_hash.clear();
         e_cache.clear();
 
         auto out_cont = aut->out(src);
@@ -570,20 +616,23 @@ namespace spot
             all_letters |= e_cache.back().einsup.first;
             support &= e_cache.back().einsup.second;
           }
-        // Complete for env
-        if (complete_env && (all_letters != bddtrue))
-            split->new_edge(src, get_sink_con_state(), bddtrue - all_letters);
+        // Complete for env (first player in Mealy, from original states;
+        // for Moore completeness is handled when creating intermediate states)
+        if (complete_env && !moore && (all_letters != bddtrue))
+          {
+            ensure_sinks();
+            split->new_edge(src, sink_second, bddtrue - all_letters);
+          }
 
         // Sort to avoid that permutations of the same edges
         // get different intermediate states
         std::sort(e_cache.begin(), e_cache.end(), less_info);
 
-        for (auto one_letter : minterms_of(all_letters, input_bdd))
+        for (auto one_letter : minterms_of(all_letters, letter_bdd))
           {
 
             dests.clear();
             for (const auto& e_info : e_cache)
-              // implies is faster than and
               if (bdd_implies(one_letter, e_info.einsup.first))
                 {
                   e_info.econdout = bdd_restrict(e_info.econd, one_letter);
@@ -593,7 +642,7 @@ namespace spot
             // By construction this should not be empty
             assert(!dests.empty());
             // # dests is almost sorted -> insertion sort
-            if (dests.size()>1)
+            if (dests.size() > 1)
               for (auto it = dests.begin(); it != dests.end(); ++it)
                 std::rotate(std::upper_bound(dests.begin(), it, *it,
                                              less_info_ptr),
@@ -604,7 +653,7 @@ namespace spot
             for (const auto& t: dests)
               h ^= t->hash();
 
-            auto range_h = env_hash.equal_range(h);
+            auto range_h = interm_hash.equal_range(h);
             for (auto it_h = range_h.first; it_h != range_h.second; ++it_h)
               {
                 const auto& [i, this_color] = it_h->second;
@@ -625,12 +674,12 @@ namespace spot
                                }))
                   {
                     to_add = false;
-                    auto it = env_edge_hash.find(i);
-                    if (it != env_edge_hash.end())
+                    auto it = interm_edge_hash.find(i);
+                    if (it != interm_edge_hash.end())
                       it->second.second |= one_letter;
                     else
-                      env_edge_hash.emplace(i,
-                        eeh_t(split->new_edge(src, i, bddtrue,
+                      interm_edge_hash.emplace(i,
+                        ieh_t(split->new_edge(src, i, bddtrue,
                                               this_color),
                               one_letter));
                     break;
@@ -642,6 +691,7 @@ namespace spot
                 unsigned d = split->new_state();
                 auto this_color = acc_cond::mark_t({});
                 bool has_uncolored = false;
+                bdd all_inputs = bddfalse;
                  for (const auto &t: dests)
                   {
                     split->new_edge(d, t->dst, t->econdout,
@@ -649,6 +699,15 @@ namespace spot
                                               : acc_cond::mark_t({}));
                     this_color |= t->acc;
                     has_uncolored |= !t->acc;
+                    all_inputs |= t->econdout;
+                  }
+                // Complete for env: in Moore, intermediate states
+                // are env (second player) and need input-complete
+                // outgoing edges.
+                if (complete_env && moore && (all_inputs != bddtrue))
+                  {
+                    ensure_sinks();
+                    split->new_edge(d, sink_first, bddtrue - all_inputs);
                   }
 
                 if (!color_env | has_uncolored)
@@ -661,14 +720,14 @@ namespace spot
                     acc_cond::mark_t({this_color.max_set()-1});
 
                 unsigned n_e = split->new_edge(src, d, bddtrue, this_color);
-                env_hash.emplace(std::piecewise_construct,
-                                 std::forward_as_tuple(h),
-                                 std::forward_as_tuple(d, this_color));
-                env_edge_hash.emplace(d, eeh_t(n_e, one_letter));
+                interm_hash.emplace(std::piecewise_construct,
+                                    std::forward_as_tuple(h),
+                                    std::forward_as_tuple(d, this_color));
+                interm_edge_hash.emplace(d, ieh_t(n_e, one_letter));
               }
           } // letters
         // save locally stored condition
-        for (const auto& elem : env_edge_hash)
+        for (const auto& elem : interm_edge_hash)
           split->edge_data(elem.second.first).cond = elem.second.second;
       } // v-src
 
@@ -677,19 +736,32 @@ namespace spot
 
     // The named property
     // compute the owners
-    // env is equal to false
+    // For Mealy: original states are env (false), new states are ctrl (true)
+    // For Moore: original states are ctrl (true), new states are env (false)
     auto owner = std::vector<bool>(split->num_states(), false);
-    // All "new" states belong to the player
-    std::fill(owner.begin()+aut->num_states(), owner.end(), true);
-    // Check if sinks have been created
-    if (sink_env != -1u)
-      owner.at(sink_env) = false;
+    if (moore)
+      {
+        // Original states are first player (ctrl=true)
+        std::fill(owner.begin(), owner.begin() + aut->num_states(), true);
+        // All "new" states belong to second player (env=false, default)
+        // Check if sinks have been created
+        if (sink_first != -1u)
+          owner.at(sink_first) = true;
+      }
+    else
+      {
+        // All "new" states belong to the second player (ctrl=true)
+        std::fill(owner.begin()+aut->num_states(), owner.end(), true);
+        // Check if sinks have been created
+        if (sink_first != -1u)
+          owner.at(sink_first) = false;
+      }
 
     // !use_color -> all words accepted
-    // complete_env && sink_env == -1u
+    // complete_env && sink_first == -1u
     // complet. for env demanded but already
     // satisfied -> split is also all true
-    if (complete_env && sink_env == -1u && !use_color)
+    if (complete_env && sink_first == -1u && !use_color)
       split->acc() = acc_cond::acc_code::t();
 
     set_state_players(split, std::move(owner));
@@ -794,8 +866,13 @@ namespace spot
   template<bool FULLYSYM>
   twa_graph_ptr
   split_2step_sym_impl(const const_twa_graph_ptr& aut,
-                       const bdd& output_bdd, bool complete_env)
+                       const bdd& output_bdd, bool complete_env,
+                       bool moore = false)
   {
+    // Moore semantics is not yet implemented for the symbolic path.
+    // The dispatcher should have forced EXPL for Moore; we assert here.
+    assert(!moore);
+    (void)moore;
 
     assert(!aut->get_named_prop<region_t>("state-player")
            && "aut is already split!");
@@ -1593,7 +1670,8 @@ namespace spot
   split_2step_(const const_twa_graph_ptr& aut,
                const bdd& output_bdd, bool complete_env,
                synthesis_info::splittype sp
-                = synthesis_info::splittype::AUTO)
+                = synthesis_info::splittype::AUTO,
+               bool moore = false)
   {
     // Heuristic for AUTO goes here
     // For the moment semisym is almost always best except if there are
@@ -1604,14 +1682,21 @@ namespace spot
                    : synthesis_info::splittype::SEMISYM)
          : sp;
 
+    // Moore semantics is not yet implemented for symbolic splitting.
+    // Force explicit enumeration for now.
+    if (moore && sp != synthesis_info::splittype::EXPL)
+      sp = synthesis_info::splittype::EXPL;
+
     switch (sp)
       {
       case synthesis_info::splittype::EXPL:
-        return split_2step_expl_impl(aut, output_bdd, complete_env);
+        return split_2step_expl_impl(aut, output_bdd, complete_env, moore);
       case synthesis_info::splittype::SEMISYM:
-        return split_2step_sym_impl<false>(aut, output_bdd, complete_env);
+        return split_2step_sym_impl<false>(aut, output_bdd, complete_env,
+                                           moore);
       case synthesis_info::splittype::FULLYSYM:
-        return split_2step_sym_impl<true>(aut, output_bdd, complete_env);
+        return split_2step_sym_impl<true>(aut, output_bdd, complete_env,
+                                          moore);
       default:
         throw std::runtime_error("split_2step_(): "
                                  "Expected explicit splittype.");
@@ -1624,18 +1709,20 @@ namespace spot
   twa_graph_ptr
   split_2step(const const_twa_graph_ptr& aut,
               const bdd& output_bdd, bool complete_env,
-              synthesis_info::splittype sp)
+              synthesis_info::splittype sp,
+              bool moore)
   {
-    return split_2step_(aut, output_bdd, complete_env, sp);
+    return split_2step_(aut, output_bdd, complete_env, sp, moore);
   }
 
   twa_graph_ptr
   split_2step(const const_twa_graph_ptr& aut, bool complete_env,
-              synthesis_info::splittype sp)
+              synthesis_info::splittype sp,
+              bool moore)
   {
     return split_2step_(aut,
                         get_synthesis_outputs(aut),
-                        complete_env, sp);
+                        complete_env, sp, moore);
   }
 
   twa_graph_ptr
@@ -1645,7 +1732,8 @@ namespace spot
     return split_2step_(aut,
                         get_synthesis_outputs(aut),
                         true,
-                        gi.sp);
+                        gi.sp,
+                        gi.moore);
   }
 
   twa_graph_ptr
@@ -2071,7 +2159,7 @@ namespace spot
     if (!get_state_winner(arena, arena->get_init_state_number()))
       return nullptr;
 
-    auto m = apply_strategy(arena, false, false);
+    auto m = apply_strategy(arena, false, false, gi.moore);
 
     m->prop_universal(true);
 
