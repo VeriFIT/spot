@@ -37,6 +37,12 @@ New in spot 2.15.1.dev  (not yet released)
   - ltlfilt learned a --distribute-X option that distributes X and
     X[!] operators over Boolean connectives.
 
+  - ltlsynt learned a --semantics=Moore option to synthesize reactive
+    controllers under Moore (output-first) semantics, where the
+    controller's outputs depend only on the history of inputs, not on
+    the current input.  This is in addition to the default Mealy
+    (input-first) semantics.  (Issue #608.)
+
   Library:
 
   - spot::lasso_enumerator is a new class that lazily enumerates all
@@ -97,6 +103,13 @@ New in spot 2.15.1.dev  (not yet released)
     [->i..j], [:*i..j], F[i..j], G[i..j], X[i], X[!][i] etc. are now
     stored as 16-bit values instead of 8-bit values, allowing bounds
     up to 65534 (instead of 254).  (Issue #485.)
+
+  - Several functions gained a new 'moore' parameter to support Moore
+    (output-first) semantics in addition to the traditional Mealy
+    (input-first) semantics: spot::split_2step(),
+    spot::apply_strategy(), spot::solved_game_to_mealy(), and
+    spot::alternate_players().  A new spot::synthesis_info::moore
+    field was also added.  (Issue #608.)
 
   Deprecation notices:
 

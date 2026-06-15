@@ -11,15 +11,29 @@ This tool synthesizes reactive controllers from LTL/PSL formulas.
 
 Consider a set $I$ of /input/ atomic propositions, a set $O$ of /output/ atomic
 propositions, and a PSL formula \phi over the propositions in $I \cup O$.  A
-*reactive controller* realizing \phi is a function $c: (2^{I})^\star \times 2^I \mapsto
-2^O$ such that, for every \omega-word $(u_i)_{i \in N} \in (2^I)^\omega$ over
-the input propositions, the word $(u_i \cup c(u_0 \dots u_{i-1}, u_i))_{i \in
+*reactive controller* realizing \phi is a finite-state machine that, at each step,
+produces output values for $O$ based on the history of input values seen so far on
+$I$, such that for every infinite sequence of input valuations, the combined
+input/output trace satisfies \phi.
+
+By default, =ltlsynt= uses Mealy (input-first) semantics: in addition
+to the history of inputs, the controller may observe the /current/
+input before deciding its output.  Formally, a Mealy controller is a
+function $c: (2^I)^\star \times 2^I \mapsto 2^O$ such that, for every
+\omega-word $(u_i)_{i \in N} \in (2^I)^\omega$ over the input
+propositions, the word $(u_i \cup c(u_0 \dots u_{i-1}, u_i))_{i \in
 N}$ satisfies \phi.
 
-If a reactive controller exists, then one with finite memory
-exists. Such controllers are easily represented as automata (or more
-specifically as Mealy machines).  In the automaton representing the
-controller, the acceptance condition is irrelevant and trivially true.
+Option =--semantics=Moore= selects Moore (output-first) semantics: the controller
+must decide its output without seeing the current input.  A Moore controller
+is a function $c: (2^I)^\star \mapsto 2^O$, with the combined trace
+$(u_i \cup c(u_0 \dots u_{i-1}))_{i \in N}$.  See the [[#semantics][Mealy vs. Moore semantics]]
+section for a more detailed comparison.
+
+Both types of controllers use finite memory, and are easily
+represented as automata (or more specifically as Mealy machines).  In
+the automaton representing the controller, the acceptance condition is
+irrelevant and trivially true.
 
 Here is a small example where $I=\{i_1,i_2\}$ and $O=\{o_1\}$.  The
 specification asks that $o_1$ hold at some point if and only if $i_1$
@@ -129,6 +143,27 @@ As an extension to this simple =*.part= format, words enclosed in
 slashes are interpreted as regexes, like for the =--ins= and =--outs=
 options.
 
+* Mealy vs. Moore semantics
+   :PROPERTIES:
+   :CUSTOM_ID: semantics
+   :END:
+
+By default, =ltlsynt= uses Mealy (input-first) semantics: the controller
+sees the current input values before deciding its output.  This is the
+standard for the SYNTCOMP competition.
+
+Option =--semantics=Moore= selects Moore (output-first) semantics: the
+controller must decide its output based only on the /history/ of
+inputs, without seeing the current input.  Under Moore semantics, the
+output state of the strategy automaton alternates starting with
+controller states.
+
+For instance, =G(o <-> i)= is realizable under Mealy semantics (the
+controller can copy the input) but unrealizable under Moore semantics
+(the controller must output before seeing the input).  Conversely,
+=G(i <-> X o)= is realizable under Moore (the controller uses the
+previous input to set the output) but unrealizable under Mealy.
+
 * TLSF input
 
 =ltlsynt= was made with the [[http://syntcomp.org/][SYNTCOMP]] competition in mind, and more
@@ -149,8 +184,9 @@ The above =--tlsf= option will call =syfco= (which must be on your
 [[file:tlsf.org][the TLSF page]] for more details.
 
 Additionally, using =--tlsf= will verify that the TLSF specification
-is defined using Mealy semantics, as =ltlsynt= does not yet support
-Moore semantics.
+is defined using Mealy semantics.  Use =--semantics=Moore= to
+force Moore semantics if the TLSF file uses Moore semantics but
+does not declare it.
 
 Some TLSF models are defined with parameters.  Those parameters have
 default values specified within the =PARAMETERS= block of the TLSF
@@ -350,7 +386,8 @@ For instance the following command builds controllers (when they
 exist) for the 23 demonstration specifications from [[http://www.ist.tugraz.at/staff/jobstmann/lily/][Lily 1.0.2]] while
 saving some statistics in =bench.csv=.  (If you compare our results
 with theirs, keep in mind that Lily uses Moore's semantics, while
-=ltlsynt= uses Mealy's semantics.)  We use =-q= to hide the
+=ltlsynt= uses Mealy's semantics by default.  Pass
+=--semantics=Moore= to use Moore semantics instead.)  We use =-q= to hide the
 constructed controllers, as we are only interested in the statistics.
 
 #+BEGIN_SRC sh :results none :exports both :epilogue true
