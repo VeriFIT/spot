@@ -1476,10 +1476,12 @@ ltlsynt -f 'G F o' --sem=Moore --ins=i --realizability
 ltlsynt -f 'i U o' --sem=Moore --ins=i --outs=o --realizability
 
 # G(o <-> (Xa & Xb)): Moore UNREALIZABLE (can't predict future inputs)
-ltlsynt -f 'G(o <-> (Xa & Xb))' --sem=Moore --ins='a,b' --realizability && exit 1
+ltlsynt -f 'G(o <-> (Xa & Xb))' --sem=Moore \
+        --ins='a,b' --realizability && exit 1
 
 # G(o <-> (a & X b)): Moore UNREALIZABLE (sees a but can't see Xb)
-ltlsynt -f 'G(o <-> (a & X b))' --sem=Moore --ins='a,b' --realizability && exit 1
+ltlsynt -f 'G(o <-> (a & X b))' --sem=Moore \
+        --ins='a,b' --realizability && exit 1
 
 # G(o1 <-> X a) & G(o2 <-> b): UNREALIZABLE (o1 requires predicting a)
 ltlsynt -f 'G(o1 <-> X a) & G(o2 <-> b)' --sem=Moore \
@@ -1625,6 +1627,63 @@ ltlsynt -f 'GFi -> GFo' --sem=Moore --ins=i --outs=o --realizability
 ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
         --algo=ds --simpl=no > out
 grep 'controllable-AP: 0' out
+
+# --- Moore with bisim/bwoa minimization: strategy verification ---
+# These test that unsplit_mealy (and thus the bisim/bwoa reduction path)
+# works correctly for Moore (ctrl-first) split machines.
+for s in bisim bwoa; do
+  ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+          --simplify=$s --algo=ds --verify 2>&1 \
+            | grep -F 'Strategy was verified'
+done
+
+# --- Moore with bisim/bwoa: AIGER output (full pipeline) ---
+for s in bisim bwoa; do
+  ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+          --simplify=$s --algo=ds --aiger=isop > out
+  grep 'REALIZABLE' out
+  grep 'aag' out
+done
+
+# --- Moore with bisim/bwoa: multi-algorithm realizability ---
+for algo in ds sd lar; do
+  for s in bisim bwoa; do
+    ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+            --ins='a,b' --outs='o1,o2' --simplify=$s \
+            --algo=$algo --realizability || exit 1
+  done
+done
+
+# --- Moore with bisim/bwoa: decomposition ---
+ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+        --ins='a,b' --outs='o1,o2' --decompose=yes \
+        --simplify=bisim --realizability
+
+# --- Moore: verify with ALL algorithms ---
+# Test --verify with --algo=sd, lar, ps, and acd (ds already tested above)
+for a in sd lar ps acd; do
+  for s in bisim bwoa; do
+    ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+            --simplify=$s --algo=$a --verify 2>&1 \
+              | grep -F 'Strategy was verified'
+    ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+            --ins='a,b' --outs='o1,o2' --simplify=$s --algo=$a --verify 2>&1 \
+            | grep -F 'Strategy was verified'
+  done
+done
+
+# --- Moore: AIGER output with --verify ---
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --simplify=bisim --verify --aiger 2>&1 | grep -F 'Circuit was verified'
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --simplify=bwoa --verify --aiger 2>&1 | grep -F 'Circuit was verified'
+ltlsynt -f 'G(i <-> X o)' --sem=Moore --ins=i --outs=o \
+        --simplify=no --verify --aiger 2>&1 | grep -F 'Circuit was verified'
+
+# --- Moore: AIGER+verify with multi-output formula ---
+ltlsynt -f '(GFa <-> GFo1) & (GFb <-> GFo2)' --sem=Moore \
+        --ins='a,b' --outs='o1,o2' --simplify=bisim \
+        --verify --aiger 2>&1 | grep -F 'Circuit was verified'
 
 # Test new print option
 cat >expected <<EOF

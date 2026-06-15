@@ -195,12 +195,6 @@ namespace spot
         return false;
       }
 
-    if (sp[m->get_init_state_number()])
-      {
-        trace << "is_split_mealy(): Initial state must be owned by env!\n";
-        return false;
-      }
-
     auto outs = get_synthesis_outputs(m);
 
     for (const auto& e : m->edges())
@@ -4312,20 +4306,14 @@ namespace spot
     if (0 < minimize_lvl && minimize_lvl < 3)
       {
         // unsplit if necessary
-        if (auto sp = m->get_named_prop<region_t>("state-player"))
+        if (m->get_named_prop<region_t>("state-player"))
           {
-            // For Moore (ctrl-first) machines, skip the bisim/bwoa
-            // reduction because unsplit_mealy() requires env-owned
-            // initial state.  Leave the machine as-is.
-            if (!(*sp)[m->get_init_state_number()])
-              {
-                m = unsplit_mealy(m);
-                is_separated = true;
-                reduce_mealy_here(m, minimize_lvl == 2);
-              }
+            m = unsplit_mealy(m);
+            is_separated = true;
           }
-        else
-          reduce_mealy_here(m, minimize_lvl == 2);
+        // FIXME: Calling readuce_mealy_here() twice will
+        // sometimes further reader the Mealy machine.
+        reduce_mealy_here(m, minimize_lvl == 2);
       }
     else if (3 <= minimize_lvl)
       m = minimize_mealy(m, si);
