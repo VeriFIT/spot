@@ -104,6 +104,20 @@ esac
 export srcdir
 
 case $1 in
+  regen)
+    shift
+    case $1 in
+      *.ipynb)
+        PYTHONPATH=$pypath:$PYTHONPATH \
+        DYLD_LIBRARY_PATH=$modpath:$DYLD_LIBRARY_PATH \
+        LD_LIBRARY_PATH=$modpath:$LD_LIBRARY_PATH \
+        PYTHONIOENCODING=utf-8:surrogateescape \
+        exec $PREFIXCMD jupyter nbconvert --execute --inplace --to notebook \
+          --ExecutePreprocessor.timeout=300 "$@";;
+      *)
+        echo "regen only works with .ipynb files" >&2
+        exit 2;;
+    esac;;
   *.ipynb)
     PYTHONPATH=$pypath:$PYTHONPATH \
     DYLD_LIBRARY_PATH=$modpath:$DYLD_LIBRARY_PATH \
