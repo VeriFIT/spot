@@ -21,6 +21,7 @@
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/simplify.hh>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
+#include <spot/twaalgos/translate.hh>
 #include <spot/twa/twagraph.hh>
 #include <spot/twa/bdddict.hh>
 #include <spot/priv/robin_hood.hh>
@@ -325,6 +326,44 @@ namespace spot
           if (ltl_satisfiable(child))
             return true;
         return false;
+      }
+
+    // The on-the-fly emptiness check using the Couvreur FM translation
+    // only supports purely existential quantifiers (body unquantified)
+    // and unquantified formulas.  For \forall or quantifier alternations
+    // (\exists\forall, \forall\exists) that survived simplification,
+    // use the full translator.
+    if (f.is_quantified())
+      {
+        // \exists a: (\psi_1 \lor \psi_2 \lor \ldots)
+        //   \equiv (\exists a: \psi_1) \lor (\exists a: \psi_2) \lor \ldots
+        // Check each disjunct independently.
+        if (f.is(op::exists) && f[f.size() - 1].is(op::Or))
+          {
+            unsigned sz = f.size();
+            std::vector<formula> qaps;
+            for (unsigned i = 0; i < sz - 1; ++i)
+              qaps.push_back(f[i]);
+            for (auto child: f[sz - 1])
+              {
+                formula sub = formula::quantify(op::exists, qaps, child);
+                if (ltl_satisfiable(sub))
+                  return true;
+              }
+            return false;
+          }
+
+        bool otf_ok = f.is(op::exists)
+                       && !f[f.size() - 1].is_quantified();
+        if (!otf_ok)
+          {
+            auto dict = make_bdd_dict();
+            translator trans(dict);
+            trans.set_type(postprocessor::Buchi);
+            trans.set_level(postprocessor::Low);
+            auto aut = trans.run(f);
+            return !aut->is_empty();
+          }
       }
 
     // On-the-fly emptiness check using the Couvreur FM translation.

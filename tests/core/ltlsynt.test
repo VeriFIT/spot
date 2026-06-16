@@ -1787,4 +1787,11 @@ ltlsynt -f "G(i0 <-> X(o0)) && FG(i1 <-> X[2](o1)) && G(i2<->o2)" \
         --print-each-mealy > out
 diff out expected
 
+# Test that quantified variable are ignored by the realizability simplified
+ltlsynt -f '\exists a: G(a->b)&G(b->c)&G(c->a)' --out=b,c --verbose 2>err
+grep -F 'exists a: (G(a -> b) & G(b -> a))' err
+ltlsynt -f '\forall a: G(a->b)&G(b->c)&G(c->a)' --out=b,c --verbose 2>err &&
+    exit 1
+grep -F 'forall a: (G(a -> b) & G(b -> a))' err
+
 :

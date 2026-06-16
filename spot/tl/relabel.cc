@@ -670,6 +670,49 @@ namespace spot
         if (i != m->end())
           return i->second;
       }
+    // For quantifiers, allow AP-to-AP relabeling of bound variables.
+    // If a bound variable is replaced by something that is not an AP
+    // (e.g., a constant like tt() or ff()), drop it from the quantifier
+    // list.  If the quantifier becomes empty, return the body directly.
+    if (f.is(op::exists, op::forall))
+      {
+        unsigned last = f.size() - 1;
+        bool changed = false;
+        std::vector<formula> qvars;
+        qvars.reserve(last);
+        for (unsigned i = 0; i < last; ++i)
+          {
+            formula var = f[i];
+            auto j = m->find(var);
+            if (j != m->end())
+              {
+                formula repl = j->second;
+                if (repl && repl.is(op::ap))
+                  {
+                    if (repl != var)
+                      changed = true;
+                    qvars.push_back(repl);
+                  }
+                else
+                  {
+                    // Non-AP replacement: drop this variable.
+                    changed = true;
+                  }
+              }
+            else
+              {
+                qvars.push_back(var);
+              }
+          }
+        formula newbody = relabel_apply(f[last], m);
+        if (!changed && newbody == f[last])
+          return f;
+        if (qvars.empty())
+          return newbody;
+        return formula::quantify(f.is(op::exists) ? op::exists
+                                                  : op::forall,
+                                 std::move(qvars), newbody);
+      }
     // Since relabel_apply is overloaded, we should help the compiler
     // to understand we are talking about the current function...
     return f.map(static_cast<formula(*)(formula,
@@ -686,6 +729,46 @@ namespace spot
           return f;
         formula g = m[id];
         return g ? g : f;
+      }
+    // For quantifiers, allow AP-to-AP relabeling of bound variables.
+    // If a bound variable is replaced by something that is not an AP
+    // (e.g., a constant like tt() or ff()), drop it from the quantifier
+    // list.  If the quantifier becomes empty, return the body directly.
+    if (f.is(op::exists, op::forall))
+      {
+        unsigned last = f.size() - 1;
+        bool changed = false;
+        std::vector<formula> qvars;
+        qvars.reserve(last);
+        for (unsigned i = 0; i < last; ++i)
+          {
+            formula var = f[i];
+            unsigned id = var.apid();
+            formula repl = (id < m.size()) ? m[id] : formula{};
+            if (repl && repl.is(op::ap))
+              {
+                if (repl != var)
+                  changed = true;
+                qvars.push_back(repl);
+              }
+            else
+              {
+                // Not replaced, or replaced by a non-AP.
+                // Only keep the variable if it's not replaced.
+                if (!repl)
+                  qvars.push_back(var);
+                else
+                  changed = true;  // non-AP: drop this variable
+              }
+          }
+        formula newbody = relabel_apply(f[last], m);
+        if (!changed && newbody == f[last])
+          return f;
+        if (qvars.empty())
+          return newbody;
+        return formula::quantify(f.is(op::exists) ? op::exists
+                                                  : op::forall,
+                                 std::move(qvars), newbody);
       }
     // Since relabel_apply is overloaded, we should help the compiler
     // to understand we are talking about the current function...

@@ -511,22 +511,31 @@ namespace spot
             // variables than output variable.  See issue #529 for
             // some examples.
             spot::collect_apids_with_polarities(f, polarities);
-            unsigned sz = polarities.size();
-            for (unsigned apid = 0; apid < sz; ++apid)
-              {
-                unsigned char pol = polarities[apid];
-                if (pol == 0b00 || pol == 0b11)
-                  continue;
-                bool neg = pol & 0b01;
-                formula ap = formula::ap_from_apid(apid);
-                bool is_input =
-                  (data_->ins_or_outs.contains(ap))
-                  == data_->is_inputs;
-                formula to = (is_input == neg)
-                  ? spot::formula::tt() : spot::formula::ff();
-                add_to_mapping(ap, is_input, to);
-                rm_has_new_terms = true;
-              }
+            {
+              std::vector<unsigned char> quantified;
+              spot::collect_quantified_apids(f, quantified);
+              unsigned sz = polarities.size();
+              for (unsigned apid = 0; apid < sz; ++apid)
+                {
+                  unsigned char pol = polarities[apid];
+                  if (pol == 0b00 || pol == 0b11)
+                    continue;
+                  bool neg = pol & 0b01;
+                  formula ap = formula::ap_from_apid(apid);
+                  // Quantified APs are not free variables: treat
+                  // ∃-quantified as outputs (favorable choice) and
+                  // ∀-quantified as inputs (adversarial choice).
+                  unsigned char q = quantified[apid];
+                  bool is_input =
+                    q ? (q & 2)  // 2 = ∀, 1 = ∃
+                      : (data_->ins_or_outs.contains(ap))
+                         == data_->is_inputs;
+                  formula to = (is_input == neg)
+                    ? spot::formula::tt() : spot::formula::ff();
+                  add_to_mapping(ap, is_input, to);
+                  rm_has_new_terms = true;
+                }
+            }
             if (rm_has_new_terms)
               {
                 f = spot::relabel_apply(f, rm);
@@ -537,20 +546,40 @@ namespace spot
           }
         if (options & global_equiv)
           {
-            // check for equivalent terms
+            // check for equivalent terms.
+            // Quantified APs are included in the equivalence clusters,
+            // but they should not be relabeled or used as
+            // representative, because their binding scope makes
+            // replacement unsound.  Unquantified APs in the set can
+            // still be simplified among themselves.
+            std::vector<unsigned char> quantified;
+            spot::collect_quantified_apids(f, quantified);
             spot::formula_ptr_less_than_bool_first cmp;
             for (std::vector<spot::formula>& equiv:
                    spot::collect_equivalent_literals(f))
               {
-                // For each set of equivalent literals, we want to
-                // pick a representative.  That representative
-                // should be an input if one of the literal is an
-                // input.  (If we have two inputs or more, the
-                // formula is not realizable.)
+                // Exclude quantified APs: they carry binding-scope
+                // information and cannot be freely renamed.
+                std::vector<spot::formula> free_equiv;
+                for (spot::formula lit: equiv)
+                  {
+                    spot::formula ap = lit;
+                    if (ap.is(spot::op::Not))
+                      ap = ap[0];
+                    if (!quantified[ap.apid()])
+                      free_equiv.push_back(lit);
+                  }
+                if (free_equiv.size() < 2)
+                  continue;
+                // For each set of equivalent (free) literals, we
+                // want to pick a representative.  That
+                // representative should be an input if one of the
+                // literal is an input.  (If we have two inputs or
+                // more, the formula is not realizable.)
                 spot::formula repr = nullptr;
                 bool repr_is_input = false;
                 spot::formula input_seen = nullptr;
-                for (spot::formula lit: equiv)
+                for (spot::formula lit: free_equiv)
                   {
                     spot::formula ap = lit;
                     if (ap.is(spot::op::Not))
@@ -603,11 +632,11 @@ namespace spot
                 // now map equivalent each atomic proposition to the
                 // representative
                 spot::formula not_repr = spot::formula::Not(repr);
-                for (spot::formula lit: equiv)
+                for (spot::formula lit: free_equiv)
                   {
                     // input or representative are not removed
-                    // (we have repr != input_seen either when input_seen
-                    // is nullptr, or if want_game is true)
+                    // (we have repr != input_seen either when
+                    // input_seen is nullptr, or if want_game is true)
                     if (lit == repr || lit == input_seen)
                       continue;
                     SPOT_ASSUME(lit != nullptr);

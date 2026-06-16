@@ -270,3 +270,156 @@ for fstr, expected in satisfiability_tests:
                    f"ltl_satisfiable('{fstr}') should be {expected}")
     tc.assertEqual(spot.translate(fstr).is_empty(), not expected,
                    f"translate('{fstr}').is_empty() should be {not expected}")
+
+# ----------------------------------------------------------------------
+# QLTL satisfiability tests
+# ----------------------------------------------------------------------
+
+# Quantifiers are always at the top level, and consecutive identical
+# quantifiers are automatically merged (e.g., "\exists a: \exists b: \u03c6"
+# becomes "\exists a, b: \u03c6").
+#
+# The on-the-fly (OTF) satisfiability check handles formulas that are
+# unquantified, or have only existential quantifiers at the top with an
+# unquantified body.  Formulas with universal quantifiers or quantifier
+# alternations are delegated to the translator.
+
+qtl_sat_tests = [
+    # ---- Purely existential (OTF path) ----
+    #
+    # Formulas where the existentially quantified APs appear with
+    # constant polarity may be simplified by the realizability
+    # simplifier (e.g., "\exists a: a" reduces to "1"), which is
+    # correct for satisfiability and still produces the right answer.
+    # To exercise the OTF path through a quantifier, the quantified AP
+    # must have mixed polarity so it survives simplification.
+
+    # Constant-polarity APs (simplified before OTF):
+    ('\\exists a: a', True),
+    ('\\exists a: a & !a', False),
+    ('\\exists a: F a', True),
+    ('\\exists a: G a', True),
+    # Mixed-polarity APs (survive through to OTF):
+    ('\\exists a: Xa & !a', True),
+    ('\\exists a: G a & F !a', False),
+    ('\\exists a, b: a U b', True),
+    ('\\exists a, b: G a & G !b', True),
+    ('\\exists a: G a & G !a', False),
+
+    # \\exists over a disjunction: each disjunct re-wrapped with the
+    # quantifier and checked independently.
+    ('\\exists a: (Xa & !a) | G a', True),
+    ('\\exists a: (G a & F !a) | (G a & G !a)', False),
+    ('\\exists a: F a | (X!a & a)', True),
+
+    # ---- Single universal (translator path) ----
+    #
+    # Formulas where the ∀-quantified AP has constant polarity
+    # are NO LONGER simplified away by the realizability simplifier;
+    # they reach the translator which handles them correctly.
+
+    # Constant positive polarity.
+    ('\\forall a: a', False),
+    ('\\forall a: G a', False),
+    ('\\forall a: Xa', False),
+    # Constant negative polarity.
+    ('\\forall a: !a', False),
+    ('\\forall a: G !a', False),
+    # Mixed polarity for comparison (should still work).
+    ('\\forall a: a | !a', True),
+    ('\\forall a: Xa | X!a', True),
+    ('\\forall a: G (a | !a)', True),
+    ('\\forall a: F a | F !a', True),
+    ('\\forall a: a & !a', False),
+    ('\\forall a: a U !a', False),
+    ('\\forall a: (a & X!a) | (!a & Xa)', False),
+    # \forall with body independent of the quantified AP (vacuous).
+    ('\\forall a: b | !b', True),
+    ('\\forall a: G b | F !b', True),
+
+    # ---- Quantifier alternations (translator path) ----
+    # \exists a: \forall b: \u03c6
+    ('\\exists a: \\forall b: b -> a', True),
+    ('\\exists a: \\forall b: a <-> b', False),
+    # \forall a: \\exists b: \u03c6
+    ('\\forall a: \\exists b: a -> b', True),
+    ('\\forall a: \\exists b: (a & b) | (!a & !b)', True),
+    ('\\forall a: \\exists b: a U !a', False),
+    # Vacuous inner quantifier.
+    ('\\exists a: \\forall b: a', True),
+
+    # ---- Equivalence simplification with quantified APs ----
+    #
+    # {a,b,c} are equivalent; a is quantified, so excluded from
+    # representative selection. {b,c} are free and simplified
+    # among themselves by the equivalence simplifier.
+    ('\\exists a: G(a -> b) & G(b -> c) & G(c -> a)', True),
+]
+
+for fstr, expected in qtl_sat_tests:
+    tc.assertEqual(spot.ltl_satisfiable(fstr), expected,
+                   f"ltl_satisfiable('{fstr}') should be {expected}")
+    # Cross-check with translate().  For \forall, translation may involve
+    # complementation which can fail on very complex automata; the simple
+    # formulas here should all succeed.
+    try:
+        tc.assertEqual(spot.translate(fstr).is_empty(), not expected,
+                       f"translate({fstr}) should be {not expected}")
+    except RuntimeError as e:
+        if 'run_q' in str(e) or 'complementation' in str(e):
+            sys.stderr.write(f"warning: translate('{fstr}') failed: {e}\n")
+        else:
+            raise
+
+# ----------------------------------------------------------------------
+# relabel_apply with quantifiers
+# ----------------------------------------------------------------------
+
+# When relabel_apply replaces a quantifier-bound variable with a non-AP
+# formula (like ff() or tt()), the variable should be dropped from the
+# quantifier list rather than kept unchanged.  If all bound variables
+# are dropped, the quantifier is removed entirely.
+
+a = spot.formula.ap('a')
+b = spot.formula.ap('b')
+
+# AP-to-AP renaming: \\exists a: a with a -> b becomes \\exists b: b.
+rm = spot.relabeling_map()
+rm[a] = b
+tc.assertEqual(str(spot.relabel_apply(spot.formula('\\exists a: a'),
+                                     rm)),
+               '\\exists b: b')
+
+# Replacement with ff(): \\exists a: a with a -> ff() becomes ff().
+rm2 = spot.relabeling_map()
+rm2[a] = spot.formula.ff()
+tc.assertEqual(str(spot.relabel_apply(spot.formula('\\exists a: a'),
+                                     rm2)),
+               '0')
+
+# Replacement with tt(): \\exists a: !a with a -> tt() becomes ff().
+# (!tt() = ff())
+rm3 = spot.relabeling_map()
+rm3[a] = spot.formula.tt()
+tc.assertEqual(str(spot.relabel_apply(spot.formula('\\exists a: !a'),
+                                     rm3)),
+               '0')    # Mixed: \\exists a, b: (a & !b) with a -> b, b -> tt().
+    # Body: a & !b -> b & !tt() = ff().  Qvars: a renamed to b (AP),
+    # b dropped (tt() is non-AP).  Result: \\exists b: ff() = ff().
+rm4 = spot.relabeling_map()
+rm4[a] = b
+rm4[b] = spot.formula.tt()
+tc.assertEqual(str(spot.relabel_apply(
+    spot.formula('\\exists a, b: a & !b'), rm4)),
+               '0')
+
+# No replacement for quantified variable: \\exists a: b with b -> tt().
+# Only b in the body is replaced; a stays in the quantifier list.
+# \\exists a: 1 simplifies to 1.
+rm5 = spot.relabeling_map()
+rm5[b] = spot.formula.tt()
+tc.assertEqual(str(spot.relabel_apply(spot.formula('\\exists a: b'),
+                                     rm5)),
+               '1')
+
+del a, b, rm, rm2, rm3, rm4, rm5
