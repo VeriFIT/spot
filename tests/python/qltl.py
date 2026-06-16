@@ -160,49 +160,26 @@ a3b = spot.ltlf_to_mtdfa(f3, dict=d)
 tc.assertFalse(a2b.is_empty())
 tc.assertFalse(a3b.is_empty())  # unlike in LTL!
 
-# Tests for spot::translator with quantified LTL (i.e., the new
-# run_q() support added in Spot 2.15).  These formulas are translated
-# via spot.translate() rather than obligation_to_mtdswa(), exercising
-# the ltl_to_tgba_fm path for ∃ and the complement trick for ∀.
-#
-# We compare against equivalent quantifier-free formulas; in each case
-# normalize_quantifiers() does not trivially eliminate the quantifier,
-# confirming that run_q() is actually exercised.
 
-def check_translate_equiv(f1_str, f2_str):
-    """Assert spot.translate(f1) is language-equivalent to
-    spot.translate(f2)."""
+
+# Test for support of QLTL in two flavors of are_equivalent()
+
+simp = spot.tl_simplifier()
+def check_formula_equiv(f1_str, f2_str):
+    """Assert both spot.are_equivalent(f1,f2) and
+    tl_simplifier.are_equivalent(f1,f2) hold."""
     f1 = spot.formula(f1_str)
     f2 = spot.formula(f2_str)
-    a1 = spot.translate(f1)
-    a2 = spot.translate(f2)
-    tc.assertTrue(spot.are_equivalent(a1, a2),
-                  f"translate({f1_str!r}) not equiv to {f2_str!r}"
-                  f" ({a1.num_states()}s/{a1.num_edges()}e vs"
-                  f" {a2.num_states()}s/{a2.num_edges()}e)")
+    tc.assertTrue(spot.are_equivalent(f1, f2),
+                  f"spot.are_equivalent({f1_str!r}, {f2_str!r}) failed")
+    tc.assertTrue(simp.are_equivalent(f1, f2),
+                  f"simp.are_equivalent({f1_str!r}, {f2_str!r}) failed")
 
-# ∃s with alternating clock: b must hold at all odd positions.
-# This is equivalent to the PSL formula {[*2][*]}[]->b.
-check_translate_equiv("\\exists s: (!s) & G(s <-> X!s) & G(s -> b)",
-                      "{[*2][*]}[]->b")
-
-# ∃ over OR: ∃a: (a & Xb) | (!a & Xc)  ≡  X(b | c)
-check_translate_equiv("\\exists a: (a & X(b)) | (!a & X(c))", "X(b | c)")
-
-# ∀ over AND: ∀a: (a | Xb) & (!a | Xc)  ≡  X(b & c)
-check_translate_equiv("\\forall a: (a | X(b)) & (!a | X(c))", "X(b & c)")
-
-# Nested quantifiers: ∀a:∃b: G(a|b)  ≡  1
-# (for any a, choose b = !a to make G(a|!a) = G(true) = true)
-check_translate_equiv("\\forall a: \\exists b: G(a | b)", "1")
-
-# Nested with non-trivial body that survives simplification.
-# ∀a:∃b: (G(a) <-> F(b))  ≡  1
-check_translate_equiv("\\forall a: \\exists b: (G(a) <-> F(b))", "1")
-
-# ¬∀ = ∃¬: ∀a:∀b: (G(a) <-> F(b))  ≡  0
-check_translate_equiv("\\forall a: \\exists b: (G(a) <-> F(b))", "0")
-
-# Single ∀ with complement: ∀a: X(a) <-> X(b)  ≡  0
-# (requires X(b) to be both true and false)
-check_translate_equiv("\\forall a: X(a) <-> X(b)", "0")
+check_formula_equiv("\\exists s: (!s) & G(s <-> X!s) & G(s -> b)",
+                    "{[*2][*]}[]->b")
+check_formula_equiv("\\exists a: (a & X(b)) | (!a & X(c))", "X(b | c)")
+check_formula_equiv("\\forall a: (a | X(b)) & (!a | X(c))", "X(b & c)")
+check_formula_equiv("\\forall a: \\exists b: G(a | b)", "1")
+check_formula_equiv("\\forall a: \\exists b: (G(a) <-> F(b))", "1")
+check_formula_equiv("\\forall a: \\forall b: (G(a) <-> F(b))", "0")
+check_formula_equiv("\\forall a: X(a) <-> X(b)", "0")

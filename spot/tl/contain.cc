@@ -23,6 +23,7 @@
 #include <spot/twaalgos/are_isomorphic.hh>
 #include <spot/priv/robin_hood.hh>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
+#include <spot/twaalgos/translate.hh>
 
 namespace spot
 {
@@ -157,9 +158,31 @@ namespace spot
     if (i != translated_->end())
       return &i->second;
 
-    auto e = ltl_to_tgba_fm(f, dict_, exprop_, symb_merge_,
-                            branching_postponement_, fair_loop_approx_,
-                            nullptr, nullptr, false, aborter_.get());
-    return &translated_->emplace(f, std::move(e)).first->second;
+    const_twa_graph_ptr aut;
+    if (f.is_quantified())
+      {
+        // Use the full translator (which handles quantifiers via
+        // run_q()) rather than ltl_to_tgba_fm.  We create a fresh
+        // translator per call; this is fine because
+        // register_formula_() already caches results per formula.
+        //
+        // Use Low optimization level to avoid containment checks
+        // in the simplifier, which could recursively call back into
+        // register_formula_() with negated (and possibly universally
+        // quantified) formulas.
+        //
+        // Note: the translator does not support output_aborter,
+        // so max_states is not enforced for quantified formulas.
+        translator trans(dict_);
+        trans.set_level(postprocessor::Low);
+        aut = trans.run(f);
+      }
+    else
+      {
+        aut = ltl_to_tgba_fm(f, dict_, exprop_, symb_merge_,
+                              branching_postponement_, fair_loop_approx_,
+                              nullptr, nullptr, false, aborter_.get());
+      }
+    return &translated_->emplace(f, std::move(aut)).first->second;
   }
 }

@@ -17,12 +17,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
+#include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/contains.hh>
 #include <spot/twaalgos/forq_contains.hh>
-#include <spot/twaalgos/complement.hh>
-#include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/isdet.hh>
+#include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/product.hh>
+#include <spot/twaalgos/translate.hh>
 
 namespace spot
 {
@@ -31,6 +32,24 @@ namespace spot
     static spot::const_twa_graph_ptr
     translate(formula f, const bdd_dict_ptr& dict)
     {
+      if (f.is_quantified())
+        {
+          // Use the full translator (which handles quantifiers via
+          // run_q()) rather than ltl_to_tgba_fm.  We create a fresh
+          // translator per call; this is fine because
+          // register_formula_() already caches results per formula.
+          //
+          // Use Low optimization level to avoid containment checks
+          // in the simplifier, which could recursively call back into
+          // register_formula_() with negated (and possibly universally
+          // quantified) formulas.
+          //
+          // Note: the translator does not support output_aborter,
+          // so max_states is not enforced for quantified formulas.
+          translator trans(dict);
+          trans.set_level(postprocessor::Low);
+          return trans.run(f);
+        }
       return ltl_to_tgba_fm(f, dict);
     }
 
