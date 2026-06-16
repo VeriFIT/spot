@@ -23,6 +23,9 @@
 
 namespace spot
 {
+  struct mtdswa;
+  typedef std::shared_ptr<mtdswa> mtdswa_ptr;
+
   /// \ingroup twa_ltl
   /// \brief Translate an LTL formula into an optimized \ref twa_graph.
   ///
@@ -152,6 +155,14 @@ namespace spot
     void build_simplifier(const bdd_dict_ptr& dict);
     /// \brief Run translation on a formula.
     twa_graph_ptr run_aux(formula f);
+    /// \brief Run translation on a quantified formula.
+    twa_graph_ptr run_q(formula f);
+    /// \brief Finalize the result of obligation_to_mtdswa().
+    twa_graph_ptr finish_obligation_mtdswa(formula f, mtdswa_ptr mtdwa);
+    /// \brief Translate a formula via ltl_to_tgba_fm and branching post.
+    twa_graph_ptr translate_via_fm(formula f, bool unambiguous);
+    /// \brief Prepend \a n leading X states before the initial state.
+    static void add_leading_x(twa_graph_ptr& aut, unsigned n);
 
   private:
     tl_simplifier* simpl_;

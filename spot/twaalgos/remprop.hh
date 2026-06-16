@@ -35,6 +35,9 @@ namespace spot
     /// \brief Register atomic propositions from a comma-separated list.
     void add_ap(const char* ap_csv);
 
+    /// \brief Register a single atomic proposition given as a formula.
+    void add_ap(formula ap);
+
     /// \brief Whether no atomic propositions are registered.
     bool empty() const
     {

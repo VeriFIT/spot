@@ -19,6 +19,7 @@
 #include "config.h"
 #include <spot/twaalgos/translate.hh>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
+#include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/compsusp.hh>
 #include <spot/misc/optionmap.hh>
 #include <spot/tl/relabel.hh>
@@ -148,6 +149,25 @@ namespace spot
 
     twa_graph_ptr aut;
     twa_graph_ptr aut2 = nullptr;
+
+    // Handle quantified formulas.
+    if (r.is_quantified())
+      {
+        // gf_guarantee_to_ba_maybe and compsusp are skipped for
+        // quantified formulas.
+        bool det = unambiguous || (pref_ & postprocessor::Deterministic);
+        if (det && new_oblig_ == 1
+            && r.is_syntactic_obligation()
+            && r.is_ltl_formula())
+          {
+            mtdswa_ptr mtdwa = obligation_to_mtdswa(r, simpl_->get_dict());
+            return finish_obligation_mtdswa(r, mtdwa);
+          }
+
+        aut = run_q(r);
+        aut = this->postprocessor::run(aut, r);
+        return aut;
+      }
 
     bool split_hard =
       type_ == Generic || (type_ & Parity) || type_ == GeneralizedBuchi;
@@ -380,21 +400,7 @@ namespace spot
             //  }
           }
         if (leading_x > 0)
-          {
-            unsigned init = aut->get_init_state_number();
-            do
-              {
-                unsigned tmp = aut->new_state();
-                aut->new_edge(tmp, init, bddtrue);
-                init = tmp;
-              }
-            while (--leading_x);
-            aut->set_init_state(init);
-            // Adding initial edges is very likely to kill stutter
-            // invariance (and it certainly cannot fix it).
-            if (aut->prop_stutter_invariant().is_true())
-              aut->prop_stutter_invariant(trival::maybe());
-          }
+          add_leading_x(aut, leading_x);
       }
     else
       {
@@ -438,85 +444,11 @@ namespace spot
             && r.is_ltl_formula()) // does not support PSL at that point
           {
             mtdswa_ptr mtdwa = obligation_to_mtdswa(r, simpl_->get_dict());
-            if (wdba_minimize_ != 0)
-              {
-                mtdwa->sinks_as_states();
-                std::vector<unsigned> part = loding_weak_ranking(mtdwa, true);
-                mtdwa = minimize_mtdswa(mtdwa, part);
-              }
-            // The output of obligation_to_mtdswa is always Büchi.  Since
-            // the automaton is complete and weak, we can obtain CoBüchi
-            // simply by flipping the colors.
-            if (type_ == CoBuchi)
-              {
-                acc_cond::mark_t good = {};
-                acc_cond::mark_t bad = {0};
-                for (auto& c: mtdwa->colors)
-                  c = mtdwa->acc.accepting(c) ? good : bad;
-                mtdwa->acc = acc_cond(1, acc_cond::acc_code::cobuchi());
-              }
-            bool want_complete = pref_ & Complete;
-            aut = mtdwa->as_twa(true, false, want_complete);
-            aut->prop_weak(true);
-
-            if (r.is_syntactic_stutter_invariant())
-              aut->prop_stutter_invariant(true);
-
-            // Unless we need a Büchi or colored automaton, if the
-            // weak automaton has all its edges marked as accepting,
-            // we can reduce the acceptance to t.
-            if (type_ != Buchi && type_ != CoBuchi && aut->num_sets() > 0)
-              {
-                acc_cond::mark_t c = {};
-                // If the automaton has no edge, we are good to reduce
-                // the acceptance to t.
-                bool good = true;
-
-                for (auto& e: aut->edges()) // pick first colors
-                  {
-                    c = e.acc;
-                    good = false; // don't reduce to t
-                    break;
-                  }
-                // unless all edges are accepting.
-                if (aut->acc().accepting(c))
-                  {
-                    good = true;
-                    // check that all edges have the same colors
-                    for (auto& e: aut->edges())
-                      if (e.acc != c)
-                        {
-                          good = false;
-                          break;
-                        }
-                  }
-                if (good)
-                  strip_acceptance_here(aut);
-              }
-            return finalize(aut);
+            return finish_obligation_mtdswa(r, mtdwa);
           }
         else
           {
-            bool exprop = unambiguous
-              || (level_ == postprocessor::High && exprop_ != 0)
-              || exprop_ > 0;
-            // branch-post: 1 == force branching postponement
-            //              0 == disable branching post. and delay_branching
-            //              2 == force delay_branching
-            //             -1 == auto (delay_branching)
-            // Some quick experiments suggests that branching postponement
-            // can produce larger automata on non-obligations formulas, and
-            // that even on obligation formulas, delay_branching is faster.
-            bool bpost = branchpost_ == 1;
-            aut = ltl_to_tgba_fm(r, simpl_->get_dict(), exprop,
-                                 true, bpost, false, nullptr, nullptr,
-                                 unambiguous,
-                                 nullptr, false, type_ == Finite);
-            if (!bpost && branchpost_ != 0 && delay_branching_here(aut))
-              {
-                aut->purge_unreachable_states();
-                aut->merge_edges();
-              }
+            aut = translate_via_fm(r, unambiguous);
           }
       }
     if (!postprocess_was_done)
@@ -535,6 +467,329 @@ namespace spot
       }
 
     return aut;
+  }
+
+  twa_graph_ptr translator::run_q(formula f)
+  {
+    // Base case: no quantifier.
+    // We don't force unambiguous output for intermediate translations;
+    // postprocessing at the end will take care of that if requested.
+    if (!f.is(op::exists, op::forall))
+      return translate_via_fm(f, false);
+
+    op qtype = f.kind();
+    unsigned sz = f.size();
+    formula body = f[sz - 1];
+
+    // Collect quantified APs.
+    std::vector<formula> qaps;
+    for (unsigned i = 0; i < sz - 1; ++i)
+      qaps.push_back(f[i]);
+
+    bool nested = body.is(op::exists, op::forall);
+
+    if (nested)
+      {
+        // Recursively translate the body.
+        auto aut = run_q(body);
+
+        // Apply the current quantifier on top.
+        remove_ap ra;
+        for (auto& ap: qaps)
+          ra.add_ap(ap);
+
+        if (qtype == op::exists)
+          return ra.strip(aut);
+        else
+          {
+            aut = complement(aut);
+            if (SPOT_UNLIKELY(!aut))
+              throw std::runtime_error(
+                "run_q(): complementation failed for nested forall");
+            aut = ra.strip(aut);
+            auto result = complement(aut);
+            if (SPOT_UNLIKELY(!result))
+              throw std::runtime_error(
+                "run_q(): second complementation failed for nested forall");
+            return result;
+          }
+      }
+
+    // Single quantifier: body has no quantifiers.
+    // Try restricted splitting.
+    op split_op = (qtype == op::exists) ? op::Or : op::And;
+    bool split_hard = type_ == Generic || (type_ & Parity)
+                      || type_ == GeneralizedBuchi;
+
+    // Remember the original formula in case splitting is skipped.
+    formula orig_f = f;
+
+    if (ltl_split_ && !body.is_syntactic_obligation())
+      {
+        formula r2 = body;
+        unsigned leading_x = 0;
+        while (r2.is(op::X))
+          {
+            r2 = r2[0];
+            ++leading_x;
+          }
+
+        // Handle F(Or) / G(And) patterns based on quantifier type.
+        if (split_hard)
+          {
+            bool want_pattern = false;
+            if (qtype == op::exists)
+              want_pattern = r2.is({op::F, op::Or})
+                             && type_ != GeneralizedBuchi;
+            else
+              want_pattern = r2.is({op::G, op::And});
+
+            if (want_pattern)
+              {
+                std::vector<formula> susp;
+                std::vector<formula> rest;
+                auto op1 = r2.kind();
+                auto op2 = r2[0].kind();
+                bool want_u = (qtype == op::exists);
+
+                for (formula child: r2[0])
+                  {
+                    bool u = child.is_universal();
+                    bool e = child.is_eventual();
+                    if (u && e)
+                      susp.push_back(child);
+                    else if ((want_u && u) || (!want_u && e))
+                      susp.push_back(formula::unop(op1, child));
+                    else
+                      rest.push_back(child);
+                  }
+                susp.push_back(formula::unop(op1,
+                               formula::multop(op2, rest)));
+                r2 = formula::multop(op2, susp);
+                // Update orig_f to use the transformed body.
+                orig_f = formula::quantify(qtype, qaps, r2);
+              }
+          }
+
+        // Top-level splitting on the allowed operator.
+        if (!r2.is_syntactic_obligation() && r2.is(split_op))
+          {
+            op topop = r2.kind();
+            std::vector<formula> oblg;
+            std::vector<formula> susp;
+            std::vector<formula> rest;
+            bool want_g = type_ == GeneralizedBuchi || type_ == Buchi;
+            for (formula child: r2)
+              {
+                if (child.is_syntactic_obligation())
+                  oblg.push_back(child);
+                else if (child.is_eventual() && child.is_universal()
+                         && (!want_g || child.is(op::G)))
+                  susp.push_back(child);
+                else
+                  rest.push_back(child);
+              }
+
+            if (!rest.empty() && !oblg.empty())
+              {
+                auto safety = [](formula g)
+                  {
+                    SPOT_ASSUME(g != nullptr);
+                    return g.is_syntactic_safety();
+                  };
+                auto i = std::remove_if(oblg.begin(), oblg.end(), safety);
+                rest.insert(rest.end(), i, oblg.end());
+                oblg.erase(i, oblg.end());
+              }
+
+            if (!susp.empty())
+              {
+                if (!rest.empty() && !split_hard)
+                  {
+                    rest.insert(rest.end(), susp.begin(), susp.end());
+                    susp.clear();
+                  }
+              }
+
+            if (susp.empty()
+                && (type_ == GeneralizedBuchi || type_ == Buchi))
+              goto no_split_q;
+
+            // Translate each piece re-wrapped with the quantifier.
+            auto transrun = [&](formula g)
+              {
+                return run_q(formula::quantify(qtype, qaps, g));
+              };
+
+            twa_graph_ptr aut = nullptr;
+
+            if (!oblg.empty())
+              {
+                formula oblg_f = formula::multop(r2.kind(), oblg);
+                aut = transrun(oblg_f);
+              }
+            if (!rest.empty())
+              {
+                formula rest_f = formula::multop(r2.kind(), rest);
+                twa_graph_ptr rest_aut = transrun(rest_f);
+                if (aut == nullptr)
+                  aut = rest_aut;
+                else if (topop == op::And)
+                  aut = product(aut, rest_aut);
+                else // Or
+                  aut = product_or(aut, rest_aut);
+              }
+            if (!susp.empty())
+              {
+                twa_graph_ptr susp_aut = nullptr;
+                for (formula g: susp)
+                  {
+                    twa_graph_ptr one = transrun(g);
+                    if (!susp_aut)
+                      susp_aut = one;
+                    else if (topop == op::And)
+                      susp_aut = product(susp_aut, one);
+                    else
+                      susp_aut = product_or(susp_aut, one);
+                  }
+                if (susp_aut->prop_universal().is_true())
+                  {
+                    scc_info si(susp_aut, scc_info_options::NONE);
+                    if (si.is_trivial(
+                          si.scc_of(susp_aut->get_init_state_number())))
+                      {
+                        unsigned st = si.one_state_of(0);
+                        assert(!si.is_trivial(0) ||
+                               susp_aut->out(st).begin()
+                               == susp_aut->out(st).end());
+                        susp_aut->set_init_state(st);
+                        susp_aut->purge_unreachable_states();
+                      }
+                  }
+                if (aut == nullptr)
+                  aut = susp_aut;
+                else if (topop == op::And)
+                  aut = product_susp(aut, susp_aut);
+                else
+                  aut = product_or_susp(aut, susp_aut);
+              }
+
+            if (leading_x > 0)
+              add_leading_x(aut, leading_x);
+
+            return aut;
+          }
+      }
+
+  no_split_q:
+    if (qtype == op::exists)
+      return translate_via_fm(orig_f, false);
+    else
+      {
+        // forall: translate exists(aps, Not(body)) then complement.
+        formula b = orig_f[orig_f.size() - 1];
+        formula neg_body = formula::Not(b);
+        formula ef = formula::quantify(op::exists, qaps, neg_body);
+        auto aut = translate_via_fm(ef, false);
+        auto result = complement(aut);
+        if (SPOT_UNLIKELY(!result))
+          throw std::runtime_error(
+            "run_q(): complementation failed during forall translation");
+        return result;
+      }
+  }
+
+  twa_graph_ptr translator::finish_obligation_mtdswa(formula f,
+                                                      mtdswa_ptr mtdwa)
+  {
+    if (wdba_minimize_ != 0)
+      {
+        mtdwa->sinks_as_states();
+        std::vector<unsigned> part = loding_weak_ranking(mtdwa, true);
+        mtdwa = minimize_mtdswa(mtdwa, part);
+      }
+    // The output of obligation_to_mtdswa is always B\u00fcchi.
+    // Since the automaton is complete and weak, we can obtain
+    // CoB\u00fcchi simply by flipping the colors.
+    if (type_ == CoBuchi)
+      {
+        acc_cond::mark_t good = {};
+        acc_cond::mark_t bad = {0};
+        for (auto& c: mtdwa->colors)
+          c = mtdwa->acc.accepting(c) ? good : bad;
+        mtdwa->acc = acc_cond(1, acc_cond::acc_code::cobuchi());
+      }
+    bool want_complete = pref_ & Complete;
+    auto aut = mtdwa->as_twa(true, false, want_complete);
+    aut->prop_weak(true);
+
+    if (f.is_syntactic_stutter_invariant())
+      aut->prop_stutter_invariant(true);
+
+    // Unless we need a B\u00fcchi or colored automaton, if the
+    // weak automaton has all its edges marked as accepting,
+    // we can reduce the acceptance to t.
+    if (type_ != Buchi && type_ != CoBuchi && aut->num_sets() > 0)
+      {
+        acc_cond::mark_t c = {};
+        // If the automaton has no edge, we are good to reduce
+        // the acceptance to t.
+        bool good = true;
+        for (auto& e: aut->edges())
+          {
+            c = e.acc;
+            good = false;
+            break;
+          }
+        if (aut->acc().accepting(c))
+          {
+            good = true;
+            for (auto& e: aut->edges())
+              if (e.acc != c)
+                {
+                  good = false;
+                  break;
+                }
+          }
+        if (good)
+          strip_acceptance_here(aut);
+      }
+    return finalize(aut);
+  }
+
+  twa_graph_ptr translator::translate_via_fm(formula f, bool unambiguous)
+  {
+    bool exprop = unambiguous
+      || (level_ == postprocessor::High && exprop_ != 0)
+      || exprop_ > 0;
+    bool bpost = branchpost_ == 1;
+    auto a = ltl_to_tgba_fm(f, simpl_->get_dict(), exprop,
+                            true, bpost, false, nullptr, nullptr,
+                            unambiguous,
+                            nullptr, false, type_ == Finite);
+    if (!bpost && branchpost_ != 0 && delay_branching_here(a))
+      {
+        a->purge_unreachable_states();
+        a->merge_edges();
+      }
+    return a;
+  }
+
+  void translator::add_leading_x(twa_graph_ptr& aut, unsigned n)
+  {
+    unsigned init = aut->get_init_state_number();
+    do
+      {
+        unsigned tmp = aut->new_state();
+        aut->new_edge(tmp, init, bddtrue);
+        init = tmp;
+      }
+    while (--n);
+    aut->set_init_state(init);
+    // Adding initial edges is very likely to kill stutter
+    // invariance (and it certainly cannot fix it).
+    if (aut->prop_stutter_invariant().is_true())
+      aut->prop_stutter_invariant(trival::maybe());
   }
 
   twa_graph_ptr translator::run(formula* f)

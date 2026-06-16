@@ -43,6 +43,11 @@ namespace spot
   }
 
 
+  void remove_ap::add_ap(formula ap)
+  {
+    props_exist.insert(ap);
+  }
+
   void remove_ap::add_ap(const char* arg)
   {
     auto start = arg;

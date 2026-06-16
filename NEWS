@@ -45,6 +45,13 @@ New in spot 2.15.1.dev  (not yet released)
 
   Library:
 
+  - the spot::translator class learned to deal with quantified LTL
+    with arbitrary nesting of quantifiers at the top-level.  Those
+    quantifications are easier to deal with in the
+    syntactic-obligation fragment; in the general case only a single
+    \exists operator can be handled efficiently, and other situations
+    involve complementing automata.
+
   - spot::lasso_enumerator is a new class that lazily enumerates all
     lasso-shaped accepted runs and words of an ω-automaton, within
     user-supplied bounds on stem and cycle lengths.  (Issue #642.)
