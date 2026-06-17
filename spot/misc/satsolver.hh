@@ -125,7 +125,12 @@ namespace spot
     /// Return code paired with a solution.
     typedef std::pair<int, solution> solution_pair;
 
-    /// \brief Return std::vector<solving_return_code, solution>.
+    /// \brief Return std::pair<solving_return_code, solution>.
+    ///
+    /// The return code is non-zero only if the SAT solver used was an
+    /// external tool that failed.  The solution is a vector of
+    /// Boolean, one per variable, or an empty vector if the problem
+    /// is UNSAT.
     solution_pair get_solution();
 
   private:  // methods
