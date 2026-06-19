@@ -518,6 +518,14 @@ do
   ltlsynt -f "Gi & Fo" --splittype="$splitt" --realizability && exit 2
 done
 
+# Issue #647: FULLYSYM split was missing environment completion edges,
+# causing unrealizable specifications to be erroneously declared
+# realizable when the DPA had states with incomplete input coverage.
+for splitt in expl semisym fullysym
+do
+  ltlsynt -f 'G(i0->Fo0)&G(!o0|!o1)&(i0 R!o0)&G((i0&Xi1)->XX(o0&o1))' \
+          --splittype="$splitt" --realizability && exit 2
+done
 
 cat >exp <<EOF
 REALIZABLE

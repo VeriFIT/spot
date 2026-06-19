@@ -1321,7 +1321,21 @@ namespace spot
 
 
 
-    unsigned sink_env = -1u;
+    // If a completion is demanded we might have to create sinks
+    unsigned sink_env = -1u;    // sink for environment
+    unsigned sink_con = -1u;    // sink for controller
+    auto get_sink_con_state =
+      [&split, &sink_con, &sink_env, um = unsat_mark]()
+      {
+        if (SPOT_UNLIKELY(sink_con == -1u))
+          {
+            sink_con = split->new_states(2);
+            sink_env = sink_con + 1;
+            split->new_edge(sink_con, sink_env, bddtrue, um);
+            split->new_edge(sink_env, sink_con, bddtrue, um);
+          }
+        return sink_con;
+      };
 
     if constexpr (FULLYSYM)
       {
@@ -1497,12 +1511,22 @@ namespace spot
                 auto state_range = bitVectDecodeRange(current_src_states.idx,
                                                       current_src_states.val);
                 for (auto it_s = state_range.begin(); (bool) it_s; ++it_s)
-                  // Loop over all edges
-                  for (const auto& [plystcond, incond] : it_cc->second.second)
-                    {
-                      const auto& [acolor, plyst] = playbdd2st[plystcond];
-                      split->new_edge(*it_s, plyst, incond, acolor);
-                    }
+                  {
+                    bdd uncovered = bddtrue;
+                    // Loop over all edges
+                    for (const auto& [plystcond, incond]
+                           : it_cc->second.second)
+                      {
+                        const auto& [acolor, plyst] =
+                          playbdd2st[plystcond];
+                        split->new_edge(*it_s, plyst, incond, acolor);
+                        if (complete_env)
+                          uncovered -= incond;
+                      }
+                    // Complete if necessary
+                    if (complete_env && uncovered != bddfalse)
+                      split->new_edge(*it_s, get_sink_con_state(), uncovered);
+                  }
               }
             else
               {
@@ -1524,24 +1548,6 @@ namespace spot
       }
     else
       {
-        // If a completion is demanded we might have to create sinks
-        // Sink controlled by player
-        unsigned sink_con = -1u;
-        auto get_sink_con_state = [&split, &sink_con, &sink_env,
-            um = unsat_mark, hu = has_unsat]
-            (bool create = true)
-          {
-            assert(hu);
-            if (SPOT_UNLIKELY((sink_con == -1u) && create))
-              {
-                sink_con = split->new_state();
-                sink_env = split->new_state();
-                split->new_edge(sink_con, sink_env, bddtrue, um);
-                split->new_edge(sink_env, sink_con, bddtrue, um);
-              }
-            return sink_con;
-          };
-
         // envstate -> edge number for current state
         auto s_edge_dict = std::unordered_map<unsigned, unsigned>();
 

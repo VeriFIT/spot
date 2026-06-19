@@ -135,6 +135,9 @@ New in spot 2.15.1.dev  (not yet released)
   - The condition to apply the trivial simplification
     f[*i..j][*k..l] = f[*ik..jl] was not capturing the cases where k=l.
 
+  - ltlsynt --splittype=fullsym had a bug that could cause unrealizable
+    specifications to be erroneously declared realizable.  (Issue #647.)
+
   Removed functions:
 
   - spot::is_bare_word() and spot::quote_unless_bare_word()
