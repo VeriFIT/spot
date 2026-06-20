@@ -237,4 +237,27 @@ namespace spot
   simplify_mealy_here(twa_graph_ptr& m, synthesis_info& si,
                       bool split_out);
   /// @}
+
+  /// \ingroup mealy
+  /// \brief Convert a terminating Mealy machine to a Büchi automaton
+  ///
+  /// In a terminating Mealy machine, termination is indicated by
+  /// self-loops on every state.  This function converts such a
+  /// machine to a Büchi automaton where an explicit output signal
+  /// (named \a signal_name) is added: it is true on all
+  /// non-terminating transitions, and becomes false on the
+  /// self-loop of an added accepting sink state.
+  ///
+  /// The resulting automaton has one more state than the input
+  /// (the accepting sink).  All transitions from the sink to
+  /// itself carry \c !signal_name and are marked with Büchi
+  /// acceptance, so an accepting run corresponds to a terminating
+  /// execution of the Mealy machine.
+  ///
+  /// \param mealy the terminating Mealy machine
+  /// \param signal_name the name of the terminating signal to add
+  /// \return a Büchi automaton with explicit termination signal
+  SPOT_API twa_graph_ptr
+  terminating_mealy_to_buchi(const const_twa_graph_ptr& mealy,
+                             const std::string& signal_name);
 }

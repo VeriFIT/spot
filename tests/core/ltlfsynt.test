@@ -175,3 +175,30 @@ for sem in Moore Mealy; do
   done
   done
 done
+
+# Test --verify on a subset of the parameter space.
+# Verification requires terminating semantics and the strategy
+# computed (no --realizability).  Unrealizable formulas still exit 1,
+# realizable ones are verified and exit 0.
+for sem in Moore Mealy; do
+  for tra in restr dfs bfs; do
+    for bp in nodes; do
+      ltlfsynt -F formulas.ltlf --trans=$tra --semantics=$sem \
+               --polarity=yes --global-equiv=yes --backprop=$bp \
+               --one-step=yes --simplify=yes --verify --terminating \
+               -H > out 2>err
+      test $? -le 1 || exit 2
+    done
+  done
+done
+
+# Also test AIG verification with --verify
+for sem in Mealy; do
+  for tra in dfs bfs; do
+    ltlfsynt -F formulas.ltlf --trans=$tra --semantics=$sem \
+             --polarity=yes --global-equiv=yes --backprop=nodes \
+             --one-step=yes --simplify=yes --verify --terminating \
+             --aiger > out 2>err
+    test $? -le 1 || exit 2
+  done
+done

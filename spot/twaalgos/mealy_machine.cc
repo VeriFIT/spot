@@ -4376,4 +4376,47 @@ namespace spot
         si.bv->sum_simpl_strat_edges += n_e_env;
       }
   }
+
+  twa_graph_ptr
+  terminating_mealy_to_buchi(const const_twa_graph_ptr& mealy,
+                             const std::string& signal_name)
+  {
+    bdd outputs = ensure_mealy("terminating_mealy_to_buchi", mealy);
+
+    auto dict = mealy->get_dict();
+    unsigned n_states = mealy->num_states();
+    unsigned sink_state = n_states;
+
+    // Create the result automaton and register the signal in its dict
+    auto res = make_twa_graph(dict);
+    res->copy_ap_of(mealy);
+    int sig_var = res->register_ap(signal_name);
+    bdd alive = bdd_ithvar(sig_var);
+    bdd nalive = bdd_nithvar(sig_var);
+    // Büchi acceptance: one set, Inf(0)
+    res->set_acceptance(1, acc_cond::acc_code::buchi());
+    res->new_states(n_states + 1);
+
+    // Copy non-self-loop edges (with their original acceptance),
+    // redirect self-loops to the sink
+    for (unsigned src = 0; src < n_states; ++src)
+      for (const auto& e : mealy->out(src))
+        {
+          bdd cond = e.cond & alive;
+          if (src != e.dst)
+            res->new_edge(src, e.dst, cond, e.acc);
+          else
+            res->new_edge(src, sink_state, cond, e.acc);
+        }
+
+    // Sink: self-loop on !alive, Büchi accepting
+    res->new_edge(sink_state, sink_state, nalive, {0});
+
+    // Keep the same initial state
+    res->set_init_state(mealy->get_init_state_number());
+    // The resulting Buchi automaton is guaranteed to be weak:
+    // non-sink SCCs have no accepting edges, only the sink SCC is accepting.
+    res->prop_weak(true);
+    return res;
+  }
 }

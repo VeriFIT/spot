@@ -40,6 +40,7 @@
 #include <spot/twaalgos/ltlf2dfa.hh>
 #include <spot/twaalgos/aiger.hh>
 #include <spot/twaalgos/mealy_machine.hh>
+#include <spot/twaalgos/translate.hh>
 
 enum
 {
@@ -66,6 +67,7 @@ enum
   OPT_TRANS,
   OPT_UNOBSERVABLE,
   OPT_VERBOSE,
+  OPT_VERIFY,
 };
 
 
@@ -178,6 +180,8 @@ static const argp_option options[] =
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
     { "verbose", OPT_VERBOSE, nullptr, 0, "verbose mode", 0 },
+    { "verify", OPT_VERIFY, nullptr, 0,
+       "verify the strategy or AIG circuit against the specification", 0 },
     { nullptr, 0, nullptr, 0, nullptr, 0 },
   };
 
@@ -327,6 +331,7 @@ static dot_choice opt_dot = dot_none;
 static const char* opt_dot_arg = "";
 static bool opt_show_status = true;
 static bool opt_compute_strateagy_and_quit = false;
+static bool opt_do_verify = false;
 
 static int
 parse_opt(int key, char *arg, struct argp_state *)
@@ -440,6 +445,9 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_VERBOSE:
       opt_verbose = &std::cerr;
       break;
+    case OPT_VERIFY:
+      opt_do_verify = true;
+      break;
     case OPT_SIMPLIFY_FORMULA:
       opt_simplify_ltl = XARGMATCH("--simplify-formula", arg,
                                    decompose_args, decompose_values);
@@ -471,6 +479,9 @@ namespace
                 const std::vector<std::string>& unobs_aps,
                 bool mealy_semantics)
   {
+    if (opt_do_verify && opt_terminating_signal.empty())
+      error(2, 0, "verification requires terminating semantics");
+
     if (opt_verbose)
       *opt_verbose << "using "
                    << (mealy_semantics ? "Mealy" : "Moore")
@@ -892,22 +903,25 @@ namespace
     if (opt_realizability || opt_compute_strateagy_and_quit)
       return 0;
 
+    spot::twa_graph_ptr tot_strat = nullptr;
+    spot::aig_ptr saig = nullptr;
+
     if (!opt_aiger && (opt_dot == dot_strategy
                        || automaton_format == Hoa))
       {
-        spot::twa_graph_ptr strat = nullptr;
         for (auto m: mealy_machines)
-          if (strat)
-            strat = spot::mealy_product(strat, m);
+          if (tot_strat)
+            tot_strat = spot::mealy_product(tot_strat, m);
           else
-            strat = m;
+            tot_strat = m;
         if (rs)        // Add any AP we removed
-          rs->patch_mealy(strat);
-        strat->merge_edges();
+          rs->patch_mealy(tot_strat);
+        tot_strat->merge_edges();
         automaton_printer printer;
         spot::process_timer timer_printer_dummy;
-        printer.print(strat, timer_printer_dummy);
-        return 0;
+        printer.print(tot_strat, timer_printer_dummy);
+        if (!opt_do_verify)
+          return 0;
       }
 
     if (opt_aiger)
@@ -916,12 +930,12 @@ namespace
         sw2.start();
         const std::string* term_sig =
           opt_terminating_signal.empty() ? nullptr : &opt_terminating_signal;
-        spot::aig_ptr saig = spot::mealy_machines_to_aig(mealy_machines,
-                                                         opt_aiger,
-                                                         input_aps,
-                                                         sub_outs_str,
-                                                         rs.get(),
-                                                         term_sig);
+        saig = spot::mealy_machines_to_aig(mealy_machines,
+                                           opt_aiger,
+                                           input_aps,
+                                           sub_outs_str,
+                                           rs.get(),
+                                           term_sig);
         double aigtime = sw2.stop();
         if (opt_verbose)
           *opt_verbose << "AIG circuit ("
@@ -936,7 +950,46 @@ namespace
             else
               spot::print_aiger(std::cout, saig) << '\n';
           }
+        if (!opt_do_verify)
+          return 0;
       }
+
+    if (opt_do_verify)
+      {
+        auto ltl_neg_f = spot::from_ltlf(spot::formula::Not(original_f),
+                                          opt_terminating_signal.c_str());
+        if (saig)
+          {
+            // Configure a fast deterministic Buchi translation for verification
+            spot::translator trans(dict);
+            trans.set_type(spot::postprocessor::BA);
+            trans.set_level(spot::postprocessor::Low);
+            trans.set_pref(spot::postprocessor::Deterministic);
+            auto neg_spec = trans.run(ltl_neg_f);
+            auto saigaut = saig->as_automaton(false);
+            if (neg_spec->intersects(saigaut))
+              error(2, 0, "AIG circuit and negated specification intersect: "
+                    "circuit is not OK.");
+            std::cout << "c\nCircuit was verified\n";
+          }
+        else if (tot_strat)
+          {
+            auto buchi_strat =
+              spot::terminating_mealy_to_buchi(tot_strat,
+                                               opt_terminating_signal);
+            // Configure a fast deterministic Buchi translation for verification
+            spot::translator trans(buchi_strat->get_dict());
+            trans.set_type(spot::postprocessor::BA);
+            trans.set_level(spot::postprocessor::Low);
+            trans.set_pref(spot::postprocessor::Deterministic);
+            auto neg_spec = trans.run(ltl_neg_f);
+            if (neg_spec->intersects(buchi_strat))
+              error(2, 0, "Strategy and negated specification intersect: "
+                    "strategy is not OK.");
+            std::cout << "/*Strategy was verified*/\n";
+          }
+      }
+
     return 0;
   }
 

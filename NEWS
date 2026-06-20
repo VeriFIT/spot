@@ -50,6 +50,13 @@ New in spot 2.15.1.dev  (not yet released)
     --terminating=NAME, and the feature can be disabled with
     --non-terminating.  (Issue #635.)
 
+  - ltlfsynt now has a --verify option to check that the computed
+    strategy or AIG circuit satisfies the specification.  For Mealy
+    machines, the strategy is converted to a Büchi automaton
+    with an explicit termination signal before checking against the
+    negated specification.  For AIG circuits, the check is performed
+    using the circuit's transition relation.
+
   Library:
 
   - the spot::translator class learned to deal with quantified LTL

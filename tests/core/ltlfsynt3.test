@@ -297,4 +297,40 @@ O_term=$(awk '{print $5}' header_term)
 test $((L_term)) -eq $((L_nonterm + 1))
 test $((O_term)) -eq $((O_nonterm + 1))
 
+# --verify --terminating with HOA output (Mealy strategy)
+for f in \
+  'G((!u | X!u) & (u | Xu)) -> X[!]F(u <-> o)' \
+  '(u & !o & XG(u|o)) | (!u & !o & X[!]F!o)' \
+; do
+  for tra in restr dfs bfs; do
+    rc=0
+    ltlfsynt -f "$f" --trans=$tra --verify --terminating -H > out 2>err || rc=$?
+    test $rc -le 1 || exit 2
+  done
+done
+
+# --verify --terminating with Moore semantics
+for f in \
+  'G((!u | X!u) & (u | Xu)) -> X[!]F(u <-> o)' \
+; do
+  for tra in restr dfs bfs; do
+    rc=0
+    ltlfsynt -f "$f" --trans=$tra --semantics=Moore \
+             --verify --terminating -H > out 2>err || rc=$?
+    test $rc -le 1 || exit 2
+  done
+done
+
+# --verify --terminating with AIG output
+for f in \
+  'G((!u | X!u) & (u | Xu)) -> X[!]F(u <-> o)' \
+; do
+  for tra in dfs bfs; do
+    rc=0
+    ltlfsynt -f "$f" --outs=o --ins=u,i2,i3,i --trans=$tra \
+             --verify --terminating --aiger > out 2>err || rc=$?
+    test $rc -le 1 || exit 2
+  done
+done
+
 :
