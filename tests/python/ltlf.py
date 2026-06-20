@@ -237,3 +237,53 @@ tc.assertLessEqual(len(str(new)), len(str(old)) * 2 + 20,
                    f"new has {len(str(new))} chars, old has {len(str(old))}")
 tc.assertTrue(new.is_syntactic_obligation(),
               f"Not syntactic obligation: {new}")
+
+
+# ---------- Tests for quantified formulas in from_ltlf() ----------
+#
+# from_ltlf() should preserve outermost quantifiers (forall/exists)
+# wrapping them around the translated body.  The alive wrapper goes
+# inside the quantifiers, i.e., from_ltlf(forall x, body) returns
+# forall x, (alive & ... & t_O(body)).
+
+quantified_cases = [
+    '\\forall u: G(u -> X o)',                 # simple universal
+    '\\forall u: \\forall v: G(u & v -> X o)',  # nested universal (flattened)
+    '\\exists x: F(x)',                         # existential
+]
+
+for s in quantified_cases:
+    qf = spot.formula(s)
+    for algo in [0, 1]:
+        result = spot.from_ltlf(qf, 'alive', algo)
+        # Quantifier structure should be preserved at the top.
+        tc.assertTrue(result.kind() == spot.op_forall or
+                      result.kind() == spot.op_exists,
+                      f"{s} algo={algo}: expected quantifier, got {result}")
+        # The body (last child of the outermost quantifier) should
+        # contain the alive wrapper (an And with alive, F(!alive), etc.).
+        body_under_q = result[result.size() - 1]
+        tc.assertTrue(body_under_q.kind() == spot.op_And,
+                      f"{s} algo={algo}: body should be alive And, "
+                      f"got {body_under_q}")
+        # algo=0 and algo=1 should be semantically equivalent.
+        if algo == 0:
+            res0 = result
+        else:
+            tc.assertTrue(spot.are_equivalent(res0, result),
+                          f"Semantic mismatch for {s}: "
+                          f"algo=0={res0}, algo=1={result}")
+
+# Nested quantifier structure.  formula::forall flattens nested quantifiers
+# into a single forall with multiple variables, so after from_ltlf() we
+# expect forall({u, v}, translated_body).  Variable order may differ from
+# the parse order, so we check the set of APs rather than exact positions.
+qf = spot.formula('\\forall u: \\forall v: G(u & v -> X o)')
+result = spot.from_ltlf(qf, 'alive', 1)
+tc.assertEqual(result.kind(), spot.op_forall)
+tc.assertEqual(result.size(), 3)   # two variables + body
+qvars = {str(result[0]), str(result[1])}
+tc.assertEqual(qvars, {'u', 'v'})
+# The body (last child) should be the alive wrapper.
+inner_body = result[result.size() - 1]
+tc.assertTrue(inner_body.kind() == spot.op_And)

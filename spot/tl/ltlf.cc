@@ -331,6 +331,19 @@ namespace spot
 
   formula from_ltlf(formula f, const char* alive_name, int algo)
   {
+    // Peel off outermost quantifiers (∀/∃), translate the body, then
+    // reconstruct the quantifiers around the result.
+    std::vector<std::pair<op, std::vector<formula>>> qs;
+    while (f.is(op::forall, op::exists))
+      {
+        std::vector<formula> vars;
+        unsigned sz = f.size();
+        vars.reserve(sz - 1);
+        for (unsigned i = 0; i < sz - 1; ++i)
+          vars.push_back(f[i]);
+        qs.emplace_back(f.kind(), std::move(vars));
+        f = f[sz - 1];
+      }
     if (!f.is_ltl_formula())
       throw std::runtime_error("from_ltlf() only supports LTL formulas");
     auto alv = ((*alive_name == '!')
@@ -338,13 +351,23 @@ namespace spot
                 : formula::ap(alive_name));
     auto nalv = formula::Not(alv);
     if (algo == 0)
-      return formula::And({from_ltlf_dv_aux(f, alv), alv,
-                           formula::U(alv, formula::G(nalv))});
+      {
+        auto result = formula::And({from_ltlf_dv_aux(f, alv), alv,
+                                    formula::U(alv, formula::G(nalv))});
+        for (auto it = qs.rbegin(); it != qs.rend(); ++it)
+          result = formula::quantify(it->first, it->second, result);
+        return result;
+      }
     // Syntactic-obligation wrapper:
     // alive & F(!alive) & (alive W G(!alive)) & t_O(f).
-    return formula::And({t_O(f, alv, nalv), alv,
-                         formula::F(nalv),
-                         formula::W(alv, formula::G(nalv))});
+    {
+      auto result = formula::And({t_O(f, alv, nalv), alv,
+                          formula::F(nalv),
+                          formula::W(alv, formula::G(nalv))});
+      for (auto it = qs.rbegin(); it != qs.rend(); ++it)
+        result = formula::quantify(it->first, it->second, result);
+      return result;
+    }
   }
 
   formula from_ltlf(formula f, const char* alive)
