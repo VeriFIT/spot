@@ -455,11 +455,16 @@ namespace spot
   ///             input/latches/gates (`isop` only) and `sub2` tries to seek
   ///             common subformulas.
   /// Uses the named-property synthesis-output to determine input/output APs.
+  /// \param terminating_signal If non-null, specifies the name of an extra
+  /// output signal that is initially true and becomes false after the first
+  /// self-loop (termination) of the Mealy machine.
   ///@{
   SPOT_API aig_ptr
-  mealy_machine_to_aig(const const_twa_graph_ptr& m, const char* mode);
+  mealy_machine_to_aig(const const_twa_graph_ptr& m, const char* mode,
+                       const std::string* terminating_signal = nullptr);
   SPOT_API aig_ptr
-  mealy_machine_to_aig(const mealy_like& m, const char* mode);
+  mealy_machine_to_aig(const mealy_like& m, const char* mode,
+                       const std::string* terminating_signal = nullptr);
   ///@}
 
   /// \ingroup synthesis
@@ -473,17 +478,22 @@ namespace spot
   /// \param outs Output atomic propositions; see \a ins.
   /// \param rs When given and non-empty, specifies how unused outputs should
   ///           be encoded by mapping them to some constant.
+  /// \param terminating_signal If non-null, specifies the name of an extra
+  /// output signal that is initially true and becomes false after the first
+  /// self-loop (termination) of the Mealy machine.
   ///@{
   SPOT_API aig_ptr
   mealy_machine_to_aig(const twa_graph_ptr& m, const char *mode,
                        const std::vector<std::string>& ins,
                        const std::vector<std::string>& outs,
-                       const realizability_simplifier* rs = nullptr);
+                       const realizability_simplifier* rs = nullptr,
+                       const std::string* terminating_signal = nullptr);
   SPOT_API aig_ptr
   mealy_machine_to_aig(mealy_like& m, const char *mode,
                        const std::vector<std::string>& ins,
                        const std::vector<std::string>& outs,
-                       const realizability_simplifier* rs = nullptr);
+                       const realizability_simplifier* rs = nullptr,
+                       const std::string* terminating_signal = nullptr);
   ///@}
 
   /// \ingroup synthesis
@@ -502,31 +512,40 @@ namespace spot
   ///
   /// If \a rs is given and is not empty, it can be used to specify how
   /// unused output should be encoded by mapping them to some constant.
+  ///
+  /// If \a terminating_signal is non-null, it specifies the name of an extra
+  /// output signal that is initially true and becomes false after the first
+  /// self-loop (termination) of the Mealy machine.
   /// @{
   SPOT_API aig_ptr
   mealy_machines_to_aig(const std::vector<const_twa_graph_ptr>& m_vec,
-                        const char* mode);
+                        const char* mode,
+                        const std::string* terminating_signal = nullptr);
   SPOT_API aig_ptr
   mealy_machines_to_aig(const std::vector<mealy_like>& m_vec,
-                        const char* mode);
+                        const char* mode,
+                        const std::string* terminating_signal = nullptr);
   SPOT_API aig_ptr
   mealy_machines_to_aig(const std::vector<const_twa_graph_ptr>& m_vec,
                         const char* mode,
                         const std::vector<std::string>& ins,
                         const std::vector<std::vector<std::string>>& outs,
-                        const realizability_simplifier* rs = nullptr);
+                        const realizability_simplifier* rs = nullptr,
+                        const std::string* terminating_signal = nullptr);
   SPOT_API aig_ptr
   mealy_machines_to_aig(const std::vector<twa_graph_ptr>& m_vec,
                         const char* mode,
                         const std::vector<std::string>& ins,
                         const std::vector<std::vector<std::string>>& outs,
-                        const realizability_simplifier* rs = nullptr);
+                        const realizability_simplifier* rs = nullptr,
+                        const std::string* terminating_signal = nullptr);
   SPOT_API aig_ptr
   mealy_machines_to_aig(const std::vector<mealy_like>& m_vec,
                         const char* mode,
                         const std::vector<std::string>& ins,
                         const std::vector<std::vector<std::string>>& outs,
-                        const realizability_simplifier* rs = nullptr);
+                        const realizability_simplifier* rs = nullptr,
+                        const std::string* terminating_signal = nullptr);
   /// @}
 
   /// \ingroup twa_io
@@ -569,7 +588,11 @@ namespace spot
   ///             blocks with `sub0` being no separation, `sub1` separation into
   ///             input/latches/gates (`isop` only) and `sub2` tries to seek
   ///             common subformulas.
+  /// \param terminating_signal If non-null, specifies the name of an extra
+  /// output signal that is initially true and becomes false after the first
+  /// self-loop (termination) of the Mealy machine.
   SPOT_API std::ostream&
   print_aiger(std::ostream& os, const const_twa_graph_ptr& aut,
-              const char* mode);
+              const char* mode,
+              const std::string* terminating_signal = nullptr);
 }

@@ -54,6 +54,7 @@ enum
   OPT_INPUT,
   OPT_MINIMIZE,
   OPT_NON_TERMINATING,
+  OPT_TERMINATING,
   OPT_ONE_STEP,
   OPT_OUTPUT,
   OPT_PART_FILE,
@@ -93,8 +94,15 @@ static const argp_option options[] =
     { "semantics", OPT_SEMANTICS, "Moore|Mealy", 0,
       "Whether to work under Mealy (input-first) or Moore "
       "(output-first) semantics.  The default is Mealy.", 0 },
+    { "terminating", OPT_TERMINATING, "NAME", OPTION_ARG_OPTIONAL,
+      "Use terminating semantics (by default).  Mealy machines output in HOA "
+      "are assumed to terminate after taking their first self-loop.  "
+      "In AIGER circuits, an extra output named __SigAlive__ (or NAME, if "
+      "given) will be on until the controller terminates, in which case "
+      "the signal is turned off definitively.",
+      0 },
     { "non-terminating", OPT_NON_TERMINATING, nullptr, 0,
-      "Use non-terminating semantics.  (Ignored if --realizability is given.)",
+      "Use non-terminating semantics.",
       0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Fine tuning:", 10 },
@@ -229,7 +237,7 @@ static bool opt_minimize = false;
 static bool opt_minimize_set = false;
 static bool opt_one_step = true;
 static bool opt_simplify_ltl = true;
-static bool opt_terminating_semantics = true;
+static std::string opt_terminating_signal = "__SigAlive__";
 
 static std::ostream* opt_verbose = nullptr;
 
@@ -390,8 +398,11 @@ parse_opt(int key, char *arg, struct argp_state *)
                                minimize_args, minimize_values);
       opt_minimize_set = true;
       break;
+    case OPT_TERMINATING:
+      opt_terminating_signal = arg ? arg : "__SigAlive__";
+      break;
     case OPT_NON_TERMINATING:
-      opt_terminating_semantics = false;
+      opt_terminating_signal.clear();
       break;
     case OPT_ONE_STEP:
       opt_one_step = XARGMATCH("--one-step", arg,
@@ -704,7 +715,8 @@ namespace
                              << " one-step preprocess\n";
               spot::ltlf_synthesis_options opts;
               opts.one_step_preprocess = opt_one_step;
-              opts.terminating_semantics = opt_terminating_semantics;
+              opts.terminating_semantics =
+                !opt_terminating_signal.empty();
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
                                                     spot::state_refine,
                                                     false /* realizability */,
@@ -764,7 +776,8 @@ namespace
               auto bp = dfs ? spot::dfs_node_backprop : spot::bfs_node_backprop;
               spot::ltlf_synthesis_options opts;
               opts.one_step_preprocess = opt_one_step;
-              opts.terminating_semantics = opt_terminating_semantics;
+              opts.terminating_semantics =
+                !opt_terminating_signal.empty();
               a = spot::ltlf_to_mtdfa_for_synthesis(*sub_f, dict, *sub_o,
                                                     bp, opt_realizability,
                                                     opts);
@@ -901,11 +914,14 @@ namespace
       {
         spot::stopwatch sw2;
         sw2.start();
+        const std::string* term_sig =
+          opt_terminating_signal.empty() ? nullptr : &opt_terminating_signal;
         spot::aig_ptr saig = spot::mealy_machines_to_aig(mealy_machines,
                                                          opt_aiger,
                                                          input_aps,
                                                          sub_outs_str,
-                                                         rs.get());
+                                                         rs.get(),
+                                                         term_sig);
         double aigtime = sw2.stop();
         if (opt_verbose)
           *opt_verbose << "AIG circuit ("

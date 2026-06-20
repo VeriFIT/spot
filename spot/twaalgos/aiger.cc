@@ -1551,7 +1551,8 @@ namespace
                 const char* mode,
                 const std::vector<std::string>& unused_ins = {},
                 const std::vector<std::string>& unused_outs = {},
-                const realizability_simplifier* rs = nullptr)
+                const realizability_simplifier* rs = nullptr,
+                const std::string* terminating_signal = nullptr)
   {
     // The aiger circuit can currently only encode separated mealy machines
 
@@ -1625,6 +1626,13 @@ namespace
     output_names_all.insert(output_names_all.end(),
                             unused_outs.cbegin(),
                             unused_outs.cend());
+
+    unsigned term_sig_idx = -1u;
+    if (terminating_signal && !terminating_signal->empty())
+      {
+        term_sig_idx = output_names_all.size();
+        output_names_all.push_back(*terminating_signal);
+      }
 
     if (rs)
       // If we have removed some APs from the original formula, they
@@ -1711,6 +1719,8 @@ namespace
         n_latches += log2n.back();
       }
     latch_offset.push_back(n_latches);
+    if (terminating_signal)
+      ++n_latches;
 
     assert(output_names.size() == (unsigned) bdd_nodecount(all_outputs));
     aig_ptr circuit_ptr =
@@ -1732,6 +1742,9 @@ namespace
 
     std::vector<unsigned> next_state_vec;
     next_state_vec.reserve(n_latches);
+
+    // Accumulated BDD of all self-loop conditions (for terminating semantics)
+    bdd self_loop_bdd = bddfalse;
 
     // Loop over the different strategies
     for (unsigned i = 0; i < strat_vec.size(); ++i)
@@ -1801,6 +1814,16 @@ namespace
                 bdd tot_cond = src_bdd & bdd_exist(e.cond, aouts);
                 // Test should not have any outs from other strats
 
+                // Detect self-loops for terminating semantics
+                if (terminating_signal)
+                  {
+                    unsigned dst_sn =
+                      sp_ptr ? sn[astrat->out(e.dst).begin()->dst]
+                             : sn[e.dst];
+                    if (sn[s] == dst_sn)
+                      self_loop_bdd |= tot_cond;
+                  }
+
                 // Set in latches/outs having "high"
                 for (auto&& nl : next_state_vec)
                   {
@@ -1816,6 +1839,14 @@ namespace
               } // edges
           } // state
       } //strat
+
+    // Wire the termination latch: next = term_latch | self_loop_bdd
+    if (terminating_signal)
+      {
+        unsigned term_latch_idx = n_latches - 1;
+        bdd term_latch_bdd = circuit.latch_bdd(term_latch_idx);
+        latch[term_latch_idx] = term_latch_bdd | self_loop_bdd;
+      }
 
     struct tr_opt
     {
@@ -1977,7 +2008,8 @@ namespace
     // Set unused signal to false by default
     const unsigned n_outs_all = output_names_all.size();
     for (unsigned i = n_outs; i < n_outs_all; ++i)
-      circuit.set_output(i, circuit.aig_false());
+      if (i != term_sig_idx)
+        circuit.set_output(i, circuit.aig_false());
 
     // RS may contains assignments for unused signals, such as
     //     out1 := 1
@@ -2052,6 +2084,16 @@ namespace
       }
     for (unsigned i = 0; i < n_latches; ++i)
       circuit.set_next_latch(i, bdd2var_min(latch[i], bddfalse));
+
+    // Set the terminating signal output: __SigAlive__ = NOT(term_latch)
+    if (terminating_signal)
+      {
+        unsigned term_latch_var =
+          circuit.latch_var(n_latches - 1);
+        unsigned sigalive_var = circuit.aig_not(term_latch_var);
+        circuit.set_output(term_sig_idx, sigalive_var);
+      }
+
     return circuit_ptr;
   } // auts_to_aiger
 }
@@ -2060,30 +2102,34 @@ namespace spot
 {
 
   aig_ptr
-  mealy_machine_to_aig(const const_twa_graph_ptr& m, const char* mode)
+  mealy_machine_to_aig(const const_twa_graph_ptr& m, const char* mode,
+                       const std::string* terminating_signal)
   {
     if (!m)
       throw std::runtime_error("mealy_machine_to_aig(): "
                                "m cannot be null.");
 
-    return auts_to_aiger({{m, get_synthesis_outputs(m)}}, mode);
+    return auts_to_aiger({{m, get_synthesis_outputs(m)}}, mode,
+                         {}, {}, nullptr, terminating_signal);
   }
 
   aig_ptr
-  mealy_machine_to_aig(const mealy_like& m, const char* mode)
+  mealy_machine_to_aig(const mealy_like& m, const char* mode,
+                       const std::string* terminating_signal)
   {
     if (m.success != mealy_like::realizability_code::REALIZABLE_REGULAR)
       throw std::runtime_error("mealy_machine_to_aig(): "
                                "Can only handle regular mealy machine, yet.");
 
-    return mealy_machine_to_aig(m.mealy_like, mode);
+    return mealy_machine_to_aig(m.mealy_like, mode, terminating_signal);
   }
 
   aig_ptr
   mealy_machine_to_aig(const twa_graph_ptr &m, const char *mode,
                        const std::vector<std::string>& ins,
                        const std::vector<std::string>& outs,
-                       const realizability_simplifier* rs)
+                       const realizability_simplifier* rs,
+                       const std::string* terminating_signal)
   {
     if (!m)
       throw std::runtime_error("mealy_machine_to_aig(): "
@@ -2116,25 +2162,28 @@ namespace spot
     }
     // todo Some additional checks?
     return auts_to_aiger({{m, get_synthesis_outputs(m)}}, mode,
-                         unused_ins, unused_outs, rs);
+                         unused_ins, unused_outs, rs, terminating_signal);
   }
 
   aig_ptr
   mealy_machine_to_aig(mealy_like& m, const char *mode,
                        const std::vector<std::string>& ins,
                        const std::vector<std::string>& outs,
-                       const realizability_simplifier* rs)
+                       const realizability_simplifier* rs,
+                       const std::string* terminating_signal)
   {
     if (m.success != mealy_like::realizability_code::REALIZABLE_REGULAR)
       throw std::runtime_error("mealy_machine_to_aig(): "
                                "Can only handle regular mealy machine, yet.");
 
-    return mealy_machine_to_aig(m.mealy_like, mode, ins, outs, rs);
+    return mealy_machine_to_aig(m.mealy_like, mode, ins, outs, rs,
+                                terminating_signal);
   }
 
   aig_ptr
   mealy_machines_to_aig(const std::vector<const_twa_graph_ptr>& m_vec,
-                        const char *mode)
+                        const char *mode,
+                        const std::string* terminating_signal)
   {
     std::for_each(m_vec.begin()+1, m_vec.end(),
                   [usedbdd = m_vec.at(0)->get_dict()](const auto& s)
@@ -2160,12 +2209,14 @@ namespace spot
         all_outputs &= this_outputs;
         new_vec.emplace_back(am, this_outputs);
       }
-    return auts_to_aiger(new_vec, mode);
+    return auts_to_aiger(new_vec, mode,
+                         {}, {}, nullptr, terminating_signal);
   }
 
   aig_ptr
   mealy_machines_to_aig(const std::vector<mealy_like>& m_vec,
-                        const char *mode)
+                        const char *mode,
+                        const std::string* terminating_signal)
   {
     if (std::any_of(m_vec.cbegin(), m_vec.cend(),
                  [](const auto& m)
@@ -2180,7 +2231,7 @@ namespace spot
                    std::back_inserter(new_vec),
                    [](const auto& m){return m.mealy_like; });
 
-    return mealy_machines_to_aig(new_vec, mode);
+    return mealy_machines_to_aig(new_vec, mode, terminating_signal);
   }
 
   // Note: This ignores the "synthesis-outputs" named property
@@ -2190,7 +2241,8 @@ namespace spot
                             const char *mode,
                             const std::vector<std::string>& ins,
                             const std::vector<std::vector<std::string>>& outs,
-                            const realizability_simplifier* rs)
+                            const realizability_simplifier* rs,
+                            const std::string* terminating_signal)
   {
     if (m_vec.empty())
       throw std::runtime_error("mealy_machines_to_aig(): No strategy given.");
@@ -2247,7 +2299,8 @@ namespace spot
       if (!used_aps.count(ai))
         unused_ins.push_back(ai);
 
-    return auts_to_aiger(new_vec, mode, unused_ins, unused_outs, rs);
+    return auts_to_aiger(new_vec, mode, unused_ins, unused_outs, rs,
+                         terminating_signal);
   }
 
   aig_ptr
@@ -2255,9 +2308,11 @@ namespace spot
                         const char *mode,
                         const std::vector<std::string>& ins,
                         const std::vector<std::vector<std::string>>& outs,
-                        const realizability_simplifier* rs)
+                        const realizability_simplifier* rs,
+                        const std::string* terminating_signal)
   {
-    return mealy_machines_to_aig_aux(m_vec, mode, ins, outs, rs);
+    return mealy_machines_to_aig_aux(m_vec, mode, ins, outs, rs,
+                                     terminating_signal);
   }
 
   aig_ptr
@@ -2265,9 +2320,11 @@ namespace spot
                         const char *mode,
                         const std::vector<std::string>& ins,
                         const std::vector<std::vector<std::string>>& outs,
-                        const realizability_simplifier* rs)
+                        const realizability_simplifier* rs,
+                        const std::string* terminating_signal)
   {
-    return mealy_machines_to_aig_aux(m_vec, mode, ins, outs, rs);
+    return mealy_machines_to_aig_aux(m_vec, mode, ins, outs, rs,
+                                     terminating_signal);
   }
 
   aig_ptr
@@ -2275,7 +2332,8 @@ namespace spot
                         const char* mode,
                         const std::vector<std::string>& ins,
                         const std::vector<std::vector<std::string>>& outs,
-                        const realizability_simplifier* rs)
+                        const realizability_simplifier* rs,
+                        const std::string* terminating_signal)
   {
     // todo extend to TGBA and possibly others
     const unsigned ns = strat_vec.size();
@@ -2309,7 +2367,8 @@ namespace spot
                                    "success identifier.");
         }
       }
-    return mealy_machines_to_aig(m_machines, mode, ins, outs_used, rs);
+    return mealy_machines_to_aig(m_machines, mode, ins, outs_used, rs,
+                                 terminating_signal);
   }
 
   std::ostream &
@@ -2369,9 +2428,10 @@ namespace spot
 
   std::ostream&
   print_aiger(std::ostream& os, const const_twa_graph_ptr& aut,
-              const char* mode)
+              const char* mode,
+              const std::string* terminating_signal)
   {
-    print_aiger(os, mealy_machine_to_aig(aut, mode));
+    print_aiger(os, mealy_machine_to_aig(aut, mode, terminating_signal));
     return os;
   }
 }

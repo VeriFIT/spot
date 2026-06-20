@@ -765,6 +765,22 @@ def state_is_accepting(self, src) -> "bool":
 
 // Should come after the definition of twa_graph
 
+// Typemap for const std::string*: None -> nullptr, a string -> pointer
+%typemap(in) const std::string* (std::string temp) {
+    if ($input == Py_None) {
+        $1 = nullptr;
+    } else {
+        int res = SWIG_AsVal_std_string($input, &temp);
+        if (!SWIG_IsOK(res)) {
+            %argument_fail(res, "$type", $symname, $argnum);
+        }
+        $1 = &temp;
+    }
+}
+%typemap(typecheck, precedence=2000) const std::string* {
+    $1 = ($input == Py_None) || (PyUnicode_Check($input) != 0);
+}
+
 %include <spot/twaalgos/aiger.hh>
 %include <spot/twaalgos/alternation.hh>
 %include <spot/twaalgos/backprop.hh>

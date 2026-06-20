@@ -271,4 +271,30 @@ ltlfsynt -f 'G(i <-> o) & G(j <-> k)' --outs=o,k --ins=i,j \
   >out 2>verbose-geq.out
 grep 'using Mealy' verbose-geq.out
 
+# --terminating semantics in AIGER output
+# Default: __SigAlive__ should appear in output names
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i --aiger --hide-status >out_term.aig
+grep '__SigAlive__' out_term.aig
+
+# With --terminating=MySig, MySig should appear
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i --aiger --terminating=MySig \
+  --hide-status >out_mysig.aig
+grep 'MySig' out_mysig.aig
+
+# With --non-terminating, __SigAlive__ should NOT appear
+ltlfsynt -f 'G(i <-> o)' --outs=o --ins=i --aiger --non-terminating \
+  --hide-status >out_nonterm.aig
+! grep -q '__SigAlive__' out_nonterm.aig
+
+# Terminating semantics adds 1 extra latch and 1 extra output.
+# Extract L and O fields from the aag header: aag M I L O A
+head -1 out_nonterm.aig > header_nonterm
+head -1 out_term.aig > header_term
+L_nonterm=$(awk '{print $4}' header_nonterm)
+O_nonterm=$(awk '{print $5}' header_nonterm)
+L_term=$(awk '{print $4}' header_term)
+O_term=$(awk '{print $5}' header_term)
+test $((L_term)) -eq $((L_nonterm + 1))
+test $((O_term)) -eq $((O_nonterm + 1))
+
 :

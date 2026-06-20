@@ -3869,3 +3869,34 @@ c
 this is not a bug
 """).to_str()
 tc.assertEqual(x, spot.aiger_circuit(x).to_str())
+
+# Test terminating semantics with mealy_machine_to_aig
+# Only the first (smallest) strategy is needed for coverage
+for strat_str, (ins_str, outs_str) in [strats[0]]:
+    strat = spot.automaton(strat_str)
+    ins = buddy.bddtrue
+    for ain in ins_str:
+        ins &= buddy.bdd_ithvar(strat.register_ap(ain))
+    outs = buddy.bddtrue
+    for aout in outs_str:
+        outs &= buddy.bdd_ithvar(strat.register_ap(aout))
+    spot.set_synthesis_outputs(strat, outs)
+    strat = spot.split_2step(strat, outs, False)
+
+    # Without terminating signal
+    aig = spot.mealy_machine_to_aig(strat, "isop")
+    out_names = list(aig.output_names())
+    n_orig_latches = aig.num_latches()
+    n_orig_outputs = aig.num_outputs()
+
+    # With a custom terminating signal name
+    aig_term = spot.mealy_machine_to_aig(strat, "isop", "MySig")
+    term_out_names = list(aig_term.output_names())
+    tc.assertIn("MySig", term_out_names)
+    tc.assertEqual(aig_term.num_latches(), n_orig_latches + 1)
+    tc.assertEqual(aig_term.num_outputs(), n_orig_outputs + 1)
+
+    # None means no terminating semantics
+    aig_none = spot.mealy_machine_to_aig(strat, "isop", None)
+    tc.assertEqual(aig_none.num_latches(), n_orig_latches)
+    tc.assertEqual(aig_none.num_outputs(), n_orig_outputs)

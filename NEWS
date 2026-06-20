@@ -43,6 +43,13 @@ New in spot 2.15.1.dev  (not yet released)
     the current input.  This is in addition to the default Mealy
     (input-first) semantics.  (Issue #608.)
 
+  - ltlfsynt now encodes terminating semantics in AIGER circuits by
+    adding an extra output named __SigAlive__ that is initially true
+    and becomes false after the controller takes its first self-loop
+    (i.e., terminates).  The signal name can be changed with
+    --terminating=NAME, and the feature can be disabled with
+    --non-terminating.  (Issue #635.)
+
   Library:
 
   - the spot::translator class learned to deal with quantified LTL
@@ -117,6 +124,13 @@ New in spot 2.15.1.dev  (not yet released)
     spot::apply_strategy(), spot::solved_game_to_mealy(), and
     spot::alternate_players().  A new spot::synthesis_info::moore
     field was also added.  (Issue #608.)
+
+  - spot::mealy_machine_to_aig(), spot::mealy_machines_to_aig(), and
+    spot::print_aiger() learned an optional terminating_signal
+    parameter to encode terminating semantics in AIGER circuits.
+    When set, an extra output (named after the given string) is added
+    that is initially true and becomes false after the first self-loop
+    of the Mealy machine.  (Issue #635.)
 
   Deprecation notices:
 

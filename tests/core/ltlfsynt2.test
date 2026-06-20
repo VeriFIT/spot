@@ -35,7 +35,7 @@ test 6 = `$R -f "$f" --decomp=no --dot=game | grep ' -> ' | wc -l`
 #test 8 = `$R -f "$f" --decomp=yes --dot=game | grep ' -> ' | wc -l`
 
 # See issue #601 for the effect of decomposition on this AIGER
-test 2 = `$C -f "$f" --decomp=no --dot=aig | grep ' -> ' | wc -l`
+test 4 = `$C -f "$f" --decomp=no --dot=aig | grep ' -> ' | wc -l`
 #test 4 = `$C -f "$f" --decomp=yes --dot=aig | grep ' -> ' | wc -l`
 
 run 0 ltlfsynt -f "$f" -H >out
@@ -58,15 +58,18 @@ diff out expected
 
 run 0 ltlfsynt -f "$f" --aiger --hide-status >out
 cat >expected <<EOF
-aag 2 2 0 2 0
+aag 3 2 1 3 0
 2
 4
+6 1
 1
 1
+7
 i0 i2
 i1 i1
 o0 o1
 o1 o2
+o2 __SigAlive__
 EOF
 diff out expected
 
