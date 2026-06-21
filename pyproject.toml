@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spot"
+dynamic = ["version"]
+description = "a library for manipulation of ω-automata and LTL"
+readme = "README"
+license = "GPL-3.0-or-later"
+authors = [
+    {name = "Spot authors", email = "spot@lrde.epita.fr"},
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.8"
+
+[project.urls]
+Homepage = "https://spot.lre.epita.fr"
+Repository = "https://gitlab.lre.epita.fr/spot/spot"

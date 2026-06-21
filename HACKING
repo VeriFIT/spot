@@ -65,6 +65,8 @@ only for certain operations (like releases):
   glucose >= 3.0  likewise
   lbtt >= 1.2.1a  used in the test suite (ltlcross is now more
             powerful, but additional tests do not hurt)
+  patchelf (or chrpath)
+            used for fixing rpaths when installing Spot with pip
 
 If you use Debian or a similar distribution, the Dockerfile at
 https://gitlab.lre.epita.fr/spot/buildenv/-/blob/master/deb/stable-amd64/Dockerfile
@@ -863,3 +865,44 @@ and then use tc.assertTrue(...), tc.assertEqual(..., ...),
 tc.assertIn(..., ...), etc.  In case of failures, those will print
 useful messages in the trace of the tests.  For instance multiline
 strings that should have been equal will be presented with a diff.
+
+
+Pip Installation
+================
+
+Spot's source distribution tarball (as produced by ``make dist``)
+can be installed directly into a Python virtual environment via
+``pip install``.  The package bundles the native CLI tools
+(ltl2tgba, autfilt, ...), shared libraries, and Python (SWIG)
+bindings.  The packaging infrastructure lives in two files at the
+top of the source tree: ``setup.py`` and ``pyproject.toml``.
+
+To build with correct rpaths, you need one of ``patchelf`` or
+``chrpath`` on Linux (``patchelf`` is preferred); the build will fail
+with a clear error if neither is found.  On macOS the
+``install_name_tool`` (shipped with Xcode command-line tools) is used
+automatically.
+
+
+Trying a local installation
+---------------------------
+
+Build a source tarball and install it in a temporary virtual
+environment.
+
+  % make dist              # -> creates spot-X.Y.Z.dev.tar.gz
+  % python3 -m venv /tmp/spot-test-venv
+  % /tmp/spot-test-venv/bin/pip install spot-Z.Y.Z.dev.tar.gz
+
+This will run ``./configure && make && make install`` from inside the
+tarball and place everything in the virtual environment:
+
+  /tmp/spot-test-venv/
+    bin/                         # native CLI tools (ltl2tgba, autfilt, ...)
+    lib/                         # shared libraries (libspot.so, ...)
+    lib/python3.X/site-packages/ # Python package + SWIG .so extensions
+
+Verify the installation:
+
+  % /tmp/spot-test-venv/bin/python3 -c "import spot; print('OK')"
+  % /tmp/spot-test-venv/bin/ltl2tgba --version

@@ -150,9 +150,33 @@ command-line tools, =python3-spot= contains the Python bindings,
 documentation that you can also find online.  Those packages depend
 on =libspot= that contains the shared libraries.
 
-* Installing as a Conda package
+* Compiling from source with pip (for Python users)
 
-  Spot is available as a [[https://anaconda.org/conda-forge/spot][Conda-forge package]] for Linux and OS X.
+  The source tarball can be installed directly into a Python virtual
+  environment with =pip=.  This bundles the native CLI tools
+  (=ltl2tgba=, =autfilt=, ...), the shared libraries, and the Python
+  bindings.
+
+#+BEGIN_SRC sh :noweb yes
+  python3 -m venv spot-env
+  ./spot-env/bin/pip install http://www.lre.epita.fr/dload/spot/spot-<<SPOT_VERSION()>>.tar.gz
+#+END_SRC
+
+  This will compile Spot inside the virtual environment (so a C++20
+  compiler, Python development headers, =make=, and =patchelf= (or
+  =chrpath=) are required).
+
+  After installation, you can run:
+
+#+BEGIN_SRC sh
+  ./spot-env/bin/python3 -c "import spot; print(spot.version())"
+  ./spot-env/bin/ltl2tgba --version
+#+END_SRC
+
+* Installing as a Conda package (for Python users)
+
+  Spot is available as a [[https://anaconda.org/conda-forge/spot][Conda-forge package]], precompiled for Linux
+  and OS X.
 
   A typical installation would go as follows:
 

@@ -64,13 +64,14 @@ EXTRA_DIST = HACKING ChangeLog.1 tools/gitlog-to-changelog	\
 	     tools/help2man tools/man2html.pl			\
 	     tools/test-driver-teamcity $(UTF8) $(DEBIAN)	\
 	     m4/gnulib-cache.m4 .dir-locals.el			\
-	     spot.spec spot.spec.in README.ltsmin
+	     spot.spec spot.spec.in README.ltsmin		\
+	     setup.py pyproject.toml
 
-dist-hook: gen-ChangeLog
+dist-hook: gen-ChangeLog gen-PKG-INFO
 
 gen_start = 2012-03-10
 gen_start_buddy = 2014-02-13
-.PHONY: gen-ChangeLog deb
+.PHONY: gen-ChangeLog gen-PKG-INFO deb
 gen-ChangeLog:
 	if test -d .git; then						\
 ## Generate all commits in the form "SHA1 subject"
@@ -98,8 +99,22 @@ gen-ChangeLog:
 	  mv $(distdir)/cl-t $(distdir)/buddy/ChangeLog;		\
 	fi
 
+# Generate PKG-INFO for PyPI packaging (PEP 566).
+gen-PKG-INFO:
+	{ \
+	  echo 'Metadata-Version: 2.1';				\
+	  echo 'Name: spot';					\
+	  echo 'Version: $(VERSION)';				\
+	  echo 'Summary: a library for manipulation of ω-automata and LTL';	\
+	  echo 'Home-page: https://spot.lre.epita.fr';		\
+	  echo 'Author: Spot authors';					\
+	  echo 'Author-email: spot@lrde.epita.fr';			\
+	  echo 'License: GPL-3.0-or-later';				\
+	} > $(distdir)/PKG-INFO
+
 # Build Debian packages.
 # Run it with:  make DEBUILDFLAGS=-j8 deb -j8
+
 deb: dist
 	rm -rf spot-$(VERSION) spot-$(VERSION)$(GITPATCH)
 	tar zxvf spot-$(VERSION).tar.gz

@@ -124,12 +124,20 @@ test suite in addition to ltlcross.
 Building and installing
 -----------------------
 
+Standard installation from source
+.................................
+
 Spot follows the traditional `./configure && make && make check &&
 make install' process.  People unfamiliar with the GNU Build System
 should read the file INSTALL for generic instructions.
 
-If you plan to use the Python bindings, we recommend you use the
-following --prefix options when calling configure:
+If you only need the Python bindings and the command-line tools,
+you may prefer the simpler "pip installation from source" described
+in the next subsection.
+
+If you plan to use the Python bindings with the standard
+installation, we recommend you use the following --prefix options
+when calling configure:
 
   --prefix ~/.local
 
@@ -224,8 +232,36 @@ Here are the meaning of the fine-tuning options, in case
     flags from a built-in list.
 
 
+pip installation from source
+............................
+
+Spot's source tarball can be installed directly into a Python virtual
+environment with =pip=.  This bundles the native CLI tools, the shared
+libraries, and the Python bindings into the virtual environment,
+without affecting the rest of your system.
+
+Requirements: a C++20 compiler, Python development headers, =make=,
+and =patchelf= (or =chrpath=).
+
+  % wget http://www.lre.epita.fr/dload/spot/spot-2.15.1.tar.gz
+  % python3 -m venv spot-env
+  % ./spot-env/bin/pip install spot-2.15.1.tar.gz
+
+After installation, you can run:
+
+  % ./spot-env/bin/python3 -c "import spot; print('OK')"
+  % ./spot-env/bin/ltl2tgba --version
+
+To use Spot from your shell, activate the environment:
+
+  % source ./spot-env/bin/activate
+  % ltl2tgba --version
+
+
 Troubleshooting installations
 -----------------------------
+
+(The following assume a standard installation, not one done with pip.)
 
 Spot installs five types of files, in different locations.  In the
 following, $prefix refers to the directory that was selected using
