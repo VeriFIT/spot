@@ -145,6 +145,8 @@ New in spot 2.15.1.dev  (not yet released)
     that is initially true and becomes false after the first self-loop
     of the Mealy machine.  (Issue #635.)
 
+  - randomize() now preserves more named properties.  (Issue #532.)
+
   Deprecation notices:
 
   - spot::collect_aps_with_polarities() is deprecated; use

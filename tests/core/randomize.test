@@ -131,3 +131,43 @@ State: 4 "s3"
 EOF
 
 diff output expected
+
+# Make sure named properties (like spot-state-player) are reordered.
+ltlsynt -f 'Gi <-> Fo' --print-game-hoa > game.hoa
+autfilt --randomize --seed=1 game.hoa -H > output
+cat >expected <<EOF
+HOA: v1
+States: 9
+Start: 3
+AP: 2 "i" "o"
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+properties: trans-labels explicit-labels trans-acc deterministic
+spot-state-player: 1 1 1 0 1 1 0 0 0
+controllable-AP: 1
+--BODY--
+State: 0
+[t] 6
+State: 1
+[!1] 8
+State: 2
+[t] 7 {0}
+State: 3
+[0] 4
+[!0] 1
+State: 4
+[!1] 3
+[1] 7
+State: 5
+[!1] 8 {0}
+State: 6
+[t] 0
+State: 7
+[!0] 0
+[0] 2 {0}
+State: 8
+[t] 5 {0}
+--END--
+EOF
+
+diff output expected

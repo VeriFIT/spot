@@ -101,11 +101,11 @@ namespace spot
       for (auto& state: s.second)
         state2class[state] = classnum++;
 
+    aut->rename_states_(state2class);
     auto& g = aut->get_graph();
-    g.rename_states_(state2class);
-    aut->set_init_state(state2class[aut->get_init_state_number()]);
     g.sort_edges_();
     g.chain_edges_();
+    aut->set_named_prop("highlight-edges", nullptr);
     return aut;
   }
 }

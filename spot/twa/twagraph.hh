@@ -822,6 +822,14 @@ namespace spot
     {
       return defrag_states(newst, used_states);
     }
+
+    /// \brief Rename all states.
+    ///
+    /// This semi-internal function is a wrapper around
+    /// digraph::rename_states_() that additionally updates
+    /// init_state and all named properties that depend on
+    /// state numbers.
+    void rename_states_(const std::vector<unsigned>& newst);
     ///@}
 #endif // SWIG
 

@@ -101,6 +101,86 @@ namespace
       if (s_idx[2] != -1u)
         hash_of_state[s] = fnv<unsigned>::init;
     }
+
+    static void
+    update_named_props_for_state_renaming_(twa_graph* aut,
+                                            const std::vector<unsigned>& newst,
+                                            unsigned used_states)
+    {
+      if (auto* names =
+          aut->get_named_prop<std::vector<std::string>>("state-names"))
+        {
+          permute_vector(*names, newst);
+          names->resize(used_states);
+        }
+      if (auto hs =
+          aut->get_named_prop<std::map<unsigned, unsigned>>("highlight-states"))
+        {
+          unsigned ns = newst.size();
+          std::map<unsigned, unsigned> hs2;
+          for (auto p: *hs)
+            {
+              // Let's just ignore unexisting states.  Raising an
+              // exception here would leave the automaton in a strange
+              // state.
+              if (SPOT_UNLIKELY(p.first >= ns))
+                continue;
+              unsigned dst = newst[p.first];
+              if (dst != -1U)
+                hs2[dst] = p.second;
+            }
+          std::swap(*hs, hs2);
+        }
+      for (const char* prop: {"original-classes",
+                              "original-states",
+                              "degen-levels",
+                              "original-clauses"})
+        if (auto os = aut->get_named_prop<std::vector<unsigned>>(prop))
+          {
+            permute_vector(*os, newst);
+            os->resize(used_states);
+          }
+      if (auto ss =
+          aut->get_named_prop<std::vector<unsigned>>("simulated-states"))
+        {
+          for (auto& s : *ss)
+            {
+              if (s >= newst.size())
+                s = -1U;
+              else
+                s = newst[s];
+            }
+        }
+      for (const char* prop: {"state-player", "state-winner"})
+        if (auto sp = aut->get_named_prop<std::vector<bool>>(prop))
+          {
+            permute_vector(*sp, newst);
+            sp->resize(used_states);
+          }
+      if (auto st =
+          aut->get_named_prop<std::vector<unsigned>>("strategy"))
+        {
+          permute_vector(*st, newst);
+          st->resize(used_states);
+        }
+      if (auto ps =
+          aut->get_named_prop<std::vector<std::pair<unsigned, unsigned>>>
+          ("product-states"))
+        {
+          permute_vector(*ps, newst);
+          ps->resize(used_states);
+        }
+      if (auto is =
+          aut->get_named_prop<std::set<unsigned>>("incomplete-states"))
+        {
+          std::set<unsigned> is2;
+          unsigned ns = newst.size();
+          for (unsigned s: *is)
+            if (s < ns && newst[s] != -1U)
+              is2.insert(newst[s]);
+          std::swap(*is, is2);
+        }
+    }
 }
 
 namespace spot
@@ -1260,38 +1340,15 @@ namespace spot
         for (auto& e: edges())
           fixup(e.dst);
       }
-    // Update properties...
-    if (auto* names = get_named_prop<std::vector<std::string>>("state-names"))
+    // Update state-indexed properties...
+    update_named_props_for_state_renaming_(this, newst, used_states);
+    // Update edge-indexed properties to reflect edge renumbering
+    // that graph::defrag_states() will produce.
+    // This might break if graph::defrag_states() is changed.
+    auto he = get_named_prop<std::map<unsigned, unsigned>>("highlight-edges");
+    auto st = get_named_prop<std::vector<unsigned>>("strategy");
+    if (he || st)
       {
-        permute_vector(*names, newst);
-        names->resize(used_states);
-      }
-    if (auto hs = get_named_prop<std::map<unsigned, unsigned>>
-        ("highlight-states"))
-      {
-        unsigned ns = newst.size();
-        std::map<unsigned, unsigned> hs2;
-        for (auto p: *hs)
-          {
-            // Let's just ignore unexisting states.  Raising an
-            // exception here would leave the automaton in a strange
-            // state.
-            if (SPOT_UNLIKELY(p.first >= ns))
-              continue;
-            unsigned dst = newst[p.first];
-            if (dst != -1U)
-              hs2[dst] = p.second;
-          }
-        std::swap(*hs, hs2);
-      }
-    if (auto he = get_named_prop<std::map<unsigned, unsigned>>
-        ("highlight-edges"))
-      {
-        // Unfortunately, the underlying graph, who might remove some
-        // edges, knows nothing about named properties.  So we have to
-        // predict the indices of the edges after
-        // graph::defrag_states() will run.  This might break if
-        // graph::defrag_states() is changed.
         auto& ev = edge_vector();
         unsigned es = ev.size();
         std::vector<unsigned> newedges(es, -1U);
@@ -1305,43 +1362,39 @@ namespace spot
             else
               newedges[e] = edgeidx++;
           }
-        std::map<unsigned, unsigned> he2;
-        for (auto [e, c]: *he)
-          // Let's just ignore unexisting edges.  Raising an exception
-          // here would leave the automaton in a strange state.
-          if (SPOT_UNLIKELY(e > es))
-            continue;
-          else if (newedges[e] != -1U)
-            he2.emplace(newedges[e], c);
-        std::swap(*he, he2);
-      }
-    for (const char* prop: {"original-classes",
-                            "original-states",
-                            "degen-levels"})
-      if (auto os = get_named_prop<std::vector<unsigned>>(prop))
-        {
-          permute_vector(*os, newst);
-          os->resize(used_states);
-        }
-    if (auto ss = get_named_prop<std::vector<unsigned>>("simulated-states"))
-      {
-        for (auto& s : *ss)
+        if (he)
           {
-            if (s >= newst.size())
-              s = -1U;
-            else
-              s = newst[s];
+            std::map<unsigned, unsigned> he2;
+            for (auto [e, c]: *he)
+              // Let's just ignore unexisting edges.  Raising an
+              // exception here would leave the automaton in a strange
+              // state.
+              if (SPOT_UNLIKELY(e > es))
+                continue;
+              else if (newedges[e] != -1U)
+                he2.emplace(newedges[e], c);
+            std::swap(*he, he2);
           }
-      }
-    // Reassign the state-players
-    if (auto sp = get_named_prop<std::vector<bool>>("state-player"))
-      {
-        permute_vector(*sp, newst);
-        sp->resize(used_states);
+        if (st)
+          {
+            for (auto& s : *st)
+              if (s < es)
+                s = newedges[s];
+              else
+                s = -1U;
+          }
       }
     // Finally, update all states and edges.
     init_number_ = newst[init_number_];
     g_.defrag_states(newst, used_states);
+  }
+
+  void
+  twa_graph::rename_states_(const std::vector<unsigned>& newst)
+  {
+    init_number_ = newst[init_number_];
+    g_.rename_states_(newst);
+    update_named_props_for_state_renaming_(this, newst, newst.size());
   }
 
   void twa_graph::remove_unused_ap()

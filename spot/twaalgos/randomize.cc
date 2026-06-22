@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <numeric>
 #include <spot/twaalgos/randomize.hh>
-#include <spot/misc/permute.hh>
 #include <spot/misc/random.hh>
 
 namespace spot
@@ -42,23 +41,7 @@ namespace spot
         std::vector<unsigned> nums(n);
         std::iota(nums.begin(), nums.end(), 0);
         mrandom_shuffle(nums.begin(), nums.end());
-        g.rename_states_(nums);
-        aut->set_init_state(nums[aut->get_init_state_number()]);
-
-        if (auto sn =
-            aut->get_named_prop<std::vector<std::string>>("state-names"))
-          {
-            sn->resize(n);
-            permute_vector(*sn, nums);
-          }
-        if (auto hs = aut->get_named_prop<std::map<unsigned, unsigned>>
-            ("highlight-states"))
-          {
-            std::map<unsigned, unsigned> hs2;
-            for (auto p: *hs)
-              hs2[nums[p.first]] = p.second;
-            std::swap(*hs, hs2);
-          }
+        aut->rename_states_(nums);
       }
     if (randomize_edges)
       {
