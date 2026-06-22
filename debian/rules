@@ -17,8 +17,10 @@ include /usr/share/dpkg/default.mk
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 # main packaging script
+# We force --buildsystem=autoconf, because the presence of setup.py
+# would otherwise cause the build system to default to python_distutils.
 %:
-	dh $@ --with=python3
+	dh $@ --with=python3 --buildsystem=autoconf
 
 # ARFLAGS is for Automake
 # AR_FLAGS is for Libtool, (but libtool 2.4.7 will now use ARFLAGS as well)
