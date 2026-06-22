@@ -505,6 +505,7 @@ TESTS_python = \
   python/synthesis.py \
   python/_synthesis.ipynb \
   python/toparity.py \
+  python/trim-mtdswa.py \
   python/trival.py \
   python/unitprop.py \
   python/tra2tba.py \

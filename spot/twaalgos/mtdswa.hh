@@ -460,8 +460,16 @@ namespace spot
 
   /// \ingroup mtdswa
   /// \brief Remove unnecessary states from an MTDSwA.
-  /// This removes states that are not accessible from the initial state, and
-  /// states that inevitably point to constant values (bddtrue or bddfalse).
-  SPOT_API void trim_mtdswa(mtdswa_ptr swa);
+  /// In a first phase, this removes states that are unreachable from the
+  /// initial state.
+  /// In a second phase, it replaces states that will inevitably lead to
+  /// acceptance/rejection with bddtrue or bddfalse respectively.
+  /// This modifies the automaton in place.
+  /// By default both phases are performed, but this can be controlled with
+  /// the two optional boolean parameters.
+  /// If \a trim_inaccessible is set to false, the first phase is skipped.
+  /// If \a trim_inevitable is set to false, the second phase is skipped.
+  SPOT_API void trim_mtdswa(mtdswa_ptr swa, bool trim_inaccessible = true,
+                            bool trim_inevitable = true);
 
 }

@@ -4058,88 +4058,7 @@ namespace spot
 
   namespace
   {
-    // Used to renumber states.
-    static std::vector<int> renum;
 
-    static int trim_renumber(int bdd, int term)
-    {
-      // bddtrue and bddfalse are left unchanged.
-      if (bdd == 0 || bdd == 1)
-        return bdd;
-      assert((unsigned) term < renum.size());
-      int newterm = renum[term];
-      // Renumbered state.
-      if (newterm != -1)
-        return bdd_terminal_as_int(newterm);
-      return 0;
-    }
-
-    // Light version of trim_mtdswa that only removes inaccessible states.
-    void trim_dead_states(mtdswa_ptr swa, bddExtCache* cache, int hash_key)
-    {
-      // Do a BFS from the initial state, and mark all accessible states.
-      unsigned n = swa->num_roots();
-      std::vector<bool> accessible(n, false);
-      std::queue<int> q;
-      q.push(0);
-      accessible[0] = true;
-      while (!q.empty())
-        {
-          int s = q.front();
-          q.pop();
-          // Mark all leaves rechable from s as accessible.
-          for (bdd term : leaves_of(swa->states[s]))
-            {
-              if (SPOT_UNLIKELY(term != bddfalse && term != bddtrue))
-                {
-                  int next = bdd_get_terminal(term);
-                  if (!accessible[next])
-                    {
-                      // Only continue the BFS from states that are not
-                      // already marked as accessible.
-                      accessible[next] = true;
-                      q.push(next);
-                    }
-                }
-            }
-        }
-      // Compute renumbering of states.
-      renum = std::vector<int>(n, -1);
-      int newnum = 0;
-      for (unsigned s = 0; s < n; ++s)
-        {
-          if (accessible[s])
-            {
-              // This state is kept, and gets new number newnum.
-              renum[s] = newnum;
-              ++newnum;
-            }
-        }
-
-      // Apply renumbering and remove inaccessible states.
-      std::vector<bdd> new_states;
-      std::vector<formula> new_names;
-      std::vector<acc_cond::mark_t> new_colors;
-      new_states.reserve(newnum);
-      new_names.reserve(newnum);
-      new_colors.reserve(newnum);
-
-      // Renumber the states
-      for (unsigned s = 0; s < n; ++s)
-        if (renum[s] != -1)
-          {
-            bdd new_state = bdd_mt_apply1_leaves(swa->states[s],
-                                                 trim_renumber,
-                                                 cache, hash_key);
-            new_states.push_back(new_state);
-            new_colors.push_back(swa->colors[s]);
-            if (s < swa->names.size())
-              new_names.push_back(swa->names[s]);
-          }
-      swa->states = new_states;
-      swa->names = new_names;
-      swa->colors = new_colors;
-    }
 
     typedef std::set<unsigned> quantify_state;
 
@@ -4459,7 +4378,7 @@ namespace spot
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
     mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::Or, &cache, 0, 1);
     if (trim)
-      trim_dead_states(res, &cache, 2);
+      trim_mtdswa(res, true, false);
     bdd_extcache_done(&cache);
     return res;
   }
@@ -4472,7 +4391,7 @@ namespace spot
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
     mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::And, &cache, 0, 1);
     if (trim)
-      trim_dead_states(res, &cache, 2);
+      trim_mtdswa(res, true, false);
     bdd_extcache_done(&cache);
     return res;
   }
@@ -4501,148 +4420,272 @@ namespace spot
     return quantify_forall(swa, aps_to_bdd(swa, aps), trim);
   }
 
+  /////////////////////////////////////////////////////////////////////////
+  //                         Trimming MTDSwAs                            //
+  /////////////////////////////////////////////////////////////////////////
 
-  // Used to renumber states.
-  static std::vector<int> renum;
-  static std::vector<short> inevitably_const;
-
-  static int trim_renumber_and_collapse(int bdd, int term)
+  namespace
   {
-    // Constants bddtrue and bddfalse are left unchanged.
-    if (bdd == 0 || bdd == 1)
-      return bdd;
-    assert((unsigned) term < renum.size());
-    int newterm = renum[term];
-    // Renumbered state.
-    if (newterm != -1)
-      return bdd_terminal_as_int(newterm);
-    // Inevitably false.
-    else if (inevitably_const[term] == -1)
-      return 0;
-    // Inevitably true.
-    else if (inevitably_const[term] == 1)
-      return 1;
-    return 0;
+
+    // Used to renumber states.
+    static std::vector<int> renum;
+    // Maps each state to its SCC number.
+    static std::vector<int> scc_vec;
+    // For each SCC, we will store its status: -2 = unknown,
+    // 1 = inevitably accepting, -1 = inevitably rejecting, 0 = non trivial.
+    static std::vector<short> scc_status;
+    // Used to store propagated colors for each state.
+    static std::vector<acc_cond::mark_t> prop_colors;
+    // Stores relevant parents and children of each state for color propagation.
+    static std::vector<std::vector<int>> relevant_parents;
+    static std::vector<std::vector<int>> relevant_children;
+
+    // Propagates colors of children of state to state, then eventually 
+    // recursively spreads to known parents of state if needed.
+    // Used to spread colors in loops inside SCCs.
+    static void propagate_colors(acc_cond::mark_t all_cols, int state)
+    {
+      // Get colors present in all children.
+      acc_cond::mark_t col = all_cols;
+      for (int child : relevant_children[state])
+        col &= prop_colors[child];
+      // combine with colors of state itself.
+      col |= prop_colors[state];
+      // If new colors are added, then update and propagate to known parents.
+      if (col != prop_colors[state])
+        {
+          prop_colors[state] = col;
+          for (int parent : relevant_parents[state])
+            propagate_colors(all_cols, parent);
+        }
+    }
+
+    // Callback for apply1_leaves.  Renumbers living states, and replaces
+    // inevitably accepting/rejecting states with bddtrue/bddfalse.
+    static int trim_renumber_and_collapse(int bdd, int term)
+    {
+      // Constants bddtrue and bddfalse are left unchanged.
+      if (bdd == 0 || bdd == 1)
+        return bdd;
+      int newterm = renum[term];
+      // Renumbered state.
+      if (newterm != -1)
+        return bdd_terminal_as_int(newterm);
+      // Inevitably rejecting.
+      else if (scc_status[scc_vec[term]] == -1)
+        return 0;
+      // Inevitably accepting.
+      else if (scc_status[scc_vec[term]] == 1)
+        return 1;
+      // Unreachable states will never be seen in a terminal.
+      SPOT_UNREACHABLE();
+    }
+
+    // Version of trim_renumber_and_collapse that only renumbers.  Used to only
+    // trim inaccessible states, but not inevitably accepting/rejecting ones.
+    static int trim_renumber(int bdd, int term)
+    {
+      // Constants bddtrue and bddfalse are left unchanged.
+      if (bdd == 0 || bdd == 1)
+        return bdd;
+      int newterm = renum[term];
+      // Renumbered state.
+      if (newterm != -1)
+        return bdd_terminal_as_int(newterm);
+      // Unreachable states will never be seen in a terminal.
+      SPOT_UNREACHABLE();
+    }
+
   }
 
-
-  void trim_mtdswa(mtdswa_ptr swa)
+  void trim_mtdswa(mtdswa_ptr swa, bool trim_inaccessible, bool trim_inevitable)
   {
-    // 1 - Detect inaccessible states
-    // Do a BFS from the initial state, and mark all accessible states.
+    if (!trim_inaccessible && !trim_inevitable)
+      return;
     unsigned n = swa->num_roots();
-    std::vector<bool> accessible(n, false);
-    std::queue<int> q;
-    q.push(0);
-    accessible[0] = true;
-    while (!q.empty())
+    std::vector<bool> accessible;
+
+    // 1 - Detect inaccessible states
+
+    if (trim_inaccessible)
       {
-        int s = q.front();
-        q.pop();
-        // Mark all leaves rechable from s as accessible.
-        for (bdd term : leaves_of(swa->states[s]))
+        // Do a BFS from the initial state, and mark all accessible states.
+        accessible = std::vector<bool>(n, false);
+        std::queue<int> q;
+        q.push(0);
+        accessible[0] = true;
+        while (!q.empty())
           {
-            if (term != bddfalse && term != bddtrue)
+            int s = q.front();
+            q.pop();
+            // Mark all leaves rechable from s as accessible.
+            for (bdd term : leaves_of(swa->states[s]))
               {
-                int next = bdd_get_terminal(term);
-                if (!accessible[next])
+                if (term != bddfalse && term != bddtrue)
                   {
-                    // Only continue the BFS from states that are not
-                    // already marked as accessible.
-                    accessible[next] = true;
-                    q.push(next);
+                    int next = bdd_get_terminal(term);
+                    if (!accessible[next])
+                      {
+                        // Only continue the BFS from states that are not
+                        // already marked as accessible.
+                        accessible[next] = true;
+                        q.push(next);
+                      }
                   }
               }
           }
       }
 
-    // 2 - Mark all states that inevitably point to bddtrue or to bddfalse.
-    inevitably_const.assign(n, 0);
-    bool changed = true;
-    while (changed)
+    // 2 - Find SCCs that are inevitably accepting or inevitably rejecting.
+    if (trim_inevitable)
       {
-        changed = false;
-        // Never remove initial state 0.
-        for (unsigned s = 1; s < n; s++)
+        // Create a SCC -> state set mapping.
+        scc_vec = scc_vector(swa);
+        unsigned n_scc = scc_vec[0] + 1;  // max reachable SCC is initial SCC.
+        std::vector<std::vector<int>> scc_states(n_scc, std::vector<int>());
+        // Initialize status of all SCCs to unknown (-2).
+        scc_status = std::vector<short>(n_scc, -2);
+        // Initialize color propagation structures.
+        prop_colors = swa->colors;
+        relevant_children = std::vector<std::vector<int>>(n,
+                                                          std::vector<int>());
+        relevant_parents = std::vector<std::vector<int>>(n, std::vector<int>());
+        // Build SCC sets.
+        for (unsigned s = 0; s < n; ++s)
           {
-            // Skip states that are not accessible, or that are already known
-            // to be inevitably true or false.
-            if (!accessible[s] || inevitably_const[s] != 0)
-              continue;
-            // Check all reachable leaves from s.
-            auto leaves = leaves_of(swa->states[s]);
-            for (bdd term : leaves)
+            unsigned scc = scc_vec[s];
+            // Ignore any scc higher than the initial state SCC (unreachable)
+            if (scc < n_scc)
+              scc_states[scc].push_back(s);
+          }
+
+        // Check SCCs.
+        for (unsigned scc = 0; scc < n_scc; ++scc)
+          {
+            int new_status = -2;  // status unknown
+            bool loops = false;  // to distinguish transient states
+            for (int s : scc_states[scc])
               {
-                // If points to itself, see if it is accepting or rejecting.
-                if (bdd_is_terminal(term) && bdd_get_terminal(term) == (int) s)
+                if (trim_inaccessible && !accessible[s])
                   {
-                    if (swa->acc.accepting(swa->colors[s])
-                        && inevitably_const[s] != -1)
-                      {
-                        // Accepting loop : inevitably true.
-                        inevitably_const[s] = 1;
-                      }
-                    else if (!swa->acc.accepting(swa->colors[s])
-                             && inevitably_const[s] != 1)
-                      {
-                        // Rejecting loop : inevitably false.
-                        inevitably_const[s] = -1;
-                      }
-                    else {
-                      // Not inevitably true nor inevitably false
-                      inevitably_const[s] = 0;
-                      break;
-                    }
-                  }
-                // If points to false or to an inevitably false state
-                else if ((term == bddfalse
-                     || (bdd_is_terminal(term)
-                     && inevitably_const[bdd_get_terminal(term)] == -1))
-                    && inevitably_const[s] != 1)
-                  {
-                    inevitably_const[s] = -1;
-                  }
-                // If points to true or to an inevitably true state
-                else if ((term == bddtrue
-                          || (bdd_is_terminal(term)
-                          && inevitably_const[bdd_get_terminal(term)] == 1))
-                         && inevitably_const[s] != -1)
-                  {
-                    inevitably_const[s] = 1;
-                  }
-                // If points to a non-inevitable state, or to both an
-                // inevitably true and an inevitably false state
-                else
-                  {
-                    inevitably_const[s] = 0;
+                    // Inaccessible SCC, skip it.
+                    new_status = 0;
                     break;
                   }
+                // Check if child SCCs are inevitably accepting or rejecting.
+                for (bdd term : leaves_of(swa->states[s]))
+                  {
+                    if (term == bddfalse && new_status != 1)
+                      {
+                        new_status = -1;
+                      }
+                    else if (term == bddtrue && new_status != -1)
+                      {
+                        new_status = 1;
+                      }
+                    else if (term != bddfalse && term != bddtrue)
+                      {
+                        int next = bdd_get_terminal(term);
+                        int child_scc = scc_vec[next];
+                        if (child_scc == (int)scc)
+                          {
+                            // Child is in the same SCC.
+                            loops = true;
+                            if (next == s)
+                              {
+                                relevant_children[s].push_back(s);
+                                // Parents are only used for recursion, so we 
+                                // don't need to register self-loops as parents.
+                              }
+                            else
+                              {
+                                // Register child SCC for color propagation.
+                                relevant_children[s].push_back(next);
+                                relevant_parents[next].push_back(s);
+                              }
+                          }
+                        else
+                          {
+                            // Child is in a different SCC.
+                            if (scc_status[child_scc] == -1 && new_status != 1)
+                              {
+                                // Child is inevitably rejecting.
+                                new_status = -1;
+                              }
+                            else if (scc_status[child_scc] == 1
+                                    && new_status != -1)
+                              {
+                                // Child is inevitably accepting.
+                                new_status = 1;
+                              }
+                            else
+                              {
+                                // This SCC is non-trivial.
+                                new_status = 0;
+                                break;
+                              }
+                          }
+                      }
+                    else
+                      {
+                        // This SCC is non-trivial.
+                        new_status = 0;
+                        break;
+                      }
+                  }
+                // If we know that this SCC is non-trivial we can stop checking.
+                if (new_status == 0)
+                  break;
+                // Otherwise propagate colors to this state from its children.
+                propagate_colors(swa->acc.all_sets(), s);
               }
-            if (inevitably_const[s] != 0)
+
+            // Check if the SCC itself is inevitably accepting or rejecting.
+            if (loops && new_status != 0)  // Only applicable if it loops.
               {
-                changed = true;
+                // Compute colors of SCC
+                acc_cond::mark_t potentially_seen{};
+                acc_cond::mark_t always_seen = swa->acc.all_sets();
+                for (int s : scc_states[scc])
+                  {
+                    potentially_seen|= prop_colors[s];
+                    always_seen &= prop_colors[s];
+                  }
+                trival is_acc = swa->acc.weakly_accepting(potentially_seen,
+                                                              always_seen);
+                if (is_acc.is_true() && new_status != -1)
+                  new_status = 1;  // Inevitably accepting SCC.
+                else if (is_acc.is_false() && new_status != 1)
+                  new_status = -1;  // Inevitably rejecting SCC.
+                else
+                  new_status = 0;  // Non trivial SCC.
               }
+            scc_status[scc] = new_status;
           }
       }
 
     // 3 - Compute renumbering of states.
     renum = std::vector<int>(n, -1);
-    int newnum = 0;
-    for (unsigned s = 0; s < n; ++s)
+    renum[0] = 0;  // initial state is always kept, and gets number 0.
+    int newnum = 1;
+    for (unsigned s = 1; s < n; ++s)
       {
-        if (accessible[s] && inevitably_const[s] == 0)
+        // If the state is accessible and not inevitably accepting/rejecting
+        if ((!trim_inaccessible || accessible[s])
+            && (!trim_inevitable || scc_vec[s] > scc_vec[0]
+                || scc_status[scc_vec[s]] == 0))
           {
-            // This state is kept, and gets new number newnum.
+            // State is kept and gets new number newnum.
             renum[s] = newnum;
             ++newnum;
           }
       }
 
     // 4 - Apply renumbering and remove states that 
-    // are not accessible or inevitably true / false.
+    // are not accessible or inevitably accepting / rejecting.
 
     bddExtCache cache;
-    bdd_extcache_init(&cache, 100, true);
+    bdd_extcache_init(&cache, size_estimate_unary(swa), true);
     std::vector<bdd> new_states;
     new_states.reserve(newnum);
 
@@ -4650,8 +4693,10 @@ namespace spot
     for (unsigned s = 0; s < n; ++s)
       if (renum[s] != -1)
         {
+          auto callback = trim_inevitable ?
+                          trim_renumber_and_collapse : trim_renumber;
           bdd new_state = bdd_mt_apply1_leaves(swa->states[s],
-                                               trim_renumber_and_collapse,
+                                               callback,
                                                &cache, 0);
           new_states.push_back(new_state);
         }
@@ -4676,6 +4721,12 @@ namespace spot
     swa->states = new_states;
     swa->names = new_names;
     swa->colors = new_colors;
+
+    // Cleanup static vectors.
+    renum.clear();
+    scc_vec.clear();
+    scc_status.clear();
+    prop_colors.clear();
   }
 
 }

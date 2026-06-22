@@ -1386,6 +1386,22 @@ namespace spot
       trival maybe_accepting(mark_t infinitely_often,
                              mark_t always_present) const;
 
+      /// \brief Check if cycles in a SCC are all accepting, all rejecting, or 
+      /// mixed.
+      ///
+      /// Assuming that an SCC intersects all sets in \a
+      /// infinitely_often (i.e., for each set in \a infinitely_often,
+      /// there exist one marked transition in the SCC), and is
+      /// included in all sets in \a always_present (i.e., all
+      /// cycles have a transition marked with \a always_present), this returns
+      /// one tree possible results:
+      /// - trival::yes() all cycles in the SCC are necessarily accepting,
+      /// - trival::no() all cycles in the SCC are necessarily rejecting,
+      /// - trival::maybe() the SCC could contain both accepting and
+      ///  rejecting cycles.
+      trival weakly_accepting(mark_t infinitely_often,
+                             mark_t always_present) const;
+
       /// \brief compute the symmetry class of the acceptance sets.
       ///
       /// Two sets x and y are symmetric if swapping them in the
@@ -2068,6 +2084,25 @@ namespace spot
     trival maybe_accepting(mark_t infinitely_often, mark_t always_present) const
     {
       return code_.maybe_accepting(infinitely_often, always_present);
+    }
+
+    /// \brief Check if cycles in a SCC are all accepting, all rejecting, or 
+    /// mixed.
+    ///
+    /// Assuming that an SCC intersects all sets in \a
+    /// infinitely_often (i.e., for each set in \a infinitely_often,
+    /// there exists one marked transition in the SCC), and is
+    /// included in all sets in \a always_present (i.e., all
+    /// cycles have a transition marked with \a always_present), this returns
+    /// one tree possible results:
+    /// - trival::yes() all cycles in the SCC are necessarily accepting,
+    /// - trival::no() all cycles in the SCC are necessarily rejecting,
+    /// - trival::maybe() the SCC could contain both accepting and
+    /// rejecting cycles.
+    trival
+    weakly_accepting(mark_t infinitely_often, mark_t always_present) const
+    {
+      return code_.weakly_accepting(infinitely_often, always_present);
     }
 
     /// \brief Return an accepting subset of \a inf
