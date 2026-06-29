@@ -491,6 +491,10 @@ namespace spot
   SPOT_API mtdfa_ptr complement(const mtdfa_ptr& dfa);
 
   /// \ingroup mtdfa
+  /// \brief Trim an MTDFA
+  SPOT_API mtdfa_ptr trim(const mtdfa_ptr& dfa);
+
+  /// \ingroup mtdfa
   /// \brief Convert a TWA (representing a DFA) into an MTDFA.
   SPOT_API mtdfa_ptr twadfa_to_mtdfa(const twa_graph_ptr& twa);
 

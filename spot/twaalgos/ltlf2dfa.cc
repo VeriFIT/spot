@@ -676,6 +676,304 @@ namespace spot
         res->names.push_back(formula::Not(dfa->names[i]));
       return res;
     }
+
+    static mtdfa_ptr
+    trim_aux(const mtdfa_ptr& dfa, bddExtCache* cache, int hash_key)
+    {
+      (void) cache;
+      (void) hash_key;
+      unsigned n = dfa->states.size();
+      unsigned ns = dfa->names.size();
+
+      // Handle the edge case of an empty automaton.
+      if (n == 0)
+        {
+          bdd_dict_ptr dict_empty = dfa->get_dict();
+          mtdfa_ptr empty_res = std::make_shared<mtdfa>(dict_empty);
+          dict_empty->register_all_propositions_of(dfa, empty_res);
+          return empty_res;
+        }
+
+      std::vector<char> reachable(n, 0);
+      // is_pure_false and is_pure_true are assumed pure until proven otherwise
+      std::vector<bool> is_pure_false(n, true);
+      std::vector<bool> is_pure_true(n, true);
+
+      std::vector<std::vector<unsigned>> preds(n); // Reversed graph for
+                                                   // backward propagation
+      std::queue<unsigned> q_reach;
+      std::queue<unsigned> q_not_false;
+      std::queue<unsigned> q_not_true;
+
+      reachable[0] = 1;
+      q_reach.push(0);
+
+      // Reachability + preds construction + initial impurity detection
+      while (!q_reach.empty())
+        {
+          unsigned u = q_reach.front();
+          q_reach.pop();
+
+          bdd b = dfa->states[u];
+
+          for (bdd leaf : leaves_of(b))
+            {
+              // A bbdtrue leaf breaks "pure falsity"
+              if (leaf == bddtrue)
+                {
+                  if (is_pure_false[u])
+                    {
+                      is_pure_false[u] = false;
+                      q_not_false.push(u);
+                    }
+                  continue;
+                }
+              // A bddfalse leaf breaks "pure truth"
+              if (leaf == bddfalse)
+                {
+                  if (is_pure_true[u])
+                    {
+                      is_pure_true[u] = false;
+                      q_not_true.push(u);
+                    }
+                  continue;
+                }
+
+              int term = bdd_get_terminal(leaf);
+              int dst = term / 2;
+              int acc = term & 1;
+
+              if (dst >= 0 && (unsigned)dst < n)
+                {
+                  // Construction of the reversed graph
+                  preds[dst].push_back(u);
+
+                  // Reacbability propagation
+                  if (!reachable[dst])
+                    {
+                      reachable[dst] = 1;
+                      q_reach.push(dst);
+                    }
+
+                  // Immediate identification of inherent impurity
+                  if (acc == 1 && is_pure_false[u])
+                    {
+                      is_pure_false[u] = false;
+                      q_not_false.push(u);
+                    }
+                  if (acc == 0 && is_pure_true[u])
+                    {
+                      is_pure_true[u] = false;
+                      q_not_true.push(u);
+                    }
+                }
+            }
+        }
+
+      // Backward propagation using a worklist.  If a state is not pure_false,
+      // all its parents lose their pure_false status.
+      while (!q_not_false.empty())
+        {
+          unsigned u = q_not_false.front();
+          q_not_false.pop();
+
+          for (unsigned p : preds[u])
+            {
+              if (is_pure_false[p]) // This guard prevents infinite loops in
+                                    // cycles.
+                {
+                  is_pure_false[p] = false;
+                  q_not_false.push(p);
+                }
+            }
+        }
+
+      // If a state is not pure_true, all its parents lose their pure_true
+      // status.
+      while (!q_not_true.empty())
+        {
+          unsigned u = q_not_true.front();
+          q_not_true.pop();
+
+          for (unsigned p : preds[u])
+            {
+              if (is_pure_true[p]) // This guard prevents infinite loops in
+                                   // cycles.
+                {
+                  is_pure_true[p] = false;
+                  q_not_true.push(p);
+                }
+            }
+        }
+
+      // Mark unreachable, pure_false, and pure_true states for removal.
+      std::vector<char> remove_state(n, 0);
+      for (unsigned i = 1; i < n; ++i)
+        {
+          if (!reachable[i] || is_pure_false[i] || is_pure_true[i])
+            remove_state[i] = 1;
+        }
+
+      // Build a mapping table from the old state indices to the newly shifted
+      // indices.
+      std::unordered_map<int, int> old_to_new;
+      std::vector<unsigned> new_list;
+      new_list.reserve(n);
+
+      old_to_new[0] = 0;
+      new_list.push_back(0);
+
+      for (unsigned i = 1; i < n; ++i)
+        {
+          if (reachable[i] && !remove_state[i])
+            {
+              old_to_new[i] = new_list.size();
+              new_list.push_back(i);
+            }
+        }
+
+      // Determine if auxiliary sink states (garbage or universal) are required.
+      // - 'used_garbage' is needed if an accepting transition points to a dead
+      // state.
+      // - 'used_univ' is needed if a non-accepting transition points to a
+      // universally true state.
+      bool used_garbage = false;
+      bool used_univ = false;
+      for (unsigned i : new_list)
+        {
+          if (dfa->states[i] == bddfalse || dfa->states[i] == bddtrue)
+            continue;
+          for (bdd leaf : leaves_of(dfa->states[i]))
+            {
+              if (leaf == bddfalse || leaf == bddtrue)
+                continue;
+              int term = bdd_get_terminal(leaf);
+              int dst = term / 2;
+              int acc = term & 1;
+
+              if (dst < 0 || (unsigned)dst >= n)
+                continue;
+
+              if (acc == 1 && is_pure_false[dst])
+                used_garbage = true;
+              else if (acc == 0 && is_pure_true[dst])
+                used_univ = true;
+            }
+        }
+
+      unsigned garbage_state_idx = new_list.size();
+      unsigned univ_state_idx = new_list.size() + (used_garbage ? 1 : 0);
+
+      std::unordered_map<int, bdd> rewritten;
+      std::vector<bdd> final_transitions(n, bdd(bddfalse));
+      std::function<bdd(bdd)> rewrite_bdd;
+
+      // Deep Structural Rewrite of Transition BDDs
+      rewrite_bdd = [&](bdd node) -> bdd {
+          if (node == bddfalse || node == bddtrue)
+            return node;
+
+          int id = node.id();
+          if (auto it = rewritten.find(id); it != rewritten.end())
+            return it->second;
+
+          bdd out = bdd(bddfalse);
+
+          if (bdd_is_terminal(node))
+            {
+              int term = bdd_get_terminal(node);
+              int dst = term / 2;
+              int acc = term & 1;
+
+              if (dst < 0 || (unsigned) dst >= n || is_pure_false[dst])
+                {
+                  // If an accepting arc leads to a dead/removed state, redirect
+                  // it to the accepting garbage trap to preserve the language.
+                  if (acc)
+                    out = bdd_terminal(2 * garbage_state_idx + 1);
+                  else
+                    out = bddfalse; // Safely reduce to pure bddfalse.
+                }
+              else if (is_pure_true[dst])
+                {
+                  // If routing to a pure_true state, collapse to bddtrue if
+                  // accepting.  Otherwise, route to the univeral sink to delay
+                  // acceptance by one step.
+                  if (acc == 1)
+                    out = bddtrue;
+                  else
+                    out = bdd_terminal(2 * univ_state_idx + 0);
+                }
+              else
+                {
+                  // Normal case: remap the transition to the shifted state
+                  // index.
+                  auto it = old_to_new.find(dst);
+                  if (it != old_to_new.end())
+                    out = bdd_terminal(2 * it->second + acc);
+                  else
+                    out = bddfalse;
+                }
+            }
+          else
+            {
+              // Recursively process the internal decision nodes.
+              int var = bdd_var(node);
+              bdd low = rewrite_bdd(bdd_low(node));
+              bdd high = rewrite_bdd(bdd_high(node));
+
+              out = bdd_ite(bdd_ithvar(var), high, low);
+            }
+
+          rewritten[id] = out;
+          return out;
+      };
+
+      for (unsigned i : new_list)
+        {
+          rewritten.clear();
+          final_transitions[i] = rewrite_bdd(dfa->states[i]);
+        }
+
+      // Final Automaton Reconstruction.
+      bdd_dict_ptr dict = dfa->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa, res);
+
+      bool keep_names = (ns > 0);
+
+      // Adjust capacities based on whether auxiliary states were trigerred.
+      if (keep_names)
+        res->names.reserve(new_list.size() + (used_garbage ? 1 : 0)
+                          + (used_univ ? 1 : 0));
+      res->states.reserve(new_list.size() + (used_garbage ? 1 : 0)
+                          + (used_univ ? 1 : 0));
+      res->aps = dfa->aps;
+
+      for (unsigned i : new_list)
+        {
+          res->states.push_back(final_transitions[i]);
+          if (keep_names)
+            res->names.push_back(i < ns ? dfa->names[i] : nullptr);
+        }
+
+      // Append the accepting garbage trap if required.
+      if (used_garbage)
+        {
+          res->states.push_back(bddfalse);
+          if (keep_names)
+            res->names.push_back(formula::ff());
+        }
+
+        // Append the univerally true sink if required.
+        if (used_univ)
+          {
+            res->states.push_back(bddtrue);
+            if (keep_names)
+              res->names.push_back(formula::tt());
+          }
+      return res;
+    }
   }
 
   mtdfa_ptr product(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
@@ -728,6 +1026,15 @@ namespace spot
     bddExtCache cache;
     bdd_extcache_init(&cache, 0, true);
     mtdfa_ptr res = complement_aux(dfa, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr trim(const mtdfa_ptr& dfa)
+  {
+    bddExtCache cache;
+    bdd_extcache_init(&cache, 0, true);
+    mtdfa_ptr res = trim_aux(dfa, &cache, 0);
     bdd_extcache_done(&cache);
     return res;
   }
