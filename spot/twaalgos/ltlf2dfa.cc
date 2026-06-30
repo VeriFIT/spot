@@ -559,6 +559,285 @@ namespace spot
       return the_product_data.pair_to_terminal_bdd(ls, rs, lb != rb);
     }
 
+    typedef std::set<unsigned> quantify_state;
+
+    struct quantify_state_hash
+    {
+      // Hash function for a set of unsigned integers.  We use the
+      // Wang hash function for 32-bit integers, and combine the
+      // hashes of each element in the set using a commutative
+      // operation (XOR).  This ensures that the hash value is the same
+      // for sets with the same elements, regardless of their order.
+      size_t
+      operator()(quantify_state s) const noexcept
+      {
+        std::size_t seed = 0;
+        for (int x : s)
+          seed ^= wang32_hash(x) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
+      }
+    };
+
+    struct quantify_data
+    {
+      // Cache the BDD node representing the terminals associated to a
+      // set of states.  We may have up to two terminals par state,
+      // to distinguish between accepting states (2*value+1) or
+      // rejecting state (2*value).  However, while we know we need at
+      // least one of terminal, we may not always need the second one.
+      // So in the interest of reducing the calls to BuDDy, we store
+      // the 1-complement of value until in the other field until we
+      // find we actually need that terminal.
+      // The array can therefore hold either
+      //    [bdd_terminal(value*2), ~value]
+      // or [~value, bdd_terminal(value*2+1)]
+      // or [bdd_terminal(value*2), bdd_terminal(value*2+1)]
+      // The distinction between the three cases can be made with
+      // the sign bit of the array element.
+      std::unordered_map<quantify_state, std::array<int, 2>,
+                         quantify_state_hash> set_to_terminal_map;
+      std::vector<quantify_state> terminal_to_set_map;
+      std::queue<quantify_state> todo;
+      unsigned state_offset;
+
+      int set_to_terminal(const quantify_state& s,
+                           bool may_stop = false)
+      {
+        if (auto it = set_to_terminal_map.find(s);
+            it != set_to_terminal_map.end())
+          {
+            int& id = it->second[may_stop];
+            if (id < 0)
+              id = bdd_terminal_as_int(2 * ~id + may_stop);
+            return id;
+          }
+
+        unsigned v = state_offset + set_to_terminal_map.size();
+        std::array<int, 2> entry;
+        int id = bdd_terminal_as_int(2 * v + may_stop);
+        entry[may_stop] = id;
+        entry[!may_stop] = ~v;
+
+        quantify_state ps{s};
+        set_to_terminal_map.emplace(ps, entry);
+        terminal_to_set_map.push_back(s);
+        todo.emplace(ps);
+
+        return id;
+      }
+
+      void add_state_to_set(quantify_state& s, unsigned v) const
+      {
+        int term_id = bdd_get_terminal(v);
+        unsigned real_v = 0;
+        real_v = term_id / 2;
+
+        if (real_v < state_offset)
+          {
+            s.insert(real_v);
+          }
+        else
+          {
+            unsigned idx = real_v - state_offset;
+
+            if (idx < terminal_to_set_map.size())
+              {
+                const quantify_state& st = terminal_to_set_map[idx];
+                s.insert(st.begin(), st.end());
+              }
+          }
+      }
+
+    } the_quantify_data;
+
+    // Combine two leaves of a BDD using the AND operation, taking into account
+    // the terminal states of the left and right leaves.  The function returns a
+    // new terminal state that represents the result of the AND operation on the
+    // two leaves.  If either leaf is a terminal state, the function will use 
+    // the corresponding terminal state to determine the result.  If both leaves
+    // are non-terminal states, the function will create a new terminal state 
+    // that represents the combination of the two leaves.
+    static int quantify_leaf_combine_and(int left, int left_term,
+                                int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 0 || right == 0))
+        return 0;
+      if (SPOT_UNLIKELY(left == 1 && right == 1))
+        return 1;
+      quantify_state s;
+      bool acc_l = (left == 1);
+      bool acc_r = (right == 1);
+
+      if (left != 1 && left != 0)
+        {
+          int term_id = bdd_is_terminal(left) ?
+                        bdd_get_terminal(left) : left_term;
+          acc_l = term_id & 1;
+          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+        }
+      if (right != 1 && right != 0)
+        {
+          int term_id = bdd_is_terminal(right) ?
+                        bdd_get_terminal(right) : right_term;
+          acc_r = term_id & 1;
+          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+        }
+      if (s.empty())
+        return 1;
+      return the_quantify_data.set_to_terminal(s, acc_l & acc_r);
+    }
+
+    // Combine two leaves of a BDD using the OR operation, taking into account
+    // the terminal states of the left and right leaves.  The function returns a
+    // new terminal state that represents the result of the OR operation on the
+    // two leaves.  If either leaf is a terminal state, the function will use 
+    // the corresponding terminal state to determine the result.  If both leaves
+    // are non-terminal states, the function will create a new terminal state
+    // that represents the combination of the two leaves.
+    static int quantify_leaf_combine_or(int left, int left_term,
+                               int right, int right_term)
+    {
+      if (SPOT_UNLIKELY(left == 1 || right == 1))
+        return 1;
+      if (SPOT_UNLIKELY(left == 0 && right == 0))
+        return 0;
+
+      quantify_state s;
+      bool acc_l = false;
+      bool acc_r = false;
+
+      if (left != 0 && left != 1)
+        {
+          int term_id = bdd_is_terminal(left) ?
+                        bdd_get_terminal(left) : left_term;
+          acc_l = term_id & 1;
+          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+        }
+      if (right != 0 && right != 1)
+        {
+          int term_id = bdd_is_terminal(right) ?
+                        bdd_get_terminal(right) : right_term;
+          acc_r = term_id & 1;
+          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+        }
+      if (s.empty())
+        return 0;
+      return the_quantify_data.set_to_terminal(s, acc_l | acc_r);
+    }
+
+    // Combine a leaf of a BDD with a terminal state, taking into account
+    // the terminal state of the leaf.  The function returns a new terminal
+    // state that represents the result of the combination.  If the leaf is a
+    // terminal state, the function will use the corresponding terminal state
+    // to determine the result.  If the leaf is a non-terminal state, the 
+    // function will create a new terminal state that represents the 
+    // combination.
+    static int quant_leaf_combine1(int bdd, int term)
+    {
+      if (SPOT_UNLIKELY(bdd == 0))
+        return 0;
+      if (SPOT_UNLIKELY(bdd == 1))
+        return 1;
+      unsigned v = 0;
+      bool accepting = false;
+
+      if (bdd_is_terminal(bdd))
+        {
+          int term_id = bdd_get_terminal(bdd);
+          v = term_id / 2;
+          accepting = term_id & 1;
+        }
+      else
+        {
+          v = term / 2;
+          accepting = term & 1;
+        }
+
+      return the_quantify_data.set_to_terminal({v}, accepting);
+    }
+
+    // Unshift the terminals of a BDD, replacing each terminal with its
+    // corresponding state index and accepting status.  The function returns a 
+    // new terminal state that represents the result of the unshifting.  If the
+    // BDD is a terminal state, the function will use the corresponding terminal
+    // state to determine the result.  If the BDD is a non-terminal state, the 
+    // function will create a new terminal state that represents the unshifting.
+    static int unshift_terminals(int bdd, int term)
+    {
+      if (SPOT_UNLIKELY(bdd == 0))
+        return 0;
+      if (SPOT_UNLIKELY(bdd == 1))
+        return 1;
+      int term_id = 0;
+      if (bdd_is_terminal(bdd))
+        {
+          term_id = bdd_get_terminal(bdd);
+        }
+      else
+        {
+          term_id = term;
+        }
+
+      unsigned v = term_id / 2;
+      bool accepting = term_id & 1;
+
+      unsigned final_state_idx = 0;
+      if (v < the_quantify_data.state_offset)
+        {
+          final_state_idx = v;
+        }
+      else
+        {
+          final_state_idx = v - the_quantify_data.state_offset;
+        }
+
+      return bdd_terminal_as_int(2 * final_state_idx + accepting);
+    }
+
+    // Apply a binary operation to a queue of BDDs, combining them pairwise
+    // until only one BDD remains. The function takes a queue of BDDs, an
+    // operation type, and function pointers for combining the leaves of the
+    // BDDs. It also takes a cache and a hash key for caching intermediate
+    // results. The function returns the final combined BDD.  
+    static bdd applyn_leaves(std::queue<bdd>& q, op o,
+                            int (*combine)(int, int, int, int),
+                            int (*combine1)(int, int),
+                            bddExtCache* cache, int hash_key,
+                            int applyop_shortcut)
+    {
+      if (SPOT_UNLIKELY(q.empty()))
+        {
+          switch (o)
+            {
+            case op::And:
+              return bddtrue;
+            case op::Or:
+              return bddfalse;
+            default:
+              throw std::runtime_error("applyn_leaves: unsupported operator");
+            }
+        }
+      if (q.size() == 1)
+        {
+          bdd s = q.front();
+          q.pop();
+          return bdd_mt_apply1_leaves(s, combine1, cache, hash_key);
+        }
+      while (q.size() > 1)
+        {
+          bdd left = q.front();
+          q.pop();
+          bdd right = q.front();
+          q.pop();
+          bdd res = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
+                                       applyop_shortcut);
+          q.push(res);
+        }
+      bdd s = q.front();
+      q.pop();
+      return s;
+    }
+
     static mtdfa_ptr
     product_mtdfa_aux(const mtdfa_ptr& dfa1,
                       const mtdfa_ptr& dfa2, op o,
@@ -974,6 +1253,122 @@ namespace spot
           }
       return res;
     }
+
+    // Quantify the variable VAR in the MTBDD DFA using the operation AND or OR.
+    static mtdfa_ptr
+    quantification_aux(const mtdfa_ptr& dfa, op o,
+                       int var, bddExtCache* cache, int quant_hash,
+                       int apply_hash)
+    {
+      int (*combine)(int, int, int, int);
+      int applyop_shortcut = -1;
+
+      // Determine the appropriate combine function and shortcut based on the 
+      // operation.
+      if (o == op::Or)
+        {
+          combine = quantify_leaf_combine_or;
+          applyop_shortcut = bddop_or_one;
+        }
+      else
+        {
+          combine = quantify_leaf_combine_and;
+          applyop_shortcut = bddop_and_zero;
+        }
+
+      // Create a new MTBDD to hold the result of the quantification.
+      bdd_dict_ptr dict = dfa->get_dict();
+      mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+      dict->register_all_propositions_of(dfa, res);
+      res->aps = dfa->aps;
+      the_quantify_data.state_offset = dfa->states.size();
+
+      // Initialize the todo queue with the initial state of the quantification.
+      std::queue<quantify_state>& todo = the_quantify_data.todo;
+      (void) the_quantify_data.set_to_terminal(quantify_state{0}, false);
+
+      // Process each state in the todo queue, combining the BDDs of the states
+      // in the set.
+      while (!todo.empty())
+        {
+          quantify_state s = todo.front();
+          todo.pop();
+
+          std::queue<bdd> q;
+          formula combine_f = o == op::And ? formula::tt() : formula::ff();
+
+          for (unsigned v: s)
+            {
+              bdd b = dfa->states[v];
+              formula f = v < dfa->names.size() ? dfa->names[v] : nullptr;
+              q.push(b);
+
+              if (combine_f)
+                {
+                  if (f)
+                  {
+                    switch (o)
+                      {
+                      case op::And:
+                        combine_f = formula::And(combine_f, f);
+                        break;
+                      case op::Or:
+                        combine_f = formula::Or(combine_f, f);
+                        break;
+                      default:
+                        SPOT_UNREACHABLE();
+                      }
+                  }
+                  else
+                    combine_f = nullptr;
+                }
+            }
+
+          // Apply the combine function to the leaves of the BDDs in the queue,
+          // quantifying the variable VAR and storing the result in the new 
+          // MTBDD.
+          bdd b = applyn_leaves(q, o, combine, quant_leaf_combine1,
+                                cache, quant_hash, applyop_shortcut);
+
+          bdd target_var_bdd = bdd_ithvar(var);
+          bdd_mt_quantify_prepare(target_var_bdd);
+          bdd qb = bdd_mt_quantify(b, [](int v){ return v; }, combine, cache,
+                                  quant_hash, apply_hash, applyop_shortcut);
+
+          if (o == op::Or)
+            {
+              qb = bdd_exist(qb, target_var_bdd);
+            }
+          else
+            {
+              qb = bdd_forall(qb, target_var_bdd);
+            }
+          qb = bdd_mt_apply1_leaves(qb, unshift_terminals, cache, apply_hash);
+          res->states.push_back(qb);
+
+          // If the variable being quantified is an atomic proposition, we can
+          // also quantify the formula associated with that atomic proposition.
+          formula var_ap = dfa->get_dict()->ap_from_var(var);
+          if (combine_f && var_ap)
+            {
+              switch (o)
+                {
+                case op::And:
+                  res->names.push_back(formula::forall(var_ap, combine_f));
+                  break;
+                case op::Or:
+                  res->names.push_back(formula::exists(var_ap, combine_f));
+                  break;
+                default:
+                  SPOT_UNREACHABLE();
+                }
+            }
+        }
+
+      the_quantify_data.set_to_terminal_map.clear();
+      the_quantify_data.terminal_to_set_map.clear();
+      return res;
+    }
   }
 
   mtdfa_ptr product(const mtdfa_ptr& dfa1, const mtdfa_ptr& dfa2)
@@ -1035,6 +1430,27 @@ namespace spot
     bddExtCache cache;
     bdd_extcache_init(&cache, 0, true);
     mtdfa_ptr res = trim_aux(dfa, &cache, 0);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr quantification(const mtdfa_ptr& dfa, bool is_existential,
+                           formula var)
+  {
+    auto& var_map = dfa->get_dict()->var_map;
+    auto it = var_map.find(var);
+
+    if (it == var_map.end())
+      return dfa;
+
+    int ivar = it->second;
+    bddExtCache cache;
+    bdd_extcache_init(&cache, 0, true);
+    while (!the_quantify_data.todo.empty())
+      the_quantify_data.todo.pop();
+    mtdfa_ptr res = trim(quantification_aux(dfa,
+                                            is_existential ? op::Or : op::And,
+                                            ivar, &cache, 0, 1));
     bdd_extcache_done(&cache);
     return res;
   }

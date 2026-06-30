@@ -495,6 +495,11 @@ namespace spot
   SPOT_API mtdfa_ptr trim(const mtdfa_ptr& dfa);
 
   /// \ingroup mtdfa
+  /// \brief Perform quantification on an MTDFA.
+  SPOT_API mtdfa_ptr quantification(const mtdfa_ptr& dfa, bool is_existential,
+                                    formula var);
+
+  /// \ingroup mtdfa
   /// \brief Convert a TWA (representing a DFA) into an MTDFA.
   SPOT_API mtdfa_ptr twadfa_to_mtdfa(const twa_graph_ptr& twa);
 
