@@ -45,7 +45,8 @@ libspot_la_LIBADD =  \
   twacube/libtwacube.la \
   mc/libmc.la \
   ../lib/libgnu.la \
-  ../picosat/libpico.la
+  ../picosat/libpico.la \
+  ../cadical/libcadical.la
 
 # Dummy C++ source to cause C++ linking.
 nodist_EXTRA_libspot_la_SOURCES = _.cc

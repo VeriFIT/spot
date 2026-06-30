@@ -163,8 +163,9 @@ for dir in "$TOP/spot" "$TOP/bin" "$TOP/tests"; do
     case $file in
     *.test);;
     *)
-      $GREP -E '(>[^>]*|^[^<]*)class[ \t]+[A-Z]' $tmp &&
-        diag 'Use lower case class names.'
+     $GREP -E '(>[^>]*|^[^<]*)class[ \t]+[A-Z]' $tmp |
+         $GREP -v -F ' Solver;' &&  # CaDiCaL::Solver is not our choice
+         diag 'Use lower case class names.'
 
       $GREP '[	 ]if(' $tmp &&
 	diag 'Missing space after "if"'

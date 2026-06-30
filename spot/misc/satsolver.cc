@@ -22,7 +22,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <spot/misc/satsolver.hh>
-#include <picosat/picosat.h>
+#include <cadical/src/cadical.hpp>
 #include <fstream>
 #include <limits>
 #include <cassert>
@@ -34,7 +34,7 @@ namespace spot
   // easy to check if psat_ was initialized or not.
   satsolver::satsolver()
     : cnf_tmp_(nullptr), cnf_stream_(nullptr), nclauses_(0), nvars_(0),
-    nassumptions_vars_(0), nsols_(0), psat_(nullptr), xcnf_tmp_(nullptr),
+    nassumptions_vars_(0), nsols_(0), solver_(nullptr), xcnf_tmp_(nullptr),
     xcnf_stream_(nullptr), path_("")
   {
     // Check SPOT_XCNF env var.
@@ -60,17 +60,17 @@ namespace spot
     }
     else
     {
-      psat_ = picosat_init();
-      picosat_set_seed(psat_, 0);
+      solver_ = new CaDiCaL::Solver();
+      // solver_->set("seed", 0);  // this is Cadical's default.
     }
   }
 
   satsolver::~satsolver()
   {
-    if (psat_)
+    if (solver_)
     {
-      picosat_reset(psat_);
-      psat_ = nullptr;
+      delete solver_;
+      solver_ = nullptr;
     }
     else
     {
@@ -130,9 +130,9 @@ namespace spot
     if (nvars < 0)
       throw std::runtime_error("variable number must be at least 0");
 
-    if (psat_)
+    if (solver_)
     {
-      picosat_adjust(psat_, nvars + nassumptions_vars_);
+      solver_->resize(nvars + nassumptions_vars_);
     }
     else
     {
@@ -155,9 +155,9 @@ namespace spot
   {
     for (auto& v : values)
     {
-      if (psat_)
+      if (solver_)
       {
-        picosat_add(psat_, v);
+        solver_->add(v);
       }
       else
       {
@@ -176,9 +176,9 @@ namespace spot
 
   void satsolver::add(int v)
   {
-    if (psat_)
+    if (solver_)
     {
-      picosat_add(psat_, v);
+      solver_->add(v);
     }
     else
     {
@@ -196,15 +196,15 @@ namespace spot
 
   int satsolver::get_nb_clauses() const
   {
-    if (psat_)
-      return picosat_added_original_clauses(psat_);
+    if (solver_)
+      return static_cast<int>(solver_->irredundant());
     return nclauses_;
   }
 
   int satsolver::get_nb_vars() const
   {
-    if (psat_)
-      return picosat_variables(psat_);
+    if (solver_)
+      return solver_->vars();
     return nvars_;
   }
 
@@ -215,8 +215,8 @@ namespace spot
 
   void satsolver::assume(int lit)
   {
-    if (psat_)
-      picosat_assume(psat_, lit);
+    if (solver_)
+      solver_->assume(lit);
     else
       throw std::runtime_error(
           "satsolver::assume(...) can not be used with an external satsolver");
@@ -271,12 +271,12 @@ namespace spot
   }
 
   satsolver::solution
-  satsolver::picosat_get_sol(int res)
+  satsolver::builtin_get_sol(int res)
   {
     satsolver::solution sol;
-    if (res == PICOSAT_SATISFIABLE)
+    if (res == CaDiCaL::SATISFIABLE)
       for (int lit = 1; lit <= nsols_; ++lit)
-        sol.push_back(picosat_deref(psat_, lit) > 0);
+        sol.push_back(solver_->val(lit) > 0);
     return sol;
   }
 
@@ -284,11 +284,11 @@ namespace spot
   satsolver::get_solution()
   {
     solution_pair p;
-    if (psat_)
+    if (solver_)
     {
       p.first = 0; // A subprocess was not executed so nothing failed.
-      int res = picosat_sat(psat_, -1); // -1: no limit (number of decisions).
-      p.second = picosat_get_sol(res);
+      int res = solver_->solve();
+      p.second = builtin_get_sol(res);
     }
     else
     {

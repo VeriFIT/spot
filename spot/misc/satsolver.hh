@@ -25,7 +25,11 @@
 #include <iosfwd>
 #include <initializer_list>
 
-struct PicoSAT; // forward
+
+namespace CaDiCaL
+{
+  class Solver;                 // forward declaration
+}
 
 namespace spot
 {
@@ -59,10 +63,10 @@ namespace spot
   /// \brief Interface with a SAT solver.
   ///
   /// This class provides the necessary functions to add clauses, comments.
-  /// Depending on SPOT_SATSOLVER, it will use either picosat solver (default)
+  /// Depending on SPOT_SATSOLVER, it will use either CaDiCaL solver (default)
   /// or the given satsolver.
   ///
-  /// Now that spot is distributed with a satsolver (PicoSAT), it is used by
+  /// Now that spot is distributed with a satsolver (CaDiCaL), it is used by
   /// default. But another satsolver can be configured via the
   /// <code>SPOT_SATSOLVER</code> environment variable. It must be set following
   /// this: "satsolver [options] %I > %O"
@@ -71,8 +75,8 @@ namespace spot
   {
   public:
     /// \brief Construct the sat solver and initialize variables.
-    /// If no satsolver is provided through SPOT_SATSOLVER env var, a
-    /// distributed version of PicoSAT will be used.
+    /// If no satsolver is provided through SPOT_SATSOLVER env var, the
+    /// builtin CaDiCaL solver will be used.
     satsolver();
     ~satsolver();
 
@@ -140,10 +144,10 @@ namespace spot
     /// \brief End the current clause and increment the counter.
     void end_clause();
 
-    /// \brief Extract the solution of Picosat output.
+    /// \brief Extract the solution of the builtin solver output.
     /// Must be called only if SPOT_SATSOLVER env variable is not set.
     satsolver::solution
-    picosat_get_sol(int res);
+    builtin_get_sol(int res);
 
     /// \brief Extract the solution of a SAT solver output.
     satsolver::solution
@@ -169,8 +173,8 @@ namespace spot
     /// (without assuming literals).
     int nsols_;
 
-    /// \brief Picosat satsolver instance.
-    PicoSAT* psat_;
+    /// \brief Builtin SAT solver instance (CaDiCaL).
+    CaDiCaL::Solver* solver_;
 
     // The next 2 pointers will be initialized if SPOT_XCNF env var
     // is set. This requires SPOT_SATSOLVER to be set as well.
@@ -183,7 +187,7 @@ namespace spot
   void
   satsolver::comment_rec(T single)
   {
-    if (!psat_)
+    if (!solver_)
       *cnf_stream_ << ' ' << single;
   }
 
@@ -191,7 +195,7 @@ namespace spot
   void
   satsolver::comment_rec(T first, Args... args)
   {
-    if (!psat_)
+    if (!solver_)
     {
       *cnf_stream_ << ' ' << first;
       comment_rec(args...);
@@ -202,7 +206,7 @@ namespace spot
   void
   satsolver::comment(T single)
   {
-    if (!psat_)
+    if (!solver_)
       *cnf_stream_ << "c " << single;
   }
 
@@ -210,7 +214,7 @@ namespace spot
   void
   satsolver::comment(T first, Args... args)
   {
-    if (!psat_)
+    if (!solver_)
     {
       *cnf_stream_ << "c " << first;
       comment_rec(args...);
