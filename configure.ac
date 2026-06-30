@@ -180,6 +180,12 @@ CHECK_ATOMIC
 AX_CHECK_BUDDY
 
 AC_CHECK_FUNCS([times kill alarm sigaction sched_getcpu])
+# 'closefrom' is a BSD function used by the bundled CaDiCaL to close file
+# descriptors after fork(); glibc grew it in 2.34 and musl does not have it.
+AC_CHECK_FUNC([closefrom],
+              [have_closefrom=yes],
+              [have_closefrom=no])
+AM_CONDITIONAL([HAVE_CLOSEFROM], [test "x$have_closefrom" = xyes])
 
 oLIBS=$LIBS
 LIBS="$LIBS -pthread"
@@ -268,6 +274,7 @@ fi)])
 
 AC_CONFIG_FILES([
   Makefile
+  cadical/Makefile
   bin/Makefile
   bin/man/Makefile
   bench/Makefile

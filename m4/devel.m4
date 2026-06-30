@@ -26,6 +26,11 @@ AC_DEFUN([adl_ENABLE_DEVEL],
    enable_assert=${enable_assert-yes}
    enable_optimizations=${enable_optimizations--O}
  fi
+
+ # Expose enable_devel to Automake so Makefile.am files can use
+ # `if DEVEL ... endif` blocks to switch off runtime invariants,
+ # extra diagnostics, etc. in development builds.
+ AM_CONDITIONAL([DEVEL], [test x"$enable_devel" = xyes])
 ])
 
 
