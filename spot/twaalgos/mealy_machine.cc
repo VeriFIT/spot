@@ -36,7 +36,7 @@
 #include <spot/twaalgos/synthesis.hh>
 #include <spot/priv/partitioned_relabel.hh>
 
-#include <picosat/picosat.h>
+#include <cadical/src/cadical.hpp>
 
 
 //#define TRACE
@@ -90,28 +90,6 @@ namespace
 namespace
 {
   static std::unique_ptr<std::ofstream> sat_csv_file;
-  struct fwrapper{
-    std::string fname;
-    std::FILE* f;
-    fwrapper(const std::string& name)
-      : fname{name}
-      , f{std::fopen(name.c_str(), "a")}
-    {
-      if (!f)
-        throw std::runtime_error("`" + name +
-                                 "' could not be opened for writing.");
-    }
-    ~fwrapper()
-    {
-      std::fclose(f);
-      f = nullptr;
-    }
-    fwrapper& operator=(const fwrapper&) = delete;
-    fwrapper& operator=(fwrapper&&) = delete;
-    fwrapper(const fwrapper&) = delete;
-    fwrapper(fwrapper&&) = delete;
-  };
-  static std::unique_ptr<fwrapper> sat_dimacs_file;
   static std::string sat_instance_name = "";
 }
 
@@ -182,7 +160,7 @@ namespace spot
     if (!m->get_named_prop<region_t>("state-player"))
       {
         trace << "is_split_mealy(): Split mealy machine must define the named "
-                 "property \"state-player\"!\n";
+          "property \"state-player\"!\n";
         return false;
       }
 
@@ -191,7 +169,7 @@ namespace spot
     if (sp.size() != m->num_states())
       {
         trace << "\"state-player\" has not the same size as the "
-                 "automaton!\n";
+          "automaton!\n";
         return false;
       }
 
@@ -247,7 +225,7 @@ namespace spot
         ins.clear();
         for (const auto& e : m->out(s))
           ins.push_back(sp_ptr ? e.cond
-                               : bdd_exist(e.cond, outs));
+                        : bdd_exist(e.cond, outs));
         if (!is_deterministic_(ins))
           {
             trace << "is_input_deterministic_mealy(): State number "
@@ -270,15 +248,15 @@ namespace spot
     };
 
     auto hasher = [](const dst_cond_color_t& dcc) noexcept
-      {
-        return dcc.color.hash() ^ pair_hash()(dcc.dst_cond);
-      };
+    {
+      return dcc.color.hash() ^ pair_hash()(dcc.dst_cond);
+    };
     auto equal = [](const dst_cond_color_t& dcc1,
                     const dst_cond_color_t& dcc2) noexcept
-      {
-        return (dcc1.dst_cond == dcc2.dst_cond)
-               && (dcc1.color == dcc2.color);
-      };
+    {
+      return (dcc1.dst_cond == dcc2.dst_cond)
+        && (dcc1.color == dcc2.color);
+    };
 
     std::unordered_map<dst_cond_color_t, unsigned,
                        decltype(hasher),
@@ -287,18 +265,18 @@ namespace spot
 
     auto get_ps = [&](unsigned dst, const bdd& ocond,
                       acc_cond::mark_t color)
-      {
-        dst_cond_color_t key{std::make_pair(dst, ocond.id()),
-                             color};
-        auto [it, inserted] =
-            player_map.try_emplace(key, m->num_states());
-        if (!inserted)
-          return it->second;
-        unsigned ns = m->new_state();
-        assert(ns == it->second);
-        m->new_edge(ns, dst, ocond, color);
-        return ns;
-      };
+    {
+      dst_cond_color_t key{std::make_pair(dst, ocond.id()),
+                           color};
+      auto [it, inserted] =
+        player_map.try_emplace(key, m->num_states());
+      if (!inserted)
+        return it->second;
+      unsigned ns = m->new_state();
+      assert(ns == it->second);
+      m->new_edge(ns, dst, ocond, color);
+      return ns;
+    };
 
     unsigned ne = m->edge_vector().size();
     for (unsigned eidx = 1; eidx < ne; ++eidx)
@@ -324,7 +302,6 @@ namespace spot
     std::fill(sp_ptr->begin(), sp_ptr->end(), false);
     for (const auto& eit : player_map)
       (*sp_ptr)[eit.second] = true;
-    //Done
   }
 
   twa_graph_ptr
@@ -370,16 +347,15 @@ namespace
     acc_cond::mark_t all_inf_;
 
   public:
-    sig_calculator(twa_graph_ptr aut, bool implications) : a_(aut),
-        po_size_(0),
-        want_implications_(implications)
+    sig_calculator(twa_graph_ptr aut, bool implications)
+      : a_(aut), po_size_(0), want_implications_(implications)
     {
       size_a_ = a_->num_states();
       // Now, we have to get the bdd which will represent the
       // class. We register one bdd by state, because in the worst
       // case, |Class| == |State|.
       unsigned set_num = a_->get_dict()
-                           ->register_anonymous_variables(size_a_, this);
+        ->register_anonymous_variables(size_a_, this);
 
       bdd init = bdd_ithvar(set_num++);
 
@@ -412,21 +388,21 @@ namespace
       // We run through the map bdd/list<state>, and we update
       // the previous_class_ with the new data.
       for (auto& p : sorted_classes_)
-      {
-        // If the signature of a state is bddfalse (no
-        // edges) the class of this state is bddfalse
-        // instead of an anonymous variable. It allows
-        // simplifications in the signature by removing a
-        // edge which has as a destination a state with
-        // no outgoing edge.
-        if (p->first == bddfalse)
-          for (unsigned s : p->second)
-            previous_class_[s] = bddfalse;
-        else
-          for (unsigned s : p->second)
-            previous_class_[s] = *it_bdd;
-        ++it_bdd;
-      }
+        {
+          // If the signature of a state is bddfalse (no
+          // edges) the class of this state is bddfalse
+          // instead of an anonymous variable. It allows
+          // simplifications in the signature by removing a
+          // edge which has as a destination a state with
+          // no outgoing edge.
+          if (p->first == bddfalse)
+            for (unsigned s : p->second)
+              previous_class_[s] = bddfalse;
+          else
+            for (unsigned s : p->second)
+              previous_class_[s] = *it_bdd;
+          ++it_bdd;
+        }
     }
 
     void main_loop()
@@ -436,14 +412,14 @@ namespace
 
       while (nb_partition_before != bdd_lstate_.size()
              || nb_po_before != po_size_)
-      {
-        update_previous_class();
-        nb_partition_before = bdd_lstate_.size();
-        nb_po_before = po_size_;
-        po_size_ = 0;
-        update_sig();
-        go_to_next_it();
-      }
+        {
+          update_previous_class();
+          nb_partition_before = bdd_lstate_.size();
+          nb_po_before = po_size_;
+          po_size_ = 0;
+          update_sig();
+          go_to_next_it();
+        }
       update_previous_class();
     }
 
@@ -453,14 +429,14 @@ namespace
       bdd res = bddfalse;
 
       for (auto& t : a_->out(src))
-      {
-        // to_add is a conjunction of the acceptance condition,
-        // the label of the edge and the class of the
-        // destination and all the class it implies.
-        bdd to_add = t.cond & relation_[previous_class_[t.dst]];
+        {
+          // to_add is a conjunction of the acceptance condition,
+          // the label of the edge and the class of the
+          // destination and all the class it implies.
+          bdd to_add = t.cond & relation_[previous_class_[t.dst]];
 
-        res |= to_add;
-      }
+          res |= to_add;
+        }
       return res;
     }
 
@@ -469,16 +445,16 @@ namespace
       bdd_lstate_.clear();
       sorted_classes_.clear();
       for (unsigned s = 0; s < size_a_; ++s)
-      {
-        bdd sig = compute_sig(s);
-        auto p = bdd_lstate_.emplace(std::piecewise_construct,
-                                     std::forward_as_tuple(sig),
-                                     std::forward_as_tuple(1, s));
-        if (p.second)
-          sorted_classes_.emplace_back(p.first);
-        else
-          p.first->second.emplace_back(s);
-      }
+        {
+          bdd sig = compute_sig(s);
+          auto p = bdd_lstate_.emplace(std::piecewise_construct,
+                                       std::forward_as_tuple(sig),
+                                       std::forward_as_tuple(1, s));
+          if (p.second)
+            sorted_classes_.emplace_back(p.first);
+          else
+            p.first->second.emplace_back(s);
+        }
     }
 
     // This method renames the color set, updates the partial order.
@@ -489,24 +465,24 @@ namespace
       // If we have created more partitions, we need to use more
       // variables.
       for (int i = 0; i < nb_new_color; ++i)
-      {
-        assert(!free_var_.empty());
-        used_var_.emplace_back(bdd_ithvar(free_var_.front()));
-        free_var_.pop();
-      }
+        {
+          assert(!free_var_.empty());
+          used_var_.emplace_back(bdd_ithvar(free_var_.front()));
+          free_var_.pop();
+        }
 
       // If we have reduced the number of partition, we 'free' them
       // in the free_var_ list.
       for (int i = 0; i > nb_new_color; --i)
-      {
-        assert(!used_var_.empty());
-        free_var_.push(bdd_var(used_var_.front()));
-        used_var_.pop_front();
-      }
+        {
+          assert(!used_var_.empty());
+          free_var_.push(bdd_var(used_var_.front()));
+          used_var_.pop_front();
+        }
 
       assert((bdd_lstate_.size() == used_var_.size())
-          || (bdd_lstate_.contains(bddfalse)
-            && bdd_lstate_.size() == used_var_.size() + 1));
+             || (bdd_lstate_.contains(bddfalse)
+                 && bdd_lstate_.size() == used_var_.size() + 1));
 
       // This vector links the tuple "C^(i-1), N^(i-1)" to the
       // new class coloring for the next iteration.
@@ -517,18 +493,18 @@ namespace
       auto it_bdd = used_var_.begin();
 
       for (auto& p : sorted_classes_)
-      {
-        // If the signature of a state is bddfalse (no edges) the
-        // class of this state is bddfalse instead of an anonymous
-        // variable. It allows simplifications in the signature by
-        // removing an edge which has as a destination a state
-        // with no outgoing edge.
-        bdd acc = bddfalse;
-        if (p->first != bddfalse)
-          acc = *it_bdd;
-        now_to_next.emplace_back(p->first, acc);
-        ++it_bdd;
-      }
+        {
+          // If the signature of a state is bddfalse (no edges) the
+          // class of this state is bddfalse instead of an anonymous
+          // variable. It allows simplifications in the signature by
+          // removing an edge which has as a destination a state
+          // with no outgoing edge.
+          bdd acc = bddfalse;
+          if (p->first != bddfalse)
+            acc = *it_bdd;
+          now_to_next.emplace_back(p->first, acc);
+          ++it_bdd;
+        }
 
       // Update the partial order.
 
@@ -540,22 +516,22 @@ namespace
       // od
 
       for (unsigned n = 0; n < sz; ++n)
-      {
-        bdd n_sig = now_to_next[n].first;
-        bdd n_class = now_to_next[n].second;
-        if (want_implications_)
-          for (unsigned m = 0; m < sz; ++m)
-          {
-            if (n == m)
-              continue;
-            if (bdd_implies(n_sig, now_to_next[m].first))
-            {
-              n_class &= now_to_next[m].second;
-              ++po_size_;
-            }
-          }
-        relation_[now_to_next[n].second] = n_class;
-      }
+        {
+          bdd n_sig = now_to_next[n].first;
+          bdd n_class = now_to_next[n].second;
+          if (want_implications_)
+            for (unsigned m = 0; m < sz; ++m)
+              {
+                if (n == m)
+                  continue;
+                if (bdd_implies(n_sig, now_to_next[m].first))
+                  {
+                    n_class &= now_to_next[m].second;
+                    ++po_size_;
+                  }
+              }
+          relation_[now_to_next[n].second] = n_class;
+        }
     }
 
     // The list of states for each class at the current_iteration.
@@ -632,38 +608,38 @@ namespace
       if (state_ != -1U)
         done[state_] = true;
       for (auto& ch : children_)
-      {
-        if (done[ch->state_])
-          continue;
-        if (bdd_implies(new_node->label_, ch->label_))
-          ch->add_aux_(new_node, done);
-        else if (bdd_implies(ch->label_, new_node->label_))
         {
-          auto ch_nodes = ch->all_children();
-          new_node->children_.push_back(ch);
-          for (auto& x : ch_nodes)
-            new_node->children_.push_back(x);
+          if (done[ch->state_])
+            continue;
+          if (bdd_implies(new_node->label_, ch->label_))
+            ch->add_aux_(new_node, done);
+          else if (bdd_implies(ch->label_, new_node->label_))
+            {
+              auto ch_nodes = ch->all_children();
+              new_node->children_.push_back(ch);
+              for (auto& x : ch_nodes)
+                new_node->children_.push_back(x);
+            }
         }
-      }
       assert(bdd_implies(new_node->label_, label_));
       children_.push_back(new_node);
     }
 
     void
     add(std::shared_ptr<bdd_digraph>& new_node, bool rec,
-              unsigned max_state)
+        unsigned max_state)
     {
       if (new_node->label_ == bddtrue)
-      {
-        assert(label_ == bddtrue);
-        state_ = new_node->state_;
-        return;
-      }
+        {
+          assert(label_ == bddtrue);
+          state_ = new_node->state_;
+          return;
+        }
       if (rec)
-      {
-        std::vector<bool> done(max_state, false);
-        add_aux_(new_node, done);
-      }
+        {
+          std::vector<bool> done(max_state, false);
+          add_aux_(new_node, done);
+        }
       else
         children_.push_back(new_node);
     }
@@ -672,20 +648,20 @@ namespace
     flatten_aux(std::unordered_map<bdd, unsigned, spot::bdd_hash>& res)
     {
       if (children_.empty())
-      {
-        res.insert({label_, state_});
-        return state_;
-      }
+        {
+          res.insert({label_, state_});
+          return state_;
+        }
       auto ch_size = children_.size();
       unsigned pos = ch_size - 1;
       auto my_repr = children_[pos]->flatten_aux(res);
       res.insert({label_, my_repr});
       for (unsigned i = 0; i < ch_size; ++i)
-      {
-        if (i == pos)
-          continue;
-        children_[i]->flatten_aux(res);
-      }
+        {
+          if (i == pos)
+            continue;
+          children_[i]->flatten_aux(res);
+        }
       return my_repr;
     }
 
@@ -703,15 +679,15 @@ namespace
     sort_nodes()
     {
       if (!children_.empty())
-      {
-        auto max_pos = std::max_element(children_.begin(), children_.end(),
-                  [](const std::shared_ptr<bdd_digraph>& n1,
-                     const std::shared_ptr<bdd_digraph>& n2)
-                  {
-                    return n1.use_count() < n2.use_count();
-                  });
-        std::iter_swap(max_pos, children_.end() - 1);
-      }
+        {
+          auto max_pos = std::max_element(children_.begin(), children_.end(),
+                                          [](const auto& n1, const auto& n2)
+                                          {
+                                            return n1.use_count()
+                                              < n2.use_count();
+                                          });
+          std::iter_swap(max_pos, children_.end() - 1);
+        }
     }
   };
 
@@ -729,42 +705,42 @@ namespace
     sig_calculator red(a, rec);
     red.main_loop();
     if (!rec && red.bdd_lstate_.size() == a_num_states)
-    {
-      repr[0] = -1U;
-      return repr;
-    }
-    for (auto& [sig, states] : red.bdd_lstate_)
-    {
-      assert(!states.empty());
-      bool in_tree = false;
-      for (auto state : states)
       {
-        signatures[state] = sig;
-        // If it is not the first iteration, le BDD is already in the graph.
-        if (!in_tree)
-        {
-          in_tree = true;
-          auto new_node =
-            std::make_shared<bdd_digraph>(bdd_digraph(sig, state));
-          graph.add(new_node, rec, a_num_states);
-        }
+        repr[0] = -1U;
+        return repr;
       }
-    }
+    for (auto& [sig, states] : red.bdd_lstate_)
+      {
+        assert(!states.empty());
+        bool in_tree = false;
+        for (auto state : states)
+          {
+            signatures[state] = sig;
+            // If it is not the first iteration, le BDD is already in the graph.
+            if (!in_tree)
+              {
+                in_tree = true;
+                auto new_node =
+                  std::make_shared<bdd_digraph>(bdd_digraph(sig, state));
+                graph.add(new_node, rec, a_num_states);
+              }
+          }
+      }
     graph.sort_nodes();
     auto repr_map = graph.flatten();
 
     bool is_useless_map = true;
     for (unsigned i = 0; i < a_num_states; ++i)
-    {
-      repr[i] = repr_map[signatures[i]];
-      is_useless_map &= (repr[i] == i);
-    }
+      {
+        repr[i] = repr_map[signatures[i]];
+        is_useless_map &= (repr[i] == i);
+      }
 
     if (is_useless_map)
-    {
-      repr[0] = -1U;
-      return repr;
-    }
+      {
+        repr[0] = -1U;
+        return repr;
+      }
     return repr;
   }
 }
@@ -838,33 +814,31 @@ namespace
 #ifdef TRACE
   void trace_clause(const std::vector<int>& clause)
   {
-    auto it = clause.begin();
-    if (*it == 0)
-      throw std::runtime_error("Trivially false clause");
-    for (; it != clause.end(); ++it)
-      {
-        trace << *it << ' ';
-        if (*it == 0)
-          {
-            trace << '\n';
-            break;
-          }
-      }
-    assert(it != clause.end() && "Clause must be zero terminated.");
+    for (int lit : clause)
+      trace << lit << ' ';
+    trace << '\n';
+  }
+  void trace_clause(int l1, int l2)
+  {
+    trace << l1 << ' ' << l2 << '\n';
+  }
+  void trace_clause(int l1, int l2, int l3)
+  {
+    trace << l1 << ' ' << l2 << ' ' << l3 << '\n';
   }
 #else
-  void trace_clause(const std::vector<int>&){}
+#  define trace_clause(...) do {} while (0)
 #endif
   struct satprob_info
   {
     stopwatch sw;
 
     double premin_time, reorg_time, partsol_time, player_incomp_time,
-           incomp_time, split_all_let_time, split_min_let_time,
-           split_cstr_time, prob_init_build_time, sat_time,
-           build_time, refine_time, total_time;
+      incomp_time, split_all_let_time, split_min_let_time,
+      split_cstr_time, prob_init_build_time, sat_time,
+      build_time, refine_time, total_time;
     long long n_classes, n_refinement, n_lit, n_clauses,
-              n_iteration, n_letters_part, n_bisim_let, n_min_states, done;
+      n_iteration, n_letters_part, n_bisim_let, n_min_states, done;
     std::string task;
     const std::string instance;
 
@@ -916,13 +890,13 @@ namespace
       if (!sat_csv_file)
         return;
       auto f = [](std::ostream& o, auto& v, bool sep = true)
-        {
-          if (v >= 0)
-            o << v;
-          if (sep)
-            o.put(',');
-          v = -1;
-        };
+      {
+        if (v >= 0)
+          o << v;
+        if (sep)
+          o.put(',');
+        v = -1;
+      };
 
       auto& out = *sat_csv_file;
       if (out.tellp() == 0)
@@ -1015,48 +989,48 @@ namespace
       if constexpr (sizeof(typename CONT::value_type) <= sizeof(size_t)/2)
         {
           constexpr size_t shift_val1 =
-              sizeof(typename CONT::value_type)*CHAR_BIT/2;
+            sizeof(typename CONT::value_type)*CHAR_BIT/2;
           constexpr size_t shift_val2 = (shift_val1*2)/3;
 
           size_t vs = v.size();
           switch (vs)
-          {
+            {
             case 0:
               return 0;
             case 1:
               return (size_t) *v.begin();
             case 2:
-            {
-              auto it = v.begin();
-              return (((size_t) *it)<<shift_val1) + (size_t) *(++it);
-            }
+              {
+                auto it = v.begin();
+                return (((size_t) *it)<<shift_val1) + (size_t) *(++it);
+              }
             default:
-            {
-              size_t h = wang32_hash(vs);
-              size_t hh;
-              auto it = v.begin();
-              const auto it_end = v.end();
-              do
-                {
-                  hh = (size_t) *it;
-                  hh <<= shift_val2;
-                  ++it;
-                  if (it != it_end)
-                    {
-                      hh += (size_t) *it;
-                      hh <<= shift_val2;
-                      ++it;
-                      if (it != it_end)
-                        {
-                          hh += (size_t) *it;
-                          ++it;
-                        }
-                    }
-                  h ^= wang32_hash(hh);
-                } while (it != it_end);
-              return h;
+              {
+                size_t h = wang32_hash(vs);
+                size_t hh;
+                auto it = v.begin();
+                const auto it_end = v.end();
+                do
+                  {
+                    hh = (size_t) *it;
+                    hh <<= shift_val2;
+                    ++it;
+                    if (it != it_end)
+                      {
+                        hh += (size_t) *it;
+                        hh <<= shift_val2;
+                        ++it;
+                        if (it != it_end)
+                          {
+                            hh += (size_t) *it;
+                            ++it;
+                          }
+                      }
+                    h ^= wang32_hash(hh);
+                  } while (it != it_end);
+                return h;
+              }
             }
-          }
         }
       else
         {
@@ -1079,18 +1053,18 @@ namespace
 
   public:
     square_matrix()
-        : std::vector<T>()
-        , dim_(0)
+      : std::vector<T>()
+      , dim_(0)
     {}
 
     square_matrix(size_t dim)
-        :  std::vector<T>(dim*dim)
-        ,  dim_{dim}
+      :  std::vector<T>(dim*dim)
+      ,  dim_{dim}
     {}
 
     square_matrix(size_t dim, const T& t)
-        :  std::vector<T>(dim*dim, t)
-        ,  dim_{dim}
+      :  std::vector<T>(dim*dim, t)
+      ,  dim_{dim}
     {}
 
     using typename std::vector<T>::value_type;
@@ -1169,15 +1143,15 @@ namespace
     using std::vector<T>::cend;
 
     std::ostream& print(std::ostream& o) const
-      {
-        for (size_t i = 0; i < dim_; ++i)
-          {
-            for (size_t j = 0; j < dim_; ++j)
-              o << (int) get(i, j) << ' ';
-            o << std::endl;
-          }
-        return o;
-      }
+    {
+      for (size_t i = 0; i < dim_; ++i)
+        {
+          for (size_t j = 0; j < dim_; ++j)
+            o << (int) get(i, j) << ' ';
+          o << std::endl;
+        }
+      return o;
+    }
   };
 
   std::pair<const_twa_graph_ptr, unsigned>
@@ -1201,7 +1175,7 @@ namespace
       if (is_ok)
         return {mm,
                 mm->num_states()
-                  - std::accumulate(sp.begin(), sp.end(), 0)};
+                - std::accumulate(sp.begin(), sp.end(), 0)};
     }
     // We actually need to generate a new graph with the correct
     // form
@@ -1214,7 +1188,7 @@ namespace
     std::deque<unsigned> todo;
     todo.push_back(mm->get_init_state_number());
     renamed[todo.front()] = sp[todo.front()] ? (next_player++)
-                                             : (next_env++);
+      : (next_env++);
 
     while (!todo.empty())
       {
@@ -1225,7 +1199,7 @@ namespace
           if (renamed[e.dst] == -1u)
             {
               renamed[e.dst] = sp[e.dst] ? (next_player++)
-                                         : (next_env++);
+                : (next_env++);
               todo.push_back(e.dst);
             }
       }
@@ -1235,7 +1209,7 @@ namespace
     for (auto& s : renamed)
       s -= ((s >= n_old) && (s != -1u))*diff;
     const unsigned n_new
-        = n_old - std::count(renamed.begin(), renamed.end(), -1u);
+      = n_old - std::count(renamed.begin(), renamed.end(), -1u);
 
     auto omm = make_twa_graph(mm->get_dict());
     omm->copy_ap_of(mm);
@@ -1257,20 +1231,21 @@ namespace
     // Make sure we have a proper strategy,
     // that is each player state has only one successor
     assert([&]()
-       {
-         unsigned n_tot = omm->num_states();
-         for (unsigned s = n_env; s < n_tot; ++s)
-           {
-             auto oute = omm->out(s);
-             if ((++oute.begin()) != oute.end())
-               return false;
-           }
-         return true;
-       }() && "Player states have multiple edges.");
+    {
+      unsigned n_tot = omm->num_states();
+      for (unsigned s = n_env; s < n_tot; ++s)
+        {
+          auto oute = omm->out(s);
+          if ((++oute.begin()) != oute.end())
+            return false;
+        }
+      return true;
+    }() && "Player states have multiple edges.");
 
 #ifdef TRACE
     trace << "State reorganize mapping\n";
-    for (unsigned s = 0; s < renamed.size(); ++s)
+    unsigned n = renamed.size();
+    for (unsigned s = 0; s < n; ++s)
       trace << s << " -> " << renamed[s] << '\n';
 #endif
     return std::make_pair(omm, n_env);
@@ -1290,8 +1265,6 @@ namespace
     square_matrix<bool, true> checked_pred(n_env, false);
 
     // Utility function
-    auto get_cond = [&mm](unsigned s)->const bdd&
-      {return mm->out(s).begin()->cond; };
 
     // Computing the incompatible player states
 
@@ -1301,7 +1274,7 @@ namespace
     // but it is beneficial to first compute the
     // compatibility between the conditions as there might be fewer
     std::unordered_map<std::pair<unsigned, unsigned>, bool, pair_hash>
-        cond_comp;
+      cond_comp;
     // Associated condition and id of each player state
     std::vector<std::pair<bdd, unsigned>> ps2c;
     ps2c.reserve(n_tot - n_env);
@@ -1310,10 +1283,10 @@ namespace
 
     for (unsigned s1 = n_env; s1 < n_tot; ++s1)
       {
-        const bdd &c1 = get_cond(s1);
+        const bdd &c1 = mm->out(s1).begin()->cond;
         const unsigned c1id = (unsigned)c1.id();
         const auto& [it, inserted] =
-            all_out_cond.try_emplace(c1id, all_out_cond.size());
+          all_out_cond.try_emplace(c1id, all_out_cond.size());
         ps2c.emplace_back(c1, it->second);
 #ifdef TRACE
         if (inserted)
@@ -1333,18 +1306,18 @@ namespace
     // only if demanded
 
     auto is_p_incomp = [&](unsigned s1, unsigned s2)
-      {
-        const auto& [s1bdd, s1idx] = ps2c[s1];
-        const auto& [s2bdd, s2idx] = ps2c[s2];
+    {
+      const auto& [s1bdd, s1idx] = ps2c[s1];
+      const auto& [s2bdd, s2idx] = ps2c[s2];
 
-        if (!inc_player_comp.get(s1idx, s2idx))
-          {
-            inc_player_comp.set(s1idx, s2idx, true);
-            inc_player.set(s1idx, s2idx,
-                           !bdd_have_common_assignment(s1bdd, s2bdd));
-          }
-        return inc_player.get(s1idx, s2idx);
-      };
+      if (!inc_player_comp.get(s1idx, s2idx))
+        {
+          inc_player_comp.set(s1idx, s2idx, true);
+          inc_player.set(s1idx, s2idx,
+                         !bdd_have_common_assignment(s1bdd, s2bdd));
+        }
+      return inc_player.get(s1idx, s2idx);
+    };
 
     si.player_incomp_time = si.restart();
 
@@ -1360,26 +1333,26 @@ namespace
     // sorting is not rentable
     // However, bdd_have_common_assignment simply becomes equality
     auto direct_incomp = [&](unsigned s1, unsigned s2)
-      {
-        for (const auto& e1 : mm->out(s1))
-          for (const auto& e2 : mm->out(s2))
-            {
-              if (is_partitioned && (e1.cond != e2.cond))
-                continue;
-              if (!is_p_incomp(e1.dst - n_env, e2.dst - n_env))
-                continue; //Compatible -> no prob
-              // Reachable under same letter?
-              if (is_partitioned ||
-                    bdd_have_common_assignment(e1.cond, e2.cond)) // -> Yes
-                {
-                  trace << s1 << " and " << s2 << " directly incomp "
-                        "due to successors " << e1.dst << " and " << e2.dst
-                        << '\n';
-                  return true;
-                }
-            }
-        return false;
-      };
+    {
+      for (const auto& e1 : mm->out(s1))
+        for (const auto& e2 : mm->out(s2))
+          {
+            if (is_partitioned && (e1.cond != e2.cond))
+              continue;
+            if (!is_p_incomp(e1.dst - n_env, e2.dst - n_env))
+              continue; //Compatible -> no prob
+            // Reachable under same letter?
+            if (is_partitioned ||
+                bdd_have_common_assignment(e1.cond, e2.cond)) // -> Yes
+              {
+                trace << s1 << " and " << s2 << " directly incomp "
+                  "due to successors " << e1.dst << " and " << e2.dst
+                      << '\n';
+                return true;
+              }
+          }
+      return false;
+    };
 
     // If two states can reach an incompatible state
     // under the same input, then they are incompatible as well
@@ -1388,54 +1361,54 @@ namespace
     // We also need a transposed_graph
     twa_graph_ptr mm_t = nullptr;
     if (!is_partitioned)
-    {
-      mm_t = make_twa_graph(mm->get_dict());
-      mm_t->copy_ap_of(mm);
-      mm_t->new_states(n_env);
+      {
+        mm_t = make_twa_graph(mm->get_dict());
+        mm_t->copy_ap_of(mm);
+        mm_t->new_states(n_env);
 
-      for (unsigned s = 0; s < n_env; ++s)
-        {
-          for (const auto& e_env : mm->out(s))
-            {
-              unsigned dst_env = mm->out(e_env.dst).begin()->dst;
-              mm_t->new_edge(dst_env, s, e_env.cond);
-            }
-        }
-    }
+        for (unsigned s = 0; s < n_env; ++s)
+          {
+            for (const auto& e_env : mm->out(s))
+              {
+                unsigned dst_env = mm->out(e_env.dst).begin()->dst;
+                mm_t->new_edge(dst_env, s, e_env.cond);
+              }
+          }
+      }
 
     auto tag_predec_unpart = [&](unsigned s1, unsigned s2)
-      {
-        static std::vector<std::pair<unsigned, unsigned>> todo_;
-        assert(todo_.empty());
+    {
+      static std::vector<std::pair<unsigned, unsigned>> todo_;
+      assert(todo_.empty());
 
-        todo_.emplace_back(s1, s2);
+      todo_.emplace_back(s1, s2);
 
-        while (!todo_.empty())
-          {
-            auto [i, j] = todo_.back();
-            todo_.pop_back();
-            if (checked_pred.get(i, j))
-              continue;
-            // If predecs are already marked incomp
-            for (const auto& ei : mm_t->out(i))
-              for (const auto& ej : mm_t->out(j))
-                {
-                  if (inc_env.get(ei.dst, ej.dst))
-                    // Have already been treated
-                    continue;
-                  // Now we need to actually check it
-                  if (bdd_have_common_assignment(ei.cond, ej.cond))
-                    {
-                      trace << ei.dst << " and " << ej.dst << " tagged incomp"
-                            " due to " << i << " and " << j << '\n';
-                      inc_env.set(ei.dst, ej.dst, true);
-                      todo_.emplace_back(ei.dst, ej.dst);
-                    }
-                }
-            checked_pred.set(i, j, true);
-          }
-        // Done tagging all pred
-      };
+      while (!todo_.empty())
+        {
+          auto [i, j] = todo_.back();
+          todo_.pop_back();
+          if (checked_pred.get(i, j))
+            continue;
+          // If predecs are already marked incomp
+          for (const auto& ei : mm_t->out(i))
+            for (const auto& ej : mm_t->out(j))
+              {
+                if (inc_env.get(ei.dst, ej.dst))
+                  // Have already been treated
+                  continue;
+                // Now we need to actually check it
+                if (bdd_have_common_assignment(ei.cond, ej.cond))
+                  {
+                    trace << ei.dst << " and " << ej.dst << " tagged incomp"
+                      " due to " << i << " and " << j << '\n';
+                    inc_env.set(ei.dst, ej.dst, true);
+                    todo_.emplace_back(ei.dst, ej.dst);
+                  }
+              }
+          checked_pred.set(i, j, true);
+        }
+      // Done tagging all pred
+    };
 
     // Version of taging taking advantaged of partitioned conditions
     struct S
@@ -1463,55 +1436,55 @@ namespace
         // Now we need to sort the edge to ensure that
         // the next algo works correctly
         mm_t_part->sort_edges_srcfirst_([](const auto& e1, const auto& e2)
-                                          {return e1.id < e2.id; });
+        {return e1.id < e2.id; });
         mm_t_part->chain_edges_();
       }
 
     auto tag_predec_part = [&](unsigned s1, unsigned s2)
-      {
-        static std::vector<std::pair<unsigned, unsigned>> todo_;
-        assert(todo_.empty());
+    {
+      static std::vector<std::pair<unsigned, unsigned>> todo_;
+      assert(todo_.empty());
 
-        todo_.emplace_back(s1, s2);
+      todo_.emplace_back(s1, s2);
 
-        while (!todo_.empty())
-          {
-            auto [i, j] = todo_.back();
-            todo_.pop_back();
-            if (checked_pred.get(i, j))
-              continue;
-            // If predecs are already marked incomp
-            auto e_it_i = mm_t_part->out(i);
-            auto e_it_j = mm_t_part->out(j);
+      while (!todo_.empty())
+        {
+          auto [i, j] = todo_.back();
+          todo_.pop_back();
+          if (checked_pred.get(i, j))
+            continue;
+          // If predecs are already marked incomp
+          auto e_it_i = mm_t_part->out(i);
+          auto e_it_j = mm_t_part->out(j);
 
-            auto e_it_i_e = e_it_i.end();
-            auto e_it_j_e = e_it_j.end();
+          auto e_it_i_e = e_it_i.end();
+          auto e_it_j_e = e_it_j.end();
 
-            auto e_i = e_it_i.begin();
-            auto e_j = e_it_j.begin();
+          auto e_i = e_it_i.begin();
+          auto e_j = e_it_j.begin();
 
-            // Joint iteration over both edge groups
-            while ((e_i != e_it_i_e) && (e_j != e_it_j_e))
-              {
-                if (e_i->id < e_j->id)
+          // Joint iteration over both edge groups
+          while ((e_i != e_it_i_e) && (e_j != e_it_j_e))
+            {
+              if (e_i->id < e_j->id)
+                ++e_i;
+              else if (e_j->id < e_i->id)
+                ++e_j;
+              else
+                {
+                  assert(e_j->id == e_i->id);
+                  trace << e_i->dst << " and " << e_j->dst << " tagged incomp"
+                    " due to " << e_i->id << '\n';
+                  inc_env.set(e_i->dst, e_j->dst, true);
+                  todo_.emplace_back(e_i->dst, e_j->dst);
                   ++e_i;
-                else if (e_j->id < e_i->id)
                   ++e_j;
-                else
-                  {
-                    assert(e_j->id == e_i->id);
-                    trace << e_i->dst << " and " << e_j->dst << " tagged incomp"
-                            " due to " << e_i->id << '\n';
-                    inc_env.set(e_i->dst, e_j->dst, true);
-                    todo_.emplace_back(e_i->dst, e_j->dst);
-                    ++e_i;
-                    ++e_j;
-                  }
-              }
-            checked_pred.set(i, j, true);
-          }
-        // Done tagging all pred
-      };
+                }
+            }
+          checked_pred.set(i, j, true);
+        }
+      // Done tagging all pred
+    };
 
     for (unsigned s1 = 0; s1 < n_env; ++s1)
       for (unsigned s2 = s1 + 1; s2 < n_env; ++s2)
@@ -1551,8 +1524,8 @@ namespace
 
     // todo get a good value for cutoff
     auto relabel_maps
-        = partitioned_game_relabel_here(mm2, true, false, true,
-                                        false, -1u, max_letter_mult);
+      = partitioned_game_relabel_here(mm2, true, false, true,
+                                      false, -1u, max_letter_mult);
     bool succ = !relabel_maps.env_map.empty();
 
     si.n_letters_part = relabel_maps.env_map.size();
@@ -1586,7 +1559,7 @@ namespace
     std::vector<std::pair<unsigned, unsigned>> incompvec(n_states);
 
     // square_matrix is row major!
-    for (size_t ns = 0; ns < n_states; ++ns)
+    for (unsigned ns = 0; ns < n_states; ++ns)
       {
         auto line_it = incompmat.get_cline(ns);
         incompvec[ns] = {ns,
@@ -1598,7 +1571,7 @@ namespace
     // Sort in reverse order
     std::sort(incompvec.begin(), incompvec.end(),
               [](const auto& p1, const auto& p2)
-                {return p1.second > p2.second; });
+              {return p1.second > p2.second; });
 
     part_sol_t part_sol;
     auto& psol = part_sol.psol;
@@ -1608,9 +1581,9 @@ namespace
         auto ns = p.first;
         if (std::all_of(psol.begin(), psol.end(),
                         [&](auto npart)
-                          {
-                            return incompmat.get(ns, npart);
-                          }))
+                        {
+                          return incompmat.get(ns, npart);
+                        }))
           psol.push_back(ns);
       }
     // Note: this is important for look-up later on
@@ -1624,9 +1597,9 @@ namespace
 
     // Also store the states in their compatibility order
     part_sol.incompvec.resize(n_states);
-    std::transform(incompvec.begin(), incompvec.end(),
-                   part_sol.incompvec.begin(),
-                   [](auto& p){return p.first; });
+    const unsigned n = incompvec.size();
+    for (unsigned i = 0; i < n; ++i)
+      part_sol.incompvec[i] = incompvec[i].first;
 #ifdef TRACE
     std::cerr << "partsol\n";
     for (auto e : psol)
@@ -1652,9 +1625,9 @@ namespace
     // associated set[1]: list of bdd ids corresponding to the covered letters
     //                    and which are represented by this one
     std::vector<
-        std::unordered_map<
-            bdd, std::pair<std::set<int>, std::set<int>>, bdd_hash>>
-                minimal_letters;
+      std::unordered_map<
+        bdd, std::pair<std::set<int>, std::set<int>>, bdd_hash>>
+    minimal_letters;
     // In the sat problem, the minimal letters are simply enumerated
     // in the same order as the in vector below
     std::vector<std::vector<bdd>> minimal_letters_vec;
@@ -1720,9 +1693,9 @@ namespace
         ++n_group;
       }
 #ifdef TRACE
-      trace << "We found " << n_group << " groups.\n";
-      for (unsigned s = 0; s < n_env; ++s)
-        trace << s << " : " << which_group.at(s) << '\n';
+    trace << "We found " << n_group << " groups.\n";
+    for (unsigned s = 0; s < n_env; ++s)
+      trace << s << " : " << which_group.at(s) << '\n';
 #endif
     return std::make_pair(n_group, which_group);
   }
@@ -1745,7 +1718,7 @@ namespace
     std::unordered_map<unsigned, unsigned> node2idx;
 
     std::unordered_multimap<size_t, std::pair<unsigned, std::set<int>>>
-        sigma_map;
+      sigma_map;
 
     const unsigned n_groups = red.n_groups;
     for (unsigned groupidx = 0; groupidx < n_groups; ++groupidx)
@@ -1783,9 +1756,9 @@ namespace
             {
               // Store bdds as vector for compatibility
               all_bdd_v.clear(); // Note: sorted automatically by id
-              std::transform(all_bdd.begin(), all_bdd.end(),
-                            std::back_inserter(all_bdd_v),
-                            [](int i){return bdd_from_int(i); });
+              all_bdd_v.reserve(all_bdd.size());
+              for (int i : all_bdd)
+                all_bdd_v.push_back(bdd_from_int(i));
               // Insert it already into the sigma_map
               trace << "Group " << groupidx << " generates a new alphabet\n";
               sigma_map.emplace(std::piecewise_construct,
@@ -1822,8 +1795,8 @@ namespace
 
         // Go through the graph for each original letter
         auto search_leaves
-            = [&ig = *this_part.ig, &group_letters, &node2idx]
-                (int orig_letter_id, unsigned s, auto&& search_leaves_) -> void
+          = [&ig = *this_part.ig, &group_letters, &node2idx]
+          (int orig_letter_id, unsigned s, auto&& search_leaves_) -> void
           {
             if (ig.state_storage(s).succ == 0)
               {
@@ -1851,13 +1824,11 @@ namespace
 
 #ifdef TRACE
         trace << "this group letters" << std::endl;
-        auto sp = [&](const auto& c)
-            {std::for_each(c.begin(), c.end(),
-                           [&](auto& e){trace << e << ' '; }); };
         for (const auto& p : group_letters)
           {
             trace << p.first << " - ";
-            sp(p.second);
+            for (const auto& e : p.second)
+              trace << e << ' ';
             trace << std::endl;
           }
 #endif
@@ -1885,13 +1856,14 @@ namespace
     std::vector<unsigned> dest_vec(nsg);
 
     // hashed id -> <dest vector, list of sim indices vec>
-    std::unordered_multimap<size_t,
-        std::pair<std::vector<unsigned>, std::vector<unsigned>>> sim_map;
+    using sim_pair_t =
+      std::pair<std::vector<unsigned>, std::vector<unsigned>>;
+    std::unordered_multimap<size_t, sim_pair_t> sim_map;
 
     auto get_e_dst = [&](const auto& e_env)->unsigned
-      {
-        return mmw->out(e_env.dst).begin()->dst;
-      };
+    {
+      return mmw->out(e_env.dst).begin()->dst;
+    };
 
     for (unsigned idx = 0; idx < n_ml; ++idx)
       {
@@ -1948,8 +1920,7 @@ namespace
     // Sort the bisimilar classes as well for the same reason
     std::sort(bs.begin(), bs.end(),
               [](const auto& v1, const auto& v2)
-                {return v1.front() < v2.front(); });
-    //Done
+              {return v1.front() < v2.front(); });
   }
 
   // If two letters take the same original edge / go to the same destination
@@ -1981,9 +1952,9 @@ namespace
           {
             assert(red.share_sigma_with[i] < i);
             red.minimal_letters
-                .push_back(red.minimal_letters[red.share_sigma_with[i]]);
+              .push_back(red.minimal_letters[red.share_sigma_with[i]]);
             red.minimal_letters_vec
-                .push_back(red.minimal_letters_vec[red.share_sigma_with[i]]);
+              .push_back(red.minimal_letters_vec[red.share_sigma_with[i]]);
             continue;
           }
 
@@ -2018,9 +1989,10 @@ namespace
                 // We have found a new minimal letter
                 // Update tgt_map and minimal_letters
                 tgt_map.emplace(hv, letter);
-                group_min_letters.emplace(letter,
-                                          std::make_pair(impl_cond,
-                                             std::set<int>{letter.id()}));
+                group_min_letters.emplace
+                  (letter,
+                   std::make_pair(impl_cond,
+                                  std::set<int>{letter.id()}));
               }
           }
         red.minimal_letters_vec.emplace_back();
@@ -2083,9 +2055,9 @@ namespace
 
     // We only need env states
     auto get_e_dst = [&](const auto& e_env)
-      {
-        return mmw->out(e_env.dst).begin()->dst;
-      };
+    {
+      return mmw->out(e_env.dst).begin()->dst;
+    };
 
     // We only need the transitions implied
     // by minimal and representative letters
@@ -2093,8 +2065,8 @@ namespace
     // to the set of implied minimal letters
     // Note we can do this group by group
     std::vector<std::unordered_map<int, std::set<int>>>
-        l_map_glob(red.n_groups,
-                   std::unordered_map<int, std::set<int>>{});
+      l_map_glob(red.n_groups,
+                 std::unordered_map<int, std::set<int>>{});
 
     // todo Check if this is bottleneck
     // Note: if two groups share the alphabet AND the
@@ -2112,7 +2084,7 @@ namespace
                 const bdd& repr_bdd =
                   red.minimal_letters_vec[i].at(a_bisim.front());
                 const auto& it_mlb =
-                    red.minimal_letters[i].at(repr_bdd);
+                  red.minimal_letters[i].at(repr_bdd);
                 const int this_id = repr_bdd.id();
                 for (int implied_by : it_mlb.first)
                   l_map[implied_by].insert(this_id);
@@ -2146,13 +2118,13 @@ namespace
 
     // todo sort edges inplace? bdd_less_than vs bdd_less_than_stable
     split_mmw->
-        get_graph().sort_edges_([](const auto& e1, const auto& e2)
-                                  {
-                                    return std::make_pair(e1.src,
-                                                          e1.cond.id())
-                                           < std::make_pair(e2.src,
-                                                            e2.cond.id());
-                                  });
+      get_graph().sort_edges_([](const auto& e1, const auto& e2)
+      {
+        return std::make_pair(e1.src,
+                              e1.cond.id())
+          < std::make_pair(e2.src,
+                           e2.cond.id());
+      });
     split_mmw->get_graph().chain_edges_();
 #ifdef TRACE
     trace << "Orig split aut\n";
@@ -2162,24 +2134,25 @@ namespace
       for (unsigned group = 0; group < red.n_groups; ++group)
         {
           std::vector<bdd> edge_num;
-          for (unsigned i = 0;  i < red.minimal_letters_vec[group].size(); ++i)
+          const unsigned n = red.minimal_letters_vec[group].size();
+          for (unsigned i = 0;  i < n; ++i)
             {
-              edge_num.push_back(
-                bdd_ithvar(ss->register_ap("g"+std::to_string(group)
-                                           +"e"+std::to_string(i))));
+              int var = ss->register_ap("g" + std::to_string(group)
+                                        + "e" + std::to_string(i));
+              edge_num.push_back(bdd_ithvar(var));
             }
           for (unsigned s = 0; s < n_env; ++s)
             {
               if (red.which_group.at(s) != group)
                 continue;
+              auto& mlv = red.minimal_letters_vec[group];
               for (auto& e : ss->out(s))
                 e.cond =
-                    edge_num.at(
-                        find_first_index_of(red.bisim_letters[group],
-                            [&, cc = e.cond](const auto& bs_idx_vec)
-                              {return cc
-                                  == red.minimal_letters_vec[group]
-                                       [bs_idx_vec.front()]; }));
+                  edge_num.at(find_first_index_of(red.bisim_letters[group],
+                                                  [&, cc = e.cond](auto& b)
+                                                  { return cc
+                                                      == mlv[b.front()];
+                                                  }));
             }
         }
       trace << "Relabeled split aut\n";
@@ -2226,36 +2199,20 @@ namespace
   }
 
   // Things for lit mapping
-  // mapping (states, classes)
-  struct xi_t : public std::pair<unsigned, unsigned>
-  {
-    unsigned& x;
-    unsigned& i;
+  // mapping (state, source class) -- used as keys in sxi_map_, etc.
+  // Use structured bindings at the call site, e.g.
+  // `auto& [x, i] = some_xi_t;`.
+  // Convention: first/second = (state, source-class). See sxi2lit()
+  // and the xi block of print().
+  using xi_t = std::pair<unsigned, unsigned>;
 
-    constexpr xi_t(unsigned x_in, unsigned i_in)
-      :  std::pair<unsigned, unsigned>{x_in, i_in}
-      , x{this->first}
-      , i{this->second}
-    {
-    }
-
-    constexpr xi_t(const xi_t& xi)
-      : xi_t{xi.x, xi.i}
-    {
-    }
-
-    xi_t& operator=(const xi_t& xi)
-    {
-      x = xi.x;
-      i = xi.i;
-      return *this;
-    }
-
-    xi_t(xi_t&& xi)
-      : xi_t{xi.x, xi.i}
-    {
-    }
-  };
+  // mapping (env state x, env state y) -- both env states;
+  // the lit represents whether x and y belong to the same class.
+  // Use structured bindings at the call site, e.g.
+  // `auto& [x, y] = some_xy_t;`.
+  // Convention: first/second = (env-state x, env-state y). See
+  // ixy2lit() and the xy block of print().
+  using xy_t = std::pair<unsigned, unsigned>;
 
   // mapping (classes, letters, classes)
   struct iaj_t
@@ -2282,33 +2239,30 @@ namespace
   };
 
   auto iaj_hash =
-      [](const iaj_t& iaj) noexcept {return iaj.hash(); };
+    [](const iaj_t& iaj) noexcept {return iaj.hash(); };
   auto iaj_eq =
-      [](const iaj_t& l, const iaj_t& r){return l == r; };
+    [](const iaj_t& l, const iaj_t& r){return l == r; };
   auto iaj_less = [](const iaj_t& l, const iaj_t& r){return l < r; };
 
-  template<bool USE_PICO>
-  struct lit_mapper;
+  // Forward decl so lit_mapper can hold a back-pointer; inc_var()
+  // is defined out of line below the full mm_sat_prob_t definition.
+  struct mm_sat_prob_t;
 
-  template<>
-  struct lit_mapper<true>
+  struct lit_mapper
   {
-    // x and y in same class?
-    //x <-> x, i <-> y
-    using xy_t = xi_t;
     // using k-th product of out-cond of state x for minimal letter u
     // u <-> i, x <-> a, k <-> k
     using uxk_t = iaj_t;
 
-    PicoSAT* psat_;
     unsigned n_classes_;
     const unsigned n_env_, n_sigma_red_;
     int next_var_;
+    int var_counter_;
     bool frozen_xi_, frozen_iaj_, frozen_si_;
     //xi -> lit
     std::unordered_map<xi_t, int, pair_hash> sxi_map_;
     //xy -> lit
-    std::unordered_map<xi_t, int, pair_hash> ixy_map_;
+    std::unordered_map<xy_t, int, pair_hash> ixy_map_;
     //iaj -> lit
     std::unordered_map<iaj_t, int,
                        decltype(iaj_hash),
@@ -2319,14 +2273,17 @@ namespace
                        decltype(iaj_eq)> cuxk_map_{1, iaj_hash, iaj_eq};
     // all lits
     std::vector<int> all_lits;
+    // Back-pointer to owning mm_sat_prob_t; inc_var() advances
+    // the solver's declared-variable window on each new id.
+    mm_sat_prob_t* owner_ = nullptr;
 
     lit_mapper(unsigned n_classes, unsigned n_env,
                unsigned n_sigma_red)
-      : psat_{picosat_init()}
-      , n_classes_{n_classes}
+      : n_classes_{n_classes}
       , n_env_{n_env}
       , n_sigma_red_{n_sigma_red}
       , next_var_{std::numeric_limits<int>::min()}
+      , var_counter_{1}
       , frozen_xi_{false}
       , frozen_iaj_{false}
     {
@@ -2339,31 +2296,32 @@ namespace
       ziaj_map_.reserve((n_classes_*n_classes_*n_sigma_red_)/3);
     }
 
-    ~lit_mapper()
-    {
-      picosat_reset(psat_);
-    }
+    ~lit_mapper() = default;
 
     int get_var_()
     {
-      return picosat_inc_max_var(psat_);
+      int v = var_counter_;
+      ++var_counter_;
+      return v;
     }
 
-    void inc_var()
+    void inc_var();
+
+    void set_owner(mm_sat_prob_t& pb)
     {
-      all_lits.push_back(next_var_);
-      next_var_ = get_var_();
+      owner_ = &pb;
     }
 
     int sxi2lit(xi_t xi)
     {
-      assert(xi.x < n_env_ && "Exceeds max state number.");
-      assert(xi.i < n_classes_ && "Exceeds max source class.");
-      auto [it, inserted] = sxi_map_.try_emplace(xi, next_var_);
-      if (inserted)
-        inc_var();
-      assert((!frozen_xi_ || !inserted) && "Created lit when frozen.");
-      return it->second;
+      auto& [x, i] = xi;
+      (void) x;
+      (void) i;
+      assert(x < n_env_ && "Exceeds max state number.");
+      assert(i < n_classes_ && "Exceeds max source class.");
+      assert((!frozen_xi_ || sxi_map_.count(xi))
+             && "Created lit when frozen.");
+      return try_emplace_lit(sxi_map_, xi);
     }
 
     int sxi2lit(xi_t xi) const
@@ -2395,11 +2353,9 @@ namespace
       assert(iaj.i < n_classes_ && "Exceeds source class.");
       assert(iaj.a < n_sigma_red_ && "Exceeds max letter idx.");
       assert(iaj.j < n_classes_&& "Exceeds dest class.");
-      auto [it, inserted] = ziaj_map_.try_emplace(iaj, next_var_);
-      assert((!frozen_iaj_ || !inserted) && "Created lit when frozen.");
-      if (inserted)
-        inc_var();
-      return it->second;
+      assert((!frozen_iaj_ || ziaj_map_.count(iaj))
+             && "Created lit when frozen.");
+      return try_emplace_lit(ziaj_map_, iaj);
     }
 
     int ziaj2lit(iaj_t iaj) const
@@ -2427,12 +2383,12 @@ namespace
 
     int ixy2lit(xy_t xy)
     {
-      assert(xy.x < n_env_ && "Exceeds max state number.");
-      assert(xy.i < n_env_ && "Exceeds max state number.");
-      auto [it, inserted] = ixy_map_.try_emplace(xy, next_var_);
-      if (inserted)
-        inc_var();
-      return it->second;
+      auto& [x, y] = xy;
+      (void) x;
+      (void) y;
+      assert(x < n_env_ && "Exceeds max state number.");
+      assert(y < n_env_ && "Exceeds max state number.");
+      return try_emplace_lit(ixy_map_, xy);
     }
 
     int ixy2lit(xy_t xy) const
@@ -2443,10 +2399,7 @@ namespace
     int cuxk2lit(uxk_t uxk)
     {
       assert(uxk.a < n_env_ && "Exceeds max state number.");
-      auto [it, inserted] = cuxk_map_.try_emplace(uxk, next_var_);
-      if (inserted)
-        inc_var();
-      return it->second;
+      return try_emplace_lit(cuxk_map_, uxk);
     }
 
     int cuxk2lit(uxk_t uxk) const
@@ -2457,51 +2410,72 @@ namespace
     std::ostream& print(std::ostream& os = std::cout,
                         std::vector<int>* sol = nullptr)
     {
-      bool hs = sol != nullptr;
-      auto ts = [&](int i){return std::to_string(i); };
+      auto ts = [&](int i){ return std::to_string(i); };
 
       {
         std::map<xi_t, int> xi_tmp(sxi_map_.begin(),
                                    sxi_map_.end());
-        os << "x - i -> lit" << (hs ? " - sol\n" : "\n");
-        for (auto& it : xi_tmp)
-          os << it.first.x << " - " << it.first.i << " -> " << it.second
-             << (hs ? " - " + ts(sol->at(sxi_map_.at(it.first))) : " ")
-             << '\n';
+        os << "x - i -> lit" << (sol ? " - sol\n" : "\n");
+        for (auto& [kv, val] : xi_tmp)
+          {
+            auto& [x, i] = kv;
+            os << x << " - " << i << " -> " << val
+               << (sol ? " - " + ts(sol->at(val)) : " ") << '\n';
+          }
       }
       {
         std::map<iaj_t, int, decltype(iaj_less)>
-            iaj_tmp(ziaj_map_.begin(), ziaj_map_.end(), iaj_less);
-        os << "i - a - j -> lit\n";
+          iaj_tmp(ziaj_map_.begin(), ziaj_map_.end(), iaj_less);
+        os << "i - a - j -> lit" << (sol ? " - sol\n" : "\n");
         for (auto& it : iaj_tmp)
-            os << it.first.i << " - " << it.first.a << " - " << it.first.j
+          os << it.first.i << " - " << it.first.a << " - " << it.first.j
              << " -> " << it.second
-             << (hs ? " - " + ts(sol->at(ziaj_map_.at(it.first))) : " ")
-             << '\n';
+             << (sol ? " - " + ts(sol->at(it.second)) : " ") << '\n';
       }
       {
         std::map<xy_t, int> xy_tmp(ixy_map_.begin(),
                                    ixy_map_.end());
-        os << "x - y -> lit" << (hs ? " - sol\n" : "\n");
-        for (auto& it : xy_tmp)
-          os << it.first.x << " - " << it.first.i << " -> " << it.second
-             << (hs ? " - " + ts(sol->at(ixy_map_.at(it.first))) : " ")
-             << '\n';
+        os << "x - y -> lit" << (sol ? " - sol\n" : "\n");
+        for (auto& [kv, val] : xy_tmp)
+          {
+            auto& [x, y] = kv;
+            os << x << " - " << y << " -> " << val
+               << (sol ? " - " + ts(sol->at(val)) : " ") << '\n';
+          }
       }
       {
         std::map<uxk_t, int, decltype(iaj_less)>
-            uxk_tmp(cuxk_map_.begin(), cuxk_map_.end(), iaj_less);
-        os << "u - x - k -> lit\n";
+          uxk_tmp(cuxk_map_.begin(), cuxk_map_.end(), iaj_less);
+        os << "u - x - k -> lit" << (sol ? " - sol\n" : "\n");
         for (auto& it : uxk_tmp)
-            os << it.first.i << " - " << it.first.a << " - " << it.first.j
+          os << it.first.i << " - " << it.first.a << " - " << it.first.j
              << " -> " << it.second
-             << (hs ? " - " + ts(sol->at(cuxk_map_.at(it.first))) : " ")
-             << '\n';
+             << (sol ? " - " + ts(sol->at(it.second)) : " ") << '\n';
       }
       return os;
     }
+
+  private:
+    // Centralizes the `try_emplace(key, next_var_) -> inc_var()`
+    // bookkeeping so those methods stay one-line (modulo their own
+    // bound and frozen asserts). All four maps are
+    // std::unordered_map<_, int, _>, so a single Map/Key template
+    // parameter covers them.
+    template <class Map, class Key>
+    int try_emplace_lit(Map& m, const Key& k)
+    {
+      auto [it, inserted] = m.try_emplace(k, next_var_);
+      if (inserted)
+        inc_var();
+      return it->second;
+    }
   };
 
+  // Intentionally distinct alias for xi_t: all three (xi_t, xy_t,
+  // ia_t) are now the same concrete type `std::pair<unsigned,
+  // unsigned>`, so mixing them is silently type-compatible.
+  // Convention for ia_t: first/second = (source-class, letter-id),
+  // used as keys in trans_cover_clauses.
   using ia_t = xi_t;
 
 
@@ -2515,11 +2489,7 @@ namespace
     }
   };
 
-  template<bool USE_PICO>
-  struct mm_sat_prob_t;
-
-  template<>
-  struct mm_sat_prob_t<true>
+  struct mm_sat_prob_t
   {
     mm_sat_prob_t(unsigned n_classes, unsigned n_env,
                   unsigned n_sigma_red, satprob_info& si)
@@ -2528,95 +2498,175 @@ namespace
       , si{si}
     {
       state_cover_clauses.reserve(n_classes);
-      trans_cover_clauses.reserve(n_classes*n_sigma_red);
+      trans_cover_clauses.reserve(n_classes * n_sigma_red);
+
+      // Instantiate the persistent CaDiCaL::Solver last, after
+      // the reserve() calls. reserve() can throw std::bad_alloc
+      // under heavy memory pressure; if it does on an earlier
+      // line, the destruct-or of an already-allocated solver
+      // would not run (the partial-ctor cleanup skips it), so
+      // we want to do this attestation LAST. add_static() can
+      // then unconditionally push clauses straight into solver_.
+      solver_ = new CaDiCaL::Solver();
+
+      // Bumped by lit_mapper::inc_var() as it mints new ids.
+      max_var_declared_ = 0;
+      lm.set_owner(*this);
     }
 
-    void add_static(int lit)
+    ~mm_sat_prob_t()
     {
-      picosat_add(lm.psat_, lit);
-    }
-    template<class CONT>
-    void add_static(CONT& lit_cont)
-    {
-      for (int lit : lit_cont)
-        picosat_add(lm.psat_, lit);
+      // solver_ is guaranteed non-null (created in the ctor);
+      // deleting it is the only cleanup we need.
+      delete solver_;
     }
 
+
+    void add_static(const std::vector<int>& lit_cont)
+    {
+      // solver_ is created in the ctor and is always non-null here;
+      // every lit in lit_cont was already declared in inc_var().
+      solver_->clause(lit_cont);
+      trace_clause(lit_cont);
+    }
+
+    void add_static(int l1, int l2)
+    {
+      solver_->clause(l1, l2);
+      trace_clause(l1, l2);
+    }
+
+    void add_static(int l1, int l2, int l3)
+    {
+      solver_->clause(l1, l2, l3);
+      trace_clause(l1, l2, l3);
+    }
 
     void set_variable_clauses()
     {
       trace << "c Number of local clauses "
-            << state_cover_clauses.size() + trans_cover_clauses.size() << '\n';
+            << state_cover_clauses.size() + trans_cover_clauses.size()
+            << '\n';
+
+      // Defensive: try_build_min_machine alternates set/unset,
+      // so current_act_var_ must be 0 here. If this ever fires,
+      // a caller short-circuited set->set without the
+      // intervening unset_variable_clauses(); the two
+      // hypotheses' cover clauses would then be unioned under
+      // the next assume(), masking the search.
+      assert(current_act_var_ == 0);
+
+      // CRITICAL ORDERING: allocate the activation variable
+      // BEFORE declaring variables to CaDiCaL. Cover clauses
+      // below are tagged with -current_act_var_, so the
+      // act_var must be counted in declare_more_variables().
+      current_act_var_ = lm.get_var_();
+      lm.inc_var();
+      ++n_hypotheses_;
+
+      // The act_var above was already declared via inc_var().
+      assert(lm.next_var_ >= 1);
+
+      trace << "c Hypothesis " << n_hypotheses_
+            << ", activation var " << current_act_var_
+            << '\n';
+
+      // Every cover clause added below is guarded by
+      // ~current_act_var_, so assuming current_act_var_=true
+      // activates this hypothesis. Other hypotheses stay
+      // disabled because their selectors were permanently
+      // falsified by the unit clause committed in
+      // unset_variable_clauses().
       trace << "c Cover clauses\n";
-      picosat_push(lm.psat_);
       for (auto& [_, clause] : state_cover_clauses)
         {
           (void)_;
-          // Clause is not nullterminated!
-          clause.push_back(0);
-          picosat_add_lits(lm.psat_, clause.data());
+          solver_->add(-current_act_var_);
+          for (int lit : clause)
+            solver_->add(lit);
+          solver_->add(0);
           trace_clause(clause);
-          clause.pop_back();
         }
       trace << "c Transition cover clauses\n";
       for (auto& elem : trans_cover_clauses)
         {
-          // Clause is not nullterminated!
           auto& clause = elem.second;
-          clause.push_back(0);
-          picosat_add_lits(lm.psat_, clause.data());
+          solver_->add(-current_act_var_);
+          for (int lit : clause)
+            solver_->add(lit);
+          solver_->add(0);
           trace_clause(clause);
-          clause.pop_back();
         }
     }
 
+    // Returns a vector of model assignments.
+    // The vector is empty iff the prob is unsat.
+    // res[l] == 1 : literal l is assigned true
+    // res[l] == 0 : literal l is assigned false (or never used)
+    // res[0]     : reserved (stays 0)
+    // All callers only test (res[l] == 1), so the false/unused
+    // distinction is unnecessary.
     std::vector<int>
     get_sol()
     {
-      // Returns a vector of assignments
-      // The vector is empty iff the prob is unsat
-      // res[i] == -1 : i not used in lit mapper
-      // res[i] == 0 : i is assigned false
-      // res[i] == 1 : i is assigned true
-      if (sat_dimacs_file)
+      // Activate the current hypothesis for this solve()
+      // call only. CaDiCaL clears the assumption list upon
+      // solve() returning, so each solve must re-issue
+      // the activation literal.
+      if (current_act_var_ != 0)
+        solver_->assume(current_act_var_);
+      int res_code = solver_->solve();
+      // On SAT the hypothesis is no longer "in flight"; the caller
+      // may not call unset_variable_clauses().  Clear
+      // current_act_var_ here so that a subsequent
+      // set_variable_clauses() on the same mm_pb (via
+      // try_build_min_machine + increment_classes + retry) is OK.
+      if (res_code == CaDiCaL::SATISFIABLE && current_act_var_ != 0)
+        current_act_var_ = 0;
+      if (res_code == CaDiCaL::UNSATISFIABLE)
+        return {};
+      else if (res_code == CaDiCaL::SATISFIABLE)
         {
-          fprintf(sat_dimacs_file->f,
-                  "c ### Next Instance %lld %lld ###\n",
-                  this->si.n_classes, this->si.n_refinement);
-          picosat_print(lm.psat_, sat_dimacs_file->f);
-        }
-      switch (picosat_sat(lm.psat_, -1))
-      {
-        case PICOSAT_UNSATISFIABLE:
-          return {};
-        case PICOSAT_SATISFIABLE:
-          {
-            unsigned nvar = 1 + (unsigned) picosat_variables(lm.psat_);
-            // Asssuming res.data() non-null was enough to prevent g++
-            // 11 from issuing a spurious "potential null pointer
-            // dereference" on the res[0] assignment.  Since g++14 we
-            // also need to assume nvar>0.
-            SPOT_ASSUME(nvar > 0);
-            std::vector<int> res(nvar, -1);
-            SPOT_ASSUME(res.data());
-            res[0] = 0; // Convention
-            for (int lit : lm.all_lits)
-              res[lit] = picosat_deref(lm.psat_, lit);
+          unsigned nvar = 1 + (unsigned) solver_->vars();
+          // Asssuming res.data() non-null was enough to prevent
+          // g++-11 from issuing a spurious "potential null pointer
+          // dereference" on the res[0] assignment.  Since g++14 we
+          // also need to assume nvar>0.
+          SPOT_ASSUME(nvar > 0);
+          unsigned max_lit = (unsigned) lm.next_var_;
+          std::vector<int> res(std::max(nvar, max_lit), 0);
+          SPOT_ASSUME(res.data());
+          for (int lit : lm.all_lits)
+            if (lit < (int) nvar)
+              res[lit] = solver_->val(lit) > 0;
 #ifdef TRACE
-            trace << "Sol is\n";
-            for (unsigned i = 0; i < res.size(); ++i)
-              trace << i << ": " << res[i] << '\n';
+          trace << "Sol is\n";
+          const unsigned n = res.size();
+          for (unsigned i = 0; i < n; ++i)
+            trace << i << ": " << res[i] << '\n';
 #endif
-            return res;
-          }
-      default:
-          throw std::runtime_error("Unknown error in picosat.");
-      }
+          return res;
+        }
+      else
+        throw std::runtime_error("Unknown error in CaDiCaL.");
     }
 
     void unset_variable_clauses()
     {
-      picosat_pop(lm.psat_);
+      // The old PicoSAT version called picosat_pop() here to rollback
+      // the hypothesis clauses. CaDiCaL has no push/pop, so we
+      // instead permanently falsify this hypothesis's activation
+      // literal: from this point on any clause tagged with
+      // ~current_act_var_ is satisfied for free, and this
+      // hypothesis's contribution to the formula is gone. The
+      // minimization loop in try_build_min_machine only iterates
+      // forward (it never revisits smaller n_classes); see the
+      // comment near increment_classes() for the proof.
+      if (solver_ && current_act_var_ != 0)
+        {
+          solver_->clause(-current_act_var_);
+          current_act_var_ = 0;
+        }
     }
 
     unsigned n_lits() const
@@ -2626,11 +2676,17 @@ namespace
 
     unsigned n_clauses() const
     {
-      return (unsigned) picosat_added_original_clauses(lm.psat_);
+      // Number of irredundant (= original, non-learned) clauses
+      // currently in the CaDiCaL solver, exposed via the public
+      // Solver::irredundant() API.
+      return (unsigned) solver_->irredundant();
     }
 
     // The mapper
-    lit_mapper<true> lm;
+    lit_mapper lm;
+
+    // The solver instance
+    CaDiCaL::Solver* solver_;
 
     // The current number of classes
     unsigned& n_classes;
@@ -2657,32 +2713,39 @@ namespace
     std::unordered_map<std::pair<int, int>, bool, pair_hash> cube_incomp_map;
     // Piggy-back a struct for performance measure
     satprob_info& si;
+
+    // Activation variable for the current hypothesis (used
+    // together with solver_->assume()). 0 means "no
+    // hypothesis active for this mm_sat_prob_t".
+    int current_act_var_ = 0;
+    // Highest variable id we have told the solver about;
+    // bumped by lit_mapper::inc_var().
+    int max_var_declared_ = -1;
+    // Diagnostic counter of hypothesis iterations seen.
+    std::size_t n_hypotheses_ = 0;
   };
 
-  template<>
-  void mm_sat_prob_t<true>::add_static(std::vector<int>& lit_cont)
+  inline void lit_mapper::inc_var()
   {
-    picosat_add_lits(lm.psat_, lit_cont.data());
+    all_lits.push_back(next_var_);
+    next_var_ = get_var_();
+    assert(owner_);
+    assert(owner_->solver_);
+    const int new_var = next_var_ - 1;
+    owner_->solver_->
+      declare_more_variables(new_var - owner_->max_var_declared_);
+    owner_->max_var_declared_ = new_var;
   }
-
-  template <bool USE_PICO>
-  void add_trans_cstr_f(mm_sat_prob_t<USE_PICO>&,
-                        const square_matrix<bool, true>&,
-                        const iaj_t, const unsigned, const int,
-                        const unsigned,
-                        const std::vector<unsigned>&,
-                        const std::vector<unsigned>&);
 
   // Add the constraints on transitions if the src class and possibly
   // the dst class is a partial solution
-  template <>
   void
-  add_trans_cstr_f<true>(mm_sat_prob_t<true>& mm_pb,
-                         const square_matrix<bool, true>& incompmat,
-                         const iaj_t iaj, const unsigned fdj, const int iajlit,
-                         const unsigned fdx_idx,
-                         const std::vector<unsigned>& group_states_,
-                         const std::vector<unsigned>& has_a_edge_)
+  add_trans_cstr_f(mm_sat_prob_t& mm_pb,
+                   const square_matrix<bool, true>& incompmat,
+                   const iaj_t iaj, const unsigned fdj, const int iajlit,
+                   const unsigned fdx_idx,
+                   const std::vector<unsigned>& group_states_,
+                   const std::vector<unsigned>& has_a_edge_)
   {
     const auto& lm = mm_pb.lm;
     const unsigned& n_sg = group_states_.size();
@@ -2690,7 +2753,8 @@ namespace
     const unsigned fdx_succ = has_a_edge_[fdx_idx];
     assert(fdj < incompmat.dim());
 
-    static std::vector<int> clause(4, 0);
+    std::vector<int> clause;
+    clause.reserve(3);
     for (unsigned xidx = 0; xidx < n_sg; ++xidx)
       {
         if (fdj == fdx_succ && xidx == fdx_idx)
@@ -2709,28 +2773,25 @@ namespace
         if (xprime == -1u || xprime == fdj)
           continue;
 
-        auto clause_it = clause.begin();
-        *clause_it = -iajlit;
+        clause.clear();
+        clause.push_back(-iajlit);
         // If xprime and the dest class are incompatible
         // -> source state can not be in i if iajlit is active
         if (xidx != fdx_idx)
           // Must be in src_class as it is founding
-          *(++clause_it) = -lm.sxi2lit({x, iaj.i});
+          clause.push_back(-lm.sxi2lit({x, iaj.i}));
         // No need to add xprime if it is not compatible
         // with the successor of the founding state of src (if existent)
         // or the dst class
         if ((fdx_succ == -1u || !incompmat.get(fdx_succ, xprime))
             && !incompmat.get(fdj, xprime))
-          *(++clause_it) = lm.sxi2lit({xprime, iaj.j});
+          clause.push_back(lm.sxi2lit({xprime, iaj.j}));
 
-        *(++clause_it) = 0;
         mm_pb.add_static(clause);
-        trace_clause(clause);
       }
   }
 
-  template <bool USE_PICO>
-  mm_sat_prob_t<USE_PICO>
+  mm_sat_prob_t
   build_init_prob(const_twa_graph_ptr split_mmw,
                   const square_matrix<bool, true>& incompmat,
                   const reduced_alphabet_t& red,
@@ -2743,7 +2804,7 @@ namespace
     const unsigned n_red = red.n_red_sigma;
     const unsigned n_groups = red.n_groups;
 
-    mm_sat_prob_t<USE_PICO> mm_pb(n_classes, n_env, n_red, si);
+    mm_sat_prob_t mm_pb(n_classes, n_env, n_red, si);
 
     auto& lm = mm_pb.lm;
 
@@ -2768,9 +2829,10 @@ namespace
         if (is_psol[s] != -1u)
           continue;
         // new clause
-        mm_pb.state_cover_clauses.emplace_back(std::piecewise_construct,
-            std::forward_as_tuple(s),
-            std::forward_as_tuple(std::vector<int>{}));
+        mm_pb.state_cover_clauses.emplace_back
+          (std::piecewise_construct,
+           std::forward_as_tuple(s),
+           std::forward_as_tuple(std::vector<int>{}));
         auto& clause = mm_pb.state_cover_clauses.back().second;
         // All possible classes
         // Note, here they are all partial solutions
@@ -2788,8 +2850,6 @@ namespace
     // Note: special care is taken later on for closure
     trace << "c Incompatibility" << std::endl;
     {
-      std::vector<int> inc_clause_(3);
-      inc_clause_[2] = 0;
       for (unsigned x = 0; x < n_env; ++x)
         {
           for (unsigned i = 0; i < n_classes; ++i)
@@ -2804,12 +2864,8 @@ namespace
                   if (psolv[i] == y || incompmat.get(psolv[i], y))
                     continue;
                   if (incompmat.get(x, y))
-                    {
-                      inc_clause_[0] = -lm.sxi2lit({x, i});
-                      inc_clause_[1] = -lm.sxi2lit({y, i});
-                      mm_pb.add_static(inc_clause_);
-                      trace_clause(inc_clause_);
-                    }
+                    mm_pb.add_static(-lm.sxi2lit({x, i}),
+                                     -lm.sxi2lit({y, i}));
                 }
             }
         }
@@ -2860,7 +2916,7 @@ namespace
               unsigned idx =
                 find_first_index_of(group_states_,
                                     [&](unsigned s)
-                                      {return s == psolv[src_class]; });
+                                    {return s == psolv[src_class]; });
               assert(idx != n_states_g_);
               group_classes_.emplace_back(src_class, idx);
             }
@@ -2874,27 +2930,27 @@ namespace
         for (unsigned abddidu = 0; abddidu < n_letters_g; ++abddidu)
           {
             const unsigned abdd_idx =
-                red.bisim_letters[group][abddidu].front();
+              red.bisim_letters[group][abddidu].front();
             const bdd& abdd = red.minimal_letters_vec[group][abdd_idx];
             const int abddid = abdd.id();
             // Advance all iterators if necessary
             // also check if finished.
             // if all edges are treated we can stop
             // Drive by check if a exists in outs
-            auto h_a_it = has_a_edge_.begin();
-            std::for_each(edge_it.begin(), edge_it.end(),
-                          [&abddid, &h_a_it](auto& eit)
-                            {
-                              *h_a_it = -1u;
-                              if ((eit.first != eit.second)
-                                   && (eit.first->cond.id() < abddid))
-                                  ++eit.first;
-                              if ((eit.first != eit.second)
-                                  && (eit.first->cond.id() == abddid))
-                                *h_a_it = eit.first->dst;
-                              ++h_a_it;
-                            });
-            assert(h_a_it == has_a_edge_.end());
+            unsigned n = edge_it.size();
+            for (unsigned i = 0; i < n; ++i)
+              {
+                auto& eit_first = edge_it[i].first;
+                auto& eit_second = edge_it[i].second;
+                has_a_edge_[i] = -1u;
+                if ((eit_first != eit_second)
+                    && (eit_first->cond.id() < abddid))
+                  ++eit_first;
+                if ((eit_first != eit_second)
+                    && (eit_first->cond.id() == abddid))
+                  has_a_edge_[i] = eit_first->dst;
+              }
+            // post-loop assert dropped: bounded by edge_it.size();
 
             // Loop over src classes, note all classes are partial solution
             // classes
@@ -2905,10 +2961,10 @@ namespace
                 const unsigned fdx_succ = has_a_edge_[fdx_idx];
                 // -1u if not partial solution else number of class
                 const unsigned fdx_succ_class =
-                    (fdx_succ == -1u) ? -1u : is_psol[fdx_succ];
+                  (fdx_succ == -1u) ? -1u : is_psol[fdx_succ];
 
                 assert(!mm_pb.trans_cover_clauses.count({src_class,
-                                                         abddidu}));
+                      abddidu}));
                 if (fdx_succ_class != -1u)
                   {
                     // The target is also partial solution state
@@ -2916,16 +2972,16 @@ namespace
                     assert(!lm.get_iaj({src_class, abddidu, fdx_succ_class}));
                     lm.unfreeze_iaj();
                     int iajlit = lm.ziaj2lit({src_class, abddidu,
-                                              fdx_succ_class});
+                        fdx_succ_class});
                     lm.freeze_iaj();
                     mm_pb.trans_cover_clauses[{src_class, abddidu}]
-                        .push_back(iajlit);
-                    add_trans_cstr_f<USE_PICO>(mm_pb,
-                                               incompmat,
-                                               {src_class, abddidu,
-                                                fdx_succ_class},
-                                               fdx_succ, iajlit, fdx_idx,
-                                               group_states_, has_a_edge_);
+                      .push_back(iajlit);
+                    add_trans_cstr_f(mm_pb,
+                                     incompmat,
+                                     {src_class, abddidu,
+                                      fdx_succ_class},
+                                     fdx_succ, iajlit, fdx_idx,
+                                     group_states_, has_a_edge_);
                   }
                 else
                   {
@@ -2956,18 +3012,18 @@ namespace
                               continue;
                             if ((fdx_succ == -1u
                                  || !incompmat.get(psolv[dst_class],
-                                                         fdx_succ))
+                                                   fdx_succ))
                                 && !incompmat.get(psolv[dst_class], xprime))
                               {
                                 // Possible dst
                                 succ_classes[dst_class] = true;
                                 lm.unfreeze_iaj();
                                 int iajlit = lm.ziaj2lit({src_class, abddidu,
-                                                          dst_class});
+                                    dst_class});
                                 lm.freeze_iaj();
                                 mm_pb.trans_cover_clauses[{src_class,
-                                                           abddidu}]
-                                    .push_back(iajlit);
+                                      abddidu}]
+                                  .push_back(iajlit);
                                 add_trans_cstr_f(mm_pb,
                                                  incompmat,
                                                  {src_class, abddidu,
@@ -3007,12 +3063,11 @@ namespace
   // This is called when we increase the number of available classes
   // We know that the new class is not associated to a partial solution
   // or founding state
-  template <bool USE_PICO>
   void increment_classes(const_twa_graph_ptr split_mmw,
                          const square_matrix<bool, true>& incompmat,
                          const reduced_alphabet_t& red,
                          const part_sol_t& psol,
-                         mm_sat_prob_t<USE_PICO>& mm_pb)
+                         mm_sat_prob_t& mm_pb)
   {
     const unsigned new_class = mm_pb.n_classes++;
     const unsigned n_env = mm_pb.lm.n_env_;
@@ -3038,14 +3093,11 @@ namespace
       }
     assert(it_cc == mm_pb.state_cover_clauses.end());
 
-
     // 2 Set incompatibilities
     // All states can be in the new class, so we have to set all
     // incompatibilities
     {
       trace << "c Incomp class " << new_class << '\n';
-      std::vector<int> inc_clause_(3); // Vector call to pico faster
-      inc_clause_[2] = 0;
       for (unsigned x = 0; x < n_env; ++x)
         {
           assert(lm.get_sxi({x, new_class}) || psol.is_psol[x] != -1u);
@@ -3053,10 +3105,8 @@ namespace
             if (incompmat.get(x, y))
               {
                 assert(lm.get_sxi({y, new_class}) || psol.is_psol[y] != -1u);
-                inc_clause_[0] = -lm.sxi2lit({x, new_class});
-                inc_clause_[1] = -lm.sxi2lit({y, new_class});
-                mm_pb.add_static(inc_clause_);
-                trace_clause(inc_clause_);
+                mm_pb.add_static(-lm.sxi2lit({x, new_class}),
+                                 -lm.sxi2lit({y, new_class}));
               }
         }
     }
@@ -3072,18 +3122,17 @@ namespace
     // New_class as dst
     for (auto& elem : mm_pb.trans_cover_clauses)
       elem.second.push_back(lm.ziaj2lit({elem.first.first, elem.first.second,
-                                         new_class}));
+            new_class}));
     // New_class as src
     for (unsigned abddidu = 0; abddidu < red.n_red_sigma; ++abddidu)
       {
         auto& na_cover =
-            mm_pb.trans_cover_clauses[{new_class, abddidu}];
+          mm_pb.trans_cover_clauses[{new_class, abddidu}];
         na_cover.reserve(new_class + 1);
         for (unsigned dst_class = 0; dst_class <= new_class; ++dst_class)
           na_cover.push_back(lm.ziaj2lit({new_class, abddidu, dst_class}));
       }
     lm.freeze_iaj();
-
 
     // 4 Transition
     // As before, simplify conditions
@@ -3127,24 +3176,23 @@ namespace
             // also check if finished.
             // if all edges are treated we can stop
             // Drive by check if a exists in outs
-            auto h_a_it = has_a_edge_.begin();
-            std::for_each(edge_it.begin(), edge_it.end(),
-                          [&abddid, &h_a_it](auto& eit)
-                            {
-                              *h_a_it = -1u;
-                              if ((eit.first != eit.second)
-                                  && (eit.first->cond.id() < abddid))
-                                ++eit.first;
-                              if ((eit.first != eit.second)
-                                  && (eit.first->cond.id() == abddid))
-                                *h_a_it = eit.first->dst;
-                              ++h_a_it;
-                            });
-            assert(h_a_it == has_a_edge_.end());
+            unsigned n = edge_it.size();
+            for (unsigned i = 0; i < n; ++i)
+              {
+                auto& eit_first = edge_it[i].first;
+                auto& eit_second = edge_it[i].second;
+                has_a_edge_[i] = -1u;
+                if ((eit_first != eit_second)
+                    && (eit_first->cond.id() < abddid))
+                  ++eit_first;
+                if ((eit_first != eit_second)
+                    && (eit_first->cond.id() == abddid))
+                  has_a_edge_[i] = eit_first->dst;
+              }
+            // post-loop assert dropped: bounded by edge_it.size();
 
             // All other classes
             // Loop over all states of the group
-            std::vector<int> inc_clause(4, 0);
             for (unsigned xidx = 0; xidx < n_states_g_; ++xidx)
               {
                 const unsigned x = group_states_[xidx];
@@ -3171,24 +3219,14 @@ namespace
                       // No additional constraints necessary
                       continue;
                     // the iaj
-                    inc_clause[0] = -lm.ziaj2lit({src_class, abddidu,
-                                                  new_class});
-
+                    int l1 = -lm.ziaj2lit({src_class, abddidu, new_class});
                     // The next two sxi2lit can introduce new literals
                     // all states can possibly be in the new class
-                    inc_clause[1] = lm.sxi2lit({xprime, new_class});
-
-                    // x is not in src class.
-                    // This is not possible if x is founding state
-                    if (src_class < n_psol && psolv[src_class] == x)
-                      // b) Founding state
-                      inc_clause[2] = 0;
+                    int l2 = lm.sxi2lit({xprime, new_class});
+                    if (!(src_class < n_psol && psolv[src_class] == x))
+                      mm_pb.add_static(l1, l2, -lm.sxi2lit({x, src_class}));
                     else
-                      // c) Full condition
-                      inc_clause[2] = -lm.sxi2lit({x, src_class});
-
-                    trace_clause(inc_clause);
-                    mm_pb.add_static(inc_clause);
+                      mm_pb.add_static(l1, l2);
                   }//src classes
                 // New class as src
                 // all states can be in there, but not all targets must
@@ -3208,45 +3246,40 @@ namespace
                       continue; // case a)
 
                     // case b)
-                    inc_clause[0] = -lm.sxi2lit({x, new_class});
-                    inc_clause[1] = -lm.ziaj2lit({new_class, abddidu,
-                                                  dst_class});
-                    // Adding lit to go from b) to c)
-                    if (dst_class < n_psol
-                        && incompmat.get(xprime, psolv[dst_class]))
-                      inc_clause[2] = 0;
-                    else
-                      {
-                        int sxi = lm.sxi2lit({xprime, dst_class});
-                        assert(sxi);
-                        inc_clause[2] = sxi;
-                      }
-
-                    trace_clause(inc_clause);
-                    mm_pb.add_static(inc_clause);
+                    auto l1 = -lm.sxi2lit({x, new_class});
+                    auto l2 = -lm.ziaj2lit({new_class, abddidu,
+                        dst_class});
+                    // Build the clause dynamically (see src branch above).
+                    {
+                      std::vector<int> clause;
+                      clause.reserve(3);
+                      clause.push_back(l1);
+                      clause.push_back(l2);
+                      if (!(dst_class < n_psol
+                            && incompmat.get(xprime, psolv[dst_class])))
+                        clause.push_back(lm.sxi2lit({xprime, dst_class}));
+                      // else: 2-literal clause
+                      mm_pb.add_static(clause);
+                    }
                   }// dst calsses
               } // states
           } // letters
       } // groups
     lm.freeze_xi();
 
-    // "Propagate" the knowledge about cases
-    // where the usual constraints are insufficient to cope with
-    // the expressiveness of bdds
-    // All constraints on the cube(s) are conditioned by
-    // whether or not the states share some class ixy
-    // So here we only need to add the new class to all
-    // tracked states.
-    std::vector<int> c_clause(4, 0);
-    const auto& lm_c = lm;
-    // The state literals must exist
+    // "Propagate" the knowledge about cases where the usual
+    // constraints are insufficient to cope with the expressiveness of
+    // bdds.  All constraints on the cube(s) are conditioned by
+    // whether or not the states share some class ixy. So here we only
+    // need to add the new class to all tracked states.
     for (unsigned s1 = 0; s1 < n_env; ++s1)
       for (unsigned s2 = s1 + 1; s2 < n_env; ++s2)
         if (mm_pb.tracked_s_pair.get(s1, s2))
           {
-            c_clause[0] = -lm.sxi2lit({s1, new_class});
-            c_clause[1] = -lm_c.sxi2lit({s2, new_class});
-            c_clause[2] = lm_c.ixy2lit({s1, s2});
+            int l1 = -lm.sxi2lit({s1, new_class});
+            int l2 = -lm.sxi2lit({s2, new_class});
+            int l3 = lm.ixy2lit({s1, s2});
+            mm_pb.add_static(l1, l2, l3);
           }
   } // done increment_classes
 
@@ -3295,11 +3328,11 @@ namespace
   void cstr_split_mealy(twa_graph_ptr& minmach,
                         const reduced_alphabet_t& red,
                         const std::vector<std::pair<unsigned,
-                                                    std::vector<bool>>>&
-                          x_in_class,
+                        std::vector<bool>>>&
+                        x_in_class,
                         std::unordered_map<iaj_t, bdd,
-                            decltype(iaj_hash),
-                            decltype(iaj_eq)>& used_ziaj_map)
+                        decltype(iaj_hash),
+                        decltype(iaj_eq)>& used_ziaj_map)
   {
     const unsigned n_env_states = minmach->num_states();
     // Looping over unordered is different on arm vs intel
@@ -3313,13 +3346,13 @@ namespace
 
     std::sort(used_ziaj_ordered.begin(), used_ziaj_ordered.end(),
               [](const auto& pl, const auto& pr)
-                {return pl.first < pr.first; });
+              {return pl.first < pr.first; });
 
     // For each minimal letter, create the (input) condition that it represents
     // This has to be created for each minimal letters
     // and might be shared between alphabets
     std::vector<std::vector<bdd>> gmm2cond
-        = comp_represented_cond(red);
+      = comp_represented_cond(red);
 
 #ifdef TRACE
     for (const auto& el : used_ziaj_ordered)
@@ -3332,51 +3365,51 @@ namespace
 #endif
 
     // player_state_map
-    // xi.x -> dst class
-    // xi.i -> id of outcond
-    // value -> player state
+    // key.first  -> dst class
+    // key.second -> id of outcond
+    // value  -> player state
     std::unordered_map<xi_t, unsigned, pair_hash> player_state_map;
     player_state_map.reserve(minmach->num_states());
     auto get_player = [&](unsigned dst_class, const bdd& outcond)
-      {
-        auto [it, inserted] =
+    {
+      auto [it, inserted] =
         player_state_map.try_emplace({dst_class, (unsigned) outcond.id()},
                                      -1u);
-        if (inserted)
-          {
-            it->second = minmach->new_state();
-            minmach->new_edge(it->second, dst_class, outcond);
-            trace << "Added p " << it->second << " - " << outcond << " > "
-                  << dst_class << std::endl;
-          }
-        assert(it->second < minmach->num_states());
-        return it->second;
-      };
+      if (inserted)
+        {
+          it->second = minmach->new_state();
+          minmach->new_edge(it->second, dst_class, outcond);
+          trace << "Added p " << it->second << " - " << outcond << " > "
+                << dst_class << std::endl;
+        }
+      assert(it->second < minmach->num_states());
+      return it->second;
+    };
 
     // env_edge_map
-    // xi.x -> src_class
-    // xi.i -> player state
-    // value -> edge_number
+    // key.first  -> src class
+    // key.second -> player state
+    // value  -> edge_number
     std::unordered_map<xi_t, unsigned, pair_hash> env_edge_map;
     env_edge_map.reserve(minmach->num_states());
 
     auto add_edge = [&](unsigned src_class, unsigned dst_class,
                         const bdd& incond, const bdd& outcond)
-      {
-        unsigned p_state = get_player(dst_class, outcond);
-        auto it = env_edge_map.find({src_class, p_state});
-        if (it == env_edge_map.end())
-          {
-            // Construct the edge
-            env_edge_map[{src_class, p_state}] =
-              minmach->new_edge(src_class, p_state, incond);
-            trace << "Added e " << src_class << " - " << incond << " > "
-                  << p_state << std::endl;
-          }
-        else
-          // There is already an edge from src to pstate -> or the condition
-          minmach->edge_storage(it->second).cond |= incond;
-      };
+    {
+      unsigned p_state = get_player(dst_class, outcond);
+      auto it = env_edge_map.find({src_class, p_state});
+      if (it == env_edge_map.end())
+        {
+          // Construct the edge
+          env_edge_map[{src_class, p_state}] =
+            minmach->new_edge(src_class, p_state, incond);
+          trace << "Added e " << src_class << " - " << incond << " > "
+                << p_state << std::endl;
+        }
+      else
+        // There is already an edge from src to pstate -> or the condition
+        minmach->edge_storage(it->second).cond |= incond;
+    };
 
     for (const auto& [iaj, outcond] : used_ziaj_ordered)
       {
@@ -3400,16 +3433,15 @@ namespace
   // This function refines the sat constraints in case the
   // incompatibility computation relying on bdds is too optimistic
   // It add constraints for each violating class and letter
-  template <bool USE_PICO>
-  void add_bdd_cond_constr(mm_sat_prob_t<USE_PICO>& mm_pb,
+  void add_bdd_cond_constr(mm_sat_prob_t& mm_pb,
                            const_twa_graph_ptr mmw,
                            const reduced_alphabet_t& red,
                            const unsigned n_env,
                            const std::deque<std::pair<unsigned, unsigned>>&
-                             infeasible_classes,
+                           infeasible_classes,
                            const std::vector<std::pair<unsigned,
-                                                       std::vector<bool>>>&
-                            x_in_class)
+                           std::vector<bool>>>&
+                           x_in_class)
   {
     //infeasible_classes : Class, Letter index
     const unsigned n_groups = red.n_groups;
@@ -3420,11 +3452,6 @@ namespace
     for (unsigned i = 0; i < n_groups; ++i)
       ocond_maps[i].resize(red.minimal_letters_vec[i].size());
 
-    // Helper
-    auto get_o_cond = [&](const auto& e)
-      {
-        return mmw->out(e.dst).begin()->cond;
-      };
     for (auto [n_class, letter_idx] : infeasible_classes)
       {
         trace << "c Adding additional constraints for class "
@@ -3446,14 +3473,14 @@ namespace
             // Search for the actual edge implied by this minimal letter
             // there is only one
             const auto& impl_edges =
-                red.minimal_letters.at(group).
-                  at(red.minimal_letters_vec.at(group).at(letter_idx)).first;
+              red.minimal_letters.at(group).
+              at(red.minimal_letters_vec.at(group).at(letter_idx)).first;
             bdd econd = bddfalse;
             for (const auto& e : mmw->out(s))
               if (impl_edges.count(e.cond.id()))
                 {
                   assert(econd == bddfalse);
-                  econd = get_o_cond(e);
+                  econd = mmw->out(e.dst).begin()->cond;
 #ifdef NDEBUG
                   break;
 #endif
@@ -3465,8 +3492,8 @@ namespace
             // If not, do so
             // Decompose it into cubes
             auto [it, inserted] =
-                mm_pb.cube_map.try_emplace(econd.id(),
-                                           std::vector<bdd>());
+              mm_pb.cube_map.try_emplace(econd.id(),
+                                         std::vector<bdd>());
 
             if (inserted)
               {
@@ -3498,9 +3525,7 @@ namespace
                 c_clause.clear();
                 for (unsigned idx = 0; idx < n_cubes; ++idx)
                   c_clause.push_back(lm.cuxk2lit({letter_idx, s, idx}));
-                c_clause.push_back(0);
                 mm_pb.add_static(c_clause);
-                trace_clause(c_clause);
               }
           }
       }
@@ -3512,99 +3537,74 @@ namespace
     //    Avoid redundant clauses for new/new constraints new/new
     auto create_cstr = [&](unsigned s1, unsigned s2,
                            const std::vector<std::pair<int, int>>&
-                                 incomp_cubes_list)
-      {
-        // No simplification as this can backfire
+                           incomp_cubes_list)
+    {
+      // No simplification as this can backfire
 
-        // Helper literal that determines if s1 and s2 are
-        // at least in one common class
-        // either s1 is not in class or s2 is not in class
-        // ot is1s2
-        const int is1s2 = lm.ixy2lit({s1, s2});
-        // The constraint below is might have already been
-        // constructed if so, the states are marked as tracked
-        if (!mm_pb.tracked_s_pair.get(s1, s2))
-          {
-            mm_pb.tracked_s_pair.set(s1, s2, true);
-            for (unsigned iclass = 0; iclass < mm_pb.n_classes; ++iclass)
-              {
-                c_clause.clear();
-                int c_lit;
-                c_lit = lm.get_sxi({s1, iclass});
-                if (c_lit)
-                  c_clause.push_back(-c_lit);
-                c_lit = lm.get_sxi({s2, iclass});
-                if (c_lit)
-                  c_clause.push_back(-c_lit);
-                c_clause.push_back(is1s2);
-                c_clause.push_back(0);
-                mm_pb.add_static(c_clause);
-                trace_clause(c_clause);
-              }
-          }
-        // Now all the additional clauses have the form
-        // not same class or not cube1 or not cube2
-        c_clause.resize(4);
-        std::fill(c_clause.begin(), c_clause.end(), 0);
-        c_clause[0] = -is1s2;
-        for (auto [c1_lit, c2_lit] : incomp_cubes_list)
-          {
-            c_clause[1] = -c1_lit;
-            c_clause[2] = -c2_lit;
-            mm_pb.add_static(c_clause);
-            trace_clause(c_clause);
-          }
-      };
+      // Helper literal that determines if s1 and s2 are
+      // at least in one common class
+      // either s1 is not in class or s2 is not in class
+      // ot is1s2
+      const int is1s2 = lm.ixy2lit({s1, s2});
+      // The constraint below is might have already been
+      // constructed if so, the states are marked as tracked
+      if (!mm_pb.tracked_s_pair.get(s1, s2))
+        {
+          mm_pb.tracked_s_pair.set(s1, s2, true);
+          for (unsigned iclass = 0; iclass < mm_pb.n_classes; ++iclass)
+            {
+              c_clause.clear();
+              int c_lit;
+              c_lit = lm.get_sxi({s1, iclass});
+              if (c_lit)
+                c_clause.push_back(-c_lit);
+              c_lit = lm.get_sxi({s2, iclass});
+              if (c_lit)
+                c_clause.push_back(-c_lit);
+              c_clause.push_back(is1s2);
+              mm_pb.add_static(c_clause);
+            }
+        }
+      // Now all the additional clauses have the form
+      // not same class or not cube1 or not cube2
+      for (auto [c1_lit, c2_lit] : incomp_cubes_list)
+        mm_pb.add_static(-is1s2, -c1_lit, -c2_lit);
+    };
 
     auto fill_incomp_list = [&](std::vector<std::pair<int, int>>&
-                                  incomp_cubes_list,
+                                incomp_cubes_list,
                                 unsigned letter_idx,
                                 unsigned s1, const std::vector<bdd>& c_list1,
                                 unsigned s2, const std::vector<bdd>& c_list2)
-      {
-        const unsigned n_c1 = c_list1.size();
-        const unsigned n_c2 = c_list2.size();
-        incomp_cubes_list.clear();
-        for (unsigned c1_idx = 0; c1_idx < n_c1; ++c1_idx)
-          for (unsigned c2_idx = 0; c2_idx < n_c2; ++c2_idx)
-            {
-              auto [it, inserted] =
-                mm_pb.cube_incomp_map.try_emplace({c_list1[c1_idx].id(),
-                                                   c_list2[c2_idx].id()},
-                                                   false);
-              if (inserted)
-                it->second =
-                    bdd_have_common_assignment(c_list1[c1_idx],
-                                               c_list2[c2_idx]);
-              if (!it->second)
-                incomp_cubes_list.emplace_back((int) c1_idx,
-                                               (int) c2_idx);
-            }
+    {
+      const unsigned n_c1 = c_list1.size();
+      const unsigned n_c2 = c_list2.size();
+      incomp_cubes_list.clear();
+      for (unsigned c1_idx = 0; c1_idx < n_c1; ++c1_idx)
+        for (unsigned c2_idx = 0; c2_idx < n_c2; ++c2_idx)
+          {
+            auto [it, inserted] =
+              mm_pb.cube_incomp_map.try_emplace({c_list1[c1_idx].id(),
+                  c_list2[c2_idx].id()},
+                false);
+            if (inserted)
+              it->second =
+                bdd_have_common_assignment(c_list1[c1_idx],
+                                           c_list2[c2_idx]);
+            if (!it->second)
+              incomp_cubes_list.emplace_back((int) c1_idx,
+                                             (int) c2_idx);
+          }
 
-        // Replace the indices in the incomp_cubes_list
-        // with the literals if there is more than one cube the
-        // reduce the number of look-ups
-        auto repl1 = [&, ntrans = n_c1 == 1](int idx)
-          {
-            return ntrans ? idx : lm.cuxk2lit({letter_idx,
-                                              s1,
-                                              (unsigned) idx});
-          };
-        auto repl2 = [&, ntrans = n_c2 == 1](int idx)
-          {
-            return  ntrans ? idx : lm.cuxk2lit({letter_idx,
-                                                s2,
-                                                (unsigned) idx});
-          };
-        std::transform(incomp_cubes_list.begin(),
-                       incomp_cubes_list.end(),
-                       incomp_cubes_list.begin(),
-                       [&](auto& el) -> std::pair<int, int>
-                       {
-                         auto r1 = repl1(el.first);
-                         auto r2 = repl2(el.second);
-                         return {r1, r2}; });
-      };
+      // Replace the indices in the incomp_cubes_list
+      // with the literals if there is more than one cube the
+      // reduce the number of look-ups
+      for (auto& el : incomp_cubes_list)
+        {
+          el.first  = lm.cuxk2lit({letter_idx, s1, (unsigned) el.first});
+          el.second = lm.cuxk2lit({letter_idx, s2, (unsigned) el.second});
+        }
+    };
 
     std::vector<std::pair<int, int>> incomp_cubes_list;
     for (unsigned group = 0; group < n_groups; ++group)
@@ -3673,12 +3673,11 @@ namespace
                 }
           }
       }
-      // Done creating the additional constraints
+    // Done creating the additional constraints
   }
 
-  template<bool USE_PICO>
   twa_graph_ptr
-  try_build_min_machine(mm_sat_prob_t<USE_PICO>& mm_pb,
+  try_build_min_machine(mm_sat_prob_t& mm_pb,
                         const_twa_graph_ptr mmw,
                         const reduced_alphabet_t& red,
                         const part_sol_t& psol,
@@ -3756,8 +3755,8 @@ namespace
         // Save which class has which states
         // and to which group this class belongs
         std::vector<std::pair<unsigned, std::vector<bool>>>
-            x_in_class(n_classes,
-                       std::make_pair(-1u, std::vector<bool>(n_env, false)));
+          x_in_class(n_classes,
+                     std::make_pair(-1u, std::vector<bool>(n_env, false)));
 
         // Todo : Check if we can "reduce" the solution
         // that is to remove states from classes without
@@ -3770,7 +3769,7 @@ namespace
             for (unsigned x = 0; x < n_env; ++x)
               // By convention 0-lit is false
               x_in_class[i].second[x] =
-                  (sol.at(lm.get_sxi({x, i})) == 1);
+                (sol.at(lm.get_sxi({x, i})) == 1);
             if (i < n_psol)
               // partial solution
               x_in_class[i].second[psolv[i]] = true;
@@ -3778,7 +3777,7 @@ namespace
             assert(first_x != n_env && "No state in class.");
             x_in_class[i].first = red.which_group[first_x];
           }
-    #ifdef TRACE
+#ifdef TRACE
         for (unsigned i = 0; i < n_classes; ++i)
           {
             trace << "Class " << i << " group " << x_in_class[i].first << '\n';
@@ -3787,29 +3786,29 @@ namespace
                 trace << x << ' ';
             trace << std::endl;
           }
-    #endif
+#endif
 
         // Check that each class has only states of the same group
         assert(std::all_of(x_in_class.begin(), x_in_class.end(),
                            [&red, n_env](const auto& p)
-                             {
-                               for (unsigned i = 0; i < n_env; ++i)
-                                 if (p.second[i]
-                                     && (red.which_group[i] != p.first))
-                                   {
-                                     trace << "state "
-                                           << i << " is in a class "
-                                                   "associated to group "
-                                           << p.first << std::endl;
-                                     return false;
-                                   }
-                               return true;
-                             }));
+                           {
+                             for (unsigned i = 0; i < n_env; ++i)
+                               if (p.second[i]
+                                   && (red.which_group[i] != p.first))
+                                 {
+                                   trace << "state "
+                                         << i << " is in a class "
+                                     "associated to group "
+                                         << p.first << std::endl;
+                                   return false;
+                                 }
+                             return true;
+                           }));
 
         // Build the conditions
         // Decide on which ziaj to use
         std::unordered_map<iaj_t, bdd, decltype(iaj_hash), decltype(iaj_eq)>
-            used_ziaj_map(0, iaj_hash, iaj_eq);
+          used_ziaj_map(0, iaj_hash, iaj_eq);
         used_ziaj_map.reserve(1 + lm.ziaj_map_.size()/2);
 
         // todo : Here we use the first successor found.
@@ -3832,7 +3831,7 @@ namespace
                       for (unsigned abddidu : red.bisim_letters[group][amlbidu])
                         {
                           used_ziaj_map[{src_class, abddidu, dst_class}]
-                              = bddtrue;
+                            = bddtrue;
                           trace << "using " << src_class << ' ' << abddidu
                                 << ' ' << dst_class << std::endl;
                         }
@@ -3844,18 +3843,6 @@ namespace
         // Attention, from here we treat the minimal letters
         // not the bisimilar ones, as minimal letters share outconds, which is
         // not the case for bisimilar ones
-
-        // Loop over edges to construct the out conds
-        auto get_o_cond = [&](const auto& e)
-          {
-            return mmw->out(e.dst).begin()->cond;
-          };
-#ifndef NDEBUG
-        auto get_env_dst = [&](const auto& e)
-          {
-            return mmw->out(e.dst).begin()->dst;
-          };
-#endif
 
         // The first two loops cover all env-edges
         for (unsigned group = 0; group < n_groups; ++group)
@@ -3878,7 +3865,7 @@ namespace
                           min_let_g.at(min_let_v_g[abddidu]);
                         if (impl_sets.first.count(e.cond.id()))
                           {
-                            bdd outcond = get_o_cond(e);
+                            bdd outcond = mmw->out(e.dst).begin()->cond;
                             // This edge has the "letter" abddidu
                             // abddidu -> e.cond
                             // Loop over all possible src- and dst-classes
@@ -3897,13 +3884,13 @@ namespace
                                     // but we still loop over
                                     // all if changed later
                                     auto it = used_ziaj_map.find({src_class,
-                                                                  abddidu,
-                                                                  dst_class});
+                                        abddidu,
+                                        dst_class});
                                     if (it != used_ziaj_map.end())
                                       {
-                                        assert(
-                                          x_in_class[dst_class]
-                                              .second[get_env_dst(e)]);
+                                        assert(x_in_class[dst_class]
+                                               .second[mmw->out(e.dst)
+                                                       .begin()->dst]);
                                         it->second &= outcond;
                                       }
                                   } // dst_class
@@ -3944,7 +3931,7 @@ namespace
   } // try_build_machine
 
   twa_graph_ptr minimize_mealy_(const const_twa_graph_ptr& mm,
-                               int premin, int max_letter_mult)
+                                int premin, int max_letter_mult)
   {
     bdd outputs = ensure_mealy("minimize_mealy", mm);
 
@@ -3958,34 +3945,34 @@ namespace
       throw std::runtime_error("premin has to be -1, 0 or 1");
 
     auto do_premin = [&]()->const_twa_graph_ptr
-      {
-        if (premin == -1)
-          {
-            if (!mm->get_named_prop<region_t>("state-player"))
-              return split_2step(mm, false);
-            else
-              return mm;
-          }
-        else
-          {
-            bool is_split = mm->get_named_prop<region_t>("state-player");
-            // We have a split machine -> unsplit then resplit,
-            // as reduce mealy works on separated
-            twa_graph_ptr mms;
-            if (is_split)
-              {
-                auto mmi = unsplit_2step(mm);
-                reduce_mealy_here(mmi, premin == 1);
-                split_separated_mealy_here(mmi);
-                return mmi;
-              }
-            else
-              {
-                auto mms = reduce_mealy(mm, premin == 1);
-                return split_2step(mms, false);
-              }
-          }
-      };
+    {
+      if (premin == -1)
+        {
+          if (!mm->get_named_prop<region_t>("state-player"))
+            return split_2step(mm, false);
+          else
+            return mm;
+        }
+      else
+        {
+          bool is_split = mm->get_named_prop<region_t>("state-player");
+          // We have a split machine -> unsplit then resplit,
+          // as reduce mealy works on separated
+          twa_graph_ptr mms;
+          if (is_split)
+            {
+              auto mmi = unsplit_2step(mm);
+              reduce_mealy_here(mmi, premin == 1);
+              split_separated_mealy_here(mmi);
+              return mmi;
+            }
+          else
+            {
+              auto mms = reduce_mealy(mm, premin == 1);
+              return split_2step(mms, false);
+            }
+        }
+    };
 
     const_twa_graph_ptr mmw = do_premin();
     assert(is_split_mealy(mmw));
@@ -4024,18 +4011,18 @@ namespace
 
 
     auto early_exit = [&]()
-      {
-        si.done = 1;
-        si.total_time = sglob.stop();
-        si.write();
-        // Always keep machines split
-        if (mm->get_named_prop<region_t>("state-player"))
-          assert(is_split_mealy_specialization(mm, mmw));
-        else
-          assert(is_split_mealy_specialization(split_2step(mm, false),
-                                               mmw));
-        return std::const_pointer_cast<twa_graph>(mmw);
-      };
+    {
+      si.done = 1;
+      si.total_time = sglob.stop();
+      si.write();
+      // Always keep machines split
+      if (mm->get_named_prop<region_t>("state-player"))
+        assert(is_split_mealy_specialization(mm, mmw));
+      else
+        assert(is_split_mealy_specialization(split_2step(mm, false),
+                                             mmw));
+      return std::const_pointer_cast<twa_graph>(mmw);
+    };
 
     // If the partial solution has the same number of
     // states as the original automaton -> we are done
@@ -4046,15 +4033,15 @@ namespace
 
     // Get the reduced alphabet
     auto [split_mmw, reduced_alphabet] =
-        reduce_and_split(mmw, n_env, incompmat, si);
+      reduce_and_split(mmw, n_env, incompmat, si);
 
-    auto mm_pb = build_init_prob<true>(split_mmw, incompmat,
-                                       reduced_alphabet, partsol, n_env, si);
+    auto mm_pb = build_init_prob(split_mmw, incompmat,
+                                 reduced_alphabet, partsol, n_env, si);
     si.prob_init_build_time = si.restart();
     si.write();
 
     twa_graph_ptr minmachine = nullptr;
-    for (size_t n_classes = partsol.psol.size();
+    for (unsigned n_classes = partsol.psol.size();
          n_classes < n_env; ++n_classes)
       {
         if (si.task.empty())
@@ -4085,10 +4072,9 @@ namespace
     si.total_time = sglob.stop();
     si.write();
 
-    assert(is_split_mealy_specialization(
-      mm->get_named_prop<region_t>("state-player") ? mm
-                                                   :split_2step(mm, false),
-      minmachine));
+    assert(is_split_mealy_specialization
+           (mm->get_named_prop<region_t>("state-player")
+            ? mm : split_2step(mm, false), minmachine));
     return minmachine;
   }
 } // namespace
@@ -4110,7 +4096,6 @@ namespace spot
                                "minimize_lvl should be between 3 and 5.");
 
     std::string csvfile = si.opt.get_str("satlogcsv");
-    std::string dimacsfile = si.opt.get_str("satlogdimacs");
 
     if (!csvfile.empty())
       {
@@ -4122,14 +4107,10 @@ namespace spot
         sat_csv_file->exceptions(std::ofstream::failbit
                                  | std::ofstream::badbit);
       }
-    if (!dimacsfile.empty())
-      sat_dimacs_file
-        = std::make_unique<fwrapper>(dimacsfile);
     sat_instance_name = si.opt.get_str("satinstancename");
     auto res = minimize_mealy_(mm, si.minimize_lvl-4,
                                si.opt.get("max_letter_mult", 10));
     sat_csv_file.reset();
-    sat_dimacs_file.reset();
     return res;
   }
 }
@@ -4152,18 +4133,18 @@ namespace spot
     // todo
     auto check_out = [](const const_twa_graph_ptr& aut,
                         const auto& sp)
-      {
-        for (unsigned s = 0; s < aut->num_states(); ++s)
-          if (sp.at(s))
-            if (((++aut->out(s).begin()) != aut->out(s).end())
-                || (aut->out(s).begin() == aut->out(s).end()))
-              {
-                std::cerr << "Failed for " << s << '\n';
-                return false;
-              }
+    {
+      for (unsigned s = 0; s < aut->num_states(); ++s)
+        if (sp.at(s))
+          if (((++aut->out(s).begin()) != aut->out(s).end())
+              || (aut->out(s).begin() == aut->out(s).end()))
+            {
+              std::cerr << "Failed for " << s << '\n';
+              return false;
+            }
 
-        return true;
-      };
+      return true;
+    };
     assert(check_out(left, spl) &&
            "Left mealy machine has multiple or no player edges for a state");
     assert(check_out(right, spr) &&
@@ -4187,10 +4168,6 @@ namespace spot
     todo.emplace_back(initl, initr);
     seen.emplace(todo.back());
 
-    auto get_p_edge_l = [&](const auto& e_env)
-      {return *(left->out(e_env.dst).begin()); };
-    auto get_p_edge_r = [&](const auto& e_env)
-      {return *(right->out(e_env.dst).begin()); };
 
     while (!todo.empty())
       {
@@ -4209,7 +4186,7 @@ namespace spot
               }
 
 
-            const auto& el_p = get_p_edge_l(el_env);
+            const auto& el_p = (*(left->out(el_env.dst).begin()));
 
             for (const auto& er_env : right->out(sr))
               {
@@ -4217,7 +4194,7 @@ namespace spot
                 // of r must implies the one of left
                 if (bdd_have_common_assignment(el_env.cond, er_env.cond))
                   {
-                    const auto& er_p = get_p_edge_r(er_env);
+                    const auto& er_p = (*(right->out(er_env.dst).begin()));
                     if (!bdd_implies(er_p.cond, el_p.cond))
                       {
                         if (verbose)
@@ -4255,11 +4232,11 @@ namespace spot
 
 #ifndef NDEBUG
     for (const auto& [m, n, o] : {std::tuple{left, "left", outs[0]},
-                                            {right, "right", outs[1]}})
+                                  {right, "right", outs[1]}})
       {
         if (!is_mealy(m))
           throw std::runtime_error(std::string("mealy_prod(): ") + n
-                                  + " is not a mealy machine");
+                                   + " is not a mealy machine");
         if (!is_complete_(m, o))
           throw std::runtime_error(std::string("mealy_prod(): ") + n
                                    + " is not input complete");
@@ -4300,7 +4277,7 @@ namespace spot
            && "simplify_mealy_here(): m is not a mealy machine!");
     if (minimize_lvl < 0 || 5 < minimize_lvl)
       throw std::runtime_error("simplify_mealy_here(): minimize_lvl "
-                                "must be between 0 and 5.");
+                               "must be between 0 and 5.");
 
     stopwatch sw;
     if (si.bv)
@@ -4315,8 +4292,8 @@ namespace spot
             m = unsplit_mealy(m);
             is_separated = true;
           }
-        // FIXME: Calling readuce_mealy_here() twice will
-        // sometimes further reader the Mealy machine.
+        // FIXME: Calling reduce_mealy_here() twice will
+        // sometimes further reduce the Mealy machine.
         reduce_mealy_here(m, minimize_lvl == 2);
       }
     else if (3 <= minimize_lvl)
@@ -4333,10 +4310,10 @@ namespace spot
       }
     else if (0 < minimize_lvl && minimize_lvl < 3 && split_out)
       {
-      if (is_separated)
-        split_separated_mealy_here(m);
-      else
-        m = split_2step(m, false);
+        if (is_separated)
+          split_separated_mealy_here(m);
+        else
+          m = split_2step(m, false);
       }
     else if (3 <= minimize_lvl && !split_out)
       m = unsplit_mealy(m);
@@ -4358,11 +4335,8 @@ namespace spot
             n_s_env = sp->size() - std::accumulate(sp->begin(),
                                                    sp->end(),
                                                    0u);
-            std::for_each(m->edges().begin(), m->edges().end(),
-                          [&n_e_env, &sp](const auto& e)
-                            {
-                              n_e_env += (*sp)[e.src];
-                            });
+            for (const auto& e : m->edges())
+              n_e_env += (*sp)[e.src];
           }
         else
           {

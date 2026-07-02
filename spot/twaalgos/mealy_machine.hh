@@ -184,8 +184,7 @@ namespace spot
   ///
   /// \note Enabling \a premin will remove finite traces.
   /// \note If si.opt contains an option "satlogcsv" detailed results will be
-  /// stored in this file.  If it contains "satlogdimacs" all sat problems will
-  /// be stored.
+  /// stored in this file.
   /// \see is_split_mealy_specialization
 
   SPOT_API twa_graph_ptr

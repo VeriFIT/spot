@@ -333,15 +333,6 @@ except RuntimeError as e:
 
 spot.set_synthesis_outputs(a, buddy.bdd_ithvar(a.register_ap("b")))
 filename = "/THIS-FILE/SHOULD/NOT/EXIST"
-opt.opt.set_str("satlogdimacs", filename)
-try:
-    spot.minimize_mealy(a, opt)
-except RuntimeError as e:
-    tc.assertIn(filename, str(e))
-else:
-    report_missing_exception()
-
-opt.opt.set_str("satlogdimacs", "")
 opt.opt.set_str("satlogcsv", filename)
 try:
     spot.minimize_mealy(a, opt)
