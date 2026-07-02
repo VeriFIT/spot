@@ -45,7 +45,6 @@ libspot_la_LIBADD =  \
   twacube/libtwacube.la \
   mc/libmc.la \
   ../lib/libgnu.la \
-  ../picosat/libpico.la \
   ../cadical/libcadical.la
 
 # Dummy C++ source to cause C++ linking.

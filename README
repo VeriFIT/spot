@@ -398,7 +398,6 @@ ltdl/             Libtool's portable dlopen() wrapper library.
 lib/              Gnulib's portability modules.
 utf8/             Trifunovic's utf-8 routines. https://github.com/nemtrif/utfcpp
 elisp/		  Related emacs modes, used for building the documentation.
-picosat/          A distribution of PicoSAT 965 (a satsolver library).
 cadical/          A distribution of Cadical 3.0.0 (a satsolver library).
 spot/bricks/      A collection of useful C++ code provided by DiVinE
 

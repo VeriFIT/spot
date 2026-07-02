@@ -28,7 +28,7 @@ if USE_PYTHON
 endif
 
 DOC_SUBDIR = doc
-SUBDIRS = picosat cadical buddy lib ltdl spot bin $(PYTHON_SUBDIR) tests \
+SUBDIRS = cadical buddy lib ltdl spot bin $(PYTHON_SUBDIR) tests \
 					$(DOC_SUBDIR) $(NEVER_SUBDIRS)
 
 UTF8 = utf8/README.md utf8/LICENSE utf8/utf8.h	\

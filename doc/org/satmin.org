@@ -7,7 +7,7 @@
 
 #+NAME: version
 #+BEGIN_SRC sh :exports none
-head -n 1 ../../picosat/VERSION | tr -d '\n'
+head -n 1 ../../cadical/VERSION | tr -d '\n'
 #+END_SRC
 
 This page explains how to use [[file:ltl2tgba.org][=ltl2tgba=]], [[file:dstar2tgba.org][=dstar2tgba=]], or [[file:autfilt.org][=autfilt=]]
@@ -29,7 +29,7 @@ Let us first state a few facts about this minimization procedure.
 3) These two procedures can optionally constrain their output to
    use state-based acceptance. (They simply restrict all the outgoing
    transitions of a state to belong to the same acceptance sets.)
-4) Spot is built using PicoSAT call_version()[:results raw].
+4) Spot is built using Cadical call_version()[:results raw].
    This solver was chosen for its performance, simplicity of
    integration and license compatibility.  However, it is
    still possible to use an external SAT solver (as described below).
@@ -51,7 +51,7 @@ Let us first state a few facts about this minimization procedure.
 
 * How to change the SAT solver used
 
-By default, Spot uses PicoSAT call_version()[:results raw], this SAT-solver
+By default, Spot uses Cadical call_version()[:results raw], this SAT-solver
 is built into the Spot library, so that no temporary files are used to
 store the problem.
 
@@ -59,7 +59,7 @@ The environment variable =SPOT_SATSOLVER= can be used to change the
 SAT solver used by Spot.  This variable should describe a shell command
 to run the SAT-solver on an input file called =%I= so that a model satisfying
 the formula will be written in =%O=.  For instance to use [[http://www.labri.fr/perso/lsimon/glucose/][Glucose 3.0]], instead
-of the builtin version of PicoSAT, define
+of the builtin version of Cadical, define
 #+BEGIN_SRC sh :exports code
 export SPOT_SATSOLVER='glucose -verb=0 -model %I >%O'
 #+END_SRC
@@ -648,7 +648,7 @@ rm -f output.hoa output2.hoa
 
 See the [[https://spot.lre.epita.fr/ipynb/satmin.html][=satmin.ipynb=]] notebook.
 
-#  LocalWords:  utf html args SRC tgba dstar DTBA DT PicoSAT LPAR GF
+#  LocalWords: Cadical LPAR GF
 #  LocalWords:  unminimized SATSOLVER det tba degeneralized gfaexxb
 #  LocalWords:  svg txt BD ltlfilt DRA wm nba acc arg ltldo DBA WDBA
 #  LocalWords:  SCC TCONG powerset incr DTGBA wdba FGa FGb autfiltsm

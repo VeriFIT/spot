@@ -487,7 +487,7 @@ autfilt --help | sed -n '/Transformations:/,/^$/p' | sed '1d;$d'
                              options are acc=STRING, states=N, max-states=N,
                              sat-incr=N, sat-incr-steps=N, sat-langmap,
                              sat-naive, colored, preproc=N. Spot uses by
-                             default its PicoSAT distribution but an external
+                             default its Cadical distribution but an external
                              SATsolver can be set thanks to the SPOT_SATSOLVER
                              environment variable (see spot-x).
       --separate-sets        if both Inf(x) and Fin(x) appear in the acceptance
@@ -896,6 +896,6 @@ rm -f example.hoa aut-ex1.hoa
 #  LocalWords:  cobuchi coBuchi superset sbacc determinized al ATVA
 #  LocalWords:  Safra Redziejowski cnf scc aN subautomaton destut dnf
 #  LocalWords:  dualize APs rabin gra streett gsa instut NUM incr aut
-#  LocalWords:  langmap preproc PicoSAT SATsolver SATSOLVER svg txt
+#  LocalWords:  langmap preproc Cadical SATsolver SATSOLVER svg txt
 #  LocalWords:  randltl ltlfilt uniq Fb XF ltldo wm Gb GFa FG hlword
 #  LocalWords:  hlnondet
