@@ -477,6 +477,7 @@ TESTS_python = \
   python/_product_weak.ipynb \
   python/_product_susp.ipynb \
   python/qltl.py \
+  python/quantification.py \
   python/randgen.py \
   python/relabel.py \
   python/remfin.py \
@@ -509,6 +510,7 @@ TESTS_python = \
   python/trival.py \
   python/unitprop.py \
   python/tra2tba.py \
+  python/trim.py \
   python/twagraph.py \
   python/toweak.py \
   python/_word.ipynb \
