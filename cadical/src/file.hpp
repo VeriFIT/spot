@@ -12,12 +12,15 @@
 #endif
 
 /*------------------------------------------------------------------------*/
-#ifndef NUNLOCKED
-#define cadical_putc_unlocked putc_unlocked
-#define cadical_getc_unlocked getc_unlocked
-#else
+#if defined(NUNLOCKED)
 #define cadical_putc_unlocked putc
 #define cadical_getc_unlocked getc
+#elif defined(_WIN32) && !defined(__CYGWIN__)
+#define cadical_putc_unlocked _putc_nolock
+#define cadical_getc_unlocked _getc_nolock
+#else
+#define cadical_putc_unlocked putc_unlocked
+#define cadical_getc_unlocked getc_unlocked
 #endif
 /*------------------------------------------------------------------------*/
 
