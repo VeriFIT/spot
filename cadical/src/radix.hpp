@@ -136,7 +136,7 @@ template <class I, class Rank> void rsort (I first, I last, Rank rank) {
     c = d;
   }
 
-  if (c == b) {
+  if (&*c != &*a) {
     for (size_t i = 0; i < n; i++)
       a[i] = b[i];
   }
