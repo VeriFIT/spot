@@ -1,0 +1,377 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Exercise the TLSF parser, printer, and translator through the
+# tests/core/parsetlsf program.  When syfco is installed, its
+# conversions are used to cross-check our signals, target, and
+# formula.
+
+. ./defs || exit 1
+
+set -e
+
+# A small specification provides a positive end-to-end check.
+cat >small.tlsf <<'EOF'
+INFO {
+  TITLE:       "native TLSF test"
+  DESCRIPTION: "small native TLSF cross-check"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {}
+MAIN {
+  INPUTS { request[1]; }
+  OUTPUTS { grant[1]; }
+  GUARANTEE { G(request[0] -> F grant[0]); }
+}
+EOF
+
+run 0 ../parsetlsf small.tlsf > small.f
+test "request_0" = "`run 0 ../parsetlsf --print-input-signals small.tlsf`"
+test "grant_0" = "`run 0 ../parsetlsf --print-output-signals small.tlsf`"
+test "Mealy" = "`run 0 ../parsetlsf --print-target small.tlsf`"
+# A formula that is not equivalent to the translation must be rejected.
+run 1 ../parsetlsf -e 'G request' small.tlsf
+
+# Strict semantics has a different composition from standard semantics:
+# ASSERT is required only while REQUIRE holds, and is represented by
+# ASSERT W !REQUIRE rather than G(ASSERT).
+cat >strict.tlsf <<'EOF'
+INFO {
+  TITLE:       "strict TLSF test"
+  DESCRIPTION: "strict semantics cross-check"
+  SEMANTICS:   Mealy,Strict
+  TARGET:      Mealy
+}
+GLOBAL {}
+MAIN {
+  INPUTS { request; env; }
+  OUTPUTS { grant; }
+  INITIALLY { request; }
+  PRESET { grant; }
+  REQUIRE { G(request); }
+  ASSUME { env; }
+  ASSERT { grant; }
+  GUARANTEE { F grant; }
+}
+EOF
+expected='request -> (grant && ((grant W !(G request)) &&'
+expected="$expected ((G (G request) && env) -> F grant)))"
+run 0 ../parsetlsf -e "$expected" strict.tlsf > strict.f
+sed 's/SEMANTICS:   Mealy,Strict/SEMANTICS:   Mealy/' strict.tlsf \
+  > standard.tlsf
+run 0 ../parsetlsf standard.tlsf > standard.f
+# The two compositions must differ.
+if ../parsetlsf -e "`cat strict.f`" standard.tlsf >/dev/null 2>&1; then
+  echo "strict and standard compositions unexpectedly coincide" >&2
+  exit 1
+fi
+
+# Malformed input must be diagnosed.
+cat >bad.tlsf <<'EOF'
+INFO { TITLE: "broken
+EOF
+run 1 ../parsetlsf -q bad.tlsf
+
+# The real-world benchmark specifications are embedded here rather
+# than read from the top-level source directory, so that the test
+# does not depend on files that may be absent from a distribution.
+cat >chomp.tlsf <<'EOF'
+INFO {
+  TITLE:       "Chomp Game"
+  DESCRIPTION: "Parameteric Chomp Game over a NxM grid"
+  SEMANTICS:   Mealy,Finite
+  TARGET:      Mealy
+}
+
+GLOBAL {
+  PARAMETERS {
+    N = 3;
+    M = 3;
+  }
+  DEFINITIONS {
+    Pos(grid, i, j) = grid[i + j * N];
+    PickOne(sel) = ||[0 <= k < (SIZEOF sel)] sel[k];
+    // if sel[i] is true, sel[i+1] should be too.
+    AboveToo(sel) = &&[0 <= i < ((SIZEOF sel) - 1)] (sel[i] -> sel[i+1]);
+    // if it's the other's turn, all values of sel should be false
+    OtherTurn(other, sel) = other -> (&&[0 <= k < (SIZEOF sel)](!sel[k]));
+    // if it's the other's turn and square (0,0) still exists, our
+    // choices for sx and sy on next turn depend on what square is
+    // available in the grid.
+    NextChoices(grid, other, sx, sy) =
+      (Pos(grid, 0, 0) && other) ->
+        (||[0 <= x < N] ||[0 <= y < M] (Pos(grid, x, y) && X(sx[x] && sy[y])));
+    // Rules that both players should obey
+    PlayerRules(grid, other, sx, sy) =
+       AboveToo(sx) &&
+       AboveToo(sy) &&
+       OtherTurn(other, sx) &&
+       OtherTurn(other, sy) &&
+       NextChoices(grid, other, sx, sy);
+  }
+}
+
+MAIN {
+  INPUTS {
+    // When it's the input player's turn, they
+    // use ix[I] iy[J] to select square (I,J).
+    ix[N];
+    iy[M];
+  }
+  OUTPUTS {
+    // When it's the output player's turn, they
+    // use ox[I] oy[J] to select square (I,J).
+    ox[N];
+    oy[M];
+    // whether a square is available
+    os[N*M];
+    // turn
+    oti; // input turn
+    oto; // output turn
+  }
+  PRESET {
+    // The output player is the first player.
+    !oti && oto;
+    // The output player has to choose a square.
+    PickOne(ox);
+    PickOne(oy);
+    // The squares that are taken initially depend on the first choice.
+    &&[0 <= i < N] &&[0 <= j < M] (Pos(os, i, j) <-> !(ox[i] && oy[j]));
+
+    // Turns alternate between players.
+    // (Writing G(oto <-> X oti) would be ok in LTL, but not LTLf.)
+    G(oti <-> !oto);
+    G(oto -> X oti);
+    G(oti -> X oto);
+  }
+  REQUIRE {
+    PlayerRules(os, oto, ix, iy);
+  }
+  ASSERT {
+    PlayerRules(os, oti, ox, oy);
+    // If (i,j) is selected by either player, then (i,j) should become false.
+    &&[0 <= i < N] &&[0 <= j < M]
+      (((ox[i] && oy[j]) || (ix[i] && iy[j])) -> !Pos(os,i,j));
+    // if (i,j) is not available now, it's not available on next turn.
+    &&[0 <= i < N] &&[0 <= j < M] ((!Pos(os,i,j)) -> X !(Pos(os,i,j)));
+    // if (i,j) is available now, it might not be on next turn.
+    &&[0 <= i < N] &&[0 <= j < M]
+      (Pos(os,i,j) -> X(Pos(os,i,j) || (ox[i] && oy[j]) || (ix[i] && iy[j])));
+  }
+  GUARANTEE {
+    // The game finishes once square (0, 0) has been taken, and since
+    // this square is poisonous, we want the input player to take it.
+    Pos(os,0,0) U (!Pos(os,0,0) && oti);
+  }
+}
+EOF
+
+cat >tictactoe.tlsf <<'EOF'
+INFO {
+  TITLE:       "Tic Tac Toe"
+  DESCRIPTION: "Tic Tac Toe Game, Finite version"
+  SEMANTICS:   Mealy,Finite
+  TARGET:      Mealy
+}
+
+GLOBAL {
+  DEFINITIONS {
+    PickOne(A) = (||[0 <= i < 9] A[i]) && (&&[0 <= i < 9]
+                 (A[i] -> &&[i <= j < 9] !A[j]));
+    // Keep the value of A[b...e] for next step.
+    NoChange(A,b,e) = &&[b <= i < e] ((A[i] && X(A[i])) || (!A[i] && X(!A[i])));
+    // change a single cell in A that isn't used in B.
+    ChangeOne(A, B) = (||[0 <= i < 9] ((!A[i] && !B[i]) -> X(A[i]))) &&
+      (&&[0 <= i < 9] ((!A[i] && X(A[i])) -> NoChange(A, i+1, 9)));
+    // all cells are taken by one of the player
+    AllTaken(A, B) = &&[0 <= i < 9] (A[i] || B[i]);
+    // check for three aligned cells
+    Aligned(A) = (A[0] && A[1] && A[2]) ||
+                 (A[3] && A[4] && A[5]) ||
+                 (A[6] && A[7] && A[8]) ||
+                 (A[0] && A[3] && A[6]) ||
+                 (A[1] && A[4] && A[7]) ||
+                 (A[2] && A[5] && A[8]) ||
+                 (A[0] && A[4] && A[8]) ||
+                 (A[2] && A[4] && A[6]);
+  }
+}
+
+MAIN {
+  // The cells are numbered as follows:
+  //   0 1 2
+  //   3 4 5
+  //   6 7 8
+  // pi[n] is true iff the input player marked cell n.
+  // po[n] is true iff the output player marked cell n.
+  INPUTS {
+    pi[9];
+  }
+  OUTPUTS {
+    po[9];
+    turno; // false = input's turn, true = output's turn
+  }
+  PRESET {
+    // The output player is the first player.
+    turno;
+    // Turn alternate betwen players
+    // (The number of turns is odd, so it's OK to use an equivalence
+    // with weak X here, it means that if turno is false the next step must
+    // exist.)
+    G(turno <-> X !turno);
+    // The player should select a single cell.
+    PickOne(po);
+  }
+  INITIALLY {
+    // the input player does not select any value on first turn.
+    &&[0 <= i < 9] !pi[i];
+  }
+  REQUIRE {
+    // if the next turn is the input's player turn, they
+    // should change exactly one cell that isn't taken by any player
+    X(!turno) -> ChangeOne(pi, po);
+    // If it not the input's turn, we do not want to see any change.
+    X(turno) -> NoChange(pi, 0, 9);
+  }
+  ASSERT {
+    // if the next turn is the outut's player turn, they
+    // should change exactly one cell that isn't taken by any player
+    X[!](turno) -> ChangeOne(po, pi);
+    // If it not the output's turn, we do not want to see any change.
+    X[!](!turno) -> NoChange(po, 0, 9);
+  }
+  GUARANTEE {
+    // The game finishes all cells are taken, or if the output player
+    // has aligned 3 cells.
+    F(AllTaken(pi,po) || Aligned(po));
+    // The output player should never align 3 cells.
+    G(!Aligned(pi));
+  }
+}
+EOF
+
+# The four Scutellà counterexamples differ only by the polarity of
+# the two guarded transitions in the ASSERT block.
+scutella_body='s[0] -> ((a && X(s[3])) || (!a && X(s[1])));
+    s[1] -> X(s[2]);
+    s[2] -> ((!b && X(s[3])) || (b && X(s[4])));
+    s[3] -> X(s[1]);'
+for spec in scutella1 scutella2 scutella3 scutella4; do
+  case $spec in
+    scutella2) body='s[0] -> ((!a && X(s[3])) || (a && X(s[1])));
+    s[1] -> X(s[2]);
+    s[2] -> ((b && X(s[3])) || (!b && X(s[4])));
+    s[3] -> X(s[1]);';;
+    scutella3) body='s[0] -> ((!a && X(s[3])) || (a && X(s[1])));
+    s[1] -> X(s[2]);
+    s[2] -> ((!b && X(s[3])) || (b && X(s[4])));
+    s[3] -> X(s[1]);';;
+    scutella4) body='s[0] -> ((a && X(s[3])) || (!a && X(s[1])));
+    s[1] -> X(s[2]);
+    s[2] -> ((b && X(s[3])) || (!b && X(s[4])));
+    s[3] -> X(s[1]);';;
+    *) body="$scutella_body";;
+  esac
+  cat >$spec.tlsf <<EOF
+INFO {
+  TITLE:       "Scutellà's counterexample"
+  DESCRIPTION: "LTLf version of a counterexample by Scutellà"
+  SEMANTICS:   Moore,Finite
+  TARGET:      Moore
+}
+GLOBAL {
+  DEFINITIONS {
+    ExactlyOne(x) = (||[0 <= i < (SIZEOF x)] x[i])
+      && (&&[1 <= i < (SIZEOF x)] (x[i] -> (&&[0 <= j < i] !x[j])));
+  }
+}
+
+MAIN {
+  INPUTS {
+    a;
+  }
+  OUTPUTS {
+    s[5]; // five states
+    b;
+  }
+  PRESET {
+    s[0]; // we start in state 0
+  }
+  ASSERT {
+    ExactlyOne(s); // only one state is active at all time
+    // transition structure:
+    $body
+  }
+  GUARANTEE {
+    // The game must reach state 4
+    F(s[4]);
+  }
+}
+EOF
+done
+
+# Native benchmark smoke coverage requested by SPEC.md section 11.2.
+for spec in chomp tictactoe scutella1 scutella2 scutella3 scutella4; do
+  case $spec in
+    chomp) opts="-op N=2 -op M=2";;
+    *) opts="";;
+  esac
+  run 0 ../parsetlsf $opts "$spec.tlsf" > $spec.f
+  test -n "`run 0 ../parsetlsf $opts --print-input-signals \
+    "$spec.tlsf"`"
+  test -n "`run 0 ../parsetlsf $opts --print-output-signals \
+    "$spec.tlsf"`"
+done
+
+# When syfco is installed, cross-check signals, target, and formula.
+if syfco --version >/dev/null 2>&1; then
+  syfco -f ltlxba -m fully small.tlsf > syfco-small.f
+  run 0 ../parsetlsf -e "`cat syfco-small.f`" small.tlsf
+  test "`syfco --print-input-signals small.tlsf`" = \
+       "`run 0 ../parsetlsf --print-input-signals small.tlsf`"
+  test "`syfco --print-output-signals small.tlsf`" = \
+       "`run 0 ../parsetlsf --print-output-signals small.tlsf`"
+  test "`syfco --print-target small.tlsf`" = \
+       "`run 0 ../parsetlsf --print-target small.tlsf`"
+
+  for spec in chomp tictactoe scutella1 scutella2 scutella3 scutella4; do
+    case $spec in
+      chomp) opts="-op N=2 -op M=2";;
+      *) opts="";;
+    esac
+    syfco -f ltlxba-fin -m fully $opts "$spec.tlsf" > syfco-$spec.f
+    run 0 ../parsetlsf -e "`cat syfco-$spec.f`" $opts "$spec.tlsf"
+    # Every native signal must be listed by syfco.
+    run 0 ../parsetlsf $opts --print-input-signals "$spec.tlsf" \
+      > our-in
+    syfco $opts --print-input-signals "$spec.tlsf" > syfco-in
+    tr ', ' '\n' < our-in | sort -u > our-in.sorted
+    tr ', ' '\n' < syfco-in | sort -u > syfco-in.sorted
+    test -z "`comm -23 our-in.sorted syfco-in.sorted`"
+    run 0 ../parsetlsf $opts --print-output-signals "$spec.tlsf" \
+      > our-out
+    syfco $opts --print-output-signals "$spec.tlsf" > syfco-out
+    tr ', ' '\n' < our-out | sort -u > our-out.sorted
+    tr ', ' '\n' < syfco-out | sort -u > syfco-out.sorted
+    test -z "`comm -23 our-out.sorted syfco-out.sorted`"
+    test "`syfco $opts --print-target "$spec.tlsf"`" = \
+         "`run 0 ../parsetlsf $opts --print-target "$spec.tlsf"`"
+  done
+fi

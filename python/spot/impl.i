@@ -26,13 +26,22 @@
 %include "std_map.i"
 %include "std_pair.i"
 %include "stdint.i"
-%include "exception.i"
-%include "typemaps.i"
+%include "exception.i"%include "typemaps.i"
 
- // git grep 'typedef.*std::shared_ptr' | grep -v const |
+// Concrete specialization for std::map<std::string, int> used by
+// spot::tlsf::parsed_tlsf::overrides and
+// tlsf_translator_options::overrides.  Without an explicit
+// %template, SWIG falls back to a bare SwigPyObject wrapper
+// and Python-side __setitem__ / dict assignment both raise
+// TypeError.  Naming parallels Spot's other templates in this
+// file (prefix used here: `map_ssi` for std::map<string, int>).
+%template(map_ssi) std::map<std::string, int>;
+
+// git grep 'typedef.*std::shared_ptr' | grep -v const |
  //   sed 's/.*<\(.*\)>.*/%shared_ptr(spot::\1)/g'
 %shared_ptr(spot::dstar_aut)
 %shared_ptr(spot::parsed_aut)
+%shared_ptr(spot::parsed_tlsf)
 %shared_ptr(spot::fair_kripke)
 %shared_ptr(spot::kripke)
 %shared_ptr(spot::kripke_graph)
@@ -179,6 +188,7 @@
 #include <spot/twaalgos/zlktree.hh>
 
 #include <spot/parseaut/public.hh>
+#include <spot/parsetlsf/public.hh>
 
 #include <spot/kripke/fairkripke.hh>
 #include <spot/kripke/kripke.hh>
@@ -552,6 +562,7 @@ static void handle_any_exception()
 namespace std {
   %template(liststr) list<std::string>;
   %template(pairunsigned) pair<unsigned, unsigned>;
+  %template(parse_aut_error) pair<spot::location, std::string>;
   %template(pairmarkunsigned) pair<spot::acc_cond::mark_t, unsigned>;
   %template(pairmark_t) pair<spot::acc_cond::mark_t, spot::acc_cond::mark_t>;
   %template(pairintacccode) pair<int, spot::acc_cond::acc_code>;
@@ -884,6 +895,17 @@ def state_is_accepting(self, src) -> "bool":
 %template(kripke_graph_state_vector) std::vector<spot::internal::distate_storage<unsigned, internal::boxed_label<kripke_graph_state, false>>>;
 
 %include <spot/parseaut/public.hh>
+// The TLSF AST internals -- spot::tlsf_ast and all the node types of
+// spot/parsetlsf/ast.hh -- are private and not exposed to Python:
+// parsed_tlsf holds its AST in an opaque private member, and the
+// parsed bodies / enumerations are reachable only through printing
+// (tlsf_print) and translation (tlsf_to_ltl).  Only the enums
+// (spot::tlsf_semantics, spot::tlsf_target) are `enum class` types;
+// SWIG does not honor `%feature("flatnested")` on `enum class`, so
+// each enumerator is exposed as a flat, top-level name
+// (`spot.tlsf_semantics_Mealy`, `spot.tlsf_target_Mealy`).
+%ignore spot::tlsf_ast;
+%include <spot/parsetlsf/public.hh>
 
 %extend std::set<spot::formula,
                  std::less<spot::formula>,
@@ -1543,6 +1565,13 @@ bool
 __bool__()
 {
   return !self->empty();
+}
+
+%newobject __iter__(PyObject **PYTHON_SELF);
+swig::SwigPyIterator* __iter__(PyObject **PYTHON_SELF)
+{
+  return swig::make_forward_iterator(self->begin(), self->begin(),
+                                     self->end(), *PYTHON_SELF);
 }
 
 }

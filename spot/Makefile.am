@@ -27,7 +27,7 @@ nobase_pkginclude_HEADERS = bricks/brick-assert bricks/brick-bitlevel \
 # end, after building '.' (since the current directory contains
 # libspot.la needed by the tests)
 SUBDIRS = misc priv tl graph twa twacube twaalgos kripke \
-          twacube_algos mc parseaut parsetl . ltsmin gen
+          twacube_algos mc parseaut parsetlsf parsetl . ltsmin gen
 
 lib_LTLIBRARIES = libspot.la
 libspot_la_SOURCES =
@@ -36,6 +36,7 @@ libspot_la_LIBADD =  \
   kripke/libkripke.la \
   misc/libmisc.la \
   parseaut/libparseaut.la \
+  parsetlsf/libparsetlsf.la \
   parsetl/libparsetl.la \
   priv/libpriv.la \
   tl/libtl.la \

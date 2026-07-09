@@ -816,6 +816,8 @@ EXCLUDE_PATTERNS       = */misc/location.hh \
                          */parseaut/parseaut.hh \
                          */parsetl/stack.hh \
                          */parsetl/parsetl.hh \
+                         */parsetlsf/stack.hh \
+                         */parsetlsf/parsetlsf.hh \
                          *test/* \
                          *priv/*
 

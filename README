@@ -360,6 +360,7 @@ spot/             Sources for libspot.
    mc/            All algorithms useful for model checking
    parseaut/      Parser for automata in multiple formats.
    parsetl/       Parser for LTL/PSL formulas.
+   parsetlsf/     Parser for TLSF specifications.
    priv/          Private algorithms, used internally but not exported.
    twa/           TωA objects and cousins (Transition-based ω-Automata).
    twacube/       TωA objects based on cube (not-bdd).

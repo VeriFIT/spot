@@ -85,6 +85,7 @@ check_PROGRAMS = \
   core/nenoform \
   core/ngraph \
   core/parity \
+  core/parsetlsf \
   core/randtgba \
   core/reduc \
   core/reduccmp \
@@ -135,6 +136,7 @@ core_nenoform_CPPFLAGS = $(AM_CPPFLAGS) -DNENOFORM
 core_nequals_SOURCES = core/equalsf.cc
 core_nequals_CPPFLAGS = $(AM_CPPFLAGS) -DNEGATE
 core_parity_SOURCES = core/parity.cc
+core_parsetlsf_SOURCES = core/parsetlsf.cc
 core_reduc_SOURCES = core/reduc.cc
 core_reduccmp_SOURCES = core/equalsf.cc
 core_reduccmp_CPPFLAGS = $(AM_CPPFLAGS) -DREDUC
@@ -361,6 +363,7 @@ TESTS_twa = \
   core/ltlsynt2.test \
   core/ltlsynt3.test \
   core/ltlsynt-pgame.test \
+  core/parsetlsf.test \
   core/syfco.test \
   core/rabin2parity.test \
   core/twacube.test
@@ -469,6 +472,7 @@ TESTS_python = \
   python/origstate.py \
   python/otfcrash.py \
   python/parsetgba.py \
+  python/parsetlsf.py \
   python/_partitioned_relabel.ipynb \
   python/parity.py \
   python/pdegen.py \

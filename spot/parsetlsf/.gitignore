@@ -1,0 +1,7 @@
+parsetlsf.cc
+parsetlsf.hh
+parsetlsf.output
+stack.hh
+lex.yy.cc
+scantlsf.cc
+refs/syfco/

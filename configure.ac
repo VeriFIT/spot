@@ -302,6 +302,7 @@ AC_CONFIG_FILES([
   spot/misc/Makefile
   spot/mc/Makefile
   spot/parseaut/Makefile
+  spot/parsetlsf/Makefile
   spot/parsetl/Makefile
   spot/priv/Makefile
   spot/tl/Makefile
