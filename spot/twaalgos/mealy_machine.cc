@@ -3383,6 +3383,10 @@ namespace
         // The group determines the incond
         const unsigned group = x_in_class[iaj.i].first;
         const bdd& incond = gmm2cond[group][iaj.a];
+        // Skip infeasible transitions whose incond is false.
+        if (incond == bddfalse)
+          continue;
+
         add_edge(iaj.i, iaj.j, incond, outcond);
       }
 
