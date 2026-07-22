@@ -361,24 +361,14 @@ namespace spot
         if (n <= 0)
           return formula::tt();
 
-        formula pi;
-
-        {
-          std::ostringstream p;
-          p << name << 1;
-          pi = formula::ap(p.str());
-        }
+        formula pi = formula::ap(name + "1");
 
         formula result = nullptr;
 
         for (int i = 1; i <= n; ++i)
           {
             formula f = F_(pi);
-
-            std::ostringstream p;
-            p << name << i + 1;
-            pi = formula::ap(p.str());
-
+            pi = formula::ap(name + std::to_string(i + 1));
             formula g = G_(pi);
 
             f = Or_(f, g);
@@ -405,9 +395,8 @@ namespace spot
 
         for (int i = 1; i <= n; ++i)
           {
-            std::ostringstream p;
-            p << name << i;
-            formula f = formula::unop(o, formula::ap(p.str()));
+            formula a = formula::ap(name + std::to_string(i));
+            formula f = formula::unop(o, a);
 
             if (result)
               result = formula::multop(cop, f, result);
