@@ -13,24 +13,37 @@ m4_define([_CHECK_ATOMIC_testbody], [[
 #include <atomic>
 #include <cstdint>
 
+// Deliberately sized/aligned like brick::hashset::Tagged<int, void>:
+// 16 bytes, so it is NOT naturally lock-free on a single machine word
+// and compare_exchange requires either CMPXCHG16B or libatomic.
 template< typename T >
 struct Tagged
 {
     T t;
     uint32_t _tag;
+    uint64_t _pad; // pad out to 16 bytes to match the real hashset::Tagged
     static const int tag_bits = 16;
     void tag( uint32_t v ) { _tag = v; }
     uint32_t tag() { return _tag; }
-    Tagged() noexcept : t(), _tag( 0 ) {}
-    Tagged( const T &t ) : t( t ), _tag( 0 ) {}
+    Tagged() noexcept : t(), _tag( 0 ), _pad( 0 ) {}
+    Tagged( const T &t ) : t( t ), _tag( 0 ), _pad( 0 ) {}
+    bool operator==( const Tagged &o ) const {
+      return t == o.t && _tag == o._tag;
+    }
 };
 
 int main() {
   std::atomic<int64_t> a{};
   int64_t v = 5;
   int64_t r = a.fetch_add(v);
+
   std::atomic<Tagged<int>> value;
-  return static_cast<int>(r) + value.load().t;
+  Tagged<int> expected = value.load();
+  Tagged<int> desired  = expected;
+  desired.tag( 1 );
+  bool ok = value.compare_exchange_strong( expected, desired );
+
+  return static_cast<int>(r) + value.load().t + (ok ? 0 : 1);
 }
 ]])
 
