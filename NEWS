@@ -147,6 +147,9 @@ New in spot 2.15.1.dev  (not yet released)
 
   - randomize() now preserves more named properties.  (Issue #532.)
 
+  - Products of mtdswa are now implemented for various Boolean
+    operators.
+
   Deprecation notices:
 
   - spot::collect_aps_with_polarities() is deprecated; use
