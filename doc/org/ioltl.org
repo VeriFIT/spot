@@ -288,7 +288,7 @@ genltl --gh-q=1..4 | ltl2tgba -F- --stats='%F,%f,%s'
 The only difference is that for the first command, =ltl2tgba= received
 its formulas from the command-line arguments supplied by =xargs= (so
 =%F= is empty as there is no input file), while in the second case the
-formula where read from standard input (denoted by =-=).
+formulas were read from standard input (denoted by =-=).
 
 
 
