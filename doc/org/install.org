@@ -128,16 +128,16 @@ Fedora version at the moment of the release.
 
 Our =stable= repository contains RPM for released versions of Spot, add it with:
 #+BEGIN_SRC sh
-sudo dnf config-manager --add-repo https://wwww.lre.epita.fr/repo/fedora/lrde.repo
+sudo dnf config-manager addrepo --from-repofile=https://www.lre.epita.fr/repo/fedora/lre.repo
 #+END_SRC
 
 Our =unstable= repository contains RPM for the development versions of Spot,
 you can opt to use that instead:
 
 #+BEGIN_SRC sh
-sudo dnf config-manager --add-repo https://wwww.lre.epita.fr/repo/fedora/lrde.repo
-sudo dnf config-manager --set-enabled lrde-unstable
-sudo dnf config-manager --set-disabled lrde-stable
+  sudo dnf config-manager addrepo --from-repofile=https://www.lre.epita.fr/repo/fedora/lre.repo
+  sudo dnf config-manager enable lre-unstable
+  sudo dnf config-manager enable lre-stable
 #+END_SRC
 
 Once the repository is set up, you can simply install Spot with:
