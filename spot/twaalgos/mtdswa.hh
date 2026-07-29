@@ -281,14 +281,40 @@ namespace spot
   SPOT_API mtdswa_ptr complement(const mtdswa_ptr& swa);
 
   /// \ingroup mtdswa
-  /// \brief Existentially quantify a variable in a *weak* MTDSwA.
+  /// \brief Existentially quantify variables in a *weak* MTDSwA.
+  ///
+  /// The second argument can be a positive cube of BDD variables,
+  /// a single atomic proposition, or a vector of atomic propositions
+  /// to remove from the automaton.  Atomic propositions that are not
+  /// registered in the automaton are silently ignored; if all of them
+  /// are ignored, the automaton is returned unchanged.
+  /// @{
   SPOT_API mtdswa_ptr
-  quantify_exists(const mtdswa_ptr& swa, formula var, bool trim = true);
+  quantify_exists(const mtdswa_ptr& swa, bdd vars, bool trim = true);
+  SPOT_API mtdswa_ptr
+  quantify_exists(const mtdswa_ptr& swa, const formula& ap, bool trim = true);
+  SPOT_API mtdswa_ptr
+  quantify_exists(const mtdswa_ptr& swa, const std::vector<formula>& aps,
+                  bool trim = true);
+  /// @}
 
   /// \ingroup mtdswa
-  /// \brief Universally quantify a variable in a *weak* MTDSwA.
+  /// \brief Universally quantify variables in a *weak* MTDSwA.
+  ///
+  /// The second argument can be a positive cube of BDD variables,
+  /// a single atomic proposition, or a vector of atomic propositions
+  /// to remove from the automaton.  Atomic propositions that are not
+  /// registered in the automaton are silently ignored; if all of them
+  /// are ignored, the automaton is returned unchanged.
+  /// @{
   SPOT_API mtdswa_ptr
-  quantify_forall(const mtdswa_ptr& swa, formula var, bool trim = true);
+  quantify_forall(const mtdswa_ptr& swa, bdd vars, bool trim = true);
+  SPOT_API mtdswa_ptr
+  quantify_forall(const mtdswa_ptr& swa, const formula& ap, bool trim = true);
+  SPOT_API mtdswa_ptr
+  quantify_forall(const mtdswa_ptr& swa, const std::vector<formula>& aps,
+                  bool trim = true);
+  /// @}
 
   /// \ingroup mtdswa
   /// \brief "Semi-internal" for translating LTL using MTBDDs

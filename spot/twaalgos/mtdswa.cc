@@ -725,6 +725,24 @@ namespace spot
         }
       return controllable_bdd;
     }
+
+    // Convert a vector of atomic proposition formulas to a positive
+    // cube (conjunction) of BDD variables.  Atomic propositions that
+    // are not registered in the automaton's dictionary are ignored.
+    static bdd
+    aps_to_bdd(const mtdswa_ptr& swa,
+               const std::vector<formula>& aps)
+    {
+      bdd_dict_ptr d = swa->get_dict();
+      bdd res = bddtrue;
+      for (const formula& ap: aps)
+        {
+          int v = d->has_registered_proposition(ap, swa);
+          if (v >= 0)
+            res &= bdd_ithvar(v);
+        }
+      return res;
+    }
   }
 
   void
@@ -4195,28 +4213,25 @@ namespace spot
       }
       the_quantify_data;
 
-    // Compute the and of the colors of a set of states in a weak mtdswa.
+    // Compute the intersection of the colors of a set of states.
     static inline acc_cond::mark_t
     colors_of_qstate_and(mtdswa_ptr swa, quantify_state state)
     {
-      for (unsigned s: state)
-        {
-          if (!swa->acc.accepting(swa->colors[s]))
-            return swa->acc.unsat_mark().second;
-        }
-      return swa->acc.sat_mark().second;
+      auto it = state.begin();
+      acc_cond::mark_t res = swa->colors[*it];
+      for (++it; it != state.end(); ++it)
+        res &= swa->colors[*it];
+      return res;
     }
 
-    // Compute the or of the colors of a set of states in a weak mtdswa.
+    // Compute the union of the colors of a set of states.
     static inline acc_cond::mark_t
     colors_of_qstate_or(mtdswa_ptr swa, quantify_state state)
     {
+      acc_cond::mark_t res = {};
       for (unsigned s: state)
-        {
-          if (swa->acc.accepting(swa->colors[s]))
-            return swa->acc.sat_mark().second;
-        }
-      return swa->acc.unsat_mark().second;
+        res |= swa->colors[s];
+      return res;
     }
 
     // Combine two leaves of the automaton with AND.
@@ -4277,16 +4292,16 @@ namespace spot
     }
 
 
-    // Combines a queue of BDDs with the given operator and combine function.
-    // combine1 is used when the queue has only one element.
-    static bdd applyn_leaves(std::queue<bdd>& q, op o,
+    // Combines a vector of BDDs with the given operator and combine
+    // function.  combine1 is used when the vector has only one element.
+    static bdd applyn_leaves(const std::vector<bdd>& bdds, op o,
                              int (*combine)(int, int, int, int),
                              int (*combine1)(int, int),
                              bddExtCache* cache, int hash_key,
                              int applyop_shortcut)
     {
-      // If empty queue, return the neutral element of the operator.
-      if (SPOT_UNLIKELY(q.empty()))
+      // If empty vector, return the neutral element of the operator.
+      if (SPOT_UNLIKELY(bdds.empty()))
         {
           switch (o)
             {
@@ -4298,34 +4313,22 @@ namespace spot
               throw std::runtime_error("applyn_leaves: unsupported operator");
             }
         }
-      // If only one element in the queue, apply combine1 to it.
-      if (q.size() == 1)
-        {
-          bdd s = q.front();
-          q.pop();
-          return bdd_mt_apply1_leaves(s, combine1, cache, hash_key);
-        }
-      // Otherwise, apply combine pairwise until only one BDD is left,
-      // which is the result.
-      while (q.size() > 1)
-        {
-          bdd left = q.front();
-          q.pop();
-          bdd right = q.front();
-          q.pop();
-          bdd res = bdd_mt_apply2_leaves(left, right, combine, cache, hash_key,
-                                       applyop_shortcut);
-          q.push(res);
-        }
-      bdd s = q.front();
-      q.pop();
-      return s;
+      // If only one element in the vector, apply combine1 to it.
+      if (bdds.size() == 1)
+        return bdd_mt_apply1_leaves(bdds[0], combine1, cache, hash_key);
+      // Otherwise, combine elements left to right.
+      bdd res = bdds[0];
+      for (size_t i = 1; i < bdds.size(); ++i)
+        res = bdd_mt_apply2_leaves(res, bdds[i], combine, cache, hash_key,
+                                   applyop_shortcut);
+      return res;
     }
 
 
-    // Quantify the given variable in a weak mtdswa.
+    // Quantify the given variable(s) in a weak mtdswa.
+    // \a vars is a positive cube (conjunction) of BDD variables to remove.
     static mtdswa_ptr
-    quantify_mtdswa_aux(const mtdswa_ptr& swa, int var, op o,
+    quantify_mtdswa_aux(const mtdswa_ptr& swa, bdd vars, op o,
                         bddExtCache* cache, int quant_hash, int apply_hash)
     {
       // Prepare the function to combine two leaves of the product automaton.
@@ -4358,18 +4361,21 @@ namespace spot
       std::queue<quantify_state>& todo = the_quantify_data.todo;
       (void) the_quantify_data.set_to_terminal(quantify_state{0});
 
+      // Prepare quantification once, before the main loop.
+      bdd_mt_quantify_prepare(vars);
+
       while (!todo.empty())
         {
           quantify_state state = todo.front();
           todo.pop();
 
           // 1 - Combine all states in s with the operator and adjust names.
-          std::queue<bdd> q;
+          std::vector<bdd> bdds;
           unsigned ns = swa->names.size();
           formula combined_f = o == op::And ? formula::tt() : formula::ff();
           for (unsigned s: state)
           {
-            q.push(swa->states[s]);
+            bdds.push_back(swa->states[s]);
             // Combine names if not null.
             formula f = s < ns ? swa->names[s] : nullptr;
             if (combined_f)
@@ -4393,11 +4399,10 @@ namespace spot
             }
           }
           // Combine all states in the quantify_state with the operator.
-          bdd b = applyn_leaves(q, o, combine, quant_leaf_combine1, cache,
-                                apply_hash, applyop_shortcut);
+          bdd b = applyn_leaves(bdds, o, combine, quant_leaf_combine1, cache,
+                                 apply_hash, applyop_shortcut);
 
           // 2 - Quantify the given variables in the resulting BDD.
-          bdd_mt_quantify_prepare(bdd_ithvar(var));
           bdd qb = bdd_mt_quantify(b, [](int v){ return v; }, combine, cache,
                                    quant_hash, apply_hash, applyop_shortcut);
           // Unshift the terminal values of the resulting BDD to match
@@ -4413,15 +4418,27 @@ namespace spot
           res->colors.push_back(col);
 
           // Construct name of the quantified state.
-          formula var_ap = swa->get_dict()->ap_from_var(var);
-          if (combined_f && var_ap)
+          // Collect all APs for the variables in the cube.
+          std::vector<formula> aps;
+          if (vars != bddtrue)
+            {
+              bdd cube = vars;
+              while (cube != bddtrue)
+                {
+                  formula ap = swa->get_dict()->ap_from_var(bdd_var(cube));
+                  if (ap)
+                    aps.push_back(ap);
+                  cube = bdd_high(cube);
+                }
+            }
+          if (combined_f && !aps.empty())
             switch (o)
               {
               case op::And:
-                res->names.push_back(formula::forall(var_ap, combined_f));
+                res->names.push_back(formula::forall(aps, combined_f));
                 break;
               case op::Or:
-                res->names.push_back(formula::exists(var_ap, combined_f));
+                res->names.push_back(formula::exists(aps, combined_f));
                 break;
               default:
                 SPOT_UNREACHABLE();
@@ -4434,34 +4451,54 @@ namespace spot
   }
 
 
-  mtdswa_ptr quantify_exists(const mtdswa_ptr& swa, formula var, bool trim)
+  mtdswa_ptr quantify_exists(const mtdswa_ptr& swa, bdd vars, bool trim)
   {
-    auto it = swa->get_dict()->var_map.find(var);
-    if (it == swa->get_dict()->var_map.end())
-      return swa; // Variable not found, return the original automaton.
-    int ivar = it->second;
+    if (vars == bddtrue)
+      return swa;
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
-    mtdswa_ptr res = quantify_mtdswa_aux(swa, ivar, op::Or, &cache, 0, 1);
+    mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::Or, &cache, 0, 1);
     if (trim)
       trim_dead_states(res, &cache, 2);
     bdd_extcache_done(&cache);
     return res;
   }
 
-  mtdswa_ptr quantify_forall(const mtdswa_ptr& swa, formula var, bool trim)
+  mtdswa_ptr quantify_forall(const mtdswa_ptr& swa, bdd vars, bool trim)
   {
-    auto it = swa->get_dict()->var_map.find(var);
-    if (it == swa->get_dict()->var_map.end())
-      return swa; // Variable not found, return the original automaton.
-    int ivar = it->second;
+    if (vars == bddtrue)
+      return swa;
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
-    mtdswa_ptr res = quantify_mtdswa_aux(swa, ivar, op::And, &cache, 0, 1);
+    mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::And, &cache, 0, 1);
     if (trim)
       trim_dead_states(res, &cache, 2);
     bdd_extcache_done(&cache);
     return res;
+  }
+
+  mtdswa_ptr quantify_exists(const mtdswa_ptr& swa, const formula& ap,
+                             bool trim)
+  {
+    return quantify_exists(swa, aps_to_bdd(swa, {ap}), trim);
+  }
+
+  mtdswa_ptr quantify_exists(const mtdswa_ptr& swa,
+                             const std::vector<formula>& aps, bool trim)
+  {
+    return quantify_exists(swa, aps_to_bdd(swa, aps), trim);
+  }
+
+  mtdswa_ptr quantify_forall(const mtdswa_ptr& swa, const formula& ap,
+                             bool trim)
+  {
+    return quantify_forall(swa, aps_to_bdd(swa, {ap}), trim);
+  }
+
+  mtdswa_ptr quantify_forall(const mtdswa_ptr& swa,
+                             const std::vector<formula>& aps, bool trim)
+  {
+    return quantify_forall(swa, aps_to_bdd(swa, aps), trim);
   }
 
 }

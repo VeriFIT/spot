@@ -151,6 +151,9 @@ New in spot 2.15.1.dev  (not yet released)
     product(), product_or(), product_xor(), product_nxor(),
     product_implies(), compement().
 
+  - quantification functions are implemented for weak mtdswa_ptr
+    as quantify_exists() and quantify_forall().
+
   Deprecation notices:
 
   - spot::collect_aps_with_polarities() is deprecated; use

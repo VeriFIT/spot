@@ -432,3 +432,87 @@ for i in range(len(obligations)):
                   "Universal quantification of MTDSwA "
                   + "is not equivalent to LTL universal quantification: "
                   + f"{obligations[i]}")
+
+# Test multi-variable quantification via vector of APs.
+# Sequential quantification should be equivalent to vector quantification.
+for fstr in ["Gp0 & Fp1", "(p0 U p1) & Fp2", "G(p0 -> Xp1)"]:
+    f = spot.formula(fstr)
+    swa = spot.obligation_to_mtdswa(f)
+    # Sequential quantification
+    m_seq = spot.quantify_exists(
+                spot.quantify_exists(swa, spot.formula.ap('p0')),
+                spot.formula.ap('p1'))
+    # Vector quantification
+    m_vec = spot.quantify_exists(swa, [spot.formula.ap('p0'),
+                                        spot.formula.ap('p1')])
+    # Compare against LTL formula
+    expected = spot.obligation_to_mtdswa(
+        spot.formula("\\exists p0,p1: " + fstr))
+    pxor = spot.product_xor(m_vec, expected)
+    tc.assertTrue(pxor.as_twa().is_empty(),
+                  "Multi-variable existential quantification of "
+                  + f"'{fstr}' is not equivalent to LTL")
+    # Sequential should equal vector
+    pxor2 = spot.product_xor(m_seq, m_vec)
+    tc.assertTrue(pxor2.as_twa().is_empty(),
+                  "Sequential and vector quantification differ for '"
+                  + fstr + "'")
+
+# Test universal multi-variable quantification.
+for fstr in ["Gp0 | Fp1", "(p0 R p1) | Gp2", "F(p0 -> Xp1)"]:
+    f = spot.formula(fstr)
+    swa = spot.obligation_to_mtdswa(f)
+    m_seq = spot.quantify_forall(
+                spot.quantify_forall(swa, spot.formula.ap('p0')),
+                spot.formula.ap('p1'))
+    m_vec = spot.quantify_forall(swa, [spot.formula.ap('p0'),
+                                        spot.formula.ap('p1')])
+    expected = spot.obligation_to_mtdswa(
+        spot.formula("\\forall p0,p1: " + fstr))
+    pxor = spot.product_xor(m_vec, expected)
+    tc.assertTrue(pxor.as_twa().is_empty(),
+                  "Multi-variable universal quantification of "
+                  + f"'{fstr}' is not equivalent to LTL")
+    pxor2 = spot.product_xor(m_seq, m_vec)
+    tc.assertTrue(pxor2.as_twa().is_empty(),
+                  "Sequential and vector quantification differ for '"
+                  + fstr + "'")
+
+# Test that an unregistered AP is silently ignored, returning
+# the automaton equivalent to the original.
+swa = spot.obligation_to_mtdswa(spot.formula("Ga & Fb"))
+m_ex = spot.quantify_exists(swa, spot.formula.ap('unused'))
+pxor = spot.product_xor(swa, m_ex)
+tc.assertTrue(pxor.as_twa().is_empty(),
+              "Quantifying an unregistered AP should return an equivalent "
+              "automaton (exists)")
+m_fa = spot.quantify_forall(swa, spot.formula.ap('unused'))
+pxor = spot.product_xor(swa, m_fa)
+tc.assertTrue(pxor.as_twa().is_empty(),
+              "Quantifying an unregistered AP should return an equivalent "
+              "automaton (forall)")
+
+# Test that a vector of unregistered APs also returns unchanged.
+m_vec_ex = spot.quantify_exists(swa, [spot.formula.ap('x'),
+                                      spot.formula.ap('y')])
+pxor = spot.product_xor(swa, m_vec_ex)
+tc.assertTrue(pxor.as_twa().is_empty(),
+              "Vector of unregistered APs should return an equivalent "
+              "automaton (exists)")
+m_vec_fa = spot.quantify_forall(swa, [spot.formula.ap('x'),
+                                      spot.formula.ap('y')])
+pxor = spot.product_xor(swa, m_vec_fa)
+tc.assertTrue(pxor.as_twa().is_empty(),
+              "Vector of unregistered APs should return an equivalent "
+              "automaton (forall)")
+
+# Test equivalence between formula overload and BDD overload.
+swa = spot.obligation_to_mtdswa(spot.formula("Ga & Fb"))
+d = swa.get_dict()
+p0_bdd = buddy.bdd_ithvar(
+    d.register_proposition(spot.formula.ap('a'), swa))
+m_formula = spot.quantify_exists(swa, spot.formula.ap('a'))
+m_bdd = spot.quantify_exists(swa, p0_bdd)
+pxor = spot.product_xor(m_formula, m_bdd)
+tc.assertTrue(pxor.as_twa().is_empty(),
+              "Formula and BDD overloads should produce the same result")
