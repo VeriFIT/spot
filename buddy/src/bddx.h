@@ -1550,10 +1550,32 @@ BUDDY_API int bdd_anodecountpp(const std::vector<bdd>& b,
 BUDDY_API bool bdd_has_true(const std::vector<bdd>& b);
 BUDDY_API bool bdd_find_leaf(const std::vector<bdd>& b, bool (*)(int));
 
+// Decompose the states (whose transition relation is encoded by
+// bdd_terminal nodes, mapped to state indices via term_succ) into
+// maximal SCCs.  The returned vector maps each state to its SCC
+// number.  The SCCs are numbered in reverse topological order, so the
+// first SCC (number 0) is a sink of the condensation: it has no
+// successor SCCs (its successor list, if non-empty, contains only the
+// -1/-2 sink markers below).
+//
+// If succs is non-null, it receives one entry per SCC: the list of
+// successor SCCs of that SCC.  The implicit sinks bddfalse and
+// bddtrue are represented by the special values ~bddfalse.id() (-1)
+// and ~bddtrue.id() (-2).  Edges internal to an SCC are omitted, so
+// an SCC never lists itself.  The lists are sorted and contain no
+// duplicates.  When a successor SCC is reached only through a node
+// that already belongs to a numbered SCC, only that SCC number is
+// recorded (not the leaves of its nodes); callers that need the
+// transitive closure of the successors (e.g. to know which sinks are
+// reachable) must follow the lists recursively.
 BUDDY_API std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
                                        int (*term_succ)(int),
                                        std::unordered_map<int, int>*
-                                       seen_res = nullptr);
+                                       seen_res = nullptr,
+                                       std::vector<bool>*
+                                       transient = nullptr,
+                                       std::vector<std::vector<int>>*
+                                       succs = nullptr);
 
 /*=== Minterm enumeration ====*/
 

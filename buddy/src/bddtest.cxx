@@ -189,6 +189,106 @@ void testIsCube(){
     ERROR("is_cube failed on b2");
 }
 
+void testMtSccs()
+{
+  cout << "Testing bdd_mt_sccs()\n";
+
+  auto identity = [] (int x) { return x; };
+
+  bdd a = bdd_ithvar(0);
+  bdd b = bdd_ithvar(1);
+
+  struct case_t
+  {
+    const char* name;
+    std::vector<bdd> states;
+    std::vector<int> scc;       // expected SCC number of each state
+    std::vector<int> transient; // expected transient flag of each SCC
+    // Expected successors of each SCC: SCC numbers, except -1 and -2
+    // which stand for the implicit bddfalse and bddtrue sinks
+    // (~bddfalse.id() and ~bddtrue.id()).
+    std::vector<std::vector<int>> succs;
+  };
+
+  const case_t cases[] =
+    {
+      // Simple chains and cycles, with various acceptances.
+      {"T1", {bdd_ite(a, bdd_terminal(2), bdd_terminal(1)),
+              bdd_terminal(2), bdd_terminal(3), bdd_terminal(3)},
+       {3, 2, 1, 0}, {0, 1, 1, 1}, {{}, {0}, {1}, {1, 2}}},
+      {"T2", {bdd_terminal(1), bdd_terminal(2),
+              bdd_ite(a, bdd_terminal(0), bdd_terminal(3)),
+              bdd_terminal(2)},
+       {0, 0, 0, 0}, {0}, {{}}},
+      {"T3", {bdd_terminal(1), bdd_terminal(2), bdd_terminal(2)},
+       {2, 1, 0}, {0, 1, 1}, {{}, {0}, {1}}},
+      {"T4", {bdd_ite(a, bdd_terminal(0), bdd_terminal(1)),
+              bdd_terminal(2), bdd_terminal(2)},
+       {2, 1, 0}, {0, 1, 0}, {{}, {0}, {1}}},
+      {"T5", {bdd_terminal(1), bdd_terminal(2), bdd_terminal(2),
+              bdd_terminal(2)},
+       {2, 1, 0, 3}, {0, 1, 1, 1}, {{}, {0}, {1}, {0}}},
+      {"T6", {bdd_ite(a, bdd_terminal(1), bdd_terminal(2)),
+              bdd_terminal(3), bdd_terminal(3), bdd_terminal(3)},
+       {3, 2, 1, 0}, {0, 1, 1, 1}, {{}, {0}, {0}, {1, 2}}},
+      {"T7", {bdd_ite(a, bdd_terminal(0), bdd_terminal(0)),
+              bdd_terminal(1), bdd_terminal(2), bdd_terminal(3)},
+       {0, 1, 2, 3}, {0, 0, 0, 0}, {{}, {}, {}, {}}},
+      // Two states sharing the same BDD root.
+      {"T8", {bdd_terminal(1), bdd_terminal(0), bdd_terminal(0)},
+       {0, 0, 1}, {0, 1}, {{}, {0}}},
+      // Mutual cycle between two states.
+      {"T9", {bdd_terminal(1), bdd_terminal(0)},
+       {0, 0}, {0}, {{}}},
+      // A terminal pointing to an already-assigned state (this used
+      // to leave a stale entry in the SEEN map that could be mistaken
+      // for a cycle closure, corrupting the SCC partition).
+      {"G38", {bdd_terminal(2),
+               bdd_ite(b, bdd_terminal(0), bdd_terminal(4)),
+               bdd_terminal(2),
+               bdd_ite(a, bdd_ite(b, bdd_terminal(3), bdd_terminal(5)),
+                       bdd_terminal(3)),
+               bdd_ite(a, bdd_ite(b, bdd_terminal(3), bdd_terminal(0)),
+                       bdd_terminal(3)),
+               bdd_terminal(3)},
+       {1, 4, 0, 2, 3, 2}, {0, 1, 0, 1, 1},
+       {{}, {0}, {}, {1, 2}, {1, 3}}},
+      // Constant state roots (these used to crash bdd_mt_sccs).
+      // States 1 and 2 have the same root, a terminal pointing to
+      // state 0, which is already assigned to an SCC (bddfalse) when
+      // they are processed: those terminals are ghost entries, and
+      // each state ends up in its own trivial SCC pointing to SCC 0.
+      {"C1", {bddfalse, bdd_terminal(0), bdd_terminal(0), bddtrue},
+       {0, 1, 2, 3}, {1, 1, 1, 1}, {{-1}, {0}, {0}, {-2}}},
+      {"C2", {bddtrue, bdd_terminal(1), bdd_terminal(2), bddfalse},
+       {0, 1, 2, 3}, {1, 0, 0, 1}, {{-2}, {}, {}, {-1}}},
+      {"C3", {bdd_ite(a, bddfalse, bdd_terminal(1)),
+              bdd_terminal(0), bddtrue},
+       {0, 0, 1}, {0, 1}, {{-1}, {-2}}},
+    };
+
+  for (const case_t& c : cases)
+    {
+      std::vector<bool> transient;
+      std::vector<std::vector<int>> succs;
+      std::vector<int> scc = bdd_mt_sccs(c.states, identity, nullptr,
+                                         &transient, &succs);
+      if (scc != c.scc)
+        ERROR(string(c.name) + ": unexpected SCC vector");
+      if (transient.size() != c.transient.size())
+        ERROR(string(c.name) + ": unexpected transient size");
+      for (unsigned i = 0; i < transient.size(); ++i)
+        if (transient[i] != (c.transient[i] != 0))
+          ERROR(string(c.name) + ": unexpected transient flag");
+      if (succs.size() != c.succs.size())
+        ERROR(string(c.name) + ": unexpected succs size");
+      for (unsigned i = 0; i < succs.size(); ++i)
+        if (succs[i] != c.succs[i])
+          ERROR(string(c.name) + ": unexpected succs list");
+    }
+}
+
+
 void testHaveCommon()
 {
   cout << "Testing have_common_assignment()\n";
@@ -251,6 +351,7 @@ int main(int ac, char** av)
   testShortest();
   testIsCube();
   testHaveCommon();
+  testMtSccs();
 
   bdd_done();
   return 0;

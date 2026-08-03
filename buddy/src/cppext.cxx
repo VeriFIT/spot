@@ -38,6 +38,7 @@
 #include <iomanip>
 #include <new>
 #include <cassert>
+#include <algorithm>
 #include <deque>
 #include <unordered_map>
 #include "kernel.h"
@@ -786,15 +787,45 @@ std::tuple<bool, int, int> bdd_mt_quantified_low_high(int r)
 // This interprets the MTBDD of states as a graph in which
 // a terminal labeled by X has term_succ(X) as successor.
 //
-// The function compute the maximal strongly connected components of
-// that graph.  If there a N such SCCs, this returns a vector of the
-// same size as STATES, indicating the SCC number (between 0 and N-1)
-// of each states.  SCCs are topologically ordered, with state 0
-// belonging to the largest SCC; an SCC can only reach SCCs with
-// smaller indices.
+// This function computes the maximal strongly connected components
+// (SCCs) of that graph.  If there are N such SCCs, it returns a
+// vector of the same size as STATES, indicating the SCC number
+// (between 0 and N-1) of each state.
+//
+// The SCCs are numbered in reverse topological order: an SCC can only
+// reach SCCs with smaller indices.  Since the DFS starts from state 0,
+// the SCC of state 0 has the largest index among the SCCs reachable
+// from it; the SCCs that are not reachable from state 0 are numbered
+// after all the reachable ones, and thus have even larger indices.
+//
+// If SEEN_RES is not null, the internal map from BDD nodes to their
+// live index, or to the negated live index of the root of their SCC
+// once they have been assigned to an SCC, is swapped into it, so
+// that the caller can group nodes by SCC.  Terminals that point to
+// an already-assigned SCC are recorded with the sentinel INT_MIN
+// (they do not belong to any SCC), so that the caller can recognize
+// them.
+//
+// If TRANSIENT is not null, it receives one entry per SCC number:
+// TRANSIENT[S] is set iff SCC S is transient, i.e., it consists of a
+// single state that has no successor inside the SCC (a state that
+// cannot be visited twice in an infinite run).
+//
+// If SUCCS is not null, it receives one entry per SCC number:
+// SUCCS[S] is the sorted list of the successors of SCC S, without
+// duplicates.  An SCC is never listed among its own successors:
+// transitions leading to states of the same SCC are self-loops, and
+// as such internal to the SCC.  Successors are represented by their
+// SCC number, except for the implicit sinks bddfalse and bddtrue,
+// which are represented by ~bddfalse.id() and ~bddtrue.id() (i.e.,
+// -1 and -2), so that they can be distinguished from the SCC numbers,
+// which are all non-negative.  The successors are collected while the
+// SCCs are being discovered, not in a post-pass.
 std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
                              int (*term_succ)(int),
-                             std::unordered_map<int, int>* seen_res)
+                             std::unordered_map<int, int>* seen_res,
+                             std::vector<bool>* transient,
+                             std::vector<std::vector<int>>* succs)
 {
   unsigned ns = states.size();
   std::vector<int> res(ns, INT_MIN);
@@ -818,12 +849,36 @@ std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
   // internal nodes have at most two successors, and terminal nodes have
   // exactly one successor.
   std::deque<int> roots;               // indices of SCC roots
+  std::deque<bool> cyclic;             // whether the SCC whose root
+                                       // index is in ROOTS contains a
+                                       // cycle so far (only maintained
+                                       // when TRANSIENT is requested)
   std::deque<int> live;                // bdd.id that have been
                                        // discovered but not assigned
                                        // to any SCC yet.
   std::unordered_map<int, int> seen;   // index of each live state; or
                                        // <0 if part of some SCC
                                        // already.
+  // The following structures are only used when SUCCS is requested.
+  std::deque<std::vector<int>> succs_list; // one list per entry of ROOTS,
+                                           // collecting the successors
+                                           // of the SCC rooted at that
+                                           // entry while it is being
+                                           // built.
+  std::unordered_map<int, std::vector<int>> node_succs; // for each BDD
+                                           // node whose SCC received no
+                                           // number (a terminal-free
+                                           // trivial SCC), the successors
+                                           // reachable from that node,
+                                           // saved when it was popped so
+                                           // that a node shared by several
+                                           // states can be reused.
+  std::unordered_map<int, int> root_number; // live index of the root of
+                                           // each numbered SCC, mapped to
+                                           // the SCC number, so that a
+                                           // ghost edge leading to a node
+                                           // of a numbered SCC can be
+                                           // resolved to that SCC.
   unsigned state_index = 0;            // number to give to newly
                                        // discovered states.
   unsigned scc_index = 0;              // number to give to newly
@@ -842,15 +897,74 @@ std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
       if (res[i] != INT_MIN) // already assigned to an SCC
         continue;
       int r = states[i].id();
-      if (!seen.emplace(r, state_index).second)
+      auto [it, ins] = seen.emplace(r, state_index);
+      if (!ins)
         {
           // this is a trivial SCC, or we would have assigned i to
           // some SCC already.
           res[i] = scc_index++;
+          if (transient)
+            transient->push_back(true); // trivial SCCs are transient
+          if (succs)
+            {
+              // The root was already explored: its successors are
+              // those reachable from that BDD node.  Recover them from
+              // the information saved when the node was popped.
+              std::vector<int> list;
+              if (ISTERM(r))
+                {
+                  // A terminal has a single leaf (itself), pointing to
+                  // the state term_succ(TERM(r)), which belongs to the
+                  // SCC in which the terminal was found.
+                  int t = res[term_succ(TERM(r))];
+                  if (t != INT_MIN)
+                    list.push_back(t);
+                }
+              else
+                {
+                  auto rn = root_number.find(seen[r]);
+                  if (rn != root_number.end())
+                    {
+                      // The node belongs to a numbered SCC: since every
+                      // node of an SCC reaches every other, the leaves
+                      // of the node are the leaves of the SCC, plus the
+                      // SCC itself.
+                      list = (*succs)[rn->second];
+                      list.push_back(rn->second);
+                    }
+                  else
+                    {
+                      auto ns = node_succs.find(r);
+                      if (ns != node_succs.end())
+                        list = ns->second;
+                    }
+                }
+              succs->push_back(std::move(list));
+            }
           continue;
         }
+      // If the root is a terminal pointing to a state that was already
+      // assigned to an SCC, the terminal is considered as seen: the
+      // state it points to has been visited even if the terminal node
+      // itself has not.  It is therefore recorded as a ghost entry, and
+      // never pushed onto the LIVE stack.
+      if (ISTERM(r))
+        if (int t = res[term_succ(TERM(r))]; t != INT_MIN)
+          {
+            it->second = INT_MIN;
+            res[i] = scc_index++;
+            if (transient)
+              transient->push_back(true); // trivial SCCs are transient
+            if (succs)
+              succs->emplace_back(1, t);
+            continue;
+          }
       live.push_back(r);
       roots.push_back(state_index);
+      if (transient)
+        cyclic.push_back(false);
+      if (succs)
+        succs_list.emplace_back();
       dfs_stack.emplace_back(r, ISTERM(r) ? 3 : 2);
       ++state_index;
 
@@ -864,6 +978,21 @@ std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
                 {
                   rootidx = ~rootidx;
                   roots.pop_back();
+                  bool transient_scc = false;
+                  if (transient)
+                    {
+                      // An SCC is transient iff it contains no cycle:
+                      // every node of an SCC reaches every other, so an
+                      // acyclic SCC is necessarily a singleton.
+                      transient_scc = !cyclic.back();
+                      cyclic.pop_back();
+                    }
+                  std::vector<int> scc_succs;
+                  if (succs)
+                    {
+                      scc_succs = std::move(succs_list.back());
+                      succs_list.pop_back();
+                    }
                   bool scc_index_assigned = false;
                   while (!live.empty())
                     {
@@ -874,14 +1003,68 @@ std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
                       it->second = rootidx;
                       if (ISTERM(t))
                         {
-                          res[term_succ(TERM(t))] = scc_index;
-                          scc_index_assigned = true;
+                          int target = term_succ(TERM(t));
+                          // The target might already belong to an SCC
+                          // if a different terminal pointed to it in an
+                          // SCC that popped earlier.  This requires a
+                          // non-injective term_succ, since terminals
+                          // are interned by value, so with the identity
+                          // function this never happens.  In that case
+                          // this terminal is just an additional edge to
+                          // that SCC, already recorded in the succs
+                          // lists when the terminal was explored, so
+                          // the target is left in its SCC.
+                          if (res[target] == INT_MIN)
+                            {
+                              res[target] = scc_index;
+                              scc_index_assigned = true;
+                            }
                         }
                       if (t == r)
                         break;
                     }
                   if (scc_index_assigned)
-                    ++scc_index;
+                    {
+                      if (transient)
+                        transient->push_back(transient_scc);
+                      if (succs)
+                        {
+                          // This SCC is numbered S.  Its successors are
+                          // the successors collected while exploring it
+                          // (note that the SCC itself is excluded: an
+                          // edge leading to a state of the SCC is a
+                          // self-loop, and self-loops are internal).
+                          succs->push_back(std::move(scc_succs));
+                          // Record the number of the SCC rooted at
+                          // ROOTIDX so that later ghost edges to nodes
+                          // of this SCC can be resolved to it.
+                          root_number[rootidx] = scc_index;
+                          if (!roots.empty())
+                            {
+                              // The SCC is a successor of the SCC that
+                              // contains the previous root.
+                              succs_list.back().push_back(scc_index);
+                            }
+                        }
+                      ++scc_index;
+                    }
+                  else if (succs)
+                    {
+                      // Terminal-free SCCs receive no number.  Their
+                      // successors are nevertheless successors of the
+                      // SCC containing the previous root, so merge them
+                      // upwards.  Keep a copy: the node may be shared by
+                      // other states, in which case ghost edges will
+                      // recover it.
+                      node_succs[r] = std::move(scc_succs);
+                      if (!roots.empty())
+                        {
+                          auto& parent = succs_list.back();
+                          parent.insert(parent.end(),
+                                        node_succs[r].begin(),
+                                        node_succs[r].end());
+                        }
+                    }
                 }
               dfs_stack.pop_back();
               continue;
@@ -894,19 +1077,33 @@ std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
               child = states[v].id();
               cnt = 0;
             }
-          else if (cnt == 2)
-            {
-              child = LOW(r);
-              cnt = 1;
-            }
           else
             {
-              assert(cnt == 1);
-              child = HIGH(r);
-              cnt = 0;
+              if (cnt == 2)
+                {
+                  child = LOW(r);
+                  cnt = 1;
+                }
+              else
+                {
+                  assert(cnt == 1);
+                  child = HIGH(r);
+                  cnt = 0;
+                }
             }
-          if (ISCONST(child))   // ignore constant nodes
-            continue;
+          if (ISCONST(child))
+            {
+              // A constant is the implicit sink bddfalse or bddtrue:
+              // the edge to it is a successor of the SCC containing
+              // the current node.  This holds even when the constant is
+              // the successor of a terminal: the terminal points to a
+              // state whose root is the constant, and that state
+              // belongs to the SCC of the terminal, so that SCC can
+              // reach the sink.
+              if (succs)
+                succs_list.back().push_back(~child);
+              continue;
+            }
 
           auto [it, ins] = seen.emplace(child, state_index);
           if (ins) // new state
@@ -914,26 +1111,149 @@ std::vector<int> bdd_mt_sccs(const std::vector<bdd>& states,
               // If r is pointing to a transient state, it is
               // possible that we have previously assigned an SCC
               // to it without ever encountering the corresponding
-              // terminal.
-              if (ISTERM(child) && res[term_succ(TERM(child))] != INT_MIN)
-                continue;
+              // terminal.  Record this ghost entry with the
+              // sentinel INT_MIN so that a later encounter is not
+              // mistaken for a cycle closure (the state is in an
+              // already-assigned SCC).  INT_MIN is safe: the real
+              // values stored in SEEN are live indices (>= 0) or
+              // negated SCC-root indices (~ROOTIDX, i.e. -1 or
+              // smaller), so INT_MIN cannot collide with them.
+              if (ISTERM(child))
+                if (int t = res[term_succ(TERM(child))]; t != INT_MIN)
+                  {
+                    it->second = INT_MIN;
+                    if (succs)
+                      // The terminal child points to the state T
+                      // which already belongs to a completed SCC.
+                      // Record that SCC as a successor of the SCC
+                      // containing the current node, just like the
+                      // ghost-edge case below.
+                      succs_list.back().push_back(t);
+                    continue;
+                  }
               live.push_back(child);
               roots.push_back(state_index);
+              if (transient)
+                cyclic.push_back(false);
+              if (succs)
+                succs_list.emplace_back();
               ++state_index;
               dfs_stack.emplace_back(child, ISTERM(child) ? 3 : 2);
               continue;
             }
 
-          int dstidx = it->second;;
+          int dstidx = it->second;
           if (dstidx < 0) // goes to another SCC
-            continue;
+            {
+              if (succs)
+                {
+                  // The child was already assigned to a completed SCC:
+                  // this edge leaves the current SCC, so record the
+                  // successor it leads to.
+                  if (ISTERM(child))
+                    {
+                      // A terminal child points to the state
+                      // term_succ(TERM(child)), which belongs to the SCC
+                      // in which the terminal was found: record that SCC.
+                      int t = res[term_succ(TERM(child))];
+                      if (t != INT_MIN)
+                        succs_list.back().push_back(t);
+                    }                    else
+                      {
+                        // An inner child belongs to a completed SCC, so
+                        // this edge leaves the current SCC and reaches
+                        // that SCC: record it.  (The successors of the
+                        // child's SCC are not copied here: the child is
+                        // an inner node, and edges to its subtree are
+                        // not edges of the current SCC.)  If the child
+                        // is terminal-free, its SCC received no number,
+                        // so its own successors, stored in NODE_SUCCS
+                        // when it was popped, are recorded instead.
+                        auto rn = root_number.find(dstidx);
+                        if (rn != root_number.end())
+                          succs_list.back().push_back(rn->second);
+                        else
+                          {
+                            auto ns = node_succs.find(child);
+                            if (ns != node_succs.end())
+                              {
+                                auto& cur = succs_list.back();
+                                cur.insert(cur.end(), ns->second.begin(),
+                                           ns->second.end());
+                              }
+                          }
+                      }
+                }
+              continue;
+            }
           // Closes a cycle: pop relevant SCC roots.
           while (roots.back() > dstidx)
-            roots.pop_back();
+            {
+              roots.pop_back();
+              if (transient)
+                cyclic.pop_back();
+              if (succs)
+                {
+                  // The popped roots are merged into the surviving SCC:
+                  // their successors become successors of that SCC.
+                  std::vector<int> merged = std::move(succs_list.back());
+                  succs_list.pop_back();
+                  auto& surv = succs_list.back();
+                  surv.insert(surv.end(), merged.begin(), merged.end());
+                }
+            }
+          // The surviving SCC now contains a cycle.
+          if (transient)
+            cyclic.back() = true;
         } // DFS
       if (res[i] == INT_MIN) // not assigned yet because trivial
-        res[i] = scc_index++;
+        {
+          res[i] = scc_index++;
+          if (transient)
+            transient->push_back(true);
+          if (succs)
+            {
+              // Same recovery as for the ghost case: the root was
+              // explored during the DFS above, and its successors are
+              // those of the SCC it belongs to, or its own successors
+              // if it is terminal-free.
+              std::vector<int> list;
+              if (ISTERM(r))
+                {
+                  int t = res[term_succ(TERM(r))];
+                  if (t != INT_MIN)
+                    list.push_back(t);
+                }
+              else
+                {
+                  auto rn = root_number.find(seen[r]);
+                  if (rn != root_number.end())
+                    {
+                      list = (*succs)[rn->second];
+                      list.push_back(rn->second);
+                    }
+                  else
+                    {
+                      auto ns = node_succs.find(r);
+                      if (ns != node_succs.end())
+                        list = ns->second;
+                    }
+                }
+              succs->push_back(std::move(list));
+            }
+        }
     }     // loop over all states
+  if (succs)
+    {
+      // The successors were collected while the SCCs were being
+      // discovered.  A state is never reassigned to another SCC, so
+      // the lists only need to be sorted to remove duplicates.
+      for (auto& v : *succs)
+        {
+          std::sort(v.begin(), v.end());
+          v.erase(std::unique(v.begin(), v.end()), v.end());
+        }
+    }
   if (seen_res)
     std::swap(seen, *seen_res);
   return res;
