@@ -26,13 +26,12 @@ trimmable = [
     "F(XG(F!c M Fc) W (c R a))",
     "X(((Xc xor (c U Ga)) | G!Gc) R c)",
     "(Gc | ((b W 0) xor !Xa)) M 1",
-    "F(!a <-> (F!c & XGF(c U b)))",  # big
 ]
 untrimmable = [
     "true",
     "false",
     "(FGc U (0 R a)) -> (Gb M 1)",  # didn't work before
-
+    "F(!a <-> (F!c & XGF(c U b)))",  # requires color propagation
 ]
 trimmable_twas = [spot.translate(f, "gen", "det", "complete", "SBAcc")
         for f in trimmable]
@@ -47,7 +46,7 @@ untrimmable_mtdswas2 = [spot.dtwa_to_mtdswa(twa) for twa in untrimmable_twas]
 for i in range(len(trimmable)):
     m1 = trimmable_mtdswas1[i]
     m2 = trimmable_mtdswas2[i]
-    spot.trim_mtdswa(m2)
+    spot.trim_mtdswa(m2, True)
     # Test that trim_mtdswa does not change the language of the automaton.
     pxor = spot.product_xor(m1.as_twa(), m2.as_twa())
     tc.assertTrue(pxor.is_empty(),
@@ -61,7 +60,7 @@ for i in range(len(trimmable)):
 for i in range(len(untrimmable)):
     m1 = untrimmable_mtdswas1[i]
     m2 = untrimmable_mtdswas2[i]
-    spot.trim_mtdswa(m2)
+    spot.trim_mtdswa(m2, True)
     # Test that trim_mtdswa does not change the language of the automaton.
     pxor = spot.product_xor(m1.as_twa(), m2.as_twa())
     tc.assertTrue(pxor.is_empty(),
@@ -102,57 +101,49 @@ def make_test_mtdswa():
     m.acc = spot.acc_cond('Inf(0) & Fin(1)')
     return m
 
-# Test that the two phases work separately
-
 m = make_test_mtdswa()
 
-# No phase: check that the MTDSwA in left unchanged
-m0 = make_test_mtdswa()
-spot.trim_mtdswa(m0, False, False)
-tc.assertEqual(m.num_roots(), m0.num_roots(),
-               "MTDSwA should not change after trimming with both phases off")
-
-# Phase 1: remove unreachable states
+# Default trim: remove unreachable states
 m1 = make_test_mtdswa()
-spot.trim_mtdswa(m1, True, False)
+spot.trim_mtdswa(m1)
 pxor = spot.product_xor(m.as_twa(), m1.as_twa())
 tc.assertTrue(pxor.is_empty(),
-              "Trimmed MTDSwA is not equivalent to original (phase 1)")
+              "Trimmed MTDSwA is not equivalent to original (default trim)")
 tc.assertEqual(m1.num_roots(), 15,
-               "Trimmed MTDSwA should have 15 states after phase 1")
+               "Trimmed MTDSwA should have 15 states after default trim")
 # Check that re-trimming does not change the MTDSwA
-spot.trim_mtdswa(m1, True, False)
+spot.trim_mtdswa(m1)
 tc.assertEqual(m1.num_roots(), 15,
-               "MTDSwA should not change after re-trimming (phase 1)")
+               "MTDSwA should not change after re-trimming (default trim)")
 
-# Phase 2: remove useless states
+# Full trim: also remove useless states
 m2 = make_test_mtdswa()
-spot.trim_mtdswa(m2, False, True)
+spot.trim_mtdswa(m2, True)
 pxor = spot.product_xor(m.as_twa(), m2.as_twa())
 tc.assertTrue(pxor.is_empty(),
-              "Trimmed MTDSwA is not equivalent to original (phase 2)")
-tc.assertLessEqual(m2.num_roots(), 9,
-               "Trimmed MTDSwA should have at most 9 states after phase 2")
-spot.trim_mtdswa(m2, False, True)
-tc.assertLessEqual(m2.num_roots(), 9,
-               "MTDSwA should not change after re-trimming (phase 2)")
+              "Trimmed MTDSwA is not equivalent to original (full trim)")
+tc.assertEqual(m2.num_roots(), 13,
+               "Trimmed MTDSwA should have 13 states after full trim")
+spot.trim_mtdswa(m2, True)
+tc.assertEqual(m2.num_roots(), 13,
+               "MTDSwA should not change after re-trimming (full trim)")
 
-# Both phases: remove unreachable and useless states
+# The order of the two modes should not matter.
 m3 = make_test_mtdswa()
-spot.trim_mtdswa(m3, True, True)
-spot.trim_mtdswa(m1, False, True)
-spot.trim_mtdswa(m2, True, False)
+spot.trim_mtdswa(m3, True)
+spot.trim_mtdswa(m1, True)   # m1 was default-trimmed first
+spot.trim_mtdswa(m2)          # m2 was full-trimmed first
 pxor = spot.product_xor(m.as_twa(), m3.as_twa())
 tc.assertTrue(pxor.is_empty(),
-              "Trimmed MTDSwA is not equivalent to original (both phases)")
-tc.assertEqual(m3.num_roots(), 6,
-               "Trimmed MTDSwA should have 6 states after both phases")
-tc.assertEqual(m1.num_roots(), 6,
-               "Trimmed MTDSwA should have 6 states after phase 1 then 2")
-tc.assertEqual(m2.num_roots(), 6,
-               "Trimmed MTDSwA should have 6 states after phase 2 then 1")
-spot.trim_mtdswa(m3, True, True)
-tc.assertEqual(m3.num_roots(), 6,
-               "MTDSwA should not change after re-trimming (both phases)")
-
-
+              "Trimmed MTDSwA is not equivalent to original (full trim)")
+tc.assertEqual(m3.num_roots(), 13,
+               "Trimmed MTDSwA should have 13 states after full trim")
+tc.assertEqual(m1.num_roots(), 13,
+               "Trimmed MTDSwA should have 13 states after default trim "
+               "then full trim")
+tc.assertEqual(m2.num_roots(), 13,
+               "Trimmed MTDSwA should have 13 states after full trim "
+               "then default trim")
+spot.trim_mtdswa(m3, True)
+tc.assertEqual(m3.num_roots(), 13,
+               "MTDSwA should not change after re-trimming (full trim)")

@@ -175,10 +175,24 @@ namespace spot
   ///
   /// This builds a vector as large as the number of states in \a aut,
   /// and giving the SCC number each state belongs to.  SCC are
-  /// numbered in topological order (the SCC of the initial state has
-  /// the highest number, and SCC with number 0 is a terminal/leaf
-  /// SCC).
-  SPOT_API std::vector<int> scc_vector(const mtdswa_ptr& aut);
+  /// numbered in reverse topological order (the SCC of the initial
+  /// state has the highest number among the reachable SCCs, and SCC
+  /// with number 0 is a terminal/leaf SCC).
+  ///
+  /// If \a transient is not null, it receives one entry per SCC
+  /// number: TRANSIENT[S] is set iff SCC S is transient, i.e., it
+  /// consists of a single state that has no successor inside the SCC.
+  ///
+  /// If \a succs is not null, it receives one entry per SCC number:
+  /// SUCCS[S] is the sorted list of the successors of SCC S, without
+  /// duplicates.  Successors are represented by their SCC number,
+  /// except for the implicit sinks bddfalse and bddtrue, which are
+  /// represented by ~bddfalse.id() and ~bddtrue.id() (i.e., -1 and
+  /// -2).
+  SPOT_API std::vector<int> scc_vector(const mtdswa_ptr& aut,
+                                       std::vector<bool>* transient = nullptr,
+                                       std::vector<std::vector<int>>*
+                                       succs = nullptr);
 
   /// \ingroup mtdswa
   /// \brief Preprocess a weak MTDSwA before minimization
@@ -460,16 +474,21 @@ namespace spot
 
   /// \ingroup mtdswa
   /// \brief Remove unnecessary states from an MTDSwA.
-  /// In a first phase, this removes states that are unreachable from the
-  /// initial state.
-  /// In a second phase, it replaces states that will inevitably lead to
-  /// acceptance/rejection with bddtrue or bddfalse respectively.
+  ///
+  /// By default, this removes states that are unreachable from the
+  /// initial state, and renumbers the remaining states.  This is what
+  /// one expects from a trim function.
+  ///
+  /// If \a trim_useless_sccs_too is set, states from which acceptance
+  /// or rejection is inevitable are also replaced by `bddtrue` or
+  /// `bddfalse` respectively.  In that case, the set of accessible
+  /// states is deduced from the SCC numbers returned by bdd_mt_sccs:
+  /// the SCC of state 0 has the largest index among the SCCs
+  /// reachable from it, so any SCC with a larger index is
+  /// unreachable.  No separate reachability pass is needed.
+  ///
   /// This modifies the automaton in place.
-  /// By default both phases are performed, but this can be controlled with
-  /// the two optional boolean parameters.
-  /// If \a trim_inaccessible is set to false, the first phase is skipped.
-  /// If \a trim_inevitable is set to false, the second phase is skipped.
-  SPOT_API void trim_mtdswa(mtdswa_ptr swa, bool trim_inaccessible = true,
-                            bool trim_inevitable = true);
+  SPOT_API void trim_mtdswa(mtdswa_ptr swa,
+                            bool trim_useless_sccs_too = false);
 
 }
