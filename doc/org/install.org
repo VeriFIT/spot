@@ -137,7 +137,7 @@ you can opt to use that instead:
 #+BEGIN_SRC sh
   sudo dnf config-manager addrepo --from-repofile=https://www.lre.epita.fr/repo/fedora/lre.repo
   sudo dnf config-manager enable lre-unstable
-  sudo dnf config-manager enable lre-stable
+  sudo dnf config-manager disable lre-stable
 #+END_SRC
 
 Once the repository is set up, you can simply install Spot with:
