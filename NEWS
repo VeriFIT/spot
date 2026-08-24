@@ -177,6 +177,10 @@ New in spot 2.15.1.dev  (not yet released)
   - ltlsynt --splittype=fullsym had a bug that could cause unrealizable
     specifications to be erroneously declared realizable.  (Issue #647.)
 
+  - Fix some incorrect result of ltlsynt in rare cases involving
+    decomposition, polarity-based simplification, and obligation-based
+    synthesis.  LedMatrix.tlsf is one such cases.  (Issue #651.)
+
   Removed functions:
 
   - spot::is_bare_word() and spot::quote_unless_bare_word()

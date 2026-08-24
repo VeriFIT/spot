@@ -690,6 +690,38 @@ namespace
     assert((sub_form.size() == sub_outs.size())
            && (sub_form.size() == sub_outs_str.size()));
 
+    // Apply per-subformula polarity/global-equiv simplifications
+    // before checking which subformulas are obligations, so that the
+    // coming BDD variable preorder is set correctly.
+    if (sub_form.size() > 1
+        && (opt_polarity == pol_yes || opt_gequiv == pol_yes))
+      {
+        unsigned opt = 0;
+        if (opt_polarity == pol_yes)
+          opt |= spot::realizability_simplifier::polarity;
+        if (opt_gequiv == pol_yes)
+          {
+            if (want_game())
+              opt |= spot::realizability_simplifier::global_equiv_output_only;
+            else if (opt_semantics == semantics_moore)
+              opt |= spot::realizability_simplifier::global_equiv_moore;
+            else
+              opt |= spot::realizability_simplifier::global_equiv;
+          }
+        if (gi->verbose_stream)
+          *gi->verbose_stream << "attempting to simplify subformulas\n";
+        for (auto& sf: sub_form)
+          {
+            if (gi->verbose_stream)
+              *gi->verbose_stream << "considering subformula " << sf << '\n';
+            spot::realizability_simplifier rsub(sf, input_and_unobs, opt,
+                                                gi ?
+                                                gi->verbose_stream : nullptr);
+            sf = rsub.simplified_formula();
+            rs->merge_mapping(rsub);
+          }
+      }
+
     spot::bdd_dict_preorder preorder(gi->dict); // in case we are using MTBDDs.
     bool has_oblig = false;
     if (opt_obligation_synthesis)
@@ -758,7 +790,6 @@ namespace
     auto sub_f = sub_form.begin();
     auto sub_o = sub_outs_str.begin();
     std::vector<spot::mealy_like> mealy_machines;
-    unsigned numsubs = sub_form.size();
 
     for (; sub_f != sub_form.end(); ++sub_f, ++sub_o)
     {
@@ -769,28 +800,9 @@ namespace
                 bddfalse
               };
 
-      if (numsubs > 1 && (opt_polarity == pol_yes || opt_gequiv == pol_yes))
-        {
-          unsigned opt = 0;
-          if (opt_polarity == pol_yes)
-            opt |= spot::realizability_simplifier::polarity;
-          if (opt_gequiv == pol_yes)
-            {
-              if (want_game())
-                opt |= spot::realizability_simplifier::global_equiv_output_only;
-              else if (opt_semantics == semantics_moore)
-                opt |= spot::realizability_simplifier::global_equiv_moore;
-              else
-                opt |= spot::realizability_simplifier::global_equiv;
-            }
-          if (gi->verbose_stream)
-            *gi->verbose_stream << "working on subformula " << *sub_f << '\n';
-          spot::realizability_simplifier rsub(*sub_f, input_and_unobs, opt,
-                                              gi ?
-                                              gi->verbose_stream : nullptr);
-          *sub_f = rsub.simplified_formula();
-          rs->merge_mapping(rsub);
-        }
+      // Per-subformula simplification was done above.
+      if (sub_form.size() > 1 && gi->verbose_stream)
+        *gi->verbose_stream << "working on subformula " << *sub_f << '\n';
 
       // If we want to print a game, we never use the direct approach
       // or the obligation code.

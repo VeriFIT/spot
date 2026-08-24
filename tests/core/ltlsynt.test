@@ -806,6 +806,9 @@ diff outx exp
 
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula (b & (b | y)) -> y
+considering subformula (a | x) -> x
 working on subformula (b & (b | y)) -> y
 trying to create strategy directly for (b & (b | y)) -> y
 direct strategy might exist but was not found.
@@ -861,6 +864,9 @@ diff outx exp
 # Here, G!(!x | !y) should be Gx & Gy
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula Gx
+considering subformula Gy
 working on subformula Gx
 trying to create strategy directly for Gx
 translating formula done in X seconds
@@ -883,6 +889,9 @@ diff outx exp
 # Here, !F(a | b) should be G(!a) & G(!b)
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula G!a
+considering subformula G!b
 working on subformula G!a
 trying to create strategy directly for G!a
 no strategy exists.
@@ -895,6 +904,9 @@ diff outx exp
 # Here, G!(a -> b) should be G(a) & G(!b)
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula Ga
+considering subformula G!b
 working on subformula Ga
 trying to create strategy directly for Ga
 no strategy exists.
@@ -906,6 +918,9 @@ diff outx exp
 
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula Ga
+considering subformula G!b
 working on subformula Ga
 formula is an obligation; solving with the on-the-fly construction
 solving done in X seconds
@@ -940,6 +955,10 @@ diff outx exp
 # (a => b) & (a => c) & (a => d)
 cat >exp <<EOF
 there are 3 subformulas
+attempting to simplify subformulas
+considering subformula a -> b
+considering subformula a -> c
+considering subformula a -> d
 working on subformula a -> b
 trying to create strategy directly for a -> b
 direct strategy might exist but was not found.
@@ -986,6 +1005,9 @@ diff outx exp
 # Here, !(F(a | b)) should be G!a & G!b
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula G!a
+considering subformula G!b
 working on subformula G!a
 trying to create strategy directly for G!a
 no strategy exists.
@@ -1019,6 +1041,9 @@ ltlsynt -f 'G(c) & (G(a) <-> GFb)' --outs=b,c --decompose=yes --oblig=false \
                                    --verbose --pol=no --realizability 2> out
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula Gc
+considering subformula Ga <-> GFb
 working on subformula Gc
 trying to create strategy directly for Gc
 direct strategy was found.
@@ -1033,6 +1058,9 @@ ltlsynt -f 'G(c) & (G(a) <-> GFb)' --outs=b,c --decompose=yes --oblig=true \
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula Gc
+considering subformula Ga <-> GFb
 working on subformula Gc
 formula is an obligation; solving with the on-the-fly construction
 solving done in X seconds
@@ -1046,6 +1074,9 @@ ltlsynt -f 'G(c) & (G(a) <-> GFb)' --outs=b,c --decompose=yes --pol=no \
         --obligation-synthesis=no --verbose --realizability --bypass=no 2> out
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula Gc
+considering subformula Ga <-> GFb
 working on subformula Gc
 translating formula done in X seconds
 automaton has 1 states and 0 colors
@@ -1072,6 +1103,9 @@ diff outx exp
 # ACD verbose
 cat >exp <<EOF
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula GFa <-> GFb
+considering subformula Gc
 working on subformula GFa <-> GFb
 translating formula done in X seconds
 automaton has 1 states and 2 colors
@@ -1265,6 +1299,27 @@ REALIZABLE
 EOF
 diff out expected
 
+# issue #651: polarity simplification turning non-obligations into
+# obligations after decomposition, causing lack of BDD preorder.
+tr -d '\n' >issue651.ltl <<EOF
+G(!((o1 & !(o0 | o2)) <-> (!o1 & !((!o0 & o2) <-> (o0 & !o2)))) & !((o3 &
+!o4) <-> (!o3 & o4)) & !((o5 & !o6) <-> (!o5 & o6)) & !((o7 & !o8) <->
+(!o7 & o8)) & !((o9 & !o10) <-> (!o9 & o10)) & !((o11 & !o12) <-> (!o11 &
+o12)) & !((o13 & !o14) <-> (!o13 & o14)) & !((o16 & !(o15 | o17)) <->
+(!o16 & !((!o15 & o17) <-> (o15 & !o17)))) & !((!((o19 & !o21) <->
+(!o19 & o21)) & !(o18 | o20)) <-> (!((!o18 & o20) <-> (o18 & !o20)) &
+!(o19 | o21))) & !((o23 & !(o22 | o24)) <-> (!o23 & !((o22 & !o24) <->
+(!o22 & o24)))) & !((!o25 & o26) <-> (o25 & !o26))) & (GFi1 -> (!o4 &
+!o6 & !o8 & o17 & G(Xo6 -> o18) & G(Xo8 -> o19) & G(Xo4 -> o20) & GFo17 &
+GFo16 & GFo4 & GFo10 & G((o16 -> (o5 & o7 & o9 & o11)) U o17) & G(o17
+-> (o6 R !o16)) & G(o17 -> (o8 R !o16)) & G(o17 -> (o10 R !(o6 | o8 |
+o16 | o18 | o19))) & G(o10 -> X(o16 R !o10)) & G(o12 <-> (i0 & o10))
+& G(i2 -> o22) & G(!i2 -> o23) & G(o1 <-> (i0 & Xo10)) & G(o1 | o2) &
+Go14 & G(o17 -> X(!o10 U i1)) & G(o17 -> (!o10 & o25)) & G(!i1 -> o25)
+& G(o25 -> (!i1 | o17))))
+EOF
+ltlsynt -F issue651.ltl --real
+
 ltlsynt --ins='/^in/,/env/' --outs='/^out/,/control/' \
   -f 'G(controlenv <-> input)' 2>err && :
 test $? -eq 2
@@ -1276,11 +1331,18 @@ ltlsynt --polarity=0 --global-e=0 -f 'G(i -> Xo) & G(!i -> F!o)' --real
 
 cat >exp <<EOF
 there are 2 subformulas
-working on subformula G(i1 -> (o1 | !o2)) & G(i2 -> X(!o1 | o2))
+attempting to simplify subformulas
+considering subformula G(i1 -> (o1 | !o2)) & G(i2 -> X(!o1 | o2))
 the following signals can be temporarily removed:
   i1 := 1
   i2 := 1
 new formula: G(o1 | !o2) & GX(!o1 | o2)
+considering subformula G(!i1 -> (o3 | !o4)) & G(!i2 -> X(!o3 | o4))
+the following signals can be temporarily removed:
+  i1 := 0
+  i2 := 0
+new formula: G(o3 | !o4) & GX(!o3 | o4)
+working on subformula G(o1 | !o2) & GX(!o1 | o2)
 trying to create strategy directly for G(o1 | !o2) & GX(!o1 | o2)
 direct strategy might exist but was not found.
 translating formula done in X seconds
@@ -1292,11 +1354,7 @@ automaton has 4 states
 solving game with acceptance: all
 game solved in X seconds
 simplification took X seconds
-working on subformula G(!i1 -> (o3 | !o4)) & G(!i2 -> X(!o3 | o4))
-the following signals can be temporarily removed:
-  i1 := 0
-  i2 := 0
-new formula: G(o3 | !o4) & GX(!o3 | o4)
+working on subformula G(o3 | !o4) & GX(!o3 | o4)
 trying to create strategy directly for G(o3 | !o4) & GX(!o3 | o4)
 direct strategy might exist but was not found.
 translating formula done in X seconds
@@ -1333,25 +1391,28 @@ the following signals can be temporarily removed:
   o5 := 1
 new formula: G(i1 -> (o1 | !o2)) & G(!i1 -> (o3 | !o4)) & $gg
 there are 2 subformulas
-working on subformula G(i1 -> (o1 | !o2)) & G(i2 -> (!o1 | o2))
+attempting to simplify subformulas
+considering subformula G(i1 -> (o1 | !o2)) & G(i2 -> (!o1 | o2))
 the following signals can be temporarily removed:
   i1 := 1
   i2 := 1
 new formula: G(o1 | !o2) & G(!o1 | o2)
   o2 := o1
 new formula: G(o1 | !o1)
-trying to create strategy directly for G(o1 | !o1)
-translating formula done in X seconds
-direct strategy was found.
-direct strategy has 1 states and 1 edges
-simplification took X seconds
-working on subformula G(!i1 -> (o3 | !o4)) & G(!i2 -> (!o3 | o4))
+considering subformula G(!i1 -> (o3 | !o4)) & G(!i2 -> (!o3 | o4))
 the following signals can be temporarily removed:
   i1 := 0
   i2 := 0
 new formula: G(o3 | !o4) & G(!o3 | o4)
   o4 := o3
 new formula: G(o3 | !o3)
+working on subformula G(o1 | !o1)
+trying to create strategy directly for G(o1 | !o1)
+translating formula done in X seconds
+direct strategy was found.
+direct strategy has 1 states and 1 edges
+simplification took X seconds
+working on subformula G(o3 | !o3)
 trying to create strategy directly for G(o3 | !o3)
 translating formula done in X seconds
 direct strategy was found.
@@ -1384,6 +1445,9 @@ the following signals can be temporarily removed:
   o5 := 1
 new formula: G(i1->(o1 | !o2)) & G(!i1->(o3 | !o4)) & $gg
 there are 2 subformulas
+attempting to simplify subformulas
+considering subformula G(i1->(o1 | !o2)) & G(i2->(!o1 | o2))
+considering subformula G(!i1->(o3 | !o4)) & G(!i2->(!o3 | o4))
 working on subformula G(i1->(o1 | !o2)) & G(i2->(!o1 | o2))
 trying to create strategy directly for G(i1->(o1 | !o2)) & G(i2->(!o1 | o2))
 translating formula done in X seconds
