@@ -572,7 +572,7 @@ namespace spot
       operator()(quantify_state s) const noexcept
       {
         std::size_t seed = 0;
-        for (int x : s)
+        for (unsigned x : s)
           seed ^= wang32_hash(x) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         return seed;
       }
@@ -629,8 +629,7 @@ namespace spot
       void add_state_to_set(quantify_state& s, unsigned v) const
       {
         int term_id = bdd_get_terminal(v);
-        unsigned real_v = 0;
-        real_v = term_id / 2;
+        unsigned real_v = term_id / 2;
 
         if (real_v < state_offset)
           {
@@ -1276,6 +1275,14 @@ namespace spot
           applyop_shortcut = bddop_and_zero;
         }
 
+      // Reset the data structures used by the leaf-combining functions
+      // below, in case a previous call did not terminate cleanly (e.g.
+      // because an exception was thrown).
+      the_quantify_data.set_to_terminal_map.clear();
+      the_quantify_data.terminal_to_set_map.clear();
+      while (!the_quantify_data.todo.empty())
+        the_quantify_data.todo.pop();
+
       // Create a new MTBDD to hold the result of the quantification.
       bdd_dict_ptr dict = dfa->get_dict();
       mtdfa_ptr res = std::make_shared<mtdfa>(dict);
@@ -1434,8 +1441,7 @@ namespace spot
     return res;
   }
 
-  mtdfa_ptr quantification(const mtdfa_ptr& dfa, bool is_existential,
-                           formula var)
+  mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa, formula var, bool trim)
   {
     auto& var_map = dfa->get_dict()->var_map;
     auto it = var_map.find(var);
@@ -1446,11 +1452,27 @@ namespace spot
     int ivar = it->second;
     bddExtCache cache;
     bdd_extcache_init(&cache, 0, true);
-    while (!the_quantify_data.todo.empty())
-      the_quantify_data.todo.pop();
-    mtdfa_ptr res = trim(quantification_aux(dfa,
-                                            is_existential ? op::Or : op::And,
-                                            ivar, &cache, 0, 1));
+    mtdfa_ptr res = quantification_aux(dfa, op::Or, ivar, &cache, 0, 1);
+    if (trim)
+      res = spot::trim(res);
+    bdd_extcache_done(&cache);
+    return res;
+  }
+
+  mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa, formula var, bool trim)
+  {
+    auto& var_map = dfa->get_dict()->var_map;
+    auto it = var_map.find(var);
+
+    if (it == var_map.end())
+      return dfa;
+
+    int ivar = it->second;
+    bddExtCache cache;
+    bdd_extcache_init(&cache, 0, true);
+    mtdfa_ptr res = quantification_aux(dfa, op::And, ivar, &cache, 0, 1);
+    if (trim)
+      res = spot::trim(res);
     bdd_extcache_done(&cache);
     return res;
   }

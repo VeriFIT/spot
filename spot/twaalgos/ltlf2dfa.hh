@@ -495,9 +495,22 @@ namespace spot
   SPOT_API mtdfa_ptr trim(const mtdfa_ptr& dfa);
 
   /// \ingroup mtdfa
-  /// \brief Perform quantification on an MTDFA.
-  SPOT_API mtdfa_ptr quantification(const mtdfa_ptr& dfa, bool is_existential,
-                                    formula var);
+  /// \brief Existentially quantify an atomic proposition in an MTDFA.
+  ///
+  /// Atomic propositions that are not registered in the automaton are
+  /// silently ignored, and the automaton is returned unchanged.  If
+  /// \a trim is set, the result is trimmed before being returned.
+  SPOT_API mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa, formula var,
+                                     bool trim = true);
+
+  /// \ingroup mtdfa
+  /// \brief Universally quantify an atomic proposition in an MTDFA.
+  ///
+  /// Atomic propositions that are not registered in the automaton are
+  /// silently ignored, and the automaton is returned unchanged.  If
+  /// \a trim is set, the result is trimmed before being returned.
+  SPOT_API mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa, formula var,
+                                     bool trim = true);
 
   /// \ingroup mtdfa
   /// \brief Convert a TWA (representing a DFA) into an MTDFA.

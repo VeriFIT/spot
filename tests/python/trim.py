@@ -24,24 +24,21 @@ tc = TestCase()
 gen = spot.randltl(4, output='ltl', ltl_priorities='strongX=1', tree_size=30)
 for i in range(200):
    f = next(gen)
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
    a1b = spot.trim(a1)
-   tc.assertTrue(spot.product_xor(a1, a1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1, a1b).is_empty(), f)
 
 gen = spot.randltl(4, output='ltl', tree_size=15)
 for i in range(100):
    f = spot.formula_And([next(gen), spot.formula_Not(next(gen)),
                          next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
    a1b = spot.trim(a1)
-   tc.assertTrue(spot.product_xor(a1b, a1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1, a1b).is_empty(), f)
 
 for i in range(100):
    f = spot.formula_Or([next(gen), spot.formula_Not(next(gen)),
                         next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
    a1b = spot.trim(a1)
-   tc.assertTrue(spot.product_xor(a1b, a1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1, a1b).is_empty(), f)

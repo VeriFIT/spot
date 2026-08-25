@@ -24,63 +24,57 @@ tc = TestCase()
 gen = spot.randltl(4, output='ltl', ltl_priorities='strongX=1', tree_size=30)
 for i in range(200):
    f = next(gen)
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
-   a1b = spot.quantification(a1, True, "p0")
+   a1b = spot.quantify_exists(a1, "p0")
    b1 = spot.formula("\\exists p0: " + str(f))
    b1b = spot.ltlf_to_mtdfa(b1)
-   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty(), f)
 
 gen = spot.randltl(4, output='ltl', tree_size=15)
 for i in range(100):
    f = spot.formula_And([next(gen), spot.formula_Not(next(gen)),
                          next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
-   a1b = spot.quantification(a1, True, "p0")
+   a1b = spot.quantify_exists(a1, "p0")
    b1 = spot.formula("\\exists p0: " + str(f))
    b1b = spot.ltlf_to_mtdfa(b1)
-   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty(), f)
 
 for i in range(100):
    f = spot.formula_Or([next(gen), spot.formula_Not(next(gen)),
                         next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
-   a1b = spot.quantification(a1, True, "p0")
+   a1b = spot.quantify_exists(a1, "p0")
    b1 = spot.formula("\\exists p0: " + str(f))
    b1b = spot.ltlf_to_mtdfa(b1)
-   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty(), f)
 
 ##########################################################
 
 gen = spot.randltl(4, output='ltl', tree_size=30)
 for i in range(200):
    f = next(gen)
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
-   a1b = spot.quantification(a1, False, "p0")
+   a1b = spot.quantify_forall(a1, "p0")
    b1 = spot.formula("\\forall p0: " + str(f))
    b1b = spot.ltlf_to_mtdfa(b1)
-   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty(), f)
 
 gen = spot.randltl(4, output='ltl', tree_size=15)
 for i in range(100):
    f = spot.formula_And([next(gen), spot.formula_Not(next(gen)),
                          next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
-   a1b = spot.quantification(a1, False, "p0")
+   a1b = spot.quantify_forall(a1, "p0")
    b1 = spot.formula("\\forall p0: " + str(f))
    b1b = spot.ltlf_to_mtdfa(b1)
-   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty(), f)
 
 for i in range(100):
    f = spot.formula_Or([next(gen), spot.formula_Not(next(gen)),
                         next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
-   a1b = spot.quantification(a1, False, "p0")
+   a1b = spot.quantify_forall(a1, "p0")
    b1 = spot.formula("\\forall p0: " + str(f))
    b1b = spot.ltlf_to_mtdfa(b1)
-   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, b1b).is_empty(), f)
