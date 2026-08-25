@@ -429,10 +429,14 @@ namespace spot
     {
       mark_t mark; ///< A set of acceptance marks.
       struct {
-        acc_op op:8;    // Operator (6 possible values, stored in 8 bits)
-        unsigned size:24; // Size of the subtree (number of acc_word),
-                          // not counting this word.
-                          // See also max_acc_formula_size_.
+        /// \brief Operator (6 possible values, stored in 8 bits)
+        acc_op op:8;
+        /// \brief Size of the subtree
+        ///
+        /// The size is the number of acc_word that represent the
+        /// subtree, not counting this word.  See also
+        /// max_acc_formula_size_.
+        unsigned size:24;
       } sub; ///< An operator node with its subtree size.
     };
 
@@ -1386,7 +1390,7 @@ namespace spot
       trival maybe_accepting(mark_t infinitely_often,
                              mark_t always_present) const;
 
-      /// \brief Check if cycles in a SCC are all accepting, all rejecting, or 
+      /// \brief Check if cycles in a SCC are all accepting, all rejecting, or
       /// mixed.
       ///
       /// Assuming that an SCC intersects all sets in \a
@@ -2086,7 +2090,7 @@ namespace spot
       return code_.maybe_accepting(infinitely_often, always_present);
     }
 
-    /// \brief Check if cycles in a SCC are all accepting, all rejecting, or 
+    /// \brief Check if cycles in a SCC are all accepting, all rejecting, or
     /// mixed.
     ///
     /// Assuming that an SCC intersects all sets in \a
