@@ -155,9 +155,9 @@ namespace swig
   for (int i = 0; i < $2; ++i)
     {
       PyObject* o = PySequence_GetItem($input, i);
-      if (PyInt_Check(o))
+      if (PyLong_Check(o))
         {
-          $1[i] = PyInt_AsLong(o);
+          $1[i] = PyLong_AsLong(o);
 	}
       else
         {
