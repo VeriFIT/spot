@@ -495,22 +495,42 @@ namespace spot
   SPOT_API mtdfa_ptr trim(const mtdfa_ptr& dfa);
 
   /// \ingroup mtdfa
-  /// \brief Existentially quantify an atomic proposition in an MTDFA.
+  /// \brief Existentially quantify variables in an MTDFA.
   ///
-  /// Atomic propositions that are not registered in the automaton are
-  /// silently ignored, and the automaton is returned unchanged.  If
-  /// \a trim is set, the result is trimmed before being returned.
-  SPOT_API mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa, formula var,
+  /// The second argument can be a positive cube of BDD variables,
+  /// a single atomic proposition, or a vector of atomic propositions
+  /// to remove from the automaton.  Atomic propositions that are not
+  /// registered in the automaton are silently ignored; if all of them
+  /// are ignored, the automaton is returned unchanged.  If \a trim is
+  /// set, the result is trimmed before being returned.
+  /// @{
+  SPOT_API mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa, bdd vars,
                                      bool trim = true);
+  SPOT_API mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa,
+                                     const formula& ap, bool trim = true);
+  SPOT_API mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa,
+                                     const std::vector<formula>& aps,
+                                     bool trim = true);
+  /// @}
 
   /// \ingroup mtdfa
-  /// \brief Universally quantify an atomic proposition in an MTDFA.
+  /// \brief Universally quantify variables in an MTDFA.
   ///
-  /// Atomic propositions that are not registered in the automaton are
-  /// silently ignored, and the automaton is returned unchanged.  If
-  /// \a trim is set, the result is trimmed before being returned.
-  SPOT_API mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa, formula var,
+  /// The second argument can be a positive cube of BDD variables,
+  /// a single atomic proposition, or a vector of atomic propositions
+  /// to remove from the automaton.  Atomic propositions that are not
+  /// registered in the automaton are silently ignored; if all of them
+  /// are ignored, the automaton is returned unchanged.  If \a trim is
+  /// set, the result is trimmed before being returned.
+  /// @{
+  SPOT_API mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa, bdd vars,
                                      bool trim = true);
+  SPOT_API mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa,
+                                     const formula& ap, bool trim = true);
+  SPOT_API mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa,
+                                     const std::vector<formula>& aps,
+                                     bool trim = true);
+  /// @}
 
   /// \ingroup mtdfa
   /// \brief Convert a TWA (representing a DFA) into an MTDFA.

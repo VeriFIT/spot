@@ -42,6 +42,16 @@ constexpr int hash_key_rename = 7;
 constexpr int hash_key_propeq = 8;
 constexpr int hash_key_finalstrat = 9;
 constexpr int hash_key_quantify = 10;
+// Hash keys used by the MTBDD quantification (quantify_exists /
+// quantify_forall).  All the passes below share a single external cache,
+// so these keys must be distinct from each other and from the hash_key_*
+// constants above: the quant and apply1 passes do not store arg2 in the
+// cache, while the apply2 pass does, and the apply2 hit test reads arg2
+// whenever arg1 and op match.
+constexpr int hash_key_quant = 11;
+constexpr int hash_key_combine = 12;
+constexpr int hash_key_combine1 = 13;
+constexpr int hash_key_unshift = 14;
 
 
 namespace spot
@@ -4219,7 +4229,7 @@ namespace spot
                              int (*combine)(int, int, int, int),
                              int (*combine1)(int, int),
                              bddExtCache* cache, int hash_key,
-                             int applyop_shortcut)
+                             int hash_key1, int applyop_shortcut)
     {
       // If empty vector, return the neutral element of the operator.
       if (SPOT_UNLIKELY(bdds.empty()))
@@ -4235,8 +4245,10 @@ namespace spot
             }
         }
       // If only one element in the vector, apply combine1 to it.
+      // hash_key1 (unary) must differ from hash_key (binary): both
+      // passes share the same cache.
       if (bdds.size() == 1)
-        return bdd_mt_apply1_leaves(bdds[0], combine1, cache, hash_key);
+        return bdd_mt_apply1_leaves(bdds[0], combine1, cache, hash_key1);
       // Otherwise, combine elements left to right.
       bdd res = bdds[0];
       for (size_t i = 1; i < bdds.size(); ++i)
@@ -4250,7 +4262,7 @@ namespace spot
     // \a vars is a positive cube (conjunction) of BDD variables to remove.
     static mtdswa_ptr
     quantify_mtdswa_aux(const mtdswa_ptr& swa, bdd vars, op o,
-                        bddExtCache* cache, int quant_hash, int apply_hash)
+                        bddExtCache* cache)
     {
       // Prepare the function to combine two leaves of the product automaton.
       int (*combine)(int, int, int, int);
@@ -4321,14 +4333,17 @@ namespace spot
           }
           // Combine all states in the quantify_state with the operator.
           bdd b = applyn_leaves(bdds, o, combine, quant_leaf_combine1, cache,
-                                 apply_hash, applyop_shortcut);
+                                 hash_key_combine, hash_key_combine1,
+                                 applyop_shortcut);
 
           // 2 - Quantify the given variables in the resulting BDD.
           bdd qb = bdd_mt_quantify(b, [](int v){ return v; }, combine, cache,
-                                   quant_hash, apply_hash, applyop_shortcut);
+                                   hash_key_quant, hash_key_combine,
+                                   applyop_shortcut);
           // Unshift the terminal values of the resulting BDD to match
           // the new state ids.
-          qb = bdd_mt_apply1_leaves(qb, unshift_terminals, cache, apply_hash);
+          qb = bdd_mt_apply1_leaves(qb, unshift_terminals, cache,
+                                    hash_key_unshift);
 
           res->states.push_back(qb);
 
@@ -4378,7 +4393,7 @@ namespace spot
       return swa;
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
-    mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::Or, &cache, 0, 1);
+    mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::Or, &cache);
     if (trim)
       trim_mtdswa(res);
     bdd_extcache_done(&cache);
@@ -4391,7 +4406,7 @@ namespace spot
       return swa;
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
-    mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::And, &cache, 0, 1);
+    mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::And, &cache);
     if (trim)
       trim_mtdswa(res);
     bdd_extcache_done(&cache);

@@ -49,6 +49,16 @@ constexpr int hash_key_strat = 8;
 constexpr int hash_key_strat_bool = 9;
 constexpr int hash_key_finalstrat = 10;
 constexpr int hash_key_quantify = 11;
+// Hash keys used by the MTBDD quantification (quantify_exists /
+// quantify_forall).  All the passes below share a single external cache,
+// so these keys must be distinct from each other and from the hash_key_*
+// constants above: the quant and apply1 passes do not store arg2 in the
+// cache, while the apply2 pass does, and the apply2 hit test reads arg2
+// whenever arg1 and op match.
+constexpr int hash_key_quant = 12;
+constexpr int hash_key_combine = 13;
+constexpr int hash_key_combine1 = 14;
+constexpr int hash_key_unshift = 15;
 
 namespace spot
 {
@@ -132,6 +142,16 @@ namespace spot
       if (prod < (1 << 14))
         return 1<<14;
       return prod;
+    }
+
+    static int size_estimate_quantify(const mtdfa_ptr& aut)
+    {
+      // quantification_aux first combines a set of state BDDs with
+      // bdd_mt_apply2_leaves().  The cache therefore needs to accommodate
+      // this phase, so we use the product-style estimate.
+      return size_estimate_product(aut->num_roots(),
+                                   aut->num_roots(),
+                                   aut->aps.size());
     }
   }
 
@@ -628,16 +648,17 @@ namespace spot
 
       void add_state_to_set(quantify_state& s, unsigned v) const
       {
-        int term_id = bdd_get_terminal(v);
-        unsigned real_v = term_id / 2;
+        // v is a terminal value of the form 2*idx+acc, where acc is
+        // the accepting bit: strip it to recover the state index.
+        unsigned idx = v / 2;
 
-        if (real_v < state_offset)
+        if (idx < state_offset)
           {
-            s.insert(real_v);
+            s.insert(idx);
           }
         else
           {
-            unsigned idx = real_v - state_offset;
+            idx -= state_offset;
 
             if (idx < terminal_to_set_map.size())
               {
@@ -652,9 +673,9 @@ namespace spot
     // Combine two leaves of a BDD using the AND operation, taking into account
     // the terminal states of the left and right leaves.  The function returns a
     // new terminal state that represents the result of the AND operation on the
-    // two leaves.  If either leaf is a terminal state, the function will use 
+    // two leaves.  If either leaf is a terminal state, the function will use
     // the corresponding terminal state to determine the result.  If both leaves
-    // are non-terminal states, the function will create a new terminal state 
+    // are non-terminal states, the function will create a new terminal state
     // that represents the combination of the two leaves.
     static int quantify_leaf_combine_and(int left, int left_term,
                                 int right, int right_term)
@@ -669,17 +690,13 @@ namespace spot
 
       if (left != 1 && left != 0)
         {
-          int term_id = bdd_is_terminal(left) ?
-                        bdd_get_terminal(left) : left_term;
-          acc_l = term_id & 1;
-          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+          acc_l = left_term & 1;
+          the_quantify_data.add_state_to_set(s, left_term);
         }
       if (right != 1 && right != 0)
         {
-          int term_id = bdd_is_terminal(right) ?
-                        bdd_get_terminal(right) : right_term;
-          acc_r = term_id & 1;
-          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+          acc_r = right_term & 1;
+          the_quantify_data.add_state_to_set(s, right_term);
         }
       if (s.empty())
         return 1;
@@ -689,12 +706,12 @@ namespace spot
     // Combine two leaves of a BDD using the OR operation, taking into account
     // the terminal states of the left and right leaves.  The function returns a
     // new terminal state that represents the result of the OR operation on the
-    // two leaves.  If either leaf is a terminal state, the function will use 
+    // two leaves.  If either leaf is a terminal state, the function will use
     // the corresponding terminal state to determine the result.  If both leaves
     // are non-terminal states, the function will create a new terminal state
     // that represents the combination of the two leaves.
     static int quantify_leaf_combine_or(int left, int left_term,
-                               int right, int right_term)
+                                        int right, int right_term)
     {
       if (SPOT_UNLIKELY(left == 1 || right == 1))
         return 1;
@@ -707,78 +724,46 @@ namespace spot
 
       if (left != 0 && left != 1)
         {
-          int term_id = bdd_is_terminal(left) ?
-                        bdd_get_terminal(left) : left_term;
-          acc_l = term_id & 1;
-          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+          acc_l = left_term & 1;
+          the_quantify_data.add_state_to_set(s, left_term);
         }
       if (right != 0 && right != 1)
         {
-          int term_id = bdd_is_terminal(right) ?
-                        bdd_get_terminal(right) : right_term;
-          acc_r = term_id & 1;
-          the_quantify_data.add_state_to_set(s, bdd_terminal_as_int(term_id));
+          acc_r = right_term & 1;
+          the_quantify_data.add_state_to_set(s, right_term);
         }
       if (s.empty())
         return 0;
       return the_quantify_data.set_to_terminal(s, acc_l | acc_r);
     }
 
-    // Combine a leaf of a BDD with a terminal state, taking into account
-    // the terminal state of the leaf.  The function returns a new terminal
-    // state that represents the result of the combination.  If the leaf is a
-    // terminal state, the function will use the corresponding terminal state
-    // to determine the result.  If the leaf is a non-terminal state, the 
-    // function will create a new terminal state that represents the 
-    // combination.
+    // Unary combination, this just turns a single state into a
+    // singleton set.
     static int quant_leaf_combine1(int bdd, int term)
     {
       if (SPOT_UNLIKELY(bdd == 0))
         return 0;
       if (SPOT_UNLIKELY(bdd == 1))
         return 1;
-      unsigned v = 0;
-      bool accepting = false;
-
-      if (bdd_is_terminal(bdd))
-        {
-          int term_id = bdd_get_terminal(bdd);
-          v = term_id / 2;
-          accepting = term_id & 1;
-        }
-      else
-        {
-          v = term / 2;
-          accepting = term & 1;
-        }
+      unsigned v = term / 2;
+      bool accepting = term & 1;
 
       return the_quantify_data.set_to_terminal({v}, accepting);
     }
 
     // Unshift the terminals of a BDD, replacing each terminal with its
-    // corresponding state index and accepting status.  The function returns a 
-    // new terminal state that represents the result of the unshifting.  If the
-    // BDD is a terminal state, the function will use the corresponding terminal
-    // state to determine the result.  If the BDD is a non-terminal state, the 
-    // function will create a new terminal state that represents the unshifting.
+    // corresponding state index and accepting status.  The function returns a
+    // new terminal state that represents the result of the unshifting.  The
+    // callback is only invoked on constant (0/1) or terminal leaves, and in
+    // the latter case the second argument holds the terminal value.
     static int unshift_terminals(int bdd, int term)
     {
       if (SPOT_UNLIKELY(bdd == 0))
         return 0;
       if (SPOT_UNLIKELY(bdd == 1))
         return 1;
-      int term_id = 0;
-      if (bdd_is_terminal(bdd))
-        {
-          term_id = bdd_get_terminal(bdd);
-        }
-      else
-        {
-          term_id = term;
-        }
-
-      unsigned v = term_id / 2;
-      bool accepting = term_id & 1;
+      unsigned v = term / 2;
+      bool accepting = term & 1;
 
       unsigned final_state_idx = 0;
       if (v < the_quantify_data.state_offset)
@@ -797,12 +782,12 @@ namespace spot
     // until only one BDD remains. The function takes a queue of BDDs, an
     // operation type, and function pointers for combining the leaves of the
     // BDDs. It also takes a cache and a hash key for caching intermediate
-    // results. The function returns the final combined BDD.  
+    // results. The function returns the final combined BDD.
     static bdd applyn_leaves(std::queue<bdd>& q, op o,
                             int (*combine)(int, int, int, int),
                             int (*combine1)(int, int),
                             bddExtCache* cache, int hash_key,
-                            int applyop_shortcut)
+                            int hash_key1, int applyop_shortcut)
     {
       if (SPOT_UNLIKELY(q.empty()))
         {
@@ -820,7 +805,9 @@ namespace spot
         {
           bdd s = q.front();
           q.pop();
-          return bdd_mt_apply1_leaves(s, combine1, cache, hash_key);
+          // hash_key1 (unary) must differ from hash_key (binary): both
+          // passes share the same cache.
+          return bdd_mt_apply1_leaves(s, combine1, cache, hash_key1);
         }
       while (q.size() > 1)
         {
@@ -955,314 +942,323 @@ namespace spot
       return res;
     }
 
+    // The nature of a state, stored on four bits:
+    //   occur_accept: state is a destination of an accepting transition
+    //   occur_reject: state is a destination of a rejecting transition
+    //   reach_accept: from state, following outgoing edges, can reach
+    //                 acceptance
+    //   reach_reject: from state, following outgoing edges, can reach
+    //                 rejection
+    enum : char
+    {
+      occur_accept = 0b0001,
+      occur_reject = 0b0010,
+      reach_accept = 0b0100,
+      reach_reject = 0b1000,
+    };
+
+    // Renaming of the terminals of the original automaton, used by
+    // trim_renumber_callback().
+    static std::vector<int>* the_trim_rename;
+
+    static int
+    trim_renumber_callback(int root, int term)
+    {
+      // Constants bddtrue and bddfalse are left unchanged.
+      if (root <= 1)
+        return root;
+      const std::vector<int>& rename = *the_trim_rename;
+      // Defensive: leave out-of-range terminals unchanged.
+      if ((unsigned) term >= rename.size())
+        return root;
+      int newterm = rename[term];
+      // The terminal is kept as is.
+      if (newterm == term)
+        return root;
+      if (newterm == -1)        // replaced by bddfalse
+        return 0;
+      if (newterm == -2)        // replaced by bddtrue
+        return 1;
+      // Renumbered terminal.
+      return bdd_terminal_as_int(newterm);
+    }
+
     static mtdfa_ptr
     trim_aux(const mtdfa_ptr& dfa, bddExtCache* cache, int hash_key)
     {
-      (void) cache;
-      (void) hash_key;
       unsigned n = dfa->states.size();
       unsigned ns = dfa->names.size();
 
       // Handle the edge case of an empty automaton.
       if (n == 0)
         {
-          bdd_dict_ptr dict_empty = dfa->get_dict();
-          mtdfa_ptr empty_res = std::make_shared<mtdfa>(dict_empty);
-          dict_empty->register_all_propositions_of(dfa, empty_res);
-          return empty_res;
+          bdd_dict_ptr dict = dfa->get_dict();
+          mtdfa_ptr res = std::make_shared<mtdfa>(dict);
+          dict->register_all_propositions_of(dfa, res);
+          return res;
         }
 
-      std::vector<char> reachable(n, 0);
-      // is_pure_false and is_pure_true are assumed pure until proven otherwise
-      std::vector<bool> is_pure_false(n, true);
-      std::vector<bool> is_pure_true(n, true);
+      // Nature of each state, stored on four bits:
+      //
+      //   occur_accept: state is a destination of an accepting
+      //                 transition (set by scanning BDD leaves of
+      //                 states that mention it as a target)
+      //   occur_reject: state is a destination of a rejecting
+      //                 transition
+      //   reach_accept: from state, following outgoing edges, can
+      //                 reach acceptance
+      //   reach_reject: from state, following outgoing edges, can
+      //                 reach rejection
+      //
+      // A state's full nature is  occur | reach.  From the four
+      // bits we derive:
+      //   has_accept = nature & (occur_accept | reach_accept)
+      //   has_reject = nature & (occur_reject | reach_reject)
 
-      std::vector<std::vector<unsigned>> preds(n); // Reversed graph for
-                                                   // backward propagation
-      std::queue<unsigned> q_reach;
-      std::queue<unsigned> q_not_false;
-      std::queue<unsigned> q_not_true;
+      // Per-state occurrence bits, accumulated during leaf scanning.
+      std::vector<char> occur(n, 0);
 
-      reachable[0] = 1;
-      q_reach.push(0);
+      // Depth-first traversal of the state graph, enumerating its SCCs
+      // with a live stack and a stack of candidate SCC roots.
+      std::vector<int> scc_of(n, -1);      // SCC number of each state
+      std::vector<int> index_of(n, -1);    // discovery index of each state
+      std::vector<char> on_stack(n, 0);    // is the state in LIVE?
+      std::vector<unsigned> live;          // states not yet in an SCC
+      std::vector<int> roots;              // candidate SCC roots (indices)
+      std::vector<char> root_direct_reach; // bddtrue/bddfalse flags
+      std::vector<std::vector<int>> root_succs; // successor SCCs
 
-      // Reachability + preds construction + initial impurity detection
-      while (!q_reach.empty())
+      // Per-SCC data, populated during backtracking.
+      std::vector<char> scc_direct_reach;
+      std::vector<std::vector<int>> scc_successors;
+
+      // The DFS is iterative, to avoid stack overflows on deep
+      // automata.  Each frame records the state being visited, the
+      // leaves of its transition BDD, and the next leaf to process.
+      struct dfs_frame
+      {
+        unsigned state;
+        std::vector<bdd> leaves;
+        unsigned next;
+      };
+      std::vector<dfs_frame> dfs_stack;
+      unsigned next_index = 0;
+
+      auto discover = [&](unsigned s)
         {
-          unsigned u = q_reach.front();
-          q_reach.pop();
+          index_of[s] = next_index++;
+          on_stack[s] = 1;
+          live.push_back(s);
+          roots.push_back(index_of[s]);
+          root_direct_reach.push_back(0);
+          root_succs.push_back({});
+          dfs_stack.push_back({s, leaves_of(dfa->states[s]), 0});
+        };
+      discover(0);
 
-          bdd b = dfa->states[u];
+      while (!dfs_stack.empty())
+        {
+          dfs_frame& f = dfs_stack.back();
+          unsigned u = f.state;
 
-          for (bdd leaf : leaves_of(b))
+          if (f.next == f.leaves.size())
             {
-              // A bbdtrue leaf breaks "pure falsity"
-              if (leaf == bddtrue)
+              // Backtracking from u.  If u is the root of a maximal
+              // SCC, enumerate that SCC.
+              if (index_of[u] == roots.back())
                 {
-                  if (is_pure_false[u])
+                  roots.pop_back();
+                  char dr = root_direct_reach.back();
+                  root_direct_reach.pop_back();
+                  auto succ_list = std::move(root_succs.back());
+                  root_succs.pop_back();
+                  unsigned sc = scc_direct_reach.size();
+                  scc_direct_reach.push_back(dr);
+                  scc_successors.push_back(std::move(succ_list));
+                  // The SCC we just numbered is a successor of the
+                  // SCC that contains the state which discovered it.
+                  if (!roots.empty())
+                    root_succs.back().push_back(sc);
+                  while (true)
                     {
-                      is_pure_false[u] = false;
-                      q_not_false.push(u);
-                    }
-                  continue;
-                }
-              // A bddfalse leaf breaks "pure truth"
-              if (leaf == bddfalse)
-                {
-                  if (is_pure_true[u])
-                    {
-                      is_pure_true[u] = false;
-                      q_not_true.push(u);
-                    }
-                  continue;
-                }
-
-              int term = bdd_get_terminal(leaf);
-              int dst = term / 2;
-              int acc = term & 1;
-
-              if (dst >= 0 && (unsigned)dst < n)
-                {
-                  // Construction of the reversed graph
-                  preds[dst].push_back(u);
-
-                  // Reacbability propagation
-                  if (!reachable[dst])
-                    {
-                      reachable[dst] = 1;
-                      q_reach.push(dst);
-                    }
-
-                  // Immediate identification of inherent impurity
-                  if (acc == 1 && is_pure_false[u])
-                    {
-                      is_pure_false[u] = false;
-                      q_not_false.push(u);
-                    }
-                  if (acc == 0 && is_pure_true[u])
-                    {
-                      is_pure_true[u] = false;
-                      q_not_true.push(u);
+                      unsigned w = live.back();
+                      live.pop_back();
+                      on_stack[w] = 0;
+                      scc_of[w] = sc;
+                      if (w == u)
+                        break;
                     }
                 }
+              dfs_stack.pop_back();
+              continue;
             }
-        }
 
-      // Backward propagation using a worklist.  If a state is not pure_false,
-      // all its parents lose their pure_false status.
-      while (!q_not_false.empty())
-        {
-          unsigned u = q_not_false.front();
-          q_not_false.pop();
-
-          for (unsigned p : preds[u])
+          bdd leaf = f.leaves[f.next++];
+          if (leaf == bddtrue)
             {
-              if (is_pure_false[p]) // This guard prevents infinite loops in
-                                    // cycles.
-                {
-                  is_pure_false[p] = false;
-                  q_not_false.push(p);
-                }
+              // S can reach the accepting sink: this SCC can reach
+              // acceptance.
+              root_direct_reach.back() |= reach_accept;
+              continue;
             }
-        }
-
-      // If a state is not pure_true, all its parents lose their pure_true
-      // status.
-      while (!q_not_true.empty())
-        {
-          unsigned u = q_not_true.front();
-          q_not_true.pop();
-
-          for (unsigned p : preds[u])
+          if (leaf == bddfalse)
             {
-              if (is_pure_true[p]) // This guard prevents infinite loops in
-                                   // cycles.
-                {
-                  is_pure_true[p] = false;
-                  q_not_true.push(p);
-                }
+              // S can reach the rejecting sink: this SCC can reach
+              // rejection.
+              root_direct_reach.back() |= reach_reject;
+              continue;
             }
-        }
+          int term = bdd_get_terminal(leaf);
+          unsigned v = term / 2;
+          assert(v < n);
+          // Set occurrence bits on the TARGET state v.
+          if (term & 1)
+            occur[v] |= occur_accept;
+          else
+            occur[v] |= occur_reject;
+          // The current state has an outgoing transition with this
+          // mark, so it can reach the corresponding outcome.
+          if (term & 1)
+            root_direct_reach.back() |= reach_accept;
+          else
+            root_direct_reach.back() |= reach_reject;
 
-      // Mark unreachable, pure_false, and pure_true states for removal.
-      std::vector<char> remove_state(n, 0);
-      for (unsigned i = 1; i < n; ++i)
-        {
-          if (!reachable[i] || is_pure_false[i] || is_pure_true[i])
-            remove_state[i] = 1;
-        }
-
-      // Build a mapping table from the old state indices to the newly shifted
-      // indices.
-      std::unordered_map<int, int> old_to_new;
-      std::vector<unsigned> new_list;
-      new_list.reserve(n);
-
-      old_to_new[0] = 0;
-      new_list.push_back(0);
-
-      for (unsigned i = 1; i < n; ++i)
-        {
-          if (reachable[i] && !remove_state[i])
+          if (index_of[v] < 0)
             {
-              old_to_new[i] = new_list.size();
-              new_list.push_back(i);
+              // Newly discovered state.
+              discover(v);
             }
-        }
-
-      // Determine if auxiliary sink states (garbage or universal) are required.
-      // - 'used_garbage' is needed if an accepting transition points to a dead
-      // state.
-      // - 'used_univ' is needed if a non-accepting transition points to a
-      // universally true state.
-      bool used_garbage = false;
-      bool used_univ = false;
-      for (unsigned i : new_list)
-        {
-          if (dfa->states[i] == bddfalse || dfa->states[i] == bddtrue)
-            continue;
-          for (bdd leaf : leaves_of(dfa->states[i]))
+          else if (on_stack[v])
             {
-              if (leaf == bddfalse || leaf == bddtrue)
-                continue;
-              int term = bdd_get_terminal(leaf);
-              int dst = term / 2;
-              int acc = term & 1;
-
-              if (dst < 0 || (unsigned)dst >= n)
-                continue;
-
-              if (acc == 1 && is_pure_false[dst])
-                used_garbage = true;
-              else if (acc == 0 && is_pure_true[dst])
-                used_univ = true;
-            }
-        }
-
-      unsigned garbage_state_idx = new_list.size();
-      unsigned univ_state_idx = new_list.size() + (used_garbage ? 1 : 0);
-
-      std::unordered_map<int, bdd> rewritten;
-      std::vector<bdd> final_transitions(n, bdd(bddfalse));
-      std::function<bdd(bdd)> rewrite_bdd;
-
-      // Deep Structural Rewrite of Transition BDDs
-      rewrite_bdd = [&](bdd node) -> bdd {
-          if (node == bddfalse || node == bddtrue)
-            return node;
-
-          int id = node.id();
-          if (auto it = rewritten.find(id); it != rewritten.end())
-            return it->second;
-
-          bdd out = bdd(bddfalse);
-
-          if (bdd_is_terminal(node))
-            {
-              int term = bdd_get_terminal(node);
-              int dst = term / 2;
-              int acc = term & 1;
-
-              if (dst < 0 || (unsigned) dst >= n || is_pure_false[dst])
+              // The edge to v closes a cycle: all candidate SCC roots
+              // above the index of v merge into the SCC containing v.
+              while (roots.back() > index_of[v])
                 {
-                  // If an accepting arc leads to a dead/removed state, redirect
-                  // it to the accepting garbage trap to preserve the language.
-                  if (acc)
-                    out = bdd_terminal(2 * garbage_state_idx + 1);
-                  else
-                    out = bddfalse; // Safely reduce to pure bddfalse.
-                }
-              else if (is_pure_true[dst])
-                {
-                  // If routing to a pure_true state, collapse to bddtrue if
-                  // accepting.  Otherwise, route to the univeral sink to delay
-                  // acceptance by one step.
-                  if (acc == 1)
-                    out = bddtrue;
-                  else
-                    out = bdd_terminal(2 * univ_state_idx + 0);
-                }
-              else
-                {
-                  // Normal case: remap the transition to the shifted state
-                  // index.
-                  auto it = old_to_new.find(dst);
-                  if (it != old_to_new.end())
-                    out = bdd_terminal(2 * it->second + acc);
-                  else
-                    out = bddfalse;
+                  roots.pop_back();
+                  char extra_dr = root_direct_reach.back();
+                  root_direct_reach.pop_back();
+                  auto sl = std::move(root_succs.back());
+                  root_succs.pop_back();
+                  root_direct_reach.back() |= extra_dr;
+                  auto& dst = root_succs.back();
+                  dst.insert(dst.end(), sl.begin(), sl.end());
                 }
             }
           else
             {
-              // Recursively process the internal decision nodes.
-              int var = bdd_var(node);
-              bdd low = rewrite_bdd(bdd_low(node));
-              bdd high = rewrite_bdd(bdd_high(node));
-
-              out = bdd_ite(bdd_ithvar(var), high, low);
+              // v already belongs to a numbered SCC: record it as a
+              // successor of the SCC containing u.
+              root_succs.back().push_back(scc_of[v]);
             }
-
-          rewritten[id] = out;
-          return out;
-      };
-
-      for (unsigned i : new_list)
-        {
-          rewritten.clear();
-          final_transitions[i] = rewrite_bdd(dfa->states[i]);
         }
 
-      // Final Automaton Reconstruction.
+      // Phase 2: Compute per-SCC occurrence bits from the accumulated
+      // per-state occur array.  The occur bits are now complete because
+      // all reachable states' BDD leaves have been scanned.
+      unsigned scc_count = scc_direct_reach.size();
+      std::vector<char> scc_occur(scc_count, 0);
+      for (unsigned s = 0; s < n; ++s)
+        if (scc_of[s] >= 0)
+          scc_occur[scc_of[s]] |= occur[s];
+
+      // Compute SCC reach bits in reverse topological order.
+      // Tarjan's pops SCCs in reverse topological order of the
+      // SCC DAG, so processing them in the order they were numbered
+      // gives the correct computation order (sinks first).
+      //
+      std::vector<char> scc_reach(scc_count, 0);
+      for (unsigned sc = 0; sc < scc_count; ++sc)
+        {
+          char reach = scc_direct_reach[sc];
+          for (int succ : scc_successors[sc])
+            reach |= scc_occur[succ] | scc_reach[succ];
+          scc_reach[sc] = reach;
+        }
+
+      // Assign new state numbers and compute the renaming of each
+      // terminal 2*s+b of the original automaton.
+      //
+      // For a state s the four nature bits determine which
+      // terminals can be replaced by constants:
+      //
+      //   occur_accept && !reach_reject
+      //       2*s+1 (accepting into s) can be replaced by bddtrue
+      //       because from s it is not possible to reject.
+      //
+      //   occur_reject && !reach_accept
+      //       2*s   (rejecting into s) can be replaced by bddfalse
+      //       because from s it is not possible to accept.
+      //
+      // State s needs to be kept (renumbered) when at least one
+      // of its terminals exists and cannot be replaced:
+      //
+      //   occur_accept && reach_reject  (2*s+1 exists, can't
+      //                                  replace by bddtrue)
+      //   occur_reject  && reach_accept (2*s   exists, can't
+      //                                  replace by bddfalse)
+      //
+      // Otherwise the state is either unreachable or all its
+      // terminals are replaced by constants, so it can be removed.
+      // The initial state is always kept.
+      std::vector<int> new_num(n, -1);
+      std::vector<int> rename(2 * n, -1);
+      unsigned next = 0;
+      for (unsigned s = 0; s < n; ++s)
+        {
+          char reach = scc_of[s] >= 0 ? scc_reach[scc_of[s]] : 0;
+          bool oa = occur[s] & occur_accept;
+          bool or_ = occur[s] & occur_reject;
+          bool ra = reach & reach_accept;
+          bool rr = reach & reach_reject;
+          bool keep = (s == 0) || (oa && rr) || (or_ && ra);
+          if (keep)
+            new_num[s] = next++;
+          // Rename each terminal independently.
+          // 2*s+0 (rejecting into s) -> bddfalse when s cannot
+          // reach acceptance (or_ && !ra).
+          // 2*s+1 (accepting into s) -> bddtrue when s cannot
+          // reach rejection (oa && !rr).
+          rename[2 * s] = (or_ && !ra) ? -1 : 2 * new_num[s];
+          rename[2 * s + 1] = (oa && !rr) ? -2 : 2 * new_num[s] + 1;
+        }
+
+      // Apply the renaming to the states that are kept.
+      the_trim_rename = &rename;
+      std::vector<bdd> new_states;
+      new_states.reserve(next);
+      for (unsigned s = 0; s < n; ++s)
+        if (new_num[s] >= 0)
+          new_states.push_back(bdd_mt_apply1_leaves(dfa->states[s],
+                                                    trim_renumber_callback,
+                                                    cache, hash_key));
+      the_trim_rename = nullptr;
+
+      // Build the resulting automaton.
       bdd_dict_ptr dict = dfa->get_dict();
       mtdfa_ptr res = std::make_shared<mtdfa>(dict);
       dict->register_all_propositions_of(dfa, res);
-
-      bool keep_names = (ns > 0);
-
-      // Adjust capacities based on whether auxiliary states were trigerred.
-      if (keep_names)
-        res->names.reserve(new_list.size() + (used_garbage ? 1 : 0)
-                          + (used_univ ? 1 : 0));
-      res->states.reserve(new_list.size() + (used_garbage ? 1 : 0)
-                          + (used_univ ? 1 : 0));
       res->aps = dfa->aps;
-
-      for (unsigned i : new_list)
+      res->states = std::move(new_states);
+      if (ns > 0)
         {
-          res->states.push_back(final_transitions[i]);
-          if (keep_names)
-            res->names.push_back(i < ns ? dfa->names[i] : nullptr);
+          res->names.reserve(res->states.size());
+          for (unsigned s = 0; s < n; ++s)
+            if (new_num[s] >= 0)
+              res->names.push_back(s < ns ? dfa->names[s] : nullptr);
         }
-
-      // Append the accepting garbage trap if required.
-      if (used_garbage)
-        {
-          res->states.push_back(bddfalse);
-          if (keep_names)
-            res->names.push_back(formula::ff());
-        }
-
-        // Append the univerally true sink if required.
-        if (used_univ)
-          {
-            res->states.push_back(bddtrue);
-            if (keep_names)
-              res->names.push_back(formula::tt());
-          }
       return res;
     }
 
-    // Quantify the variable VAR in the MTBDD DFA using the operation AND or OR.
+    // Quantify the variables in the positive cube VARS in the MTBDD DFA
+    // using the operation AND or OR.
     static mtdfa_ptr
     quantification_aux(const mtdfa_ptr& dfa, op o,
-                       int var, bddExtCache* cache, int quant_hash,
-                       int apply_hash)
+                       bdd vars, bddExtCache* cache)
     {
       int (*combine)(int, int, int, int);
       int applyop_shortcut = -1;
 
-      // Determine the appropriate combine function and shortcut based on the 
+      // Determine the appropriate combine function and shortcut based on the
       // operation.
       if (o == op::Or)
         {
@@ -1293,6 +1289,25 @@ namespace spot
       // Initialize the todo queue with the initial state of the quantification.
       std::queue<quantify_state>& todo = the_quantify_data.todo;
       (void) the_quantify_data.set_to_terminal(quantify_state{0}, false);
+
+      // Prepare the quantification once, before the main loop: this records
+      // the variables of the cube in buddy's quantvarset array.
+      bdd_mt_quantify_prepare(vars);
+
+      // Collect the atomic propositions quantified by the cube, so that the
+      // names of the new states can be quantified accordingly.
+      std::vector<formula> aps;
+      if (vars != bddtrue)
+        {
+          bdd cube = vars;
+          while (cube != bddtrue)
+            {
+              formula ap = dfa->get_dict()->ap_from_var(bdd_var(cube));
+              if (ap)
+                aps.push_back(ap);
+              cube = bdd_high(cube);
+            }
+        }
 
       // Process each state in the todo queue, combining the BDDs of the states
       // in the set.
@@ -1332,48 +1347,58 @@ namespace spot
             }
 
           // Apply the combine function to the leaves of the BDDs in the queue,
-          // quantifying the variable VAR and storing the result in the new 
-          // MTBDD.
+          // quantifying the variables and storing the result in the new MTBDD.
           bdd b = applyn_leaves(q, o, combine, quant_leaf_combine1,
-                                cache, quant_hash, applyop_shortcut);
+                                cache, hash_key_combine, hash_key_combine1,
+                                applyop_shortcut);
 
-          bdd target_var_bdd = bdd_ithvar(var);
-          bdd_mt_quantify_prepare(target_var_bdd);
+          // Quantify the variables.  This must be done with
+          // bdd_mt_quantify, because the BDD contains terminal nodes:
+          // the plain bdd_exist/bdd_forall know nothing about
+          // terminals and would corrupt them.
           bdd qb = bdd_mt_quantify(b, [](int v){ return v; }, combine, cache,
-                                  quant_hash, apply_hash, applyop_shortcut);
-
-          if (o == op::Or)
-            {
-              qb = bdd_exist(qb, target_var_bdd);
-            }
-          else
-            {
-              qb = bdd_forall(qb, target_var_bdd);
-            }
-          qb = bdd_mt_apply1_leaves(qb, unshift_terminals, cache, apply_hash);
+                                   hash_key_quant, hash_key_combine,
+                                   applyop_shortcut);
+          qb = bdd_mt_apply1_leaves(qb, unshift_terminals, cache,
+                                    hash_key_unshift);
           res->states.push_back(qb);
 
-          // If the variable being quantified is an atomic proposition, we can
-          // also quantify the formula associated with that atomic proposition.
-          formula var_ap = dfa->get_dict()->ap_from_var(var);
-          if (combine_f && var_ap)
-            {
-              switch (o)
-                {
-                case op::And:
-                  res->names.push_back(formula::forall(var_ap, combine_f));
-                  break;
-                case op::Or:
-                  res->names.push_back(formula::exists(var_ap, combine_f));
-                  break;
-                default:
-                  SPOT_UNREACHABLE();
-                }
-            }
+          // If the quantified variables correspond to atomic propositions,
+          // quantify the state name accordingly.
+          if (combine_f && !aps.empty())
+            switch (o)
+              {
+              case op::And:
+                res->names.push_back(formula::forall(aps, combine_f));
+                break;
+              case op::Or:
+                res->names.push_back(formula::exists(aps, combine_f));
+                break;
+              default:
+                SPOT_UNREACHABLE();
+              }
         }
 
       the_quantify_data.set_to_terminal_map.clear();
       the_quantify_data.terminal_to_set_map.clear();
+      return res;
+    }
+
+    // Convert a vector of atomic proposition formulas to a positive
+    // cube (conjunction) of BDD variables.  Atomic propositions that
+    // are not registered in the automaton's dictionary are ignored.
+    static bdd
+    aps_to_bdd(const mtdfa_ptr& dfa,
+               const std::vector<formula>& aps)
+    {
+      bdd_dict_ptr d = dfa->get_dict();
+      bdd res = bddtrue;
+      for (const formula& ap: aps)
+        {
+          int v = d->has_registered_proposition(ap, dfa);
+          if (v >= 0)
+            res &= bdd_ithvar(v);
+        }
       return res;
     }
   }
@@ -1441,40 +1466,54 @@ namespace spot
     return res;
   }
 
-  mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa, formula var, bool trim)
+  mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa, bdd vars, bool trim)
   {
-    auto& var_map = dfa->get_dict()->var_map;
-    auto it = var_map.find(var);
-
-    if (it == var_map.end())
+    if (vars == bddtrue)
       return dfa;
-
-    int ivar = it->second;
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0, true);
-    mtdfa_ptr res = quantification_aux(dfa, op::Or, ivar, &cache, 0, 1);
+    bdd_extcache_init(&cache, size_estimate_quantify(dfa), true);
+    mtdfa_ptr res = quantification_aux(dfa, op::Or, vars, &cache);
     if (trim)
       res = spot::trim(res);
     bdd_extcache_done(&cache);
     return res;
   }
 
-  mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa, formula var, bool trim)
+  mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa, bdd vars, bool trim)
   {
-    auto& var_map = dfa->get_dict()->var_map;
-    auto it = var_map.find(var);
-
-    if (it == var_map.end())
+    if (vars == bddtrue)
       return dfa;
-
-    int ivar = it->second;
     bddExtCache cache;
-    bdd_extcache_init(&cache, 0, true);
-    mtdfa_ptr res = quantification_aux(dfa, op::And, ivar, &cache, 0, 1);
+    bdd_extcache_init(&cache, size_estimate_quantify(dfa), true);
+    mtdfa_ptr res = quantification_aux(dfa, op::And, vars, &cache);
     if (trim)
       res = spot::trim(res);
     bdd_extcache_done(&cache);
     return res;
+  }
+
+  mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa, const formula& ap,
+                            bool trim)
+  {
+    return quantify_exists(dfa, aps_to_bdd(dfa, {ap}), trim);
+  }
+
+  mtdfa_ptr quantify_exists(const mtdfa_ptr& dfa,
+                            const std::vector<formula>& aps, bool trim)
+  {
+    return quantify_exists(dfa, aps_to_bdd(dfa, aps), trim);
+  }
+
+  mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa, const formula& ap,
+                            bool trim)
+  {
+    return quantify_forall(dfa, aps_to_bdd(dfa, {ap}), trim);
+  }
+
+  mtdfa_ptr quantify_forall(const mtdfa_ptr& dfa,
+                            const std::vector<formula>& aps, bool trim)
+  {
+    return quantify_forall(dfa, aps_to_bdd(dfa, aps), trim);
   }
 
   ////////////////////////////////////////////////////////////////////////

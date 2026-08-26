@@ -152,7 +152,7 @@ New in spot 2.15.1.dev  (not yet released)
     product_implies(), complement().
 
   - quantification functions are implemented for weak mtdswa_ptr
-    as quantify_exists() and quantify_forall().
+    and for mtdfa_ptr as quantify_exists() and quantify_forall().
 
   - trim_mtdswa() is a new function to remove useless states in
     mtdswa_ptr.
