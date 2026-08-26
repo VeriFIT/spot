@@ -46,13 +46,13 @@ untrimmable_mtdswas2 = [spot.dtwa_to_mtdswa(twa) for twa in untrimmable_twas]
 for i in range(len(trimmable)):
     m1 = trimmable_mtdswas1[i]
     m2 = trimmable_mtdswas2[i]
-    spot.trim_mtdswa(m2, True)
-    # Test that trim_mtdswa does not change the language of the automaton.
+    spot.trim(m2, True)
+    # Test that trim does not change the language of the automaton.
     pxor = spot.product_xor(m1.as_twa(), m2.as_twa())
     tc.assertTrue(pxor.is_empty(),
                   "Trimmed MTDSwA is not equivalent to original: "
                   + f"{trimmable[i]}")
-    # Test that trim_mtdswa reduces the number of states in the automaton.
+    # Test that trim reduces the number of states in the automaton.
     tc.assertLess(m2.num_roots(), m1.num_roots(),
                   "Trimmed MTDSwA should have less states than original: "
                   + f"{trimmable[i]}")
@@ -60,19 +60,19 @@ for i in range(len(trimmable)):
 for i in range(len(untrimmable)):
     m1 = untrimmable_mtdswas1[i]
     m2 = untrimmable_mtdswas2[i]
-    spot.trim_mtdswa(m2, True)
-    # Test that trim_mtdswa does not change the language of the automaton.
+    spot.trim(m2, True)
+    # Test that trim does not change the language of the automaton.
     pxor = spot.product_xor(m1.as_twa(), m2.as_twa())
     tc.assertTrue(pxor.is_empty(),
                   "Trimmed MTDSwA is not equivalent to original: "
                   + f"{untrimmable[i]}")
-    # Test that trim_mtdswa does not reduce the number of states for these.
+    # Test that trim does not reduce the number of states for these.
     tc.assertEqual(m2.num_roots(), m1.num_roots(),
                    "Trimmed MTDSwA should have same nb of states as original: "
                    + f"{untrimmable[i]}")
 
 
-# Test all reductions of trim_mtdswa on a hand-built MTDSwA.
+# Test all reductions of trim on a hand-built MTDSwA.
 
 bdd_dict = spot.make_bdd_dict()
 
@@ -105,34 +105,34 @@ m = make_test_mtdswa()
 
 # Default trim: remove unreachable states
 m1 = make_test_mtdswa()
-spot.trim_mtdswa(m1)
+spot.trim(m1)
 pxor = spot.product_xor(m.as_twa(), m1.as_twa())
 tc.assertTrue(pxor.is_empty(),
               "Trimmed MTDSwA is not equivalent to original (default trim)")
 tc.assertEqual(m1.num_roots(), 15,
                "Trimmed MTDSwA should have 15 states after default trim")
 # Check that re-trimming does not change the MTDSwA
-spot.trim_mtdswa(m1)
+spot.trim(m1)
 tc.assertEqual(m1.num_roots(), 15,
                "MTDSwA should not change after re-trimming (default trim)")
 
 # Full trim: also remove useless states
 m2 = make_test_mtdswa()
-spot.trim_mtdswa(m2, True)
+spot.trim(m2, True)
 pxor = spot.product_xor(m.as_twa(), m2.as_twa())
 tc.assertTrue(pxor.is_empty(),
               "Trimmed MTDSwA is not equivalent to original (full trim)")
 tc.assertEqual(m2.num_roots(), 13,
                "Trimmed MTDSwA should have 13 states after full trim")
-spot.trim_mtdswa(m2, True)
+spot.trim(m2, True)
 tc.assertEqual(m2.num_roots(), 13,
                "MTDSwA should not change after re-trimming (full trim)")
 
 # The order of the two modes should not matter.
 m3 = make_test_mtdswa()
-spot.trim_mtdswa(m3, True)
-spot.trim_mtdswa(m1, True)   # m1 was default-trimmed first
-spot.trim_mtdswa(m2)          # m2 was full-trimmed first
+spot.trim(m3, True)
+spot.trim(m1, True)   # m1 was default-trimmed first
+spot.trim(m2)          # m2 was full-trimmed first
 pxor = spot.product_xor(m.as_twa(), m3.as_twa())
 tc.assertTrue(pxor.is_empty(),
               "Trimmed MTDSwA is not equivalent to original (full trim)")
@@ -144,6 +144,6 @@ tc.assertEqual(m1.num_roots(), 13,
 tc.assertEqual(m2.num_roots(), 13,
                "Trimmed MTDSwA should have 13 states after full trim "
                "then default trim")
-spot.trim_mtdswa(m3, True)
+spot.trim(m3, True)
 tc.assertEqual(m3.num_roots(), 13,
                "MTDSwA should not change after re-trimming (full trim)")

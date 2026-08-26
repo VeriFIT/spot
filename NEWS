@@ -154,8 +154,8 @@ New in spot 2.15.1.dev  (not yet released)
   - quantification functions are implemented for weak mtdswa_ptr
     and for mtdfa_ptr as quantify_exists() and quantify_forall().
 
-  - trim_mtdswa() is a new function to remove useless states in
-    mtdswa_ptr.
+  - trim() is a new function to remove useless states in mtdswa_ptr
+    and in mtdfa_ptr.
 
   Deprecation notices:
 

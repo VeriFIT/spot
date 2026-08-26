@@ -4387,28 +4387,28 @@ namespace spot
   }
 
 
-  mtdswa_ptr quantify_exists(const mtdswa_ptr& swa, bdd vars, bool trim)
+  mtdswa_ptr quantify_exists(const mtdswa_ptr& swa, bdd vars, bool do_trim)
   {
     if (vars == bddtrue)
       return swa;
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
     mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::Or, &cache);
-    if (trim)
-      trim_mtdswa(res);
+    if (do_trim)
+      trim(res);
     bdd_extcache_done(&cache);
     return res;
   }
 
-  mtdswa_ptr quantify_forall(const mtdswa_ptr& swa, bdd vars, bool trim)
+  mtdswa_ptr quantify_forall(const mtdswa_ptr& swa, bdd vars, bool do_trim)
   {
     if (vars == bddtrue)
       return swa;
     bddExtCache cache;
     bdd_extcache_init(&cache, size_estimate_quantify(swa), true);
     mtdswa_ptr res = quantify_mtdswa_aux(swa, vars, op::And, &cache);
-    if (trim)
-      trim_mtdswa(res);
+    if (do_trim)
+      trim(res);
     bdd_extcache_done(&cache);
     return res;
   }
@@ -4495,7 +4495,7 @@ namespace spot
 
   }
 
-  void trim_mtdswa(mtdswa_ptr swa, bool trim_useless_sccs_too)
+  void trim(mtdswa_ptr swa, bool trim_useless_sccs_too)
   {
     unsigned n = swa->num_roots();
     std::vector<bool> accessible;

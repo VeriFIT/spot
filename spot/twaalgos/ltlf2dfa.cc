@@ -59,6 +59,10 @@ constexpr int hash_key_quant = 12;
 constexpr int hash_key_combine = 13;
 constexpr int hash_key_combine1 = 14;
 constexpr int hash_key_unshift = 15;
+// Hash key used by trim_aux().  When trim_aux is called from the
+// quantification functions, it shares the quantification external cache,
+// so its key must also be distinct from all the above.
+constexpr int hash_key_trim = 16;
 
 namespace spot
 {
@@ -1461,7 +1465,7 @@ namespace spot
   {
     bddExtCache cache;
     bdd_extcache_init(&cache, 0, true);
-    mtdfa_ptr res = trim_aux(dfa, &cache, 0);
+    mtdfa_ptr res = trim_aux(dfa, &cache, hash_key_trim);
     bdd_extcache_done(&cache);
     return res;
   }
@@ -1474,7 +1478,8 @@ namespace spot
     bdd_extcache_init(&cache, size_estimate_quantify(dfa), true);
     mtdfa_ptr res = quantification_aux(dfa, op::Or, vars, &cache);
     if (trim)
-      res = spot::trim(res);
+      // Reuse the quantification cache, to avoid allocating a new one.
+      res = trim_aux(res, &cache, hash_key_trim);
     bdd_extcache_done(&cache);
     return res;
   }
@@ -1487,7 +1492,8 @@ namespace spot
     bdd_extcache_init(&cache, size_estimate_quantify(dfa), true);
     mtdfa_ptr res = quantification_aux(dfa, op::And, vars, &cache);
     if (trim)
-      res = spot::trim(res);
+      // Reuse the quantification cache, to avoid allocating a new one.
+      res = trim_aux(res, &cache, hash_key_trim);
     bdd_extcache_done(&cache);
     return res;
   }

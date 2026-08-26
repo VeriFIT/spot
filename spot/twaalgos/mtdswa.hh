@@ -488,7 +488,7 @@ namespace spot
   /// unreachable.  No separate reachability pass is needed.
   ///
   /// This modifies the automaton in place.
-  SPOT_API void trim_mtdswa(mtdswa_ptr swa,
-                            bool trim_useless_sccs_too = false);
+  SPOT_API void trim(mtdswa_ptr swa,
+                     bool trim_useless_sccs_too = false);
 
 }
