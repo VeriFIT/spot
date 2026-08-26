@@ -141,9 +141,9 @@ static struct opt_t
 
 static spot::randltlgenerator::output_type output =
   spot::randltlgenerator::LTL;
-static char* opt_pL = nullptr;
-static char* opt_pS = nullptr;
-static char* opt_pB = nullptr;
+static const char* opt_pL = nullptr;
+static const char* opt_pS = nullptr;
+static const char* opt_pB = nullptr;
 static bool opt_dump_priorities = false;
 static int opt_formulas = 1;
 static int opt_seed = 0;

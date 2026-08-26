@@ -146,8 +146,8 @@ static const argp_child children[] = {
 static int opt_formulas = 1;
 static spot::randltlgenerator::output_type output =
   spot::randltlgenerator::Bool;
-static char* opt_pL = nullptr;
-static char* opt_pB = nullptr;
+static const char* opt_pL = nullptr;
+static const char* opt_pB = nullptr;
 static char random_conj[] = "not=0,implies=0,equiv=0,xor=0,or=0";
 static bool opt_dump_priorities = false;
 static int opt_seed = 0;

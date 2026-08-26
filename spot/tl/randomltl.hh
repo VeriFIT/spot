@@ -104,7 +104,9 @@ namespace spot
     /// For instance <code>"xor=0, F=3"</code> will prevent \c xor
     /// from being used, and will raise the relative probability of
     /// occurrences of the \c F operator.
-    const char* parse_options(char* options);
+    ///
+    /// The input string is not modified.
+    const char* parse_options(const char* options);
 
     /// \brief whether we can use unary operators
     bool has_unary_ops() const
@@ -382,17 +384,17 @@ namespace spot
 
     /// \brief Construct with \a aprops_n random atomic propositions.
     randltlgenerator(int aprops_n, const option_map& opts,
-                     char* opt_pL = nullptr,
-                     char* opt_pS = nullptr,
-                     char* opt_pB = nullptr,
+                     const char* opt_pL = nullptr,
+                     const char* opt_pS = nullptr,
+                     const char* opt_pB = nullptr,
                      const atomic_prop_set* subformulas = nullptr,
                      std::function<bool(formula)> is_output = nullptr);
 
     /// \brief Construct with an explicit set of atomic propositions.
     randltlgenerator(atomic_prop_set aprops, const option_map& opts,
-                     char* opt_pL = nullptr,
-                     char* opt_pS = nullptr,
-                     char* opt_pB = nullptr,
+                     const char* opt_pL = nullptr,
+                     const char* opt_pS = nullptr,
+                     const char* opt_pB = nullptr,
                      const atomic_prop_set* subformulas = nullptr,
                      std::function<bool(formula)> is_output = nullptr);
 

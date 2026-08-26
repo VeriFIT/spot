@@ -181,6 +181,14 @@ New in spot 2.15.1.dev  (not yet released)
     decomposition, polarity-based simplification, and obligation-based
     synthesis.  LedMatrix.tlsf is one such cases.  (Issue #651.)
 
+  - random_formula::parse_options() and randltlgenerator() were using
+    strtok() to parse priority strings, which mutates the input
+    buffer and is non-reentrant.  This could crash when called with
+    a string literal, and worked only by luck from Python (SWIG's
+    temporary buffer happened to be writable).  The parsing has been
+    rewritten to use a non-mutating string_view tokenizer, and the
+    priority parameters now take const char*.
+
   Removed functions:
 
   - spot::is_bare_word() and spot::quote_unless_bare_word()

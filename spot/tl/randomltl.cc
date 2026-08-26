@@ -21,7 +21,9 @@
 #include <spot/tl/randomltl.hh>
 #include <spot/misc/random.hh>
 #include <iostream>
+#include <cctype>
 #include <cstring>
+#include <string_view>
 #include <spot/misc/optionmap.hh>
 
 namespace spot
@@ -375,37 +377,69 @@ namespace spot
   }
 
   const char*
-  random_formula::parse_options(char* options)
+  random_formula::parse_options(const char* options)
   {
     if (!options)
       return nullptr;
-    char* key = strtok(options, "=\t, :;");
-    while (key)
+
+    // Tokenize the option string without modifying it.  (strtok would
+    // require a mutable buffer, which the Python bindings only
+    // provide as a read-only copy.)  Tokens are the KEY and VALUE
+    // strings of each KEY=VALUE assignment, in that order.
+    std::vector<std::string_view> tokens;
+    {
+      std::string_view s(options);
+      size_t pos = 0;
+      while (pos < s.size())
+        {
+          size_t start = s.find_first_not_of("=\t, :;", pos);
+          if (start == std::string_view::npos)
+            break;
+          size_t end = s.find_first_of("=\t, :;", start);
+          tokens.emplace_back(s.substr(start, end - start));
+          pos = end == std::string_view::npos ? s.size() : end;
+        }
+    }
+
+    // A name matches the key exactly, or case-insensitively if it
+    // starts with a lowercase letter (as before).
+    auto name_matches = [](std::string_view name, std::string_view key)
       {
-        char* value = strtok(nullptr, "=\t, :;");
-        if (!value)
-          return key;
-
-        char* endptr;
-        double res = strtod(value, &endptr);
-        if (*endptr)
-          return value;
-
-        unsigned i;
-        for (i = 0; i < proba_size_; ++i)
+        if (name.size() != key.size())
+          return false;
+        if ('a' <= name[0] && name[0] <= 'z')
           {
-            if (('a' <= *proba_[i].name && *proba_[i].name <= 'z'
-                 && !strcasecmp(proba_[i].name, key))
-                || !strcmp(proba_[i].name, key))
+            for (size_t i = 0; i < name.size(); ++i)
+              if (std::tolower(name[i]) != std::tolower(key[i]))
+                return false;
+            return true;
+          }
+        return name == key;
+      };
+
+    for (size_t i = 0; i < tokens.size(); i += 2)
+      {
+        std::string_view key = tokens[i];
+        if (i + 1 == tokens.size())
+          return options + (key.data() - options); // key without value
+
+        std::string_view value = tokens[i + 1];
+        char* endptr;
+        double res = strtod(value.data(), &endptr);
+        if (endptr != value.data() + value.size())
+          return options + (value.data() - options); // invalid value
+
+        unsigned j;
+        for (j = 0; j < proba_size_; ++j)
+          {
+            if (name_matches(proba_[j].name, key))
               {
-                proba_[i].proba = res;
+                proba_[j].proba = res;
                 break;
               }
           }
-        if (i == proba_size_)
-          return key;
-
-        key = strtok(nullptr, "=\t, :;");
+        if (j == proba_size_)
+          return options + (key.data() - options); // unknown key
       }
     update_sums();
     return nullptr;
@@ -564,9 +598,9 @@ namespace spot
 
   randltlgenerator::randltlgenerator(atomic_prop_set aprops,
                                      const option_map& opts,
-                                     char* opt_pL,
-                                     char* opt_pS,
-                                     char* opt_pB,
+                                     const char* opt_pL,
+                                     const char* opt_pS,
+                                     const char* opt_pB,
                                      const atomic_prop_set* subs,
                                      std::function<bool(formula)> is_output)
     : simplify_opts_(load_simpl_options(opts)),
@@ -644,9 +678,9 @@ namespace spot
 
   randltlgenerator::randltlgenerator(int aprops_n,
                                      const option_map& opts,
-                                     char* opt_pL,
-                                     char* opt_pS,
-                                     char* opt_pB,
+                                     const char* opt_pL,
+                                     const char* opt_pS,
+                                     const char* opt_pB,
                                      const atomic_prop_set* subs,
                                      std::function<bool(formula)> is_output)
     : randltlgenerator(create_atomic_prop_set(aprops_n,
