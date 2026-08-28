@@ -411,6 +411,37 @@ for kind in [spot.parity_kind_min, spot.parity_kind_max]:
         tc.assertTrue(c_strat == c_strat2)
 
 
+# Check the strategy contract for all solved states.  Entries for states
+# whose owner is not the winner are intentionally unspecified.
+def check_strategy_contract(aut, global_solve=False):
+    spot.solve_parity_game(aut, global_solve)
+    winners = spot.get_state_winners(aut)
+    owners = spot.get_state_players(aut)
+    strategy = spot.get_strategy(aut)
+    edges = list(aut.edges())
+    edge_numbers = {aut.edge_number(e): e for e in edges}
+    for state in range(aut.num_states()):
+        if not global_solve and state not in reachable_states(aut):
+            continue
+        if owners[state] == winners[state]:
+            tc.assertIn(strategy[state], edge_numbers)
+            edge = edge_numbers[strategy[state]]
+            tc.assertEqual(edge.src, state)
+            tc.assertEqual(winners[edge.dst], winners[state])
+
+
+def reachable_states(aut):
+    seen = set()
+    todo = [aut.get_init_state_number()]
+    while todo:
+        state = todo.pop()
+        if state in seen:
+            continue
+        seen.add(state)
+        todo.extend(e.dst for e in aut.out(state))
+    return seen
+
+
 # Test that strategies are not appended
 # if solve is called multiple times
 aut = spot.make_twa_graph()
@@ -424,3 +455,24 @@ S1 = list(spot.get_strategy(aut))
 spot.solve_game(aut)
 S2 = list(spot.get_strategy(aut))
 tc.assertEqual(S1, S2)
+
+# Strategy entries are valid in local and global mode.
+check_strategy_contract(aut)
+aut.new_states(1)
+# The new state is unreachable and must be solved only globally.
+spot.set_state_players(aut, [False, True, False])
+aut.new_edge(2, 2, buddy.bddtrue, [0])
+check_strategy_contract(aut, True)
+
+# Empty marks are supported: they are normalized as the lowest priority for
+# max-parity (the solver's internal equivalent representation uses -1).
+empty = spot.make_twa_graph()
+empty.set_buchi()
+empty.new_states(1)
+empty.new_edge(0, 0, buddy.bddtrue, [])
+spot.set_state_players(empty, [True])
+tc.assertFalse(spot.solve_parity_game(empty))
+
+# A parity game with a dead end is outside the solver's precondition.
+# Keep this test as documentation of the currently unsupported input rather
+# than asserting a result whose finite-play semantics are not defined.

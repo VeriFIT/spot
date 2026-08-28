@@ -64,25 +64,44 @@ namespace spot
   /// \ingroup games
   /// \brief Solve a parity game.
   ///
-  /// The arena is a deterministic max odd parity automaton with a
-  /// "state-player" property.
+  /// The arena must have a transition-based parity acceptance and a
+  /// "state-player" property.  The solver accepts all four parity
+  /// variants (`max`/`min`, `odd`/`even`) and normalizes them
+  /// internally.  Choices are made by the owner of each state;
+  /// determinism of transition labels is not required by the solver,
+  /// but callers such as synthesis may require mutually exclusive
+  /// labels.  States without successors are not supported by parity
+  /// games and should be removed or completed by the caller.
   ///
   /// Player 1 tries to satisfy the acceptance condition, while player
   /// 0 tries to prevent that.
   ///
-  /// This computes the winning strategy and winning region using
-  /// Zielonka's recursive algorithm.  \cite zielonka.98.tcs
+  /// This computes a winning region (stored in the "state-winner"
+  /// property) and a positional winning strategy (stored in the
+  /// "strategy" property).  The strategy is meaningful only for
+  /// states whose owner is the winner; its entry is a global edge
+  /// number leading to a state with the same winner.  Other entries
+  /// are unspecified and currently represented by 0; zero can
+  /// nevertheless be a valid global edge number, so callers must
+  /// check the owner and winner before using an entry.
   ///
-  /// By default only a 'local' strategy is computed:
-  /// Only the part of the arena reachable from the init state is considered.
-  /// If you want to compute a strategy for ALL states, set
-  /// \a solve_globally to true
+  /// By default only a 'local' strategy is computed: only the part of
+  /// the arena reachable from the initial state is considered.
+  /// Unreachable states consequently have no solved winner or
+  /// strategy guarantee.  If you want winners and strategies for all
+  /// states, set \a solve_globally to true.  In either mode, solving
+  /// is done from scratch, and named properties from an earlier solve
+  /// are replaced.
   ///
-  /// Also includes some inspiration from Oink.
+  /// The implementation currently uses Zielonka's recursive
+  /// algorithm, with optimizations inspired by Oink.  These
+  /// implementation details are not part of the strategy-selection
+  /// contract.
+  /// \cite zielonka.98.tcs
   /// \cite vandijk.18.tacas
   ///
   /// Returns the player winning in the initial state, and sets
-  /// the state-winner and strategy named properties.
+  /// the "state-winner" and "strategy" named properties.
   SPOT_API
   bool solve_parity_game(const twa_graph_ptr& arena,
                          bool solve_globally = false);
@@ -100,7 +119,7 @@ namespace spot
   /// winning for player 1.
   ///
   /// Returns the player winning in the initial state, and sets
-  /// the state-winner and strategy named properties.
+  /// the "state-winner" and "strategy" named properties.
   SPOT_API
   bool solve_safety_game(const twa_graph_ptr& game);
 
