@@ -63,6 +63,39 @@ State: 8 {1}
 [0] 2
 --END--""")
 
+# Prefer the current subgame over an already solved exit.  This is the
+# situation where a sink is still being solved and has no subgame number yet.
+short_cycle = spot.automaton("""HOA: v1
+States: 4
+Start: 0
+AP: 0
+acc-name: parity max odd 1
+Acceptance: 1 Inf(0)
+properties: trans-acc explicit-labels spot-state-player: 0 1 0 0
+--BODY--
+State: 0
+[t] 1 {0}
+[t] 2 {0}
+State: 1
+[t] 3 {0}
+State: 2
+[t] 0 {0}
+State: 3
+[t] 3 {0}
+--END--""")
+spot.solve_parity_game(short_cycle)
+short_strategy = spot.get_strategy(short_cycle)
+tc.assertEqual(short_strategy[0], 2)
+
+# The accepting-edge strategy path should prefer the current winning
+# attractor over an older exit, without changing the winning region.
+issue649 = spot.formula("(F(i0 & X(i1)) <-> Fo)").translate('parity', 'det')
+issue649 = spot.split_2step(
+    issue649, buddy.bdd_ithvar(issue649.register_ap('o')))
+spot.solve_game(issue649)
+issue649_strategy = spot.get_strategy(issue649)
+tc.assertEqual(issue649_strategy[10], 19)
+
 # Testing case where parity_game optimization
 # lead to wrong results
 si = spot.synthesis_info()

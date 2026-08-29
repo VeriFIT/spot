@@ -201,6 +201,7 @@ namespace spot
                       {
                         subgame_[v] = rd_;
                         w_.set(v, false);
+                        rank_[v] = 0;
                         // The strategy for player 0 is to take the first
                         // available edge.
                         if ((*owner_ptr_)[v] == false)
@@ -323,6 +324,8 @@ namespace spot
         w_.winner_.resize(n_states, 0);
         s_.clear();
         s_.resize(n_states, no_strat_mark);
+        rank_.clear();
+        rank_.resize(n_states, unseen_mark);
         // Init
         rd_ = 0;
         info_ = std::make_unique<scc_info>(arena_);
@@ -528,6 +531,8 @@ namespace spot
               {
                 // v is winning
                 w_.set(v, p);
+                if (rank_[v] == unseen_mark)
+                  rank_[v] = 0;
                 // Mark if demanded
                 if (acc_par)
                   {
@@ -584,6 +589,10 @@ namespace spot
                                       {
                                         s_[v] = arena_->edge_number(e);
                                         min_subgame_idx = subgame_[e.dst];
+                                        rank_[v] =
+                                          rank_[e.dst] == unseen_mark
+                                          ? 0 : rank_[e.dst] + 1;
+
                                         if (!p)
                                           // No optim for env
                                           break;
@@ -639,29 +648,44 @@ namespace spot
             assert(min_win_par <= to_par(e_s));
             assert(to_par(e_s) <= max_par);
 
-            // Strategy heuristic : go to the oldest subgame
+            // Strategy heuristic: prefer the lowest rank, then the oldest
+            // winning subgame.  An accepting edge may point to a state in
+            // the current attractor, which has no subgame number yet.
             unsigned min_subgame_idx = unseen_mark;
+            unsigned min_rank = unseen_mark;
+            unsigned min_dst = unseen_mark;
 
             s_[v] = no_strat_mark;
             for (const auto &e_fix : arena_->out(v))
               {
-                if (subgame_[e_fix.dst] >= rd)
+                par_t this_par = to_par(e_fix);
+                // This edge must have less than max_par, otherwise it would
+                // have already been attracted.
+                assert((this_par <= max_par)
+                       || (to_player(this_par) != (max_par&1)));
+                // If it is accepting and leads to the winning region, it is
+                // a valid fix.
+                if ((min_win_par <= this_par)
+                    && (this_par <= max_par)
+                    && w_(e_fix.dst, p))
                   {
-                    par_t this_par = to_par(e_fix);
-                    // This edge must have less than max_par,
-                    // otherwise it would have already been attracted
-                    assert((this_par <= max_par)
-                           || (to_player(this_par) != (max_par&1)));
-                    // if it is accepting and leads to the winning region
-                    // -> valid fix
-                    if ((min_win_par <= this_par)
-                        && (this_par <= max_par)
-                        && w_(e_fix.dst, p)
-                        && (subgame_[e_fix.dst] < min_subgame_idx))
+                    unsigned subgame_idx = subgame_[e_fix.dst] == unseen_mark
+                      ? rd : subgame_[e_fix.dst];
+                    unsigned edge_rank = rank_[e_fix.dst] == unseen_mark
+                      ? 0 : rank_[e_fix.dst] + 1;
+                    bool better = edge_rank < min_rank
+                      || (edge_rank == min_rank
+                          && subgame_idx < min_subgame_idx)
+                      || (edge_rank == min_rank
+                          && subgame_idx == min_subgame_idx
+                          && e_fix.dst < min_dst);
+                    if (better)
                       {
-                        // Max par edge to older subgame found
                         s_[v] = arena_->edge_number(e_fix);
-                        min_subgame_idx = subgame_[e_fix.dst];
+                        min_subgame_idx = subgame_idx;
+                        min_rank = edge_rank;
+                        min_dst = e_fix.dst;
+                        rank_[v] = edge_rank;
                       }
                   }
               }
@@ -793,6 +817,7 @@ namespace spot
         w_.has_winner_.clear();
         w_.winner_.clear();
         s_.clear();
+        rank_.clear();
         rd_ = 0;
         max_abs_par_ = 0;
       }
@@ -819,17 +844,27 @@ namespace spot
             // State of the subgame
             subgame_[v] = rd;
             w_.set(v, winner);
-            // Get the strategy
+            // Get the strategy.  Prefer the oldest suitable subgame.
+            // This is only a heuristic: the parity solver's winning
+            // regions remain unchanged.
             assert(s_[v] == no_strat_mark);
+            unsigned min_subgame_idx = unseen_mark;
             for (const auto &e : arena_->out(v))
               {
                 par_t this_par = to_par(e);
                 if ((subgame_[e.dst] >= rd) && (this_par <= max_par))
                   {
                     assert(this_par == one_par);
-                    // Ok for strat
-                    s_[v] = arena_->edge_number(e);
-                    break;
+                    // States in the current one-priority subgame are not
+                    // assigned a subgame number until this loop completes.
+                    // Consequently, prefer them over already solved exits.
+                    unsigned subgame_idx =
+                      subgame_[e.dst] == unseen_mark ? rd : subgame_[e.dst];
+                    if (subgame_idx < min_subgame_idx)
+                      {
+                        min_subgame_idx = subgame_idx;
+                        s_[v] = arena_->edge_number(e);
+                      }
                   }
               }
             assert((0 < s_[v]) && (s_[v] < unseen_mark));
@@ -860,6 +895,8 @@ namespace spot
       // We need a signed value here in order to "fix" the strategy
       // during construction
       std::vector<strat_t> s_;
+      // Heuristic distance to the seed of the current attractor.
+      std::vector<unsigned> rank_;
 
       // Informations about sccs and the current scc
       std::unique_ptr<scc_info> info_;
