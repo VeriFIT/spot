@@ -29,11 +29,11 @@ namespace spot
   namespace
   {
     constexpr unsigned unseen_mark = std::numeric_limits<unsigned>::max();
-    using par_t = int;
-    constexpr par_t limit_par_even =
-        std::numeric_limits<par_t>::max() & 1
-        ? std::numeric_limits<par_t>::max()-3
-        : std::numeric_limits<par_t>::max()-2;
+    using priority_t = int;
+    constexpr priority_t limit_priority_even =
+        std::numeric_limits<priority_t>::max() & 1
+        ? std::numeric_limits<priority_t>::max()-3
+        : std::numeric_limits<priority_t>::max()-2;
     using strat_t = long long;
     constexpr strat_t no_strat_mark = std::numeric_limits<strat_t>::min();
 
@@ -100,42 +100,42 @@ namespace spot
     // Struct to change recursive calls to stack
     struct work_t
     {
-      work_t(unsigned wstep_, unsigned rd_, par_t min_par_,
-             par_t max_par_) noexcept
+      work_t(unsigned wstep_, unsigned rd_, priority_t min_priority_,
+             priority_t max_priority_) noexcept
         : wstep(wstep_),
           rd(rd_),
-          min_par(min_par_),
-          max_par(max_par_)
+          min_priority(min_priority_),
+          max_priority(max_priority_)
       {
       }
       const unsigned wstep, rd;
-      const par_t min_par, max_par;
+      const priority_t min_priority, max_priority;
     }; // work_t
 
     // Collects information about an scc
     // Used to detect special cases
     struct subgame_info_t
     {
-      typedef std::set<par_t, std::greater<par_t>> all_parities_t;
+      typedef std::set<priority_t, std::greater<priority_t>> all_priorities_t;
 
       subgame_info_t() noexcept
       {
       }
 
-      subgame_info_t(bool empty, bool one_parity, bool one_player0,
-                     bool one_player1, all_parities_t parities) noexcept
+      subgame_info_t(bool empty, bool one_priority, bool one_player0,
+                     bool one_player1, all_priorities_t priorities) noexcept
         : is_empty(empty),
-          is_one_parity(one_parity),
+          is_one_priority(one_priority),
           is_one_player0(one_player0),
           is_one_player1(one_player1),
-          all_parities(parities)
+          all_priorities(priorities)
       {};
       bool is_empty; // empty subgame
-      bool is_one_parity; // only one parity appears in the subgame
+      bool is_one_priority; // only one priority appears in the subgame
       // todo : Not used yet
       bool is_one_player0; // one player subgame for player0 <-> p==false
       bool is_one_player1; // one player subgame for player1 <-> p==true
-      all_parities_t all_parities;
+      all_priorities_t all_priorities;
     }; // subgame_info_t
 
 
@@ -220,14 +220,17 @@ namespace spot
                 if (!subgame_info.is_empty)
                   {
                     // Check for special cases
-                    if (subgame_info.is_one_parity)
-                      one_par_subgame_solver(subgame_info, max_abs_par_);
+                    if (subgame_info.is_one_priority)
+                      one_priority_subgame_solver(subgame_info,
+                                               max_abs_priority_);
                     else
                       {
                         // "Regular" solver
-                        max_abs_par_ = *subgame_info.all_parities.begin();
+                        max_abs_priority_ =
+                          *subgame_info.all_priorities.begin();
                         w_stack_.emplace_back(0, 0,
-                                              min_par_graph_, max_abs_par_);
+                                              min_priority_graph_,
+                                              max_abs_priority_);
                         zielonka();
                       }
                   }
@@ -329,60 +332,55 @@ namespace spot
         // Init
         rd_ = 0;
         info_ = std::make_unique<scc_info>(arena_);
-        // Create all the parities
+        // Create all the priorities
         // we want zielonka to work with any of the four parity types
         // and we want it to work on partially colored arenas
-        // However the actually algorithm still supposes max odd.
+        // However the actual algorithm still supposes max odd.
         // Therefore (and in order to avoid the manipulation of the mark
         // at each step) we generate a vector directly storing the
-        // "equivalent" parity for each edge
+        // "equivalent" priority for each edge
         bool max, odd;
         arena_->acc().is_parity(max, odd, true);
-        max_abs_par_ = arena_->acc().all_sets().max_set()-1;
+        max_abs_priority_ = arena_->acc().all_sets().max_set()-1;
         // Make it the next larger odd
-        par_t next_max_par = max_abs_par_ + 1;
-        all_edge_par_.resize(arena_->edge_vector().size(),
-                             std::numeric_limits<par_t>::max());
+        priority_t next_max_priority = max_abs_priority_ + 1;
+        all_edge_priorities_.resize(arena_->edge_vector().size(),
+                             std::numeric_limits<priority_t>::max());
 
-        // The parities are modified much like for colorize_parity
+        // The priorities are modified much like for colorize_parity
         // however if the acceptance condition is "min", we negate all
-        // parities to get "max"
-    // The algorithm works on negative or positive parities alike
-    //| kind/style | n   |   empty tr.   | other tr.  | result       | min par
-    //|------------+-----+---------------+------------+--------------|---------
-    //| max odd    | any | set to {-1}   | unchanged  | max odd n    | -1
-    //| max even   | any | set to {0}    | add 1      | max odd n+1  | 0
-    //| min odd    | any | set to {-n}   | negate     | max odd 0    | -n
-    //| min even   | any | set to {-n+1} | negate + 1 | max odd +1   | -n + 1
-        min_par_graph_ = -(!max*max_abs_par_) - (max*odd);
-        max_par_graph_ = max*(max_abs_par_ + !odd) + !max*!odd;
-
-        // Takes an edge and returns the "equivalent" max odd parity
-        auto equiv_par = [max, odd, next_max_par, inv = 2*max-1](const auto& e)
-          {
-            par_t e_par =
-              (max ? e.acc.max_set() : e.acc.min_set()) - 1; // -1 for empty
-            // If "min" and empty -> set to n
-            if (!max & (e_par == -1))
-              e_par = next_max_par;
-            // Negate if min
-            e_par *= inv;
-            // even -> odd
-            e_par += !odd;
-            return e_par;
-          };
+        // priorities to get "max"
+        // The algorithm works on negative or positive priorities alike.
+        //
+        // | kind/style | empty tr.   | other tr.  | result       |
+        // |------------+-------------+------------+--------------|
+        // | max odd    | set to -1   | unchanged  | max odd n    |
+        // | max even   | set to 0    | add 1      | max odd n+1  |
+        // | min odd    | set to -n   | negate     | max odd 0    |
+        // | min even   | set to -n+1 | negate + 1 | max odd +1   |
+        min_priority_graph_ = -(!max*max_abs_priority_) - (max*odd);
+        max_priority_graph_ = max*(max_abs_priority_ + !odd) + !max*!odd;
 
         for (const auto& e : arena_->edges())
           {
             unsigned e_idx = arena_->edge_number(e);
-            all_edge_par_[e_idx] = equiv_par(e);
+            priority_t e_priority =
+              (max ? e.acc.max_set() : e.acc.min_set()) - 1;
+            // If "min" and empty -> set to n
+            if (!max & (e_priority == -1))
+              e_priority = next_max_priority;
+            // Negate if min
+            e_priority *= 2*max-1;
+            // even -> odd
+            e_priority += !odd;
+            all_edge_priorities_[e_idx] = e_priority;
           }
       }
 
-      // Checks if an scc is empty and reports the occurring parities
+      // Checks if an scc is empty and reports the occurring priorities
       // or special cases
       inline subgame_info_t
-      inspect_scc(par_t max_par)
+      inspect_scc(priority_t max_priority)
       {
         subgame_info_t info;
         info.is_empty = true;
@@ -398,10 +396,10 @@ namespace spot
               if (subgame_[e.dst] == unseen_mark)
                 {
                   info.is_empty = false;
-                  par_t this_par = to_par(e);
-                  if (this_par <= max_par)
+                  priority_t this_priority = to_priority(e);
+                  if (this_priority <= max_priority)
                     {
-                      info.all_parities.insert(this_par);
+                      info.all_priorities.insert(this_priority);
                       multi_edge = true;
                     }
                 }
@@ -415,8 +413,8 @@ namespace spot
                   info.is_one_player0 = false;
               }
           } // v
-        assert(info.all_parities.size() || info.is_empty);
-        info.is_one_parity = info.all_parities.size() == 1;
+        assert(info.all_priorities.size() || info.is_empty);
+        info.is_one_priority = info.all_priorities.size() == 1;
         // Done
         return info;
       }
@@ -434,22 +432,24 @@ namespace spot
         // but we have to "trick" it into
         // not disregarding the transitions leaving the scc
         // dummy needed to pass asserts
-        max_abs_par_ = limit_par_even+2;
+        max_abs_priority_ = limit_priority_even+2;
         // The attractors should define their own subgame
         // but as we want to compute the attractors of the
         // leaving transitions, we need to make
         // sure that
         // a) no transition is excluded due to its parity
         // b) no transition is considered accepting/winning
-        //    due to its parity
+        //    due to its priority
         // Final note: Attractors cannot intersect by definition
         //             therefore the order in which they are computed
         //             is irrelevant
         unsigned dummy_rd = 0;
         // Attractor of outgoing transitions winning for env
-        attr(dummy_rd, false, limit_par_even, true, limit_par_even, false);
+        attr(dummy_rd, false, limit_priority_even, true,
+             limit_priority_even, false);
         // Attractor of outgoing transitions winning for player
-        attr(dummy_rd, true, limit_par_even+1, true, limit_par_even+1, false);
+        attr(dummy_rd, true, limit_priority_even+1, true,
+             limit_priority_even+1, false);
 
         // No strategy fix need
         // assert if all winning states of the current scc have a valid strategy
@@ -486,19 +486,19 @@ namespace spot
                  return true;
                }());
 
-        auto ins = inspect_scc(limit_par_even);
+        auto ins = inspect_scc(limit_priority_even);
         return ins;
       } // fix_scc
 
       inline bool
-      attr(unsigned &rd, bool p, par_t max_par,
-           bool acc_par, par_t min_win_par, bool respect_sg=true)
+      attr(unsigned &rd, bool p, priority_t max_priority,
+           bool acc_par, priority_t min_winning_priority, bool respect_sg=true)
       {
         // In fix_scc, the attr computation is
         // abused so we can not check certain things
         // Computes the attractor of the winning set of player p within a
         // subgame given as rd.
-        // If acc_par is true, max_par transitions are also accepting and
+        // If acc_par is true, max_priority transitions are also accepting and
         // the subgame count will be increased
         // The attracted vertices are directly added to the set
 
@@ -509,9 +509,10 @@ namespace spot
         // As proposed in Oink! / PGSolver
         // Needs the transposed graph however
 
-        assert((!acc_par) || (acc_par && to_player(max_par) == p));
-        assert(!acc_par || (min_par_graph_ <= min_win_par));
-        assert((min_win_par <= max_par) && (max_par <= max_abs_par_));
+        assert((!acc_par) || (acc_par && to_player(max_priority) == p));
+        assert(!acc_par || (min_priority_graph_ <= min_winning_priority));
+        assert((min_winning_priority <= max_priority)
+               && (max_priority <= max_abs_priority_));
 
         bool grown = false;
         // We could also directly mark states as owned,
@@ -558,25 +559,30 @@ namespace spot
                 unsigned min_subgame_idx = unseen_mark;
                 for (const auto &e: arena_->out(v))
                   {
-                    par_t this_par = to_par(e);
+                    priority_t this_priority = to_priority(e);
                     if ((!respect_sg || (subgame_[e.dst] >= rd))
-                         && (this_par <= max_par))
+                         && (this_priority <= max_priority))
                       {
                         // Check if winning
                         if (w_(e.dst, p)
-                            || (acc_par && (min_win_par <= this_par)))
+                            || (acc_par
+                                && (min_winning_priority <= this_priority)))
                           {
-                            assert(!acc_par || (this_par < min_win_par) ||
-                                   (acc_par && (min_win_par <= this_par) &&
-                                    (to_player(this_par) == p)));
+                            assert(!acc_par
+                                   || (this_priority < min_winning_priority)
+                                   ||
+                                   (acc_par
+                                    && (min_winning_priority <= this_priority)
+                                    &&
+                                    (to_player(this_priority) == p)));
                             if (is_owned)
                               {
                                 wins = true;
                                 if (acc_par)
                                   {
                                     s_[v] = arena_->edge_number(e);
-                                    if (min_win_par <= this_par)
-                                      // max par edge
+                                    if (min_winning_priority <= this_priority)
+                                      // max-priority edge
                                       // change sign -> mark as needs
                                       // to be possibly fixed
                                       s_[v] = -s_[v];
@@ -623,7 +629,9 @@ namespace spot
       // We need to check if transitions that are accepted due
       // to their parity remain in the winning region of p
       inline bool
-      fix_strat_acc(unsigned rd, bool p, par_t min_win_par, par_t max_par)
+      fix_strat_acc(unsigned rd, bool p,
+                     priority_t min_winning_priority,
+                     priority_t max_priority)
       {
         for (unsigned v : c_states())
           {
@@ -645,8 +653,8 @@ namespace spot
 
             // This is an accepting edge that is no longer admissible
             // or we seek a more desirable edge (for player)
-            assert(min_win_par <= to_par(e_s));
-            assert(to_par(e_s) <= max_par);
+            assert(min_winning_priority <= to_priority(e_s));
+            assert(to_priority(e_s) <= max_priority);
 
             // Strategy heuristic: prefer the lowest rank, then the oldest
             // winning subgame.  An accepting edge may point to a state in
@@ -658,15 +666,15 @@ namespace spot
             s_[v] = no_strat_mark;
             for (const auto &e_fix : arena_->out(v))
               {
-                par_t this_par = to_par(e_fix);
-                // This edge must have less than max_par, otherwise it would
-                // have already been attracted.
-                assert((this_par <= max_par)
-                       || (to_player(this_par) != (max_par&1)));
+                priority_t this_priority = to_priority(e_fix);
+                // This edge must have less than max_priority, otherwise it
+                // would have already been attracted.
+                assert((this_priority <= max_priority)
+                       || (to_player(this_priority) != (max_priority&1)));
                 // If it is accepting and leads to the winning region, it is
                 // a valid fix.
-                if ((min_win_par <= this_par)
-                    && (this_par <= max_par)
+                if ((min_winning_priority <= this_priority)
+                    && (this_priority <= max_priority)
                     && w_(e_fix.dst, p))
                   {
                     unsigned subgame_idx = subgame_[e_fix.dst] == unseen_mark
@@ -710,67 +718,74 @@ namespace spot
               case (0):
                 {
                   assert(this_work.rd == 0);
-                  assert(this_work.min_par == min_par_graph_);
+                  assert(this_work.min_priority == min_priority_graph_);
 
                   unsigned rd;
-                  assert(this_work.max_par <= max_abs_par_);
+                  assert(this_work.max_priority <= max_abs_priority_);
 
-                  // Check if empty and get parities
+                  // Check if empty and get priorities
                   subgame_info_t subgame_info =
-                    inspect_scc(this_work.max_par);
+                    inspect_scc(this_work.max_priority);
 
                   if (subgame_info.is_empty)
                     // Nothing to do
                     break;
-                  if (subgame_info.is_one_parity)
+                  if (subgame_info.is_one_priority)
                     {
                       // Can be trivially solved
-                      one_par_subgame_solver(subgame_info, this_work.max_par);
+                      one_priority_subgame_solver(subgame_info,
+                                               this_work.max_priority);
                       break;
                     }
 
-                  // Compute the winning parity boundaries
+                  // Compute the winning priority boundaries
                   // -> Priority compression
                   // Optional, improves performance
                   // Highest actually occurring
                   // Attention in partially colored graphs
-                  // the parity -1 and 0 appear
-                  par_t max_par = *subgame_info.all_parities.begin();
-                  par_t min_win_par = max_par;
-                  while ((min_win_par >= (min_par_graph_+2)) &&
-                         (!subgame_info.all_parities.count(min_win_par - 1)))
-                    min_win_par -= 2;
-                  assert(min_win_par >= min_par_graph_);
-                  assert(max_par >= min_win_par);
-                  assert((max_par&1) == (min_win_par&1));
-                  assert(!subgame_info.all_parities.empty());
+                  // the priority -1 and 0 appear
+                  priority_t max_priority =
+                    *subgame_info.all_priorities.begin();
+                  priority_t min_winning_priority = max_priority;
+                  while ((min_winning_priority >= (min_priority_graph_+2)) &&
+                         (!subgame_info.all_priorities.count(
+                             min_winning_priority - 1)))
+                    min_winning_priority -= 2;
+                  assert(min_winning_priority >= min_priority_graph_);
+                  assert(max_priority >= min_winning_priority);
+                  assert((max_priority&1) == (min_winning_priority&1));
+                  assert(!subgame_info.all_priorities.empty());
 
                   // Get the player
-                  bool p = to_player(min_win_par);
-                  // Attraction to highest par
+                  bool p = to_player(min_winning_priority);
+                  // Attraction to highest priority
                   // This increases rd_ and passes it to rd
-                  attr(rd, p, max_par, true, min_win_par);
+                  attr(rd, p, max_priority, true, min_winning_priority);
                   // All those attracted get subgame_[v] <- rd
 
                   // Continuation
-                  w_stack_.emplace_back(1, rd, min_win_par, max_par);
+                  w_stack_.emplace_back(1, rd, min_winning_priority,
+                                        max_priority);
                   // Recursion
-                  w_stack_.emplace_back(0, 0, min_par_graph_, min_win_par - 1);
+                  w_stack_.emplace_back(0, 0, min_priority_graph_,
+                                        min_winning_priority - 1);
                   // Others attracted will have higher counts in subgame
                   break;
                 }
               case (1):
                 {
                   unsigned rd = this_work.rd;
-                  par_t min_win_par = this_work.min_par;
-                  par_t max_par = this_work.max_par;
-                  assert(to_player(min_win_par) == to_player(max_par));
-                  bool p = to_player(min_win_par);
+                  priority_t min_winning_priority = this_work.min_priority;
+                  priority_t max_priority = this_work.max_priority;
+                  assert(to_player(min_winning_priority)
+                         == to_player(max_priority));
+                  bool p = to_player(min_winning_priority);
                   // Check if the attractor of w_[!p] is equal to w_[!p]
                   // if so, player wins if there remain accepting transitions
-                  // for max_par (see fix_strat_acc)
+                  // for max_priority (see fix_strat_acc)
                   // This does not increase but reuse rd
-                  bool grown = attr(rd, !p, max_par, false, min_win_par);
+                  bool grown = attr(rd, !p, max_priority, false,
+                                    min_winning_priority);
                   // todo investigate: A is an attractor, so the only way that
                   // attr(w[!p]) != w[!p] is if the max par "exit" edges lead
                   // to a trap for player/ exit the winning region of the
@@ -780,8 +795,9 @@ namespace spot
 
                   // Check if strategy needs to be fixed / is fixable
                   if (!grown)
-                    // this only concerns parity accepting edges
-                    grown = fix_strat_acc(rd, p, min_win_par, max_par);
+                    // this only concerns priority accepting edges
+                    grown = fix_strat_acc(rd, p, min_winning_priority,
+                                         max_priority);
                   // If !grown we are done, and the partitions are valid
 
                   if (grown)
@@ -797,7 +813,8 @@ namespace spot
                             // Unset strat for testing
                             s_[v] = no_strat_mark;
                           }
-                      w_stack_.emplace_back(0, 0, min_par_graph_, max_par);
+                      w_stack_.emplace_back(0, 0, min_priority_graph_,
+                                            max_priority);
                       // No need to do anything else
                       // the attractor of !p of this level is not changed
                     }
@@ -819,23 +836,23 @@ namespace spot
         s_.clear();
         rank_.clear();
         rd_ = 0;
-        max_abs_par_ = 0;
+        max_abs_priority_ = 0;
       }
 
       // Dedicated solver for special cases
-      inline void one_par_subgame_solver(const subgame_info_t &info,
-                                         par_t max_par)
+      inline void one_priority_subgame_solver(const subgame_info_t &info,
+                                         priority_t max_priority)
       {
-        assert(info.all_parities.size() == 1);
-        // The entire subgame is won by the player of the only parity
+        assert(info.all_priorities.size() == 1);
+        // The entire subgame is won by the player of the only priority
         // Any edge will do
         // todo optim for smaller circuit
         // This subgame gets its own counter
         ++rd_;
         unsigned rd = rd_;
-        par_t one_par = *info.all_parities.begin();
-        bool winner = to_player(one_par);
-        assert(one_par <= max_par);
+        priority_t one_priority = *info.all_priorities.begin();
+        bool winner = to_player(one_priority);
+        assert(one_priority <= max_priority);
 
         for (unsigned v : c_states())
           {
@@ -851,10 +868,10 @@ namespace spot
             unsigned min_subgame_idx = unseen_mark;
             for (const auto &e : arena_->out(v))
               {
-                par_t this_par = to_par(e);
-                if ((subgame_[e.dst] >= rd) && (this_par <= max_par))
+                priority_t this_priority = to_priority(e);
+                if ((subgame_[e.dst] >= rd) && (this_priority <= max_priority))
                   {
-                    assert(this_par == one_par);
+                    assert(this_priority == one_priority);
                     // States in the current one-priority subgame are not
                     // assigned a subgame number until this loop completes.
                     // Consequently, prefer them over already solved exits.
@@ -873,14 +890,14 @@ namespace spot
       }
 
       template <class EDGE>
-      inline par_t
-      to_par(const EDGE& e)
+      inline priority_t
+      to_priority(const EDGE& e)
       {
-        return all_edge_par_[arena_->edge_number(e)];
+        return all_edge_priorities_[arena_->edge_number(e)];
       }
 
       inline bool
-      to_player(par_t par)
+      to_player(priority_t par)
       {
         return par & 1;
       }
@@ -900,18 +917,18 @@ namespace spot
 
       // Informations about sccs and the current scc
       std::unique_ptr<scc_info> info_;
-      par_t max_abs_par_; // Max parity occurring in the current scc
-      // Minimal and maximal parity occurring in the entire graph
-      par_t min_par_graph_, max_par_graph_;
+      priority_t max_abs_priority_; // Max priority occurring in the current scc
+      // Minimal and maximal priority occurring in the entire graph
+      priority_t min_priority_graph_, max_priority_graph_;
       // Info on the current scc
       unsigned c_scc_idx_;
       // Change recursive calls to stack
       std::vector<work_t> w_stack_;
-      // Directly store a vector of parities
+      // Directly store a vector of priorities
       // This vector will be created such
       // that it takes care of the actual parity condition
       // and after that zielonka can be called as if max odd
-      std::vector<par_t> all_edge_par_;
+      std::vector<priority_t> all_edge_priorities_;
     };
 
   } // anonymous
