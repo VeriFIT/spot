@@ -1039,7 +1039,7 @@ namespace spot
       {
         auto max_elem = get_max();
         unsigned n_occur_old = max_elem.second;
-        if (max_elem.second == 0)
+        if (n_occur_old == 0)
           break;
 
         // Create the gate
@@ -1074,7 +1074,7 @@ namespace spot
               }
           }
         assert(n_occur_old == n_occur);
-        (void) n_occur_old;
+        (void) n_occur;
       }
     // All products should now be created
     assert(std::all_of(needed_prods.cbegin(), needed_prods.cend(),
@@ -1101,7 +1101,7 @@ namespace spot
       {
         auto max_elem = get_max();
         unsigned n_occur_old = max_elem.second;
-        if (max_elem.second == 0)
+        if (n_occur_old == 0)
           break;
         // Create the gate
         bdd orcond = or_(max_elem);
@@ -1132,7 +1132,7 @@ namespace spot
             }
           }
         assert(n_occur_old == n_occur);
-        (void) n_occur_old;
+        (void) n_occur;
       }
   }
 
@@ -1331,7 +1331,7 @@ namespace spot
 
     std::deque<unsigned> todo;
     todo.push_back(0);
-    assert(n_max_states > 0);
+    SPOT_ASSUME(n_max_states > 0);
     std::vector<bool> seen(n_max_states, false);
     seen[0] = true;
 
