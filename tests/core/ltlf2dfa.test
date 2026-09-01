@@ -173,8 +173,10 @@ State: 2 "1"
 EOF
 diff out.hoa exp.hoa
 
-ltlf2dfa -f '\forall a: (a U b) | (b U !a)' --trans=compo 2>err && exit 2
-grep 'does not support' err
+ltlf2dfa -f '\forall a: (a U b) | (b U !a)' --trans=compo >out.hoa
+grep 'AP: 2 "a" "b"' out.hoa
+ltlf2dfa -f '\exists a: (a U b) | (b U !a)' --trans=compo >out.hoa
+grep 'AP: 2 "a" "b"' out.hoa
 
 # We also use different minimization/simplify/translation algorithms,
 # but because the formulas are very simple, the result is expected to

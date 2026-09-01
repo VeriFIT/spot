@@ -1388,18 +1388,34 @@ namespace spot
       return res;
     }
 
-    // Convert a vector of atomic proposition formulas to a positive
-    // cube (conjunction) of BDD variables.  Atomic propositions that
-    // are not registered in the automaton's dictionary are ignored.
+    // Convert atomic propositions to a positive cube (conjunction) of
+    // BDD variables.  Atomic propositions that are not registered in
+    // the automaton's dictionary are ignored.
     static bdd
-    aps_to_bdd(const mtdfa_ptr& dfa,
-               const std::vector<formula>& aps)
+    aps_to_bdd(const mtdfa_ptr& dfa, const std::vector<formula>& aps)
     {
       bdd_dict_ptr d = dfa->get_dict();
       bdd res = bddtrue;
       for (const formula& ap: aps)
         {
           int v = d->has_registered_proposition(ap, dfa);
+          if (v >= 0)
+            res &= bdd_ithvar(v);
+        }
+      return res;
+    }
+
+    static bdd
+    aps_to_bdd_from_quantifier(const mtdfa_ptr& dfa, const formula& quantified)
+    {
+      assert(quantified.is_quantified());
+      bdd_dict_ptr d = dfa->get_dict();
+      bdd res = bddtrue;
+      std::cerr << quantified << '\n';
+      unsigned last = quantified.size() - 1;
+      for (unsigned i = 0; i < last; ++i)
+        {
+          int v = d->has_registered_proposition(quantified[i], dfa);
           if (v >= 0)
             res &= bdd_ithvar(v);
         }
@@ -3388,9 +3404,18 @@ namespace spot
       case op::OrRat:
       case op::Star:
       case op::UConcat:
+        throw std::runtime_error("ltlf_to_mtdfa_compose: unsupported operator");
       case op::exists:
       case op::forall:
-        throw std::runtime_error("ltlf_to_mtdfa_compose: unsupported operator");
+        {
+          unsigned last = f.size() - 1;
+          mtdfa_ptr sub = rec(f[last]);
+          bdd vars = aps_to_bdd_from_quantifier(sub, f);
+          if (o == op::exists)
+            return quantify_exists(sub, vars);
+          else
+            return quantify_forall(sub, vars);
+        }
       }
     SPOT_UNREACHABLE();
     return nullptr;

@@ -298,14 +298,8 @@ namespace
             a->names.clear();
           if (opt_minimize)
             a = spot::minimize_mtdfa(a);
-        }
-      else
+        }        else
         {
-          if (SPOT_UNLIKELY(f.is_quantified()))
-            error_at_line(2, 0, filename, linenum,
-                          "--translation=compositional does not support "
-                          "quantified formulas");
-
           a = spot::ltlf_to_mtdfa_compose(f, dict,
                                           opt_minimize,
                                           opt_composition_by_ap,

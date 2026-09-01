@@ -23,42 +23,62 @@ tc = TestCase()
 gen = spot.randltl(4, output='ltl', ltl_priorities='strongX=1', tree_size=30)
 for i in range(200):
    f = next(gen)
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
    a1b = spot.minimize_mtdfa(a1)
-   a2 = spot.translate(f, "finite", "deterministic", )
+   a2 = spot.translate(f, "finite", "deterministic")
    a3 = spot.twadfa_to_mtdfa(a2)
-   tc.assertTrue(spot.product_xor(a1b, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, a3).is_empty(), f);
    a4 = spot.ltlf_to_mtdfa_compose(f, True, False)
-   tc.assertTrue(spot.product_xor(a4, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a4, a3).is_empty(), f);
    a5 = spot.ltlf_to_mtdfa_compose(f, True, True)
-   tc.assertTrue(spot.product_xor(a5, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a5, a3).is_empty(), f);
 
 gen = spot.randltl(4, output='ltl', tree_size=15)
 for i in range(100):
    f = spot.formula_And([next(gen), spot.formula_Not(next(gen)),
                          next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
    a1b = spot.minimize_mtdfa(a1)
-   a2 = spot.translate(f, "finite", "deterministic", )
+   a2 = spot.translate(f, "finite", "deterministic")
    a3 = spot.twadfa_to_mtdfa(a2)
-   tc.assertTrue(spot.product_xor(a1b, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, a3).is_empty(), f);
    a4 = spot.ltlf_to_mtdfa_compose(f, True, False)
-   tc.assertTrue(spot.product_xor(a4, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a4, a3).is_empty(), f);
    a5 = spot.ltlf_to_mtdfa_compose(f, True, True)
-   tc.assertTrue(spot.product_xor(a5, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a5, a3).is_empty(), f);
 
 for i in range(100):
    f = spot.formula_Or([next(gen), spot.formula_Not(next(gen)),
                         next(gen), spot.formula_Not(next(gen))])
-   print(f)
    a1 = spot.ltlf_to_mtdfa(f)
    a1b = spot.minimize_mtdfa(a1)
-   a2 = spot.translate(f, "finite", "deterministic", )
+   a2 = spot.translate(f, "finite", "deterministic")
    a3 = spot.twadfa_to_mtdfa(a2)
-   tc.assertTrue(spot.product_xor(a1b, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a1b, a3).is_empty(), f);
    a4 = spot.ltlf_to_mtdfa_compose(f, True, False)
-   tc.assertTrue(spot.product_xor(a4, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a4, a3).is_empty(), f);
    a5 = spot.ltlf_to_mtdfa_compose(f, True, True)
-   tc.assertTrue(spot.product_xor(a5, a3).is_empty());
+   tc.assertTrue(spot.product_xor(a5, a3).is_empty(), f);
+
+# Quantified LTLf formulas must agree between direct and compositional
+# MTDFA translations.
+quantified = [
+   "\\exists a: F(a & b) | G(!a | c)",
+   "\\forall a: G(a | b) & F(!a | c)",
+   "\\exists a: (a U (!a & b)) | (!a U (a & c))",
+   "\\forall a: (F(a & b) | G(!a | c)) & (F(!a & d) | G(a | e))",
+   "\\exists a, b: F((a & !b & c) | (!a & b & d))",
+   "\\forall a, b: G((a | !b | c) & (!a | b | d))",
+   "\\exists a, b: (a U (!b & c)) & (!a U (b | d))",
+   "\\forall a, b: (F(a & !b & c) | G(!a | b | d))",
+   "\\exists a, b: \\forall c, d: ((a & !c & e) U (b | d | f))",
+   "\\forall a, b: \\exists c, d: G((a | !c | e) & (!b | d | f))",
+   "\\exists a, b: \\exists c: (F(a & !b & c) | G(!a & (b | !c | d)))",
+   "\\forall a, b: \\forall c: (G(a | !b | c) & F(!a & (b | !c | d)))",
+]
+for f in map(spot.formula, quantified):
+   direct = spot.ltlf_to_mtdfa(f)
+   composed = spot.ltlf_to_mtdfa_compose(f, True, False)
+   tc.assertTrue(spot.product_xor(direct, composed).is_empty(), f)
+   composed2 = spot.ltlf_to_mtdfa_compose(f, True, True)
+   tc.assertTrue(spot.product_xor(direct, composed2).is_empty(), f)
