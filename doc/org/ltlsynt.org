@@ -518,11 +518,17 @@ following paper:
 - *Reactive Synthesis from LTL Specification with Spot*, /Thibaud Michaud/,
   /Maximilien Colange/.  Presented in SYNT@CAV'18.  ([[https://www.lre.epita.fr/dload/papers/michaud.18.synt.pdf][pdf]] | [[https://wwww.lre.epita.fr/~max/bibtexbrowser.php?key=michaud.18.synt&bib=perso.bib][bib]])
 
-Further improvements are described in the following paper:
+Further improvements are described in the following papers:
 
 - *Improvements to =ltlsynt=*, /Florian Renkin/, /Philipp Schlehuber/,
   /Alexandre Duret-Lutz/, and /Adrien Pommellet/.  Presented at the
   SYNT'21 workshop.  ([[https://wwww.lre.epita.fr/~adl/dl/adl/renkin.21.synt.pdf][pdf]] | [[https://wwww.lre.epita.fr/~adl/dl/adl_bib.html#renkin.21.synt][bib]])
+
+- *Fast obligation translation and synthesis*
+  /Alexandre Duret-Lutz/, /Giuseppe De Giacomo/, /Marcin Jurdzinski/,
+  /Nir Piterman/, /Moshe Y. Vardi/, and /Shufang Zhu/.
+  In Proc. of CAV'26.  LNCS 16682, pp. 322--339.  Jul. 2026.
+  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.26.cav][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.26.cav.pdf][pdf]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.26.cav.slides.pdf][slides]])
 
 Simplification of Mealy machines is discussed in the following papers:
 

@@ -292,6 +292,7 @@ namespace spot
   ///   reconstructed), so it is disabled by default.
   ///
   /// \cite duret.25.ciaa
+  /// \cite alon.26.kr
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa(formula f, const bdd_dict_ptr& dict,
                 bool fuse_same_bdds = true,
@@ -388,6 +389,7 @@ namespace spot
   /// details.
   ///
   /// \cite duret.25.ciaa
+  /// \cite alon.26.kr
   SPOT_API mtdfa_ptr
   ltlf_to_mtdfa_for_synthesis(formula f, const bdd_dict_ptr& dict,
                               const std::vector<std::string>& outvars,

@@ -562,6 +562,25 @@ stop after one or two steps depending on the initial value of =i=.
 rm -f counter2.ltlf
 #+END_SRC
 
+* References
+
+The initial implementation of =ltlfsynt= is described in the following paper:
+
+- *Engineering an LTLf Synthesis Tool*
+  /Alexandre Duret-Lutz/, /Shufang Zhu/, /Nir Piterman/,
+  /Giuseppe De Giacomo/, and /Moshe Y. Vardi/.
+  In Proc. of CIAA'25.  LNCS 15981, pp. 129--147.  Sep. 2025.
+  ([[https://wwww.lre.epita.fr/~adl/dl/adl_bib.html#duret.25.ciaa][bib]] | [[https://wwww.lre.epita.fr/~adl/dl/adl/duret.25.ciaa.pdf][pdf]] | [[https://wwww.lre.epita.fr/~adl/dl/adl/duret.25.ciaa.slides.pdf][slides]])
+
+Support for synthesis under partial observability is described here:
+
+- *On-the-fly LTLf synthesis under partial observability*
+  /Nadav Alon/, /Alexandre Duret-Lutz/, /Supratik Chakraborty/, /Dror Fried/,
+  /Lucas M. Tabajara/, /Moshe Y. Vardi/, and /Shufang Zhu/.
+  In Proc. of KR'26.  pp. 25--35.  Jul. 2026.
+  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#alon.26.kr][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/alon.26.kr.pdf][pdf]])
+
+
 #  LocalWords:  utf ltlfsynt realizabiity LTLf html args LTL AIG le
 #  LocalWords:  realizability varphi mathbb genltl SRC tv sed init oc
 #  LocalWords:  HOA acc GraphViz's ltlfsyntexstrat svg txt ltlsynt un

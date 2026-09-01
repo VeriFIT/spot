@@ -434,6 +434,11 @@ namespace spot
   ///
   /// The formula may use quantified atomic propositions
   /// (∀ or ∃).
+  ///
+  /// The main translation (without quantification) is
+  /// described by \cite duret.26.cav and the support
+  /// for quantification uses the technique described
+  /// in \cite alon.26.kr
   SPOT_API
   mtdswa_ptr obligation_to_mtdswa(formula f, const bdd_dict_ptr& dict,
                                   bool fuse_same_bdds = true,
@@ -455,6 +460,10 @@ namespace spot
   /// The formula may also use quantified atomic propositions
   /// (∀ or ∃).  The quantified variables should not be
   /// pre-registered in the dictionary.
+  ///
+  /// The main translation and synthesis techniques is described by
+  /// \cite duret.26.cav and the support for quantification uses the
+  /// technique described in \cite alon.26.kr
   SPOT_API
   mtdswa_ptr obligation_synthesis(formula f, const bdd_dict_ptr& dict,
                                   const std::vector<std::string>& outvars,

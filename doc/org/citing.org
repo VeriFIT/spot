@@ -102,6 +102,30 @@ be more specific about a particular aspect of Spot.
   Discusses some of the implementation behind [[file:ltlf2dfa.org][=ltlf2dfa=]] and
   [[file:ltlfsynt.org][=ltlfsynt=]].
 
+- *Fast obligation translation and synthesis*
+  /Alexandre Duret-Lutz/, /Giuseppe De Giacomo/, /Marcin Jurdzinski/,
+  /Nir Piterman/, /Moshe Y. Vardi/, and /Shufang Zhu/.
+  In Proc. of CAV'26.  LNCS 16682, pp. 322--339.  Jul. 2026.
+  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#duret.26.cav][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.26.cav.pdf][pdf]] | [[https://www.lrde.epita.fr/~adl/dl/adl/duret.26.cav.slides.pdf][slides]])
+
+  Apply the techniques developped for LTLf and DFA in the previous
+  paper to a subset of LTL called syntactic obligations and to weak
+  deterministic Büchi automata.  Used by [[file:ltlsynt.org][=ltlsynt=]] and [[file:ltl2tgba.org][=ltl2tgba=]] when
+  the input is a syntactic obligation, and the desired output is
+  deterministic.
+
+- *On-the-fly LTLf synthesis under partial observability*
+  /Nadav Alon/, /Alexandre Duret-Lutz/, /Supratik Chakraborty/, /Dror Fried/,
+  /Lucas M. Tabajara/, /Moshe Y. Vardi/, and /Shufang Zhu/.
+  In Proc. of KR'26.  pp. 25--35.  Jul. 2026.
+  ([[https://www.lrde.epita.fr/~adl/dl/adl_bib.html#alon.26.kr][bib]] | [[https://www.lrde.epita.fr/~adl/dl/adl/alon.26.kr.pdf][pdf]])
+
+  LTLf synthesis with partial observability, is based on a simple
+  universal quantification performed during the translation.
+  Extending this technique, Spot also support existential
+  quantifications of LTLf The same technique was aslo implemented for
+  quantified syntactic obligations.
+
 * Obsolete references
 
 - *Spot 2.0 — a framework for LTL and ω-automata manipulation*,
