@@ -1385,6 +1385,8 @@ namespace spot
 
       the_quantify_data.set_to_terminal_map.clear();
       the_quantify_data.terminal_to_set_map.clear();
+      for (bdd b = vars; b != bddtrue; b = bdd_high(b))
+        dict->unregister_variable(bdd_var(b), res);
       return res;
     }
 

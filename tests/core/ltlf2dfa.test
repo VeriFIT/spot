@@ -174,9 +174,9 @@ EOF
 diff out.hoa exp.hoa
 
 ltlf2dfa -f '\forall a: (a U b) | (b U !a)' --trans=compo >out.hoa
-grep 'AP: 2 "a" "b"' out.hoa
+grep 'AP: 1 "b"' out.hoa
 ltlf2dfa -f '\exists a: (a U b) | (b U !a)' --trans=compo >out.hoa
-grep 'AP: 2 "a" "b"' out.hoa
+grep 'AP: 1 "b"' out.hoa
 
 # We also use different minimization/simplify/translation algorithms,
 # but because the formulas are very simple, the result is expected to
