@@ -10,18 +10,18 @@ New in spot 2.15.1.dev  (not yet released)
 
   - autdo is a new tool, similar to ltldo, but for automata: it runs
     automata through one or more external tools and outputs the results.
-    The input options are the same as autcross, and the output options are
-    the same as ltldo (e.g., ability to output the smallest or largest
-    result from multiple tools, changing the output format, killing
-    tools on timeout...).  (Issue #466.)
+    Its input options are the same as those of autcross, and its output
+    options are the same as those of ltldo (e.g., ability to output the
+    smallest or largest result from multiple tools, changing the output
+    format, killing tools on timeout...).  (Issue #466.)
 
   - autwords is a new tool that enumerates lasso-shaped words accepted
     by an ω-automaton.  (Issue #642.)
 
   - genaut learned a new family of automata --el-empty=k,N.  It
-    generates a one-state, empty-language automaton, that has a
-    complex EL acceptance condition designed to challenge EL
-    emptiness-checking algorithms.
+    generates a one-state, empty-language automaton with a complex EL
+    acceptance condition designed to challenge EL emptiness-checking
+    algorithms.
 
   - autcross and autdo now recognize "kofola" as a shorthand, appending
     "%H>%O" when no %-sequence is used in the command.
@@ -63,13 +63,16 @@ New in spot 2.15.1.dev  (not yet released)
     negated specification.  For AIG circuits, the check is performed
     using the circuit's transition relation.
 
+  - ltlsynt learned --print-each-mealy to print each Mealy machine
+    produced for a decomposed specification before AIGER encoding.
+
   - ltlf2dfa --translation=compositional now also supports QLTL.
     (Quantifiers were only supported by --translation=direct before.)
 
   Library:
 
   - the spot::translator class learned to deal with quantified LTL
-    with arbitrary nesting of quantifiers at the top-level.  Those
+    with arbitrary nesting of quantifiers at the top level.  Those
     quantifications are easier to deal with in the
     syntactic-obligation fragment; in the general case only a single
     \exists operator can be handled efficiently, and other situations
@@ -84,8 +87,14 @@ New in spot 2.15.1.dev  (not yet released)
     or nullptr if the variable is not an atomic proposition.  This avoids
     having to access the internal bdd_map directly.  (Issue #622.)
 
-  - BuDDy has a new function called bdd_splitcube(), used to spit a cube
+  - BuDDy has a new function called bdd_splitcube(), used to split a cube
     according to a set of variables.  (Issue #644.)
+
+  - spot::analyze_dependent_output() is a new function that identifies
+    output variables whose values may depend on previous output values.
+    The supporting BuDDy function bdd_have_dependent_var() is also
+    available.  (See "On Dependent Variables in Reactive Synthesis"
+    by Akshay et al. TACAS'24)
 
   - spot::obligation_to_mtdswa() now also supports \exists and \forall.
 
@@ -114,8 +123,8 @@ New in spot 2.15.1.dev  (not yet released)
     this class.
 
   - spot::ltl_satisfiable() (introduced in 2.15) has been rewritten
-    to use the above on-the-fly explorer. Note that this functions is
-    what is used by 'ltlfilt --satisfiable'.  (Issue #626.)
+    to use the above on-the-fly explorer. Note that this function is
+    used by 'ltlfilt --satisfiable'.  (Issue #626.)
 
   - spot::distribute_next() is a new function that distributes X and
     X[!] operators over Boolean connectives in a formula.
@@ -160,6 +169,10 @@ New in spot 2.15.1.dev  (not yet released)
   - trim() is a new function to remove useless states in mtdswa_ptr
     and in mtdfa_ptr.
 
+  - generic_emptiness_check_select_version() now accepts spot216, a new
+    generic emptiness-checking algorithm with improved asymptotic
+    complexity for the relevant acceptance conditions.
+
   Deprecation notices:
 
   - spot::collect_aps_with_polarities() is deprecated; use
@@ -180,9 +193,9 @@ New in spot 2.15.1.dev  (not yet released)
   - ltlsynt --splittype=fullsym had a bug that could cause unrealizable
     specifications to be erroneously declared realizable.  (Issue #647.)
 
-  - Fix some incorrect result of ltlsynt in rare cases involving
+  - Fix some incorrect results of ltlsynt in rare cases involving
     decomposition, polarity-based simplification, and obligation-based
-    synthesis.  LedMatrix.tlsf is one such cases.  (Issue #651.)
+    synthesis.  LedMatrix.tlsf is one such case.  (Issue #651.)
 
   - random_formula::parse_options() and randltlgenerator() were using
     strtok() to parse priority strings, which mutates the input
