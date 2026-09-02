@@ -64,6 +64,8 @@ namespace spot
   /// <code>SPOT_FROM_LTLF</code> (values: <b>0</b> = original,
   /// <b>1</b> = syntactic-obligation) exactly once and caches the result.
   /// The default when the variable is unset is <b>1</b>.
+  ///
+  /// \cite duret.26.arxiv
   SPOT_API formula
   from_ltlf(formula f, const char* alive = "alive");
 

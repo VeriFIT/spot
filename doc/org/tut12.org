@@ -63,6 +63,9 @@ equal to =t(φ₁) U t(φ₂ & alive)=) that is fixed in the [[https://www.cs.ri
 paper]], but that second paper forgets to ensure that =alive= holds
 initially, as required in the first paper...
 
+This Spot 2.16, the reduction from LTLf to LTL uses a slightly
+different encoding described in some [[https://arxiv.org/abs/2609.00379][arXiv paper]].
+
 * Shell version
 
 The first four steps of the above sequence of operations can be
