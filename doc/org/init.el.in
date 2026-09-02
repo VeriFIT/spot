@@ -58,6 +58,8 @@
 (setq ess-gen-proc-buffer-name-function 'ess-gen-proc-buffer-name:directory)
 (setq ess-use-flymake nil)
 
+(setq ess-history-file nil)
+
 (setq org-export-htmlize-output-type 'css)
 (setq org-html-htmlize-output-type 'css)
 ; the .org-timestamp directory does not always exist, is not always
@@ -229,9 +231,48 @@ object unless a different class is specified with an attribute."
 (unless (fboundp 'org-html--svg-image)
   (advice-add 'org-html--format-image :before-until 'spot-svg-output-as-object))
 
-(org-publish-all t)
 ;;; org-babel-remove-temporary-directory does not correctly remove
 ;;; nested directories and we have some files in tmp/.libs/ because of
-;;; libtool.  So we have to clean that ourselves.
-(if (file-directory-p org-babel-temporary-directory)
-    (delete-directory org-babel-temporary-directory t))
+;;; libtool.  Recent version sometimes fail with
+;;; "Failed to remove temporary Org-babel directory"
+(defun spot-org-babel-remove-temporary-directory ()
+  (if (file-directory-p org-babel-temporary-directory)
+      (delete-directory org-babel-temporary-directory t)))
+
+(advice-add 'org-babel-remove-temporary-directory :override
+            'spot-org-babel-remove-temporary-directory)
+
+
+
+;;; Org-mode 9.8 let-bound ess-directory and ess-firectory-function to nil,
+;;; this causes R to ignore our globally set directory, and also
+;;; causes some "Don’t know how to make a let-bound variable an alias"
+;;; error.
+(when (version< "9.8" org-version)
+  (defun spot-org-babel-R-initiate-session (session _params)
+    "Create or return the current R SESSION buffer."
+    (unless (string= session "none")
+      (let* ((session (or session "*R*"))
+             ;; Make ESS name the process buffer as SESSION.
+             (ess-gen-proc-buffer-name-function
+              (lambda (_) session)))
+        (if (org-babel-comint-buffer-livep session)
+            session
+          (save-window-excursion
+            (when (get-buffer session)
+              ;; Session buffer exists, but with dead process
+              (set-buffer session))
+            (org-require-package 'ess-r-mode "ESS")
+            (set-buffer (run-ess-r))
+            (let ((R-proc (get-process (or ess-local-process-name
+                                           ess-current-process-name))))
+              (while (process-get R-proc 'callbacks)
+                (ess-wait-for-process R-proc)))
+            (current-buffer))))))
+
+  (advice-add 'org-babel-R-initiate-session :override
+              'spot-org-babel-R-initiate-session))
+
+
+
+(org-publish-all t)
