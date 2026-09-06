@@ -57,7 +57,9 @@ libcommon_a_SOURCES =				\
   common_setup.hh				\
   common_sys.hh                                 \
   common_trans.cc				\
-  common_trans.hh
+  common_trans.hh				\
+  common_tlsf.cc				\
+  common_tlsf.hh
 
 bin_PROGRAMS = \
   autcross \

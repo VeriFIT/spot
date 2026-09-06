@@ -169,19 +169,19 @@ previous input to set the output) but unrealizable under Mealy.
 =ltlsynt= was made with the [[http://syntcomp.org/][SYNTCOMP]] competition in mind, and more
 specifically the TLSF track of this competition.  TLSF is a high-level
 specification language created for the purpose of this competition.
-Fortunately, the SYNTCOMP organizers also provide a tool called
-[[https://github.com/reactive-systems/syfco][=syfco=]] which can translate a TLSF specification to an LTL formula.
 
 The following line shows how a TLSF specification called =FILE= can
-be synthesized using =syfco= and =ltlsynt=:
+be synthesized with =ltlsynt=:
 
 #+BEGIN_SRC sh :export code
 ltlsynt --tlsf FILE
 #+END_SRC
 
-The above =--tlsf= option will call =syfco= (which must be on your
-=$PATH=) to perform the conversion and extract output signals.  See
-[[file:tlsf.org][the TLSF page]] for more details.
+The =--tlsf= option uses the TLSF parser embedded in Spot to convert
+the specification to LTL and to extract the output signals.  Set the
+=SPOT_TLSF_PARSER= environment variable to =syfco= to use the
+external [[https://github.com/reactive-systems/syfco][=syfco=]] tool instead.  See [[file:tlsf.org][the TLSF page]] for more
+details.
 
 Additionally, using =--tlsf= will verify that the TLSF specification
 is defined using Mealy semantics.  Use =--semantics=Moore= to

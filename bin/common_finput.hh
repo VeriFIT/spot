@@ -88,7 +88,6 @@ public:
   run();
 
   char* real_filename = nullptr;
-  char* assignments = nullptr;  // for TLSF
   long int col_to_read = 0;
   char* prefix = nullptr;
   char* suffix = nullptr;

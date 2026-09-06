@@ -22,11 +22,11 @@
 #include <error.h>
 #include <argmatch.h>
 #include <iomanip>
-#include <sys/stat.h>
 
 #include "common_aoutput.hh"
 #include "common_finput.hh"
 #include "common_setup.hh"
+#include "common_tlsf.hh"
 #include "common_trans.hh"
 #include "common_ioap.hh"
 #include <spot/priv/robin_hood.hh>
@@ -34,7 +34,6 @@
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/ltlf.hh>
-#include <sys/stat.h>
 #include <spot/twaalgos/dot.hh>
 #include <spot/twaalgos/synthesis.hh> // for split_independent_formulas
 #include <spot/twaalgos/ltlf2dfa.hh>
@@ -90,9 +89,11 @@ static const argp_option options[] =
     { "part-file", OPT_PART_FILE, "FILENAME", 0,
       "read the I/O partition of atomic propositions from FILENAME", 0 },
     { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,
-      "Read a TLSF specification from FILENAME, and call syfco to "
-      "convert it into LTLf.  Any parameter assignment specified after a slash"
-      " is passed as '-op VAR=VAL' to syfco." , 0 },
+      "Read a TLSF specification from FILENAME, and convert it into "
+      "LTLf using the parser embedded in Spot (unless the "
+      "SPOT_TLSF_PARSER environment variable selects the external "
+      "syfco tool).  Any parameter assignment specified after a slash"
+      " overrides that parameter." , 0 },
     { "semantics", OPT_SEMANTICS, "Moore|Mealy", 0,
       "Whether to work under Mealy (input-first) or Moore "
       "(output-first) semantics.  The default is Mealy.", 0 },
@@ -193,8 +194,11 @@ static const struct argp_child children[] =
   };
 
 static const char argp_program_doc[] = "\
-Convert LTLf formulas to transition-based deterministic finite automata.\n\n\
-If multiple formulas are supplied, several automata will be output.";
+Synthesize a controller from its LTLf specification.\v\
+Exit status:\n\
+  0   if all input problems were realizable\n\
+  1   if at least one input problem was not realizable\n\
+  2   if any error has been reported";
 
 enum translation_type {
   translation_otf_dfs,
@@ -1019,102 +1023,49 @@ namespace
     int
     process_tlsf_file(const char* filename) override
     {
-      if (assignments)
-        {
-          free(assignments);
-          assignments = nullptr;
-        }
-      char* syfco_filename = const_cast<char*>(filename);
+      // The flags below request an LTLf (finite) formula, and
+      // mirror the two conditions checked before calling this
+      // function: when the user forced the output signals or the
+      // semantics from the command-line, there is no need to query
+      // them from the TLSF file (this saves syfco calls in the
+      // syfco backend).
+      tlsf_flags flags = tlsf_flags::TLSF_EXPECT_FINITE;
+      if (all_input_aps.has_value() || all_output_aps.has_value())
+        flags |= tlsf_flags::TLSF_IGNORE_SIGNALS;
+      if (opt_semantics != semantics_default)
+        flags |= tlsf_flags::TLSF_IGNORE_TARGET;
 
-      // The filename passed can be either a real filename, or
-      // a string link FILENAME/ASSIGNMENTS where ASSIGNMENTS are
-      // comma-separated assignments.  E.g., "../spec.tlsf/N=3,M=4".
-      //
-      // If the filename contains a slash followed by some equal sign,
-      // and does not correspond to an existing file, then we remove
-      // the part after the last slash and assume the rest is a
-      // filename before passing it to syfco.  We don't check if the
-      // new (truncated) filename exist, syfco will do it anyway.
-      struct stat buf;
-      if (const char* slash = strrchr(filename, '/');
-          slash && strchr(slash, '=') && stat(filename, &buf) != 0)
-        {
-          if (real_filename)
-            free(real_filename);
-          real_filename = strndup(filename, slash - filename);
-          assignments = strdup(slash + 1);
-          syfco_filename = real_filename;
-        }
+      tlsf_conversion_result conv;
+      if (!read_tlsf_file(filename, flags, conv, opt_verbose))
+        // An unreadable TLSF file is an error, not an unrealizable
+        // specification: report it with exit status 2.
+        return 2;
 
-      std::vector<char*> command;
-      static char arg0[] = "syfco";
-      command.push_back(arg0);
-      // split assignments on commas, and pass each VAR=VALUE
-      // as -op VAR=VALUE to syfco.
-      if (assignments)
-        {
-          static char argop[] = "-op";
-          char* assignment = strtok(assignments, ",");
-          while (assignment)
-            {
-              command.push_back(argop);
-              command.push_back(assignment);
-              assignment = strtok(nullptr, ",");
-            }
-        }
-      unsigned after_assignments = command.size();
-      static char arg1[] = "-f";
-      command.push_back(arg1);
-      static char arg2[] = "ltlxba-fin";
-      command.push_back(arg2);
-      static char arg3[] = "-m";
-      command.push_back(arg3);
-      static char arg4[] = "fully";
-      command.push_back(arg4);
-      command.push_back(syfco_filename);
-      command.push_back(nullptr);
-
-      std::string tlsf_string = read_stdout_of_command(command, opt_verbose);
-
-      // The set of atomic proposition will be temporary set to those
-      // given by syfco, unless they were forced from the command-line.
+      // The set of atomic propositions is temporarily set to those
+      // declared in the TLSF file, unless they were forced from the
+      // command-line.
       bool reset_aps = false;
       if (!all_input_aps.has_value() && !all_output_aps.has_value())
         {
           reset_aps = true;
-          command.resize(after_assignments);
-          static char arg[] = "--print-output-signals";
-          command.push_back(arg);
-          command.push_back(syfco_filename);
-          command.push_back(nullptr);
-          std::string res = read_stdout_of_command(command, opt_verbose);
-
-          all_output_aps.emplace(std::vector<std::string>{});
-          split_aps(res, *all_output_aps);
-          for (const std::string& a: *all_output_aps)
+          all_output_aps.emplace(conv.outputs);
+          for (const std::string& a: conv.outputs)
             identifier_map.emplace(a, ap_type::OutputAP);
         }
       semantics_choice old_semantics = opt_semantics;
       if (old_semantics == semantics_default)
         {
-          command.resize(1);    // syfco
-          static char arg[] = "--print-target";
-          command.push_back(arg);
-          command.push_back(syfco_filename);
-          command.push_back(nullptr);
-          std::string res = read_stdout_of_command(command, opt_verbose);
-
-          auto not_space = [](unsigned char c){ return !std::isspace(c); };
-          res.erase(std::find_if(res.rbegin(), res.rend(), not_space).base(),
-                    res.end());
-          if (res == "Mealy")
-            opt_semantics = semantics_mealy;
-          else if (res == "Moore")
-            opt_semantics = semantics_moore;
-          else
-            error(2, 0, "%s: unknown target: `%s'", filename, res.c_str());
+          switch (conv.target)
+            {
+            case spot::tlsf_target::Mealy:
+              opt_semantics = semantics_mealy;
+              break;
+            case spot::tlsf_target::Moore:
+              opt_semantics = semantics_moore;
+              break;
+            }
         }
-      int res = process_string(tlsf_string, filename);
+      int res = process_formula(conv.formula, filename);
       opt_semantics = old_semantics;
       if (reset_aps)
         {

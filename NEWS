@@ -1,18 +1,32 @@
 New in spot 2.16.0.dev  (not yet released)
 
-  Build
+  Build:
 
-  - Previous version of Spot used to embed PicoSAT, and used it for
+  - Previous versions of Spot used to embed PicoSAT, and used it for
     minimizing deterministic automata or Mealy machines.  In this
     release, PicoSAT was replaced by CaDiCaL 3.0.0.  This change is
     internal to Spot (the CaDiCaL API is not exported publicly) but
     may affect the output of some minimization algorithms.  (Issue #514.)
 
-  Library
+  Tools:
+
+  - ltlsynt, ltlfsynt, and ltlf2dfa no longer call the external
+    "syfco" tool to convert their --tlsf FILENAME input into LTL/LTLf:
+    they now use a TLSF parser embedded in Spot.  The new
+    SPOT_TLSF_PARSER environment variable (documented in spot-x(7))
+    can be set to "syfco" to restore the previous behavior, for
+    instance to cross-check the two conversions, or in case the
+    built-in parser is incomplete.
+
+  Library:
 
   - As a consequence of the move from PicoSAT to CaDiCaL,
     minimize_mealy() lost its "satlogdimacs" option to print the
     intermediate DIMACS files during incremental SAT solving.
+
+  - The spot/parsetlsf/ contains a parser for TLSF specifications,
+    removing Spot's dependency on syfco.
+
 
 New in spot 2.16  (2026-09-03)
 

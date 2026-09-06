@@ -22,11 +22,11 @@
 #include <error.h>
 #include <argmatch.h>
 #include <iomanip>
-#include <sys/stat.h>
 
 #include "common_aoutput.hh"
 #include "common_finput.hh"
 #include "common_setup.hh"
+#include "common_tlsf.hh"
 #include "common_trans.hh"
 #include <spot/tl/formula.hh>
 #include <spot/tl/print.hh>
@@ -52,9 +52,11 @@ static const argp_option options[] =
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Input options:", 1 },
     { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,
-      "Read a TLSF specification from FILENAME, and call syfco to "
-      "convert it into LTLf.  Any parameter assignment specified after a slash"
-      " is passed as '-op VAR=VAL' to syfco." , 0 },
+      "Read a TLSF specification from FILENAME, and convert it into "
+      "LTLf using the parser embedded in Spot (unless the "
+      "SPOT_TLSF_PARSER environment variable selects the external "
+      "syfco tool).  Any parameter assignment specified after a slash"
+      " overrides that parameter." , 0 },
     { "negate", OPT_NEGATE, nullptr, 0, "negate each formula", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Processing options:", 10 },
@@ -373,63 +375,18 @@ namespace
     int
     process_tlsf_file(const char* filename) override
     {
-      if (assignments)
-        {
-          free(assignments);
-          assignments = nullptr;
-        }
-      char* syfco_filename = const_cast<char*>(filename);
-
-      // The filename passed can be either a real filename, or
-      // a string link FILENAME/ASSIGNMENTS where ASSIGNMENTS are
-      // comma-separated assignments.  E.g., "../spec.tlsf/N=3,M=4".
-      //
-      // If the filename contains a slash followed by some equal sign,
-      // and does not correspond to an existing file, then we remove
-      // the part after the last slash and assume the rest is a
-      // filename before passing it to syfco.  We don't check if the
-      // new (truncated) filename exist, syfco will do it anyway.
-      struct stat buf;
-      if (const char* slash = strrchr(filename, '/');
-          slash && strchr(slash, '=') && stat(filename, &buf) != 0)
-        {
-          if (real_filename)
-            free(real_filename);
-          real_filename = strndup(filename, slash - filename);
-          assignments = strdup(slash + 1);
-          syfco_filename = real_filename;
-        }
-
-      std::vector<char*> command;
-      static char arg0[] = "syfco";
-      command.push_back(arg0);
-      // split assignments on commas, and pass each VAR=VALUE
-      // as -op VAR=VALUE to syfco.
-      if (assignments)
-        {
-          static char argop[] = "-op";
-          char* assignment = strtok(assignments, ",");
-          while (assignment)
-            {
-              command.push_back(argop);
-              command.push_back(assignment);
-              assignment = strtok(nullptr, ",");
-            }
-        }
-      static char arg1[] = "-f";
-      command.push_back(arg1);
-      static char arg2[] = "ltlxba-fin";
-      command.push_back(arg2);
-      static char arg3[] = "-m";
-      command.push_back(arg3);
-      static char arg4[] = "fully";
-      command.push_back(arg4);
-      command.push_back(syfco_filename);
-      command.push_back(nullptr);
-
-      std::string tlsf_string = read_stdout_of_command(command);
-      int res = process_string(tlsf_string, filename);
-      return res;
+      tlsf_conversion_result conv;
+      // Only the formula is needed: expect a finite formula (like
+      // ltlfsynt), and pass the ignore flags so the syfco backend
+      // does not spend two more process invocations retrieving
+      // signals and target that would be discarded.
+      if (!read_tlsf_file(filename,
+                          tlsf_flags::TLSF_EXPECT_FINITE
+                          | tlsf_flags::TLSF_IGNORE_SIGNALS
+                          | tlsf_flags::TLSF_IGNORE_TARGET, conv))
+        // Parse errors must be reported with exit status 2.
+        return 2;
+      return process_formula(conv.formula, filename);
     }
 
   };

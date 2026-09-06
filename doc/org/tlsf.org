@@ -21,9 +21,10 @@ There is a tool, called [[https://github.com/reactive-systems/syfco][=syfco=]], 
 specification to an LTLf or LTL formula in various syntaxes.
 
 Some of Spot's command-line tools ([[file:ltlsynt.org][=ltlsynt=]], [[file:ltlfsynt.org][=ltlfsynt=]], [[file:ltlf2dfa.org][=ltlf2dfa=]])
-have support for the TLSF format, but they all rely on [[https://github.com/reactive-systems/syfco][=syfco=]] to
-translate TLSF to LTL or LTLf.  You should install [[https://github.com/reactive-systems/syfco][=syfco=]] somewhere
-on your =$PATH= for this to work.
+have support for the TLSF format.  By default they use the TLSF
+parser embedded in Spot to translate the specification to LTL or
+LTLf; set the =SPOT_TLSF_PARSER= environment variable to =syfco= to
+use the external [[https://github.com/reactive-systems/syfco][=syfco=]] tool instead.
 
 * Example TLSF specification
 
@@ -151,13 +152,18 @@ Removing the =--realizability= flag would output the strategy, but
 because that specification uses 23 atomic propositions, the resulting
 strategy is not very readable.
 
-* How is syfco used
+* How the TLSF specification is converted
 
-Running the previous command with the =--verbose= option will show that
-=ltlfsynt= actually perform three calls to [[https://github.com/reactive-systems/syfco][=syfco=]].
+As explained above, =--tlsf= uses the TLSF parser embedded in Spot by
+default, so no external tool is required.  Setting the
+=SPOT_TLSF_PARSER= environment variable to =syfco= selects the
+external [[https://github.com/reactive-systems/syfco][=syfco=]] tool instead; running the previous command with
+the =--verbose= option then shows that =ltlfsynt= actually performs
+three calls to [[https://github.com/reactive-systems/syfco][=syfco=]].
 
 #+BEGIN_SRC sh
-  ltlfsynt --tlsf chomp.tlsf --realizability --verbose 2>&1 | grep syfco
+  SPOT_TLSF_PARSER=syfco ltlfsynt --tlsf chomp.tlsf --realizability \
+    --verbose 2>&1 | grep syfco
 #+END_SRC
 #+RESULTS:
 : running: syfco -f ltlxba-fin -m fully chomp.tlsf
@@ -251,8 +257,9 @@ syfco --print-target chomp.tlsf
 
 
 Note that you can use =--semantics=, =--ins=, or =--outs= to override
-the partition of propositions or the semantics.  In this case, =ltlfsynt=
-will not make unnecessary calls to [[https://github.com/reactive-systems/syfco][=syfco=]].
+the partition of propositions or the semantics taken from the TLSF
+file.  For instance, forcing Moore semantics and classifying the
+propositions that start with =o= as outputs:
 
 #+BEGIN_SRC sh
   ltlfsynt --tlsf chomp.tlsf --semantics=Moore --outs='/^o/' --realizability \
@@ -260,15 +267,13 @@ will not make unnecessary calls to [[https://github.com/reactive-systems/syfco][
 #+END_SRC
 
 #+RESULTS:
-: running: syfco -f ltlxba-fin -m fully chomp.tlsf
 : UNREALIZABLE
 
 * When =--tlsf= is not enough
 
-If you do not have [[https://github.com/reactive-systems/syfco][=syfco=]] installed in your =$PATH=, or want to
-replace [[https://github.com/reactive-systems/syfco][=syfco=]], or want to use TLSF with a tool that does not support the
-=--tlsf= option, you can still call that tool explicitly and pass the
-LTL/LTLf formulas directly.
+If you want to use TLSF with a tool that does not support the
+=--tlsf= option, you can still call [[https://github.com/reactive-systems/syfco][=syfco=]] explicitly and pass the
+LTL/LTLf formulas it produces directly to that tool.
 
 Beware that doing something like this only works up to a certain size
 of specifications:
@@ -296,8 +301,8 @@ syfco -f ltlxba-fin -m fully chomp.tlsf |
 #+RESULTS:
 : REALIZABLE
 
-(When option =--tlsf= is used, everything that [[https://github.com/reactive-systems/syfco][=syfco=]] outputs is
-received through a pipe.)
+(When the =syfco= backend is selected with =SPOT_TLSF_PARSER=syfco=,
+everything that [[https://github.com/reactive-systems/syfco][=syfco=]] outputs is received through a pipe.)
 
 * Overwriting TLSF parameters
 
@@ -311,12 +316,8 @@ We can use that to verify that M=1,N=1 is not realizable since the
 first player is forced to take the only square.
 
 #+BEGIN_SRC sh :export code
-ltlfsynt --tlsf chomp.tlsf/N=1,M=1 --realizability --verbose 2>&1 |
-  grep 'syfco\|REAL'
+ltlfsynt --tlsf chomp.tlsf/N=1,M=1 --realizability
 #+END_SRC
 
 #+RESULTS:
-: running: syfco -op N=1 -op M=1 -f ltlxba-fin -m fully chomp.tlsf
-: running: syfco -op N=1 -op M=1 --print-output-signals chomp.tlsf
-: running: syfco --print-target chomp.tlsf
 : UNREALIZABLE

@@ -282,6 +282,21 @@ BDD implementation, 2 force matrix-based implementation and 0 is default, a
 heuristic is used to choose which implementation to use.
 
 .TP
+\fBSPOT_TLSF_PARSER\fR
+Selects how the \fB\-\-tlsf\fR option of \fBltlsynt\fR, \fBltlfsynt\fR,
+and \fBltlf2dfa\fR converts a TLSF specification to LTL or LTLf.  The
+default value, \fBspot\fR, uses the TLSF parser embedded in Spot.  Set
+this variable to \fBsyfco\fR to use the external \fBsyfco\fR tool
+instead; \fBsyfco\fR must then be installed somewhere on your
+\fBPATH\fR.  The \fBsyfco\fR backend is mainly useful to work around
+bugs or missing features of the built-in parser, or to cross\-check
+its output.  Unlike the built-in parser, which reads the whole
+specification in one pass, the \fBsyfco\fR backend invokes
+\fBsyfco\fR once per requested item, so it is slower; the tools skip
+the invocations for information they do not need (for instance
+\fBltlf2dfa\fR only requests the formula).
+
+.TP
 \fBSPOT_TMPDIR\fR, \fBTMPDIR\fR
 These variables control in which directory temporary files (e.g.,
 those who contain the input and output when interfacing with

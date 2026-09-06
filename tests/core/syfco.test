@@ -20,10 +20,20 @@
 . ./defs || exit 1
 set -e
 
-# Test that we can pass a tlsf specification to ltlsynt.  This
-# only work if syfco is installed.
+# Test that we can pass a TLSF specification to ltlsynt, ltlfsynt,
+# and ltlf2dfa.  This used to require the external syfco tool; it
+# now works with the TLSF parser embedded in Spot.  When syfco is
+# installed, the same checks are also run with the SPOT_TLSF_PARSER
+# environment variable set to syfco, to make sure that backend is
+# still functional.
 
-(syfco --version) || exit 77
+backends=spot
+if syfco --version >/dev/null 2>&1; then
+  backends="spot syfco"
+fi
+
+for backend in $backends; do
+  export SPOT_TLSF_PARSER=$backend
 
 cat >test.tlsf <<EOF
 INFO {
@@ -69,6 +79,30 @@ test 1 = `grep out_2 out3 | wc -l`
 # Finite semantics
 sed '/SEMANTICS:/s/Mealy/&,Finite/' test.tlsf >testf.tlsf
 test `ltlfsynt --tlsf testf.tlsf/n=3 --real` = "UNREALIZABLE"
+
+# Exit statuses: 0 = realizable, 1 = unrealizable, 2 = error.
+# Commands exiting 0 or 1 are expected here, so disable "set -e"
+# while running them, and check the recorded statuses afterwards.
+set +e
+ltlsynt --tlsf test.tlsf --realizability >/dev/null
+s1=$?
+ltlsynt --outs=foo --tlsf test.tlsf --realizability >/dev/null
+s2=$?
+ltlsynt --tlsf nonexistent.tlsf --realizability 2>err
+s3=$?
+ltlfsynt --tlsf testf.tlsf/n=3 --real >/dev/null
+s4=$?
+ltlfsynt --tlsf test.tlsf --real 2>err    # not a Finite spec
+s5=$?
+ltlf2dfa --tlsf test.tlsf 2>err           # not a Finite spec
+s6=$?
+set -e
+test $s1 = 0
+test $s2 = 1
+test $s3 = 2
+test $s4 = 1
+test $s5 = 2
+test $s6 = 2
 
 ltlf2dfa --tlsf testf.tlsf/n=4 >out.hoa
 test "3,5" = `autfilt --stats=%s,%x out.hoa`
@@ -182,3 +216,5 @@ BuDDy hashsize: 524288 (2048KB)
 BuDDy gbcnum: 0
 EOF
 diff out expected
+
+done

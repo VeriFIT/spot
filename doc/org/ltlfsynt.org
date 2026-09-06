@@ -298,10 +298,12 @@ comparing =ltlfsynt= to other tools, beware that they may not
 have the same semantics by default.
 
 When the specification is passed as a TLSF file with the =--tlsf=
-option, the [[https://github.com/reactive-systems/syfco][=syfco=]] tool is automatically invoked to transform the
+option, the TLSF parser embedded in Spot is used to transform the
 specification into LTLf, to retrieve the lists of input/output
-variables, and to obtain the semantics to use.  See [[file:tlsf.org][the TLSF page]] for
-more details.
+variables, and to obtain the semantics to use (set the
+=SPOT_TLSF_PARSER= environment variable to =syfco= to use the
+external [[https://github.com/reactive-systems/syfco][=syfco=]] tool instead).  See [[file:tlsf.org][the TLSF page]] for more
+details.
 
 * Fine-tuning
 

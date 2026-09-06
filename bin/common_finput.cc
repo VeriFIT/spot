@@ -108,8 +108,6 @@ job_processor::~job_processor()
 {
   if (real_filename)
     free(real_filename);
-  if (assignments)
-    free(assignments);
   if (prefix)
     free(prefix);
   if (suffix)
