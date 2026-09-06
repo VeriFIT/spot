@@ -1172,7 +1172,8 @@ private:
   //   require (VALID)
   //   ensure (VALID)
   //
-  const char *read_dimacs (File *, int &, int strict, bool *incremental = nullptr,
+  const char *read_dimacs (File *, int &, int strict,
+                           bool *incremental = nullptr,
                            std::vector<int> * = nullptr);
 
   // Factored out common code for 'solve', 'simplify' and 'lookahead'.

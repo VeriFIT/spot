@@ -4,9 +4,10 @@ New in spot 2.16.0.dev  (not yet released)
 
   - Previous versions of Spot used to embed PicoSAT, and used it for
     minimizing deterministic automata or Mealy machines.  In this
-    release, PicoSAT was replaced by CaDiCaL 3.0.0.  This change is
+    release, PicoSAT was replaced by CaDiCaL 3.0.1.  This change is
     internal to Spot (the CaDiCaL API is not exported publicly) but
-    may affect the output of some minimization algorithms.  (Issue #514.)
+    may affect the output of some minimization algorithms.
+    (Issue #514.)
 
   Tools:
 
