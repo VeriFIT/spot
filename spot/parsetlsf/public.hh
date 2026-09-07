@@ -67,10 +67,18 @@ namespace spot
   struct tlsf_parser_options;
   struct tlsf_translator_options;
   struct tlsf_translation_result;
+  // The parser-side state of a parse in progress, defined by the
+  // generated spot/parsetlsf/parsetlsf.hh.  Only the private
+  // parsed_tlsf::finish_parse() below names it, and only in its
+  // declaration, so this header does not have to include the
+  // generated file.
+  struct tlsf_result;
 
-  /// Shared pointer typedefs (matching the rest of Spot).
+  /// Shared pointer typedefs
+  /// @{
   typedef std::shared_ptr<parsed_tlsf> parsed_tlsf_ptr;
   typedef std::shared_ptr<const parsed_tlsf> const_parsed_tlsf_ptr;
+  /// @}
 
   /// \brief Result of parsing a TLSF specification.
   ///
@@ -110,9 +118,7 @@ namespace spot
     std::string description;
 
     /// Tags from the INFO section (`INFO { TAGS: foo, bar; }`),
-    /// in source order.  Empty when TAGS is absent.  See
-    /// syfco's `tagsParser`
-    /// (spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Info.hs).
+    /// in source order.  Empty when TAGS is absent.
     std::vector<std::string> tags;
 
     /// Parameter overrides applied at parse time, mirrored here for
@@ -133,26 +139,38 @@ namespace spot
     /// tlsf_to_ltl).
     parse_tlsf_error_list errors;
 
+    /// Non-fatal diagnostics collected during parsing.  A
+    /// specification that triggers only warnings is still valid:
+    /// \c errors stays empty and the caller may go on with the
+    /// translation.  Currently used for the `SEMANTICS` / `TARGET`
+    /// mismatch of TLSF v1.2 SS1.4, where the specification is
+    /// ambiguous rather than invalid.
+    parse_tlsf_error_list warnings;
+
     /// Print collected diagnostics to \a os in Spot's
     /// "filename:line:col: message" format. Returns true iff at least
     /// one diagnostic was emitted.
     bool format_errors(std::ostream& os);
 
+    /// Print the collected warnings to \a os, in the same format as
+    /// format_errors.  Returns true iff at least one warning was
+    /// emitted.
+    bool format_warnings(std::ostream& os);
+
+
     /// Constructor: store the source filename for use in error
     /// messages and round-trip printing.
     explicit parsed_tlsf(std::string filename);
 
-    /// Default constructor is forbidden: a parsed_tlsf always
-    /// carries the source filename used in error messages.
+    // Default constructor is forbidden: a parsed_tlsf always
+    // carries the source filename used in error messages.
     parsed_tlsf() = delete;
 
     /// Destructor is out-of-line because tlsf_ast is incomplete
-    /// in this header; it is defined in spot/parsetlsf/public.cc.
+    /// in this header.
     ~parsed_tlsf();
 
-    /// No copy / move: only shared ownership is meaningful here.
-    /// Move is explicitly deleted too, to make the intent obvious
-    /// (the user-declared destructor would otherwise mask it).
+    // No copy / move: only shared ownership is meaningful here.
     parsed_tlsf(const parsed_tlsf&) = delete;
     parsed_tlsf(parsed_tlsf&&) = delete;
     parsed_tlsf& operator=(const parsed_tlsf&) = delete;
@@ -169,6 +187,9 @@ namespace spot
     friend parsed_tlsf_ptr parse_tlsf(int fd,
                                       const std::string& filename,
                                       const tlsf_parser_options& opts);
+    friend parsed_tlsf_ptr parse_tlsf(const std::string& contents,
+                                      const std::string& name,
+                                      const tlsf_parser_options& opts);
     friend void tlsf_print(std::ostream& os, const parsed_tlsf& tlsf);
     friend tlsf_translation_result tlsf_to_ltl(
         const parsed_tlsf& tlsf,
@@ -179,7 +200,40 @@ namespace spot
     /// The AST built by parse_tlsf, kept opaque. May be null if the
     /// parser could not produce even a partial AST.
     std::shared_ptr<tlsf_ast> ast;
+
+    /// \brief Shared tail of the three parse_tlsf() overloads.
+    ///
+    /// Runs the cross-section validations of TLSF v1.2 (see
+    /// spot/parsetlsf/public.cc) on the AST that \a res holds, moves
+    /// its diagnostics onto this object, and turns them into a
+    /// std::runtime_error when \a opts asks for it.  A private member
+    /// rather than a free function because it is the only place that
+    /// fills the private members above.
+    void finish_parse(tlsf_result& res,
+                      const tlsf_parser_options& opts);
   };
+
+  /// \brief Print \a diags to \a os in Spot's diagnostic format.
+  ///
+  /// Each diagnostic is written as "filename:line.column: message",
+  /// the same format as parsed_tlsf::format_errors() and
+  /// parsed_tlsf::format_warnings().  \a filename is the name of the
+  /// specification the diagnostics come from; it is suppressed when it
+  /// is empty or "-", which is the convention for input read from a
+  /// pipe.
+  ///
+  /// A spot::location does not record a file name (the scanner leaves
+  /// position::filename null), so a diagnostic only becomes
+  /// attributable once the caller supplies the name.  Use this function
+  /// to print the parse_tlsf_error_list returned by tlsf_to_ltl(), so
+  /// that translation-time diagnostics are formatted exactly like the
+  /// parse-time ones.
+  ///
+  /// \return true iff at least one diagnostic was printed.
+  SPOT_API
+  bool format_tlsf_diagnostics(std::ostream& os,
+                               const std::string& filename,
+                               const parse_tlsf_error_list& diags);
 
   /// \brief Print a TLSF representation of \a tlsf to \a os.
   ///
@@ -203,6 +257,20 @@ namespace spot
     /// Otherwise (default) the error is appended to parsed_tlsf::errors
     /// and parsing continues.
     bool raise_errors = false;
+
+    /// Report a diagnostic when one of the mandatory INFO items
+    /// (TITLE, DESCRIPTION, SEMANTICS, TARGET) is missing.  True by
+    /// default: TLSF v1.2 SS1.2 requires all four, and an absent
+    /// SEMANTICS is the worst case, because the translation would be
+    /// composed as if the file had declared `Mealy`.  Set it to
+    /// false to accept a specification whose INFO section is
+    /// incomplete or absent -- what tests/core/parsetlsf does, since
+    /// its fixtures are about the rest of the language.
+    /// Note that a *duplicated* INFO item is always reported, whether
+    /// this option is set or not: the second declaration is ignored
+    /// rather than overriding the first, so it is never what the
+    /// author meant.
+    bool check_info = true;
 
     /// Emit Bison/Flex debug traces (default false).
     bool debug = false;
@@ -233,31 +301,31 @@ namespace spot
   {
     /// LTL translation of MAIN { INITIALLY { ... } }: the
     /// conjunction of the section's formulas (tt() when empty).
-    spot::formula initially;
+    formula initially;
 
     /// LTL translation of MAIN { PRESET { ... } } (same convention).
-    spot::formula preset;
+    formula preset;
 
     /// LTL translation of MAIN { REQUIRE / REQUIREMENTS { ... } }
     /// (same convention).
-    spot::formula require;
+    formula require;
 
     /// LTL translation of MAIN { ASSERT / INVARIANTS { ... } }
     /// (same convention).
-    spot::formula assertion;
+    formula assertion;
 
     /// LTL translation of MAIN { ASSUME / ASSUMPTIONS { ... } }
     /// (same convention).
-    spot::formula assume;
+    formula assume;
 
     /// LTL translation of MAIN { GUARANTEE / GUARANTEES { ... } }
     /// (same convention).
-    spot::formula guarantee;
+    formula guarantee;
 
     /// The composed synthesis formula (the standard or strict
     /// composition described in translate.cc), or a null formula on
     /// failure.
-    spot::formula full_formula;
+    formula full_formula;
 
     /// Flattened input AP names (e.g. `request_0`, `request_1` after
     /// expanding `request[N];` with `N = 2`).
@@ -273,6 +341,15 @@ namespace spot
   /// and metadata, so it can be safely retained for printing or
   /// re-translation with different options.
   ///
+  /// Once the whole file has been read, the declarations are checked
+  /// against each other (see spot/parsetlsf/public.cc): a name may
+  /// be declared only once across PARAMETERS, DEFINITIONS, the
+  /// enumerations, INPUTS and OUTPUTS, and the mandatory INFO items
+  /// must be present unless opts.check_info is false.  A violation is
+  /// appended to \c errors; an ambiguous but usable specification
+  /// (a SEMANTICS that does not match the TARGET) only produces a
+  /// warning, and is listed in \c warnings.
+  ///
   /// The parser does not throw unless opts.raise_errors is true.
   SPOT_API parsed_tlsf_ptr
   parse_tlsf(const std::string& filename,
@@ -285,6 +362,16 @@ namespace spot
   SPOT_API parsed_tlsf_ptr
   parse_tlsf(int fd,
              const std::string& filename, // for error messages
+             const tlsf_parser_options& opts = {});
+
+  /// \brief Parse a TLSF specification held in memory.
+  ///
+  /// \a contents must be NUL-terminated (as a `std::string` is);
+  /// \a name is only used in error messages. This flavour lets
+  /// callers parse a specification that was not stored on disk.
+  SPOT_API parsed_tlsf_ptr
+  parse_tlsf(const std::string& contents,
+             const std::string& name, // for error messages
              const tlsf_parser_options& opts = {});
 
   /// \brief Convert a parsed TLSF AST to an LTL formula.

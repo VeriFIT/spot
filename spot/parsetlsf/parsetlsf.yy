@@ -1,6 +1,7 @@
 %language "C++"
 %defines
 %debug
+%define parse.error verbose
 %define api.value.type variant
 %locations
 %define api.location.type {spot::location}
@@ -22,6 +23,7 @@
   #include <sstream>
   #include <stdexcept>
   #include <string>
+  #include <unordered_set>
   #include <utility>
   #include <vector>
 
@@ -36,6 +38,14 @@
       /// Diagnostics emitted by both the parser and the lexer.
       parse_tlsf_error_list errors;
 
+      /// Non-fatal diagnostics emitted by the post-parse
+      /// validations (see spot/parsetlsf/public.cc).  They are
+      /// moved onto parsed_tlsf::warnings by the parse_tlsf()
+      /// entry points, so that a valid-but-ambiguous specification
+      /// (a SEMANTICS that does not match the TARGET) can be
+      /// reported without failing the parse.
+      parse_tlsf_error_list warnings;
+
       /// Whose inputs/outputs the next ap_decl should append to.
       /// Set by mid-rule actions on INPUTS / OUTPUTS and cleared
       /// on the matching RBRACE.
@@ -43,9 +53,7 @@
 
       /// Current MAIN-subsection body being filled.  Set by
       /// mid-rule actions on INITIALLY / PRESET / REQUIRE / ASSERT /
-      /// GUARANTEE / ASSUME.  The vector is owned by
-      /// `spec->{initially_body,...}`; `stmt` productions append
-      /// to it.  Cleared (set to nullptr) on the matching RBRACE.
+      /// GUARANTEE / ASSUME.  Cleared on the matching RBRACE.
       std::vector<tlsf_expr_ptr>* current_body = nullptr;
 
       /// True if yyin was opened with fopen() in tlsfyyopen, so
@@ -58,9 +66,121 @@
       /// so a duplicate-name pair can emit BOTH diagnostics -- the
       /// first ("shadowed by later") anchored at the original's
       /// location, and the second ("already defined") anchored at
-      /// the new one's location -- in O(log n) instead of an O(n^2)
-      /// scan of `spec->definitions`.
-      std::map<std::string, spot::location> def_first_loc;
+      /// the new one's location.
+      std::map<std::string, location> def_first_loc;
+
+      /// \brief Every enum name and tag this file declares, plus the
+      /// name of every parameter, definition, definition argument, and
+      /// input/output signal.
+      ///
+      /// TLSF's list of words is a scanner convention, not a
+      /// reservation: syfco lets a file call an enumeration `U`, name
+      /// a tag `U`, or name a parameter `U`, and then resolves that
+      /// word in expressions like any other identifier.  The scanner
+      /// fills this set while it is in the `enumname` and `enumdecl`
+      /// start conditions, in the `declhead`, `arglist`, `signalhead`
+      /// and `signalafter` ones added for the GLOBAL and MAIN
+      /// declarations, and consults it before returning a keyword
+      /// token; see ENUM_WORD() in spot/parsetlsf/scantlsf.ll.
+      ///
+      /// A word whose own syntactic trigger a scanner cannot see
+      /// (`G`, `F`, `X`, `NOT`, `SIZEOF`, `true`, `false`, and the
+      /// section keywords) is never consulted and stays reserved: a
+      /// scanner that has seen nothing but `G` cannot tell `G x` from
+      /// a reference to a tag named `G`.
+      std::unordered_set<std::string> declared_words;
+
+      /// \brief One entry per open brace: 0 for a block that holds
+      /// no declarations, 1 for a `PARAMETERS` or `DEFINITIONS`
+      /// block, and 2 for an `INPUTS` or `OUTPUTS` block.
+      ///
+      /// The `;` that separates two items of such a block is what
+      /// hands the scanner to the `declhead` (kind 1) or `signalhead`
+      /// (kind 2) start condition: there the next token is the name
+      /// of a parameter or a definition, or of an input/output signal.
+      std::vector<unsigned char> brace_is_decl;
+
+      /// \brief The kind of block the next `{` opens: 1 for a
+      /// `PARAMETERS` or `DEFINITIONS` block, 2 for an `INPUTS` or
+      /// `OUTPUTS` one, 0 otherwise.
+      ///
+      /// Set by the `PARAMETERS` and `DEFINITIONS` keyword rules (and
+      /// by `INPUTS`/`OUTPUTS`) and consumed (and cleared) by the
+      /// next `{` rule, which uses it to push an entry onto
+      /// `brace_is_decl` and to switch the scanner to the matching
+      /// name-reading start condition.  Only whitespace and
+      /// comments may separate the keyword from its brace in a valid
+      /// file, and every other token rule clears the flag, so a
+      /// keyword that a malformed file leaves unmatched by its brace
+      /// cannot latch onto a later one.
+      unsigned char await_decl = 0;
+
+      /// \brief The first identifier of an `INPUTS`/`OUTPUTS`
+      /// declaration, as read by the `signalhead` start condition.
+      ///
+      /// One lookahead decides whether it is a signal name (`U;`,
+      /// `U[2];`, `U}`), recorded into `declared_words` by the
+      /// `signalafter` rule that sees the `;`/`[`/`}`, or the enum
+      /// type of a typed-bus declaration (`E U;`), in which case the
+      /// signalafter rule that sees a second identifier records THAT
+      /// one instead.  Being the name is the default: a bare
+      /// identifier followed by nothing that makes it a type is a
+      /// scalar signal.
+      std::string pending_signal;
+
+      /// \brief Whether the last token returned can end an expression.
+      ///
+      /// One token of left context, used to tell the infix reading of a
+      /// word this file declared (`a U b`) from its identifier reading
+      /// (`b == U`).  Only the rules that can end an expression set it;
+      /// it stays false after `{`, `;`, `(`, `,` and after any
+      /// operator, which is exactly where a declared word is an
+      /// identifier.
+      bool prev_ends_expr = false;
+
+      /// \brief Record that the INFO item \a bit was seen at \a loc.
+      ///
+      /// Returns true the first time an item is seen, and false
+      /// afterwards, in which case a "duplicate INFO item" diagnostic
+      /// is appended to `errors`.  The caller uses the return value
+      /// to decide whether to record the item's value: as for a
+      /// re-defined DEFINITION, the first declaration wins and the
+      /// later one is only reported.  See tlsf_info_item in
+      /// spot/parsetlsf/ast.hh.
+      bool note_info_item(unsigned bit, const location& loc,
+                          const char* name)
+      {
+        if (spec->info_seen & bit)
+          {
+            errors.emplace_back(loc, std::string("duplicate INFO item '")
+                                + name + ":'");
+            return false;
+          }
+        spec->info_seen |= bit;
+        return true;
+      }
+
+      /// \brief Set the SEMANTICS of the spec to \a s.
+      ///
+      /// The value of an INFO item is parsed by a sub-production of
+      /// info_item, so it reduces -- and would assign -- before
+      /// note_info_item has a chance to reject a duplicate.  These
+      /// two helpers keep the "first declaration wins" rule of
+      /// note_info_item: the flag is still clear when the first item
+      /// is parsed, and already set for every later one.
+      void note_semantics(::spot::tlsf_semantics s)
+      {
+        if (!(spec->info_seen & ::spot::TLSF_INFO_SEMANTICS))
+          spec->semantics = s;
+      }
+
+      /// \brief Set the TARGET of the spec to \a t.  See
+      /// note_semantics.
+      void note_target(::spot::tlsf_target t)
+      {
+        if (!(spec->info_seen & ::spot::TLSF_INFO_TARGET))
+          spec->target = t;
+      }
     };
   }
 }
@@ -73,6 +193,18 @@
 %token <std::string> STRING "string"
 %token <std::string> IDENTIFIER "identifier"
 %token <std::string> NUMBER "number"
+// One maximal run of `0`, `1` and `*` characters: a bit pattern of
+// an `enum` declaration.  Only the scanner's `enumdecl` state
+// returns it; a run outside an enum body is a NUMBER (or a STAR)
+// and a juxtaposed run inside one is a syntax error.
+%token <std::string> BITS "bit pattern"
+// A `Tag` of an `enum` body.  The scanner returns it only from the
+// `enumdecl` state, and only for an identifier it has seen followed
+// by `:`; a tag is therefore the one identifier that can continue the
+// entry list of the enum being declared, which is what keeps the
+// grammar free of a shift/reduce conflict on the enum/definition
+// boundary (see the %expect block below).
+%token <std::string> ENUM_TAG "enum tag"
 
 %token INFO "INFO"
 %token MAIN "MAIN"
@@ -82,48 +214,33 @@
 %token RBRACE "}"
 %token LBRACKET "["
 %token RBRACKET "]"
+// Strong (`!`) markers on the stacked next and on the bounded
+// temporal operators: `X[!n]`/`X[n!]`, `F[!a:b]`/`F[a:b!]`,
+// `G[!a:b]`/`G[a:b!]`.
+%token LBRACKET_BANG "[!"
+%token BANG_RBRACKET "!]"
 %token LPAREN "("
 %token RPAREN ")"
 %token EQUAL "="
 %token COMMA ","
-// `:` separator inside `Tag:bits` enum entries.  Reserved
-// only at the enum_entry position; otherwise `:` is not a
-// Spot syntax token (the LTL `X[!]` operator uses `[`, `!`,
-// `]` characters, not `:`).
+// `:` separator inside `Tag:bits` enum entries.
 %token COLON ":"
 
 %token TITLE "TITLE:"
 %token DESCRIPTION "DESCRIPTION:"
 %token SEMANTICS_KW "SEMANTICS:"
 %token TARGET "TARGET:"
-// `TAGS:` keyword, accepted as the INFO TAGS section opener.
-// Format per syfco (refs/.../Reader/Parser/Info.hs tagsParser):
-// comma-separated IDENTIFIER list.  TAGS is OPTIONAL -- a spec
-// with no TAGS line is still valid.
 %token TAGS "TAGS:"
 
 %token PARAMETERS "PARAMETERS"
 %token DEFINITIONS "DEFINITIONS"
-// `enum` keyword, accepted as a def_list item INSIDE
-// GLOBAL { DEFINITIONS { ... } } (NOT a top-level global_item
-// -- syfco's Reader/Parser/Global.hs dispatch on
-// `globalContentParser` only takes `}`, `PARAMETERS`,
-// `DEFINITIONS` as top-level alternatives; enums are mixed
-// in with regular defs, separated by `;`).  Format per
-// syfco: `enum X = {V0:00, V1:01, ...};` -- a
-// comma-separated list of `Tag:bits` pairs.  The bits width
-// is the length of the first entry's bits string; subsequent
-// entries must match (syfco enforces this via
-// `valueParserL n = count n bitParser`).
 %token ENUM "enum"
 %token INPUTS "INPUTS"
 %token OUTPUTS "OUTPUTS"
 %token INITIALLY "INITIALLY"
 %token PRESET "PRESET"
-// Plural aliases for the REQUIRE/ASSERT/GUARANTEE/ASSUME
-// block keywords, matching TLSF v1.1's MAIN section vocabulary
-// in syfco's Reader/Parser/Component.hs (sectionParser lines map
-// every alias to the same body field):
+// Aliases for the REQUIRE/ASSERT/GUARANTEE/ASSUME
+// block keywords, matching TLSF v1.0's old names.
 //   REQUIRE     | REQUIREMENTS   -> require_body
 //   ASSERT      | INVARIANTS     -> assert_body
 //   GUARANTEE   | GUARANTEES     -> guarantee_body
@@ -143,19 +260,6 @@
 %token FINITE "Finite"
 
 // LTL op keywords.
-// `M` (LTL strong release) is intentionally NOT a reserved
-// keyword at either the lexer or grammar level here -- see
-// spot/parsetlsf/scantlsf.ll for the rationale (real-world
-// TLSF benchmarks, notably chomp.tlsf, use single-letter
-// parameter/AP names like `M`, and reserving it would
-// surface a spurious "syntax error" on otherwise-valid
-// specs).  Strong Release can be reintroduced by adding
-// BOTH a `%token LTL_M "M"` here AND a `"M" return
-// token::LTL_M;` line in scantlsf.ll.  The AST also needs a
-// matching operator entry -- none currently exists in
-// spot/parsetlsf/ast.hh -- so introduce that first or
-// alongside the keyword so the parser has a target for the
-// new token.
 %token LTL_G "G"
 %token LTL_F "F"
 %token LTL_X "X"
@@ -251,15 +355,20 @@
 %left STAR KW_MUL
 %precedence NUM_UNARY
 
-%type <std::string> size
+%type <spot::tlsf_ap_decl> ap_decl_body
 %type <std::vector<spot::tlsf_expr_ptr>> body
 %type <std::vector<std::string>> arg_list
 %type <std::vector<std::string>> tag_list
-// Enum-related types.  `bits` is a string accumulator
-// (built from `0`/`1`/`*` characters); `enum_entry` is the
-// per-tag pair; `enum_entries` is the comma-separated list;
-// `enum_decl` is the full `enum X = { ... };` node.
-%type <std::string> bits
+// Enum-related types.  A pattern is the maximal run of `0`, `1` and
+// `*` characters that the scanner returns as a single BITS token;
+// `enum_patterns` is the comma-separated pattern list of one tag;
+// `enum_entry` is the per-tag (tag, patterns) pair; `enum_entries` is
+// the whitespace-separated entry list; `enum_decl` is the full
+// `enum X = ...;` node.  `def_item` (the parent) discards the
+// enum_decl value, so `enum_decl` only side-effects on
+// `res.spec->enumerations`.
+%type <std::vector<std::string>> enum_patterns
+%type <spot::tlsf_definition> def_head
 %type <spot::tlsf_enum_value> enum_entry
 %type <std::vector<spot::tlsf_enum_value>> enum_entries
 %type <spot::tlsf_enum_decl> enum_decl
@@ -270,28 +379,52 @@
 
 %start tlsf
 
-// Two shift/reduce conflicts, both resolved to the shift by Bison's
-// default rule (no %prec involved), and both matching the syfco
-// reference parser's maximal munch (`many1 exprParser`):
+// One shift/reduce conflict, resolved to the shift by Bison's default
+// rule (no %prec involved): the shift is always the maximal munch.
+// It is inherent to the juxtaposed-clause syntax of TLSF v1.2 SS4.6,
+// where `f(x) = a b` is a two-clause body and `a b` is neither a
+// definition nor a complete expression.
 //
-//  1. A `(` after a bare identifier can be the argument list of a
-//     function application or the start of a juxtaposed clause.  A
-//     parenthesized expression after an identifier is always a valid
-//     application, so maximal munch never splits there.
-//  2. An identifier after a completed definition `body` can be a
-//     juxtaposed clause extending the SAME definition (multi-clause
-//     bodies like full_arbiter's mone) or the head of a FOLLOWING
-//     `;`-less definition.  The shift extends the body -- the
-//     correct maximal munch: two juxtaposed definitions without a
-//     `;` then fail at the second one's `=`, exactly where syfco
-//     fails (see the def_list comment).  The semicolon separator
-//     itself introduces no conflict because `def_list` is only ever
-//     followed by `RBRACE`, so after an item only `;` may be shifted
-//     and only `}` may reduce.
+//  A `(` after a bare identifier can be the argument list of a
+//  function application or the start of a juxtaposed clause.  A
+//  parenthesized expression after an identifier is always a valid
+//  application, so maximal munch never splits there.
+//
+// The companion question -- an identifier after a completed definition
+// `body`, which can be a juxtaposed clause extending the SAME
+// definition (multi-clause bodies like full_arbiter's mone) or the head
+// of a FOLLOWING definition -- is no longer a conflict.  It used to be,
+// while `def_list` still had a `def_list -> def_list def_item`
+// alternative for a `;`-less item, because that made `identifier` part
+// of the lookahead set for reducing the definition and hence offered a
+// reduce against the shift.  Splitting the list in two (see the
+// `def_list` and `def_items` rules above) leaves a `;`-less item
+// followed by `RBRACE` alone, so the only action on `identifier` is the
+// shift: it always extends the body, and two juxtaposed definitions
+// without a `;` fail at the second one's `=`.
+//
+// The same question once arose at the end of a brace-less enum
+// declaration, where the `;` is optional (TLSF v1.2 SS4.4 has no
+// terminator at all): an identifier there could be the tag of a
+// further entry or the head of the next def_list item.  That was a
+// third conflict, removed earlier by having the scanner return an
+// ENUM_TAG for an identifier it has seen followed by `:` and leave the
+// `enumdecl` state otherwise (see the `enumdecl` rules of
+// scantlsf.ll).  The following item is then rejected by the
+// `def_items`/`def_list` split rather than by a conflict, which is what
+// syfco does too: its `enumVParserL` cannot end the entry list at an
+// identifier that is not a tag either.
+//
+// The strong `!` markers of SS4.8 (`[!`, `!]`) are a fourth question that
+// never became one: the scanner returns each marker glued to its bracket
+// as one token, so `F[!a:b]` cannot be confused with the `F[(!a):b]`
+// that the plain `!` token would have made of it.  Adding those six
+// alternatives therefore leaves this count at 1, and `F[!a:b!]` matches
+// none of them and is rejected, as in syfco.
 //
 // Keep the count in sync if the expression grammar grows new postfix
-// forms or the definition/body productions change.
-%expect 2
+// forms or the definition/body productions change shape.
+%expect 1
 
 %%
 
@@ -306,7 +439,14 @@ sections: %empty
         | sections section
         ;
 
-section: INFO LBRACE info_items RBRACE
+section: INFO
+          {
+            // Remember where the INFO section starts: the validator
+            // anchors a "missing item" diagnostic here, and needs to
+            // tell a missing section (line 0) from a present one.
+            res.spec->info_loc = @1;
+          }
+        LBRACE info_items RBRACE
        | GLOBAL LBRACE global_items RBRACE
        | MAIN LBRACE main_items RBRACE
        | error SEMICOLON
@@ -316,44 +456,51 @@ info_items: %empty
           | info_items info_item
           ;
 
-// No trailing `;` after an INFO item: the canonical reference
-// parser syfco (spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Info.hs,
-// `infoContentParser`) treats `;` after TITLE/DESCRIPTION/SEMANTICS/
-// TARGET as a SYNTAX ERROR.  Spot matches syfco exactly here, so a
-// `;` in the INFO block will surface as a parse error just as it
-// would in syfco.  Real-world TLSF corpora (tests/core/syfco.dir/
-// chomp.tlsf, SPIReadManag.tlsf, tictactoe.tlsf, ...) match this.
+// No trailing `;` after an INFO item: TITLE, DESCRIPTION,
+// SEMANTICS, and TARGET are each followed directly by their value.
+// TLSF v1.2 SS1.2 requires the first four to be present exactly
+// once (and TAGS at most once); note_info_item reports a duplicate
+// here, and the validator (spot/parsetlsf/public.cc) reports a
+// missing mandatory item.  As with a re-defined DEFINITION, the
+// first occurrence wins so a file with a duplicate still translates.
 info_item: TITLE STRING
            {
-             res.spec->title = std::move($2);
+             if (res.note_info_item(::spot::TLSF_INFO_TITLE, @1, "TITLE"))
+               res.spec->title = std::move($2);
            }
          | DESCRIPTION STRING
            {
-             res.spec->description = std::move($2);
+             if (res.note_info_item(::spot::TLSF_INFO_DESCRIPTION, @1,
+                                    "DESCRIPTION"))
+               res.spec->description = std::move($2);
            }
          | SEMANTICS_KW semantics
+           {
+             if (res.note_info_item(::spot::TLSF_INFO_SEMANTICS, @1,
+                                    "SEMANTICS"))
+               res.spec->semantics_loc = @1;
+           }
          | TARGET target_kind
+           {
+             if (res.note_info_item(::spot::TLSF_INFO_TARGET, @1,
+                                    "TARGET"))
+               res.spec->target_loc = @1;
+           }
          | TAGS tag_list
            {
-             res.spec->tags = std::move($2);
+             if (res.note_info_item(::spot::TLSF_INFO_TAGS, @1, "TAGS"))
+               res.spec->tags = std::move($2);
            }
-         // `;` is no longer a valid INFO token (the `info_item`
-         // productions above never produce a `;`), so the error
-         // recovery sync token switches from SEMICOLON to RBRACE
-         // here.  Falling back to `error SEMICOLON` would have
-         // Bison scan past the closing `}` of the INFO block
-         // searching for a `;` that cannot appear.
          | error RBRACE
          ;
 
-// Comma-separated IDENTIFIER list for INFO TAGS.  Matches syfco's
-// `commaSep tokenparser (identifier (~~))` in
-// refs/.../Reader/Parser/Info.hs (tagsParser).  TAGS is OPTIONAL
-// in the spec; rule-list size is "one or more" since `TAGS:` with
-// no identifier would be a typo, but the source grammar still
-// accepts it as a degenerate empty list (the parser would
-// recover on the next expected token).
-tag_list: IDENTIFIER
+// Comma-separated IDENTIFIER list for optional TAGS.  The list may be
+// empty: syfco builds it with `commaSep`, which accepts no element at
+// all, so a bare `TAGS:` is valid there.  The `{}` matters -- without
+// an action, bison's default for an empty rule is `$$ = $1`, on a rule
+// that has no $1; this is the idiom `arg_list` below already uses.
+tag_list: %empty {}
+        | IDENTIFIER
           {
             $$.push_back(std::move($1));
           }
@@ -365,29 +512,29 @@ tag_list: IDENTIFIER
         ;
 
 semantics: MEALY
-           { res.spec->semantics = ::spot::tlsf_semantics::Mealy; }
+           { res.note_semantics(::spot::tlsf_semantics::Mealy); }
          | MOORE
-           { res.spec->semantics = ::spot::tlsf_semantics::Moore; }
+           { res.note_semantics(::spot::tlsf_semantics::Moore); }
          | MEALY COMMA STRICT
-           { res.spec->semantics = ::spot::tlsf_semantics::MealyStrict; }
+           { res.note_semantics(::spot::tlsf_semantics::MealyStrict); }
          | STRICT COMMA MEALY
-           { res.spec->semantics = ::spot::tlsf_semantics::MealyStrict; }
+           { res.note_semantics(::spot::tlsf_semantics::MealyStrict); }
          | MEALY COMMA FINITE
-           { res.spec->semantics = ::spot::tlsf_semantics::MealyFinite; }
+           { res.note_semantics(::spot::tlsf_semantics::MealyFinite); }
          | FINITE COMMA MEALY
-           { res.spec->semantics = ::spot::tlsf_semantics::MealyFinite; }
+           { res.note_semantics(::spot::tlsf_semantics::MealyFinite); }
          | MOORE COMMA STRICT
-           { res.spec->semantics = ::spot::tlsf_semantics::MooreStrict; }
+           { res.note_semantics(::spot::tlsf_semantics::MooreStrict); }
          | STRICT COMMA MOORE
-           { res.spec->semantics = ::spot::tlsf_semantics::MooreStrict; }
+           { res.note_semantics(::spot::tlsf_semantics::MooreStrict); }
          | MOORE COMMA FINITE
-           { res.spec->semantics = ::spot::tlsf_semantics::MooreFinite; }
+           { res.note_semantics(::spot::tlsf_semantics::MooreFinite); }
          | FINITE COMMA MOORE
-           { res.spec->semantics = ::spot::tlsf_semantics::MooreFinite; }
+           { res.note_semantics(::spot::tlsf_semantics::MooreFinite); }
          ;
 
-target_kind: MEALY { res.spec->target = ::spot::tlsf_target::Mealy; }
-           | MOORE { res.spec->target = ::spot::tlsf_target::Moore; }
+target_kind: MEALY { res.note_target(::spot::tlsf_target::Mealy); }
+           | MOORE { res.note_target(::spot::tlsf_target::Moore); }
            ;
 
 global_items: %empty
@@ -403,7 +550,11 @@ param_list: %empty
           | param_list param_decl
           ;
 
-param_decl: IDENTIFIER EQUAL size SEMICOLON
+// A PARAMETERS value, like every other integer position, is an
+// `expr` AST: the translator's integer evaluator (eval_int) is the
+// single arbiter of what an integer expression is, so the grammar
+// does not restrict the shape here.
+param_decl: IDENTIFIER EQUAL expr SEMICOLON
             {
               res.spec->parameters.push_back(
                 ::spot::tlsf_parameter_decl{@1,
@@ -412,136 +563,196 @@ param_decl: IDENTIFIER EQUAL size SEMICOLON
             }
           ;
 
-// A DEFINITIONS block holds zero or more items.  Mirroring syfco's
-// `sepBy assignmentParser (rOp ";")` (spot/parsetlsf/refs/syfco/src/
-// lib/Reader/Parser/Global.hs), the `;` SEPARATES items: it is
-// required between two items but the last one may omit it, so all of
-// `A; B;`, `A; B`, `A;`, and a lone `A` are valid (real benchmarks
-// such as M.tlsf in the project root end their last definition
-// without `;`).  The `;` is therefore NOT part of `definition` /
-// `enum_decl`; those rules end at their `body` / `RBRACE` and the
-// optional trailing `;` is handled here.  Two items juxtaposed with
-// no `;` at all are NOT a valid two-item list: the second item's
-// head is munched into the first item's `body` as another clause
-// (maximal munch, matching syfco's `many1 exprParser`), and the
-// parse fails at the second item's `=` -- exactly where syfco fails.
-def_list: %empty
-        | def_list def_item
-        | def_list def_item SEMICOLON
+// A DEFINITIONS block holds zero or more items.  The `;` SEPARATES
+// items: it is required between two items but the last one may omit
+// it, so all of `A; B;`, `A; B`, `A;`, and a lone `A` are valid.
+//
+// The two cases are different nonterminals so that a `;`-less item
+// cannot be followed by any other item: `def_items` only ever holds
+// `;`-terminated ones, and it is not a `def_list`, so the single
+// unterminated item that `def_list -> def_items def_item` appends is
+// necessarily the last one.  This matters for brace-less enums, whose
+// entry list has no terminator (TLSF v1.2 SS4.4) and which are
+// therefore ended by the scanner rather than by the grammar: with a
+// single `def_list -> def_list def_item` production, two `;`-less
+// items would still be derivable, so `enum E = A: 00  F(x) = x;` would
+// parse as a def_list of two items.  syfco's `sepBy`
+// (Reader/Parser/Global.hs) rejects that input, because its
+// `enumVParserL` consumes the following identifier before requiring
+// the `:` of a tag, so Parsec cannot end the entry list there; keeping
+// the same restriction costs nothing and matches the reference
+// implementation.
+def_list: def_items
+        | def_items def_item
         ;
 
+// The part of a DEFINITIONS block that precedes a last, `;`-less item.
+def_items: %empty
+         | def_items def_item SEMICOLON
+         | def_items error SEMICOLON
+         ;
+
 // Each entry in a DEFINITIONS block is either a regular
-// function-style definition or an `enum` declaration.  The
-// two are disambiguated by the leading token: definition
-// starts with IDENTIFIER (followed by `(` or `=`), enum_decl
-// starts with the `enum` keyword.  No LALR(1) conflict
-// because IDENTIFIER and ENUM are distinct terminals.
+// function-style definition or an `enum` declaration.
 def_item: definition
         | enum_decl
         ;
 
-// No trailing `;`: it belongs to def_list (see above).  The last
-// grammar symbol is `body` (position 6), so the def's location span
-// is @1 + @6 (IDENTIFIER through the last body clause).
-definition: IDENTIFIER LPAREN arg_list RPAREN EQUAL body
+// The left-hand side of a definition: either a parameterized
+// `name(a1, ..., an)` or a bare parameterless `name`
+def_head: IDENTIFIER LPAREN arg_list RPAREN
           {
-            // TLSF specifies "one symbol = one definition" (see the
-            // arXiv v1.1 paper on TLSF and the canonical
-            // syfco parser's tArgs map keyed by symbol name:
-            // spot/parsetlsf/refs/syfco/src/lib/Reader/Bindings.hs).
-            // We enforce that here: a second DEFINITION with the
-            // same name -- regardless of arity -- emits BOTH
-            // diagnostics (one at the FIRST definition's location
-            // warning of the shadow, one at the SECOND location
-            // reporting the duplicate) and the second definition
-            // is dropped.  The first one survives so any later
-            // calls still expand to a real body.
-            //
-            // Looking up via `def_first_loc` is O(log n) in the
-            // number of definitions (vs. an O(n^2) linear scan of
-            // `spec->definitions`); the map also gives us the
-            // original location so the shadow-warning can point
-            // precisely at the FIRST occurrence.
-            const std::string& name = $1;
-            // Track only the LHS (the IDENTIFIER token's span, `@1`)
-            // for the duplicate-detection shadow warning, so the two
-            // diagnostics fire at consistent anchors: both callouts
-            // point at the IDENTIFIER itself, not at one end's
-            // full-LHS-to-EQUAL span.  The def's own `loc` field
-            // keeps the broader `@1 + @6` span -- useful for any
-            // future caller that wants a whole-def range rather
-            // than just the LHS token.
-            auto ins = res.def_first_loc.emplace(name, @1);
+            $$ = ::spot::tlsf_definition{@1,
+                  std::move($1),
+                  std::move($3),
+                  {}};
+          }
+        | IDENTIFIER
+          {
+            $$ = ::spot::tlsf_definition{@1,
+                  std::move($1),
+                  {},
+                  {}};
+          }
+        ;
+
+// No trailing `;`: it belongs to def_list (see above)
+definition: def_head EQUAL body
+          {
+            const std::string& name = $1.name;
+            auto ins = res.def_first_loc.emplace(name, $1.loc);
             if (!ins.second)
               {
+                // TLSF specifies "one symbol = one definition".
                 res.errors.emplace_back(
                   ins.first->second,
                   "definition '" + name
                   + "' is shadowed by a later re-definition");
                 res.errors.emplace_back(
-                  @1,
+                  $1.loc,
                   "definition '" + name
                   + "' is already defined");
               }
             else
               {
-                // $6 carries the parsed clause list for `body` (one
-                // vector slot per `(ec)` clause, possibly guarded).
-                // Expansion uses clone-and-substitute
-                // (translator::subst_arg) plus guarded-clause
-                // selection (translator::select_def_clause).
-                res.spec->definitions.push_back(
-                  ::spot::tlsf_definition{@1 + @6,
-                    std::move($1),
-                    std::move($3),
-                    std::move($6)});
+                $1.body = std::move($3);
+                res.spec->definitions.push_back(std::move($1));
               }
           }
           ;
 
-// `enum` declaration: `enum X = { V0:bits0, V1:bits1, ... };` -- the
-// trailing `;` belongs to def_list (see above), so the last grammar
-// symbol is `RBRACE` (position 6) and the location span is @1+@6
-// (ENUM through the closing brace).  Symbol positions:
-// 1=ENUM, 2=IDENTIFIER(name), 3=EQUAL, 4=LBRACE, 5=enum_entries,
-// 6=RBRACE.  $2 carries the name (typed), $5 carries the entries
-// (typed).  The action side-effects by appending to
-// `res.spec->enumerations` (mirroring the `definition:` rule's
-// pattern of pushing onto `res.spec->definitions`); the
-// `$$ = ...` assignment is then unused by the parent
-// `def_item` rule but is kept so the typed value is available
-// to Bison's default %type machinery.
-enum_decl: ENUM IDENTIFIER EQUAL LBRACE enum_entries RBRACE
+// `enum` declaration: `enum X = T0:bits0 T1:bits1 ...;` -- the
+// trailing `;` belongs to def_list (see above), and the enum
+// grammar of TLSF v1.2 SS4.4 has no terminator at all, so the `;`
+// may be omitted when the enum is the last item of the block.  The
+// action side-effects by appending to `res.spec->enumerations`; the
+// `$$ = ...` assignment is then unused by the parent `def_item` rule
+// but is kept so the typed value is available to Bison's default
+// %type machinery.
+enum_decl: ENUM IDENTIFIER EQUAL enum_entries
            {
-             ::spot::tlsf_enum_decl decl{ @1 + @6,
+             // Binding-level validation: (1) uniform width; (2) no
+             // overlapping patterns, two DIFFERENT tags must not
+             // cover the same concrete valuation.  Overlapping
+             // patterns WITHIN one tag are accepted: a tag's pattern
+             // list is a deliberate coverage union (the canonical
+             // TLSF example `UNDEF: 11*, 1*1, *11` overlaps itself).
+             // Spot tests overlap position-wise (no 2^w enumeration)
+             // and renders the shared valuation by preferring the
+             // concrete bit of either pattern ('0' when both are
+             // don't-cares).  Duplicate tags with disjoint patterns
+             // are legal.
+             const std::string& ename = $2;
+             if (!$4.empty())
+               {
+                 const size_t w = $4[0].patterns[0].size();
+                 // Flatten to (entry, pattern) pairs in source
+                 // order so within-entry pattern clashes (e.g.
+                 // `A: 00, 00`) are checked like cross-tag ones.
+                 std::vector<const spot::tlsf_enum_value*> ents;
+                 std::vector<const std::string*> pats;
+                 for (const auto& e : $4)
+                   for (const auto& p : e.patterns)
+                     {
+                       ents.push_back(&e);
+                       pats.push_back(&p);
+                     }
+                 const size_t n = pats.size();
+                 for (size_t i = 0; i < n; ++i)
+                   {
+                     if (pats[i]->size() != w)
+                       {
+                         res.errors.emplace_back(
+                           ents[i]->loc,
+                           "enumeration '" + ename + "': pattern '"
+                           + *pats[i] + "' of tag '"
+                           + ents[i]->tag + "' has length "
+                           + std::to_string(pats[i]->size())
+                           + ", but the width is fixed to "
+                           + std::to_string(w)
+                           + " by the first pattern");
+                         // Skip the overlap comparisons: the
+                         // position-wise loop below indexes both
+                         // patterns up to w-1 and a short pattern
+                         // would read past its end.
+                         continue;
+                       }
+                     for (size_t j = 0; j < i; ++j)
+                       {
+                         if (pats[j]->size() != w)
+                           continue;
+                         // Position-wise compatibility test.
+                         bool overlap = true;
+                         std::string shared(w, '0');
+                         for (size_t k = 0; k < w && overlap; ++k)
+                           {
+                             char c1 = (*pats[j])[k];
+                             char c2 = (*pats[i])[k];
+                             if (c1 != '*' && c2 != '*' && c1 != c2)
+                               overlap = false;
+                             else if (c1 != '*')
+                               shared[k] = c1;
+                             else if (c2 != '*')
+                               shared[k] = c2;
+                           }
+                         if (overlap && ents[j]->tag != ents[i]->tag)
+                           res.errors.emplace_back(
+                             ents[i]->loc,
+                             "conflict in enumeration '"
+                             + ename + "': tags '"
+                             + ents[j]->tag + "' and '"
+                             + ents[i]->tag
+                             + "' share the same value: "
+                             + shared);
+                       }
+                   }
+               }
+             ::spot::tlsf_enum_decl decl{ @1 + @4,
                    std::move($2),
-                   std::move($5) };
+                   std::move($4) };
              res.spec->enumerations.push_back(std::move(decl));
-             $$ = ::spot::tlsf_enum_decl{ @1 + @6, "", {} };
            }
            ;
 
-// Comma-separated enum_entries list.  Mirrors the structure
-// of `arg_list` (commas between entries, no leading/trailing
-// comma tolerated).  Syfco allows an empty enum
-// (`enum X = {};`); we mirror with `enum_entries: %empty` in
-// a follow-up.  For now, an empty enum is rejected -- the
-// grammar matches one or more entries.
+// Whitespace-separated enum_entries list.
+// All semantic checks (width, duplicate tags, pattern conflicts) are
+// performed once in the `enum_decl` action, where the enum name and
+// the complete entry list are available.
 enum_entries: enum_entry
               {
                 $$.push_back(std::move($1));
               }
-            | enum_entries COMMA enum_entry
+            | enum_entries enum_entry
               {
-                $1.push_back(std::move($3));
+                $1.push_back(std::move($2));
                 $$ = std::move($1);
               }
             ;
 
-// One `Tag:bits` pair.  Symbol positions: 1=IDENTIFIER(tag),
-// 2=COLON, 3=bits.  $1=tag, $3=bits.  Location @1+@3
-// covers the entry.
-enum_entry: IDENTIFIER COLON bits
+// One `Tag: patterns...` entry.  The tag is an ENUM_TAG, so a
+// following identifier cannot be mistaken for another entry: it
+// belongs to the next def_list item, and the enum body is over.
+enum_entry: ENUM_TAG COLON enum_patterns
             {
               $$ = ::spot::tlsf_enum_value{ @1 + @3,
                     std::move($1),
@@ -549,46 +760,38 @@ enum_entry: IDENTIFIER COLON bits
             }
             ;
 
-// `bits` is a sequence of `0`, `1`, and `*` characters,
-// accumulated into a std::string.  Reuses the existing
-// NUMBER token (which matches `[0-9]+` -- e.g. `0`, `1`,
-// `00`, `01`, etc.) and the existing STAR token (the
-// multiplication operator).  No new lexer token needed;
-// this keeps single-bit numbers in expressions (`0`, `1`)
-// tokenising as NUMBER rather than introducing an enum-
-// context-specific lexer.  The recursive accumulation
-// requires the parser to shift on NUMBER/STAR after `bits`,
-// which Bison resolves by default (shift over reduce).
-bits: NUMBER       { $$ = std::move($1); }
-    | STAR         { $$ = "*"; }
-    | bits NUMBER  { $$ = $1 + $2; }
-    | bits STAR    { $$ = $1 + "*"; }
-    ;
+// Comma-separated bit patterns bound to one tag,
+// e.g. `U: 11*, 1*1, *11`.  Each pattern is a single BITS token (one
+// maximal run of `0`, `1` and `*` characters, per TLSF v1.2 SS4.4),
+// so a run may only follow a `,`.
+enum_patterns: BITS
+                {
+                  $$.push_back(std::move($1));
+                }
+              | enum_patterns COMMA BITS
+                {
+                  $1.push_back(std::move($3));
+                  $$ = std::move($1);
+                }
+              | enum_patterns BITS
+                {
+                  // Two runs with no `,` between them.
+                  res.errors.emplace_back(@2,
+                    "missing ',' between bit patterns; a pattern is"
+                    " one run of '0', '1' and '*' characters");
+                  $$ = std::move($1);
+                }
+              ;
 
 // Right-hand side of a DEFINITION.  TLSF v1.2 SS4.6 allows one or
 // more (possibly guarded) clauses `(ec)+` with `ec = e | eB : e |
-// eP : e`; the canonical syfco reference parser
-// (spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Global.hs
-// `reminderParser`) parses the body with `many1 exprParser`, i.e.
-// the clauses are juxtaposed maximal expressions.  The `body` rule
-// below mirrors that list shape: each clause is a full `expr` (a
-// guarded clause is an `expr COLON expr`, see the Guard production
-// in the expression rules), and consecutive clauses are simply
-// juxtaposed.  The translator keeps one clause per `tlsf_definition`
-// body slot and selects the first whose guard holds at expansion
-// time (translator::select_def_clause in translate.cc).
-//
-// Quoted-string RHS is NOT accepted here; the STRING token remains
-// in the grammar only for `INFO { TITLE: "..."; DESCRIPTION:
-// "..."; }`.
+// eP : e`.
 // Both rules carry the loosest precedence (%prec COLON) so that the
 // reduce-versus-shift conflicts between "this expression is a complete
 // clause" and "this infix operator extends the current expression" are
 // resolved by precedence in favor of the shift: an infix operator can
 // never start a new clause, so a completed clause followed by one is
-// always a longer maximal expression (matching syfco's many1
-// exprParser).  See the %expect note above for the one conflict that
-// precedence cannot resolve.
+// always a longer maximal expression.
 body: expr %prec COLON
       {
         // `$$` is default-constructed as an empty vector; pushing
@@ -602,22 +805,10 @@ body: expr %prec COLON
       }
     ;
 
-// `arg_list` is the formal-parameter list of a DEFINITION.  TLSF
-// uses comma separation here, matching `arg_expr_list` (the actual
-// argument list at App call sites) and syfco's `commaSep tokenparser`
-// combinator in spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Global.hs.
-// Whitespace alone is NOT a separator: `Pos(grid i j)` would be
-// rejected by every other TLSF tool.
+// `arg_list` is the formal-parameter list of a DEFINITION.
 arg_list: %empty {}
         | IDENTIFIER
           {
-            // Push directly into `$$` (default-constructed by Bison
-            // as an empty std::vector) rather than build a stack
-            // local first and move it in: the local-and-double-move
-            // pattern can leave Bison's variant in a partially
-            // populated state on some compilers, and using `$$`
-            // directly matches the working `arg_list COMMA IDENTIFIER`
-            // pattern below.
             $$.push_back(std::move($1));
           }
         | arg_list COMMA IDENTIFIER
@@ -686,72 +877,90 @@ main_item: INPUTS LBRACE
            }
          ;
 
-ap_list: %empty
-       | ap_list ap_decl
+// Declarations separated by `;`; the trailing `;` of the LAST one may
+// be omitted (e.g. `HBURST[2]` without `;` in amba_decomposed_decode).
+// Like `property_body` above, the split
+// between `ap_decls` and a single terminating `ap_decl_nosemi` keeps
+// the `;` mandatory between two declarations.
+ap_list: ap_decls {}
+       | ap_decls ap_decl_nosemi
        ;
 
-ap_decl: IDENTIFIER SEMICOLON
-         {
-           if (res.io_target)
-             res.io_target->push_back(
-               ::spot::tlsf_ap_decl{@1, std::move($1), std::string()});
-         }
-       | IDENTIFIER LBRACKET size RBRACKET SEMICOLON
-         {
-           if (res.io_target)
-             res.io_target->push_back(
-               ::spot::tlsf_ap_decl{@1, std::move($1), std::move($3)});
-         }
-       ;
+ap_decls: %empty {}
+        | ap_decls ap_decl
+        ;
 
-// `size` is the bus-size expression in `name[size]`.  TLSF permits
-// integer literals AND parameter names AND arithmetic
-// combinations thereof -- chomp.tlsf has `os[N*M]`, for instance.
-// Pure arithmetic -- arithmetic ops and parens -- so the size
-// cannot accidentally swallow a boolean subterm.  Left-assoc;
-// the existing `%left "+" "-"` / `%left "*" "/" "%"`
-// declarations carry over because precedence is keyed on
-// tokens.
-//
-// TODO(limitation): the `size` non-terminal stringifies
-// without tracking explicit grouping heuristics, so a source
-// like `os[(N+1)*M]` (user parens around N+1 to force
-// `(N+1)*M` precedence) round-trips through parse-deparse
-// as `os[N+1*M]` and re-parses with left-assoc as
-// `N + (1*M)`, changing semantics.  chomp.tlsf's bus-sizes
-// are all bare arithmetic (`os[N*M]`), so the round-trip is
-// value-preserving on that corpus.  Future work: replace the
-// string-based size with a small AST node carrying a
-// `parenthesized` flag, so any user-supplied grouping is
-// preserved verbatim through deparse.  Until then, prefer
-// rewriting user-supplied grouped sizes to bare arithmetic
-// before testing against the deparser.
-size: NUMBER      { $$ = std::move($1); }
-    | IDENTIFIER  { $$ = std::move($1); }
-    | LPAREN size RPAREN { $$ = "(" + $2 + ")"; }
-    | size PLUS size     %prec PLUS { $$ = $1 + " + " + $3; }
-    | size KW_PLUS size  %prec KW_PLUS { $$ = $1 + " + " + $3; }
-    | size MINUS_ size   %prec MINUS_ { $$ = $1 + " - " + $3; }
-    | size KW_MINUS size %prec KW_MINUS { $$ = $1 + " - " + $3; }
-    | size STAR size     %prec STAR { $$ = $1 + " * " + $3; }
-    | size KW_MUL size   %prec KW_MUL { $$ = $1 + " * " + $3; }
-    | size SLASH size    %prec SLASH { $$ = $1 + " / " + $3; }
-    | size KW_DIV size   %prec KW_DIV { $$ = $1 + " / " + $3; }
-    | size PERCENT size  %prec PERCENT { $$ = $1 + " % " + $3; }
-    | size KW_MOD size   %prec KW_MOD { $$ = $1 + " % " + $3; }
-    ;
-
-// ----- property body (semicolon-terminated formulas) -----------------
-property_body: %empty {}
-            | property_body stmt
+ap_decl_body: IDENTIFIER
+              {
+                $$ = ::spot::tlsf_ap_decl{@1, std::move($1),
+                  nullptr, std::string()};
+              }
+            | IDENTIFIER LBRACKET expr RBRACKET
+              {
+                // A bus width is an integer expression, i.e. any
+                // `expr` the translator's integer evaluator accepts
+                // (see eval_int in spot/parsetlsf/translate.cc:
+                // literals, parameters, loop variables, the
+                // builtins, user definitions, and the arithmetic and
+                // comparison operators).  Nothing outside that
+                // language is rejected here -- it is diagnosed, with
+                // a location, at translation time.
+                $$ = ::spot::tlsf_ap_decl{@1, std::move($1), std::move($3),
+                  std::string()};
+              }
+            | IDENTIFIER IDENTIFIER
+              {
+                // Typed-bus declaration `enumType SIGNAL;` (TLSF v1.2
+                // SS4.5): SIGNAL is a bus whose width is the bit width
+                // of the named enumeration.  The enum existence check
+                // happens at translation time, when the GLOBAL section
+                // is guaranteed to have been seen (enums may be declared
+                // after MAIN lexically, and forward references are
+                // accepted).
+                $$ = ::spot::tlsf_ap_decl{@1, std::move($2),
+                  nullptr, std::move($1)};
+              }
             ;
 
-stmt: expr SEMICOLON
-     {
-       if (res.current_body)
-         res.current_body->push_back(std::move($1));
-     }
-   ;
+ap_decl: ap_decl_body SEMICOLON
+         {
+           if (res.io_target)
+             res.io_target->push_back(std::move($1));
+         }
+       ;
+
+ap_decl_nosemi: ap_decl_body
+         {
+           if (res.io_target)
+             res.io_target->push_back(std::move($1));
+         }
+       ;
+
+// ----- property body (semicolon-separated formulas) ------------------
+//
+// Statements are separated by `;`.  The semicolon of the LAST
+// statement before `}` may be omitted (several benchmarks from the
+// wild do so, e.g. amba_decomposed_lock*).  Splitting the list between
+// `stmts` (terminated statements) and a trailing `expr` keeps the
+// semicolon mandatory between two statements: after `stmts expr` the
+// only legal lookahead is `;` (start a new statement) or `}` (reduce the
+// trailing expression), so `a b` is still rejected while a lone `a`
+// before `}` is accepted.
+property_body: stmts {}
+            | stmts expr
+              {
+                if (res.current_body)
+                  res.current_body->push_back(std::move($2));
+              }
+            ;
+
+stmts: %empty {}
+     | stmts expr SEMICOLON
+       {
+         if (res.current_body)
+           res.current_body->push_back(std::move($2));
+       }
+     ;
 
 // ----- expressions ----------------------------------------------------
 expr: NUMBER
@@ -764,7 +973,7 @@ expr: NUMBER
             // there is no stated width, but a literal that does not
             // fit in a signed 64-bit integer cannot be represented
             // by the AST.  Record a diagnostic instead of silently
-            // truncating to 0 (SyFCo's `read` throws here too).
+            // truncating to 0.
             res.errors.emplace_back(@1,
               "integer literal is too large");
           }
@@ -817,18 +1026,13 @@ expr: NUMBER
         $$ = ::spot::tlsf_make_nary_setop(
           ::spot::tlsf_op::SetDifference, @1, std::move($3));
       }
-    // `SIZEOF <expr>` -- the canonical TLSF form when the argument
-    // is a single token (chomp.tlsf's `(SIZEOF sel)`, for
-    // instance).  This production subsumes the historical
-    // `SIZEOF(arg_list)` form: when written with parens the
-    // argument parses as a primary `( ... )` expression inside
-    // `expr`, so a separate parenthesised production would
-    // collide with this one (LALR(1) shift/reduce on `RPAREN`
-    // between `arg_expr_list` and `(...)`).  Unifying on the
-    // bare-arg form keeps the parser unambiguous and lets
-    // `tlsf_print_expr` round-trip both spellings identically.
-    // Precedence ties to BANG so `SIZEOF !x` parses as
-    // `SIZEOF(!x)` rather than `(SIZEOF! x)`.
+    // `SIZEOF <expr>` -- the canonical TLSF form when the argument is
+    // a single token (chomp.tlsf's `(SIZEOF sel)`, for instance).
+    // This production subsumes the historical `SIZEOF(arg_list)`
+    // form: when written with parens the argument parses as a primary
+    // `( ... )` expression inside `expr`.  Unifying on the bare-arg
+    // form keeps the parser unambiguous and lets `tlsf_print_expr`
+    // round-trip both spellings identically.
     | FN_SIZEOF expr %prec NUM_UNARY
       {
         std::vector< ::spot::tlsf_expr_ptr> args;
@@ -946,6 +1150,47 @@ expr: NUMBER
         $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::XStack,
                @1, $3, $5);
       }
+    // Bounded temporal operators `F[a:b] phi` / `G[a:b] phi`
+    | LTL_F LBRACKET expr COLON expr RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_bounded(::spot::tlsf_op::FBounded,
+               @1, $3, $5, $7);
+      }
+    | LTL_G LBRACKET expr COLON expr RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_bounded(::spot::tlsf_op::GBounded,
+               @1, $3, $5, $7);
+      }
+    | LTL_X LBRACKET_BANG expr RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_quantifier(
+               ::spot::tlsf_op::StrongXStack, @1, $3, $5);
+      }
+    | LTL_X LBRACKET expr BANG_RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_quantifier(
+               ::spot::tlsf_op::StrongXStack, @1, $3, $5);
+      }
+    | LTL_F LBRACKET_BANG expr COLON expr RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_bounded(::spot::tlsf_op::StrongFBounded,
+               @1, $3, $5, $7);
+      }
+    | LTL_F LBRACKET expr COLON expr BANG_RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_bounded(::spot::tlsf_op::StrongFBounded,
+               @1, $3, $5, $7);
+      }
+    | LTL_G LBRACKET_BANG expr COLON expr RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_bounded(::spot::tlsf_op::StrongGBounded,
+               @1, $3, $5, $7);
+      }
+    | LTL_G LBRACKET expr COLON expr BANG_RBRACKET expr %prec QUANTIFIER
+      {
+        $$ = ::spot::tlsf_make_bounded(::spot::tlsf_op::StrongGBounded,
+               @1, $3, $5, $7);
+      }
     | AND LBRACKET expr RBRACKET expr  %prec QUANTIFIER
       {
         $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::And, @1, $3, $5);
@@ -954,33 +1199,21 @@ expr: NUMBER
       {
         $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::Or, @1, $3, $5);
       }
-    // Quantifier range `&&[lo..hi] body` / `||[lo..hi] body`:
-    // un-braced form not yet supported by Spot's `expr`
-    // grammar (DOTDOT is only valid inside `{...}` set ranges);
-    // adding parallel productions here lets a bare range flow
-    // directly into the quantifier bound.  We synthesise a
-    // SetRange AST node ($3..$4) so the body's quantifier slot
-    // gets the SAME shape a `{lo..hi}` SetExplicit would, and
-    // the deparser emits `&&[{lo..hi}] body` (round-trip
-    // idempotent because `expr: {expr DOTDOT expr}` parses
-    // that exactly).  No LALR(1) conflict: after `expr`,
-    // `LBRACKET` is the existing reduction choice in the
-    // quantifier context, `DOTDOT` is the new one -- distinct
-    // terminals.
-    | AND LBRACKET expr DOTDOT expr RBRACKET expr  %prec QUANTIFIER
+    // Error recovery for a malformed quantifier bound: swallow the
+    // `[...]` region and resume parsing on the body.
+    | AND LBRACKET error RBRACKET expr  %prec QUANTIFIER
       {
-        // Symbol positions: 1=AND, 2=LBRACKET, 3=lo expr,
-        // 4=DOTDOT, 5=hi expr, 6=RBRACKET, 7=body expr.  $4/$6
-        // refer to the untyped DOTDOT/RBRACKET punctuation tokens,
-        // so they cannot be used as semantic values; lo=$3, hi=$5,
-        // body=$7 here.
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::And, @1,
-               ::spot::tlsf_make_set_range(@3 + @5, $3, $5), $7);
+        res.errors.emplace_back(@1,
+          "invalid quantifier bound; supported forms are "
+          "`&&[0 <= i < N]` or `&&[i IN {0, 1}]`");
+        $$ = $5;
       }
-    | OR LBRACKET expr DOTDOT expr RBRACKET expr  %prec QUANTIFIER
+    | OR LBRACKET error RBRACKET expr  %prec QUANTIFIER
       {
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::Or, @1,
-               ::spot::tlsf_make_set_range(@3 + @5, $3, $5), $7);
+        res.errors.emplace_back(@1,
+          "invalid quantifier bound; supported forms are "
+          "`||[0 <= i < N]` or `||[i IN {0, 1}]`");
+        $$ = $5;
       }
     | LBRACE set_elements RBRACE
       {

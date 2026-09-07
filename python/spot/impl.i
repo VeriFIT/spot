@@ -548,6 +548,8 @@ static void handle_any_exception()
 %include <spot/misc/optionmap.hh>
 %include <spot/misc/random.hh>
 %include <spot/misc/escape.hh>
+%include <spot/misc/position.hh>
+%include <spot/misc/location.hh>
 
 %implicitconv spot::trival;
 %include <spot/misc/trival.hh>

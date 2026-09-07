@@ -17,9 +17,24 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import random
 import spot
 from unittest import TestCase
 tc = TestCase()
+
+
+def parse_tlsf(source, opts=None):
+    """spot.parse_tlsf() with the mandatory-INFO check disabled.
+
+    Most fixtures below are stripped-down specifications that only
+    spell out the INFO items the test they belong to is about, so
+    requiring TITLE, DESCRIPTION, SEMANTICS, and TARGET on all of them
+    would only add noise.  The check itself is exercised by the
+    check_info tests further down."""
+    if opts is None:
+        opts = spot.tlsf_parser_options()
+    opts.check_info = False
+    return spot.parse_tlsf(source, opts)
 
 
 def formulas_in_section(canonical, keyword):
@@ -70,9 +85,9 @@ MAIN {
 }
 """
 
-# chomp.tlsf, a real-world benchmark, is embedded here so that the
-# round-trip and translation fixtures below do not depend on a copy
-# of the file living at the top level of the source tree.
+# chomp.tlsf, tictactoe.tlsf, and scutella1.tlsf, are specifications
+# embedded here round-trip and translation fixtures below do not
+# depend on a copy of the file living in the source tree.
 chomp_contents = """\
 INFO {
   TITLE:       "Chomp Game"
@@ -164,12 +179,136 @@ MAIN {
 }
 """
 
+tictactoe_contents = """\
+INFO {
+  TITLE:       "Tic Tac Toe"
+  DESCRIPTION: "Tic Tac Toe Game, Finite version"
+  SEMANTICS:   Mealy,Finite
+  TARGET:      Mealy
+}
+
+GLOBAL {
+  DEFINITIONS {
+    PickOne(A) = (||[0 <= i < 9] A[i]) &&
+      (&&[0 <= i < 9] (A[i] -> &&[i <= j < 9]!A[j]));
+    // Keep the value of A[b...e] for next step.
+    NoChange(A,b,e) = &&[b <= i < e] ((A[i] && X(A[i])) || (!A[i] && X(!A[i])));
+    // change a single cell in A that isn't used in B.
+    ChangeOne(A, B) = (||[0 <= i < 9] ((!A[i] && !B[i]) -> X(A[i]))) &&
+      (&&[0 <= i < 9] ((!A[i] && X(A[i])) -> NoChange(A, i+1, 9)));
+    // all cells are taken by one of the player
+    AllTaken(A, B) = &&[0 <= i < 9] (A[i] || B[i]);
+    // check for three aligned cells
+    Aligned(A) = (A[0] && A[1] && A[2]) ||
+                 (A[3] && A[4] && A[5]) ||
+                 (A[6] && A[7] && A[8]) ||
+                 (A[0] && A[3] && A[6]) ||
+                 (A[1] && A[4] && A[7]) ||
+                 (A[2] && A[5] && A[8]) ||
+                 (A[0] && A[4] && A[8]) ||
+                 (A[2] && A[4] && A[6]);
+  }
+}
+
+MAIN {
+  // The cells are numbered as follows:
+  //   0 1 2
+  //   3 4 5
+  //   6 7 8
+  // pi[n] is true iff the input player marked cell n.
+  // po[n] is true iff the output player marked cell n.
+  INPUTS {
+    pi[9];
+  }
+  OUTPUTS {
+    po[9];
+    turno; // false = input's turn, true = output's turn
+  }
+  PRESET {
+    // The output player is the first player.
+    turno;
+    // Turn alternate betwen players
+    // (The number of turns is odd, so it's OK to use an equivalence
+    // with weak X here, it means that if turno is false the next step must
+    // exist.)
+    G(turno <-> X !turno);
+    // The player should select a single cell.
+    PickOne(po);
+  }
+  INITIALLY {
+    // the input player does not select any value on first turn.
+    &&[0 <= i < 9] !pi[i];
+  }
+  REQUIRE {
+    // if the next turn is the input's player turn, they
+    // should change exactly one cell that isn't taken by any player
+    X(!turno) -> ChangeOne(pi, po);
+    // If it not the input's turn, we do not want to see any change.
+    X(turno) -> NoChange(pi, 0, 9);
+  }
+  ASSERT {
+    // if the next turn is the outut's player turn, they
+    // should change exactly one cell that isn't taken by any player
+    X[!](turno) -> ChangeOne(po, pi);
+    // If it not the output's turn, we do not want to see any change.
+    X[!](!turno) -> NoChange(po, 0, 9);
+  }
+  GUARANTEE {
+    // The game finishes all cells are taken, or if the output player
+    // has aligned 3 cells.
+    F(AllTaken(pi,po) || Aligned(po));
+    // The output player should never align 3 cells.
+    G(!Aligned(pi));
+  }
+}
+"""
+
+scutella1_contents = """\
+INFO {
+  TITLE:       "Scutellà's counterexample"
+  DESCRIPTION: "LTLf version of a counterexample by Scutellà"
+  SEMANTICS:   Moore,Finite
+  TARGET:      Moore
+}
+GLOBAL {
+  DEFINITIONS {
+    ExactlyOne(x) = (||[0 <= i < (SIZEOF x)] x[i])
+      && (&&[1 <= i < (SIZEOF x)] (x[i] -> (&&[0 <= j < i] !x[j])));
+  }
+}
+
+MAIN {
+  INPUTS {
+    a;
+  }
+  OUTPUTS {
+    s[5]; // five states
+    b;
+  }
+  PRESET {
+    s[0]; // we start in state 0
+  }
+  ASSERT {
+    ExactlyOne(s); // only one state is active at all time
+    // transition structure:
+    s[0] -> ((a && X(s[3])) || (!a && X(s[1])));
+    s[1] -> X(s[2]);
+    s[2] -> ((!b && X(s[3])) || (b && X(s[4])));
+    s[3] -> X(s[1]);
+  }
+  GUARANTEE {
+    // The game must reach state 4
+    F(s[4]);
+  }
+}
+"""
+
 filename = 'parsetlsf.tlsf'
 with open(filename, 'w') as f:
     f.write(contents)
 
 try:
-    parsed = spot.parse_tlsf(filename)
+    parsed = parse_tlsf(filename)
     tc.assertFalse(parsed.errors,
                    f"parse_tlsf reported errors: "
                    f"{[(e.first, e.second) for e in parsed.errors]}")
@@ -187,8 +326,7 @@ try:
 
     # parsed_tlsf does not expose the MAIN bodies (they live in the
     # opaque AST); the per-section shapes are pinned below on the
-    # canonical printed form instead.  INITIALLY/PRESET/REQUIRE/ASSERT
-    # are empty and GUARANTEE holds 2 formulas.
+    # canonical printed form.  GUARANTEE holds 2 formulas.
     tc.assertEqual(parsed.filename, filename)
 
     # Round-trip via spot.tlsf_print.
@@ -211,9 +349,8 @@ try:
     tc.assertEqual(len(formulas_in_section(canonical, 'GUARANTEE')), 2,
                    "expected 2 formulas in GUARANTEE")
 
-    with open(filename, 'w') as f:
-        f.write(canonical)
-    parsed2 = spot.parse_tlsf(filename)
+    parsed2 = parse_tlsf(canonical)
+
     tc.assertFalse(parsed2.errors)
     tc.assertEqual(parsed2.title, parsed.title)
     tc.assertEqual(parsed2.description, parsed.description)
@@ -228,7 +365,8 @@ try:
 
     # Translation: tlsf_to_ltl produces a formula whose APs are the
     # bus-flattened `request_0`/`request_1`/`grant_0`/`grant_1`, and
-    # whose inputs list mirrors those names in first-use order.
+    # whose inputs list mirrors those names in declaration order
+    # (signals are registered eagerly).
     res = spot.tlsf_to_ltl(parsed)
     tc.assertTrue(bool(res.full_formula),
                   "tlsf_to_ltl returned a null formula")
@@ -238,15 +376,15 @@ try:
     tc.assertIn('request_1', fstr)
     tc.assertIn('grant_1',  fstr)
     tc.assertEqual(list(res.inputs),
-                   ['request_0', 'grant_0', 'request_1', 'grant_1'])
-    tc.assertEqual(list(res.outputs), [])
+                   ['request_0', 'request_1', 'grant_0', 'grant_1'])
+    # `done` is declared but never used; it is still registered.
+    tc.assertEqual(list(res.outputs), ['done'])
     # Errors are surfaced on the parsed AST, not on the result.
     tc.assertFalse(parsed.errors,
                    f"errors: {[(e.first, e.second) for e in parsed.errors]}")
     # tlsf_translation_result carries one LTL formula per MAIN
     # section plus the composed full_formula.  Only GUARANTEE is
-    # non-empty here: every other section folds to true, and the
-    # composed formula is (semantically) just that guarantee.
+    # non-empty here.
     for section in (res.initially, res.preset, res.require,
                     res.assertion, res.assume):
         tc.assertTrue(section.is_tt(),
@@ -260,9 +398,8 @@ try:
                   f"section; got: {res.full_formula}")
 
     # Empty spec.
-    with open(filename, 'w') as f:
-        f.write("INFO {} GLOBAL {} MAIN {}\n")
-    empty = spot.parse_tlsf(filename)
+    empty = parse_tlsf("INFO {} GLOBAL {} MAIN {}\n")
+
     tc.assertFalse(empty.errors)
     tc.assertEqual(empty.title, "")
     tc.assertEqual(list(empty.inputs), [])
@@ -273,26 +410,24 @@ try:
                    [])
 
     # Bogus file.
-    bogus = spot.parse_tlsf("/nonexistent/path.tlsf")
+    bogus = parse_tlsf("/nonexistent/path.tlsf")
     tc.assertTrue(bogus.errors)
 
     # Malformed file.
-    with open(filename, 'w') as f:
-        f.write("INFO { TITLE: \"oops\"\n")
-    broken = spot.parse_tlsf(filename)
+    broken = parse_tlsf("INFO { TITLE: \"oops\"\n")
+
     tc.assertTrue(broken.errors)
 
     # TRANSITIONS is not a TLSF section and must not be accepted as
     # a Spot-specific extension.
-    with open(filename, 'w') as f:
-        f.write("INFO {} GLOBAL {} MAIN { TRANSITIONS { a; } }\\n")
-    transitions = spot.parse_tlsf(filename)
+    transitions = parse_tlsf(
+        "INFO {} GLOBAL {} MAIN { TRANSITIONS { a; } }\n")
+
     tc.assertTrue(
         transitions.errors,
         "TRANSITIONS must be rejected as a non-TLSF extension")
-    # Second spec exercising bool/mixed-binary + quantifier bodies.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test bool/mixed-binary operators and quantifier bodies.
+    val = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {}\n"
             "MAIN {\n"
@@ -303,7 +438,7 @@ try:
             "    &&[N - 1] (b[i] || !b[i + 1]);\n"
             "  }\n"
             "}\n")
-    val = spot.parse_tlsf(filename)
+
     tc.assertFalse(val.errors)
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, val)
@@ -317,62 +452,57 @@ try:
     tc.assertIn("&&[N - 1]", can2)
     # Round-trip: re-parse the canonical and verify the second
     # deparse matches the first (idempotence).
-    with open(filename, 'w') as f:
-        f.write(can2)
-    val2 = spot.parse_tlsf(filename)
+    val2 = parse_tlsf(can2)
+
     tc.assertFalse(val2.errors)
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, val2)
     can3 = ostr.str()
     tc.assertEqual(can3, can2)
 
-    # Third spec exercising the associativity-aware BinaryOp wrap
-    # (right-assoc LHS, right-assoc RHS interplay, cross-precedence,
-    # and quantifier under BinaryOp).  Each line is deparsed and
-    # re-parsed; deparse-on-deparse must be idempotent.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test associativity-aware parenthesis wrapping in the printer:
+    # right-assoc operators in LHS/RHS position, cross-precedence,
+    # and a quantifier under a BinaryOp.  Deparse-on-deparse must be
+    # idempotent.
+    assoc = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {}\n"
             "MAIN {\n"
             "  INPUTS { a; b; c; p; q; }\n"
             "  ASSERT {\n"
-            # Right-assoc -> : re-derives same shape.
+            # Right-assoc -> :
             "    a -> b -> c;\n"
-            # Tighter LHS (&& inside -> LHS) needs no wrap.
+            # Tighter LHS:
             "    a && b -> c;\n"
-            # Tighter RHS (&& inside -> RHS) needs no wrap.
+            # Tighter RHS:
             "    a -> b && c;\n"
-            # Quantifier body extends with -> (bison `%prec "<->>"`).
+            # Quantifier body extends with ->:
             "    &&[N - 1] p -> q;\n"
-            # Force-source paren preserved through round-trip.
+            # Source parens preserved:
             "    (a -> b) -> c;\n"
-            # Left-assoc parent with looser-precedence RHS: emitted as
-            # `(b -> c)` via the BinaryOp parenthesized branch.
+            # Left-assoc parent, looser-precedence RHS:
             "    a && (b -> c);\n"
             "  }\n"
             "}\n")
-    assoc = spot.parse_tlsf(filename)
+
     tc.assertFalse(assoc.errors,
                    f"errors: {[(e.first, e.second) for e in assoc.errors]}")
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, assoc)
     can_ass = ostr.str()
-    with open(filename, 'w') as f:
-        f.write(can_ass)
-    assoc2 = spot.parse_tlsf(filename)
+    assoc2 = parse_tlsf(can_ass)
+
     tc.assertFalse(assoc2.errors)
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, assoc2)
     can_ass2 = ostr.str()
     tc.assertEqual(can_ass2, can_ass)
 
-    # Precedence follows Table 1 of TLSF v1.2.  In particular, U and W
-    # are separate right-associative tiers, R is a lower left-associative
-    # tier, division/modulo are right-associative and weaker than MUL,
-    # and quantified Boolean operators share the unary-LTL tier.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test operator precedence and associativity per the TLSF v1.2
+    # specification: U/W are separate right-associative tiers, R is a
+    # lower left-associative tier, / and % are right-associative and
+    # weaker than MUL, and quantifiers share the unary-LTL tier.
+    precedence = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {}\n"
             "MAIN {\n"
@@ -386,7 +516,7 @@ try:
             "    a || b && c;\n"
             "  }\n"
             "}\n")
-    precedence = spot.parse_tlsf(filename)
+
     tc.assertFalse(precedence.errors,
                    f"precedence fixture must parse cleanly; "
                    f"errors: {[(e.first, e.second) for e in precedence.errors]}"
@@ -394,38 +524,26 @@ try:
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, precedence)
     can_prec = ostr.str()
-    # These spellings are unambiguous under TLSF v1.2's precedence
-    # and associativity rules and must remain stable through a
-    # print/parse/print round-trip.
+    # These spellings are unambiguous under the TLSF precedence and
+    # associativity rules and must be stable through round-trips.
     tc.assertIn("a U b W c;", can_prec)
     tc.assertIn("a R b U c;", can_prec)
     tc.assertIn("a / b / c;", can_prec)
     tc.assertIn("&&[N - 1] p -> q;", can_prec)
     tc.assertIn("a -> b <-> c;", can_prec)
     tc.assertIn("a || b && c;", can_prec)
-    with open(filename, 'w') as f:
-        f.write(can_prec)
-    precedence2 = spot.parse_tlsf(filename)
+    precedence2 = parse_tlsf(can_prec)
+
     tc.assertFalse(precedence2.errors)
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, precedence2)
     tc.assertEqual(ostr.str(), can_prec)
 
-    # Fourth spec: Finite semantics + bus inputs/outputs in
-    # MAIN, with `X[!] ack[0]` in GUARANTEE.  The TLSF lexer
-    # accepts `X[!]` (only) as the LTLf-style "strong" next
-    # operator (spot/parsetlsf/scantlsf.ll: token rule
-    # `"X[!]"  return token::LTL_STRONG_NEXT`).  The bare
-    # `X!` is NOT a token: it parses as the sequence `X !`
-    # (next + bang), and Spot's formula printer renders the
-    # resulting `X(NOT p)` as `X!p` -- a textual coincidence
-    # with the old token spelling.  This fixture exercises
-    # the dispatch-by-semantics Finite branch (X strong
-    # accepted, emitted as strong_X) along with bus
-    # flattening on both sides: `event[N]` -> `event_0/1`,
-    # `ack[N]` -> `ack_0/1`.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test Finite semantics with bus inputs/outputs: the `X[!]` strong-next
+    # operator is accepted (and later emitted as strong_X), while the
+    # bare `X!` is NOT a token -- it parses as `X !` (next + bang), and
+    # Spot's printer happens to render the result as `X!p`.
+    finite = parse_tlsf(
             "INFO {\n"
             "  SEMANTICS:   Mealy,Finite\n"
             "}\n"
@@ -439,7 +557,7 @@ try:
             "    X[!] ack[0] || !ack[1] || !event[0] || !event[1];\n"
             "  }\n"
             "}\n")
-    finite = spot.parse_tlsf(filename)
+
     tc.assertFalse(finite.errors,
                    f"parse_tlsf reported errors: "
                    f"{[(e.first, e.second) for e in finite.errors]}")
@@ -448,18 +566,14 @@ try:
     tc.assertEqual(list(finite.inputs), ["event"])
     tc.assertEqual(list(finite.outputs), ["ack"])
     # The GUARANTEE section carries the single X[!]-formula; visible
-    # through the canonical print since parsed_tlsf keeps its AST
-    # opaque.
+    # through the canonical print.
     finite_canon = spot.ostringstream()
     spot.tlsf_print(finite_canon, finite)
     tc.assertEqual(len(formulas_in_section(finite_canon.str(),
                                            'GUARANTEE')), 1)
 
-    # Translate.  Finite semantics accepts X strong next
-    # and emits spot::formula::strong_X.  Spot's default
-    # `repr` and the 'spot' printer both render strong_X
-    # as `X[!]`, distinguishable from the weak `X` of
-    # plain LTL; assert both renderings agree.
+    # Finite semantics emits spot::formula::strong_X, rendered as `X[!]`
+    # by both the `repr` and 'spot' printer.
     res_fin = spot.tlsf_to_ltl(finite)
     tc.assertTrue(bool(res_fin.full_formula),
                   "tlsf_to_ltl returned a null formula")
@@ -472,10 +586,9 @@ try:
                 f"to_str('spot') should still emit X[!]; "
                 f"got: {spot_str}")
 
-    # Bus-flattened inputs/outputs (orthogonal to semantics):
-    # the body's four BusRef occurrences (ack[0], ack[1],
-    # event[0], event[1]) flatten the buses into indexed APs,
-    # recorded in first-use order on res_fin.inputs/outputs.
+    # Bus flattening on the four BusRef occurrences (ack[0], ack[1],
+    # event[0], event[1]) yields index APs, recorded on the result
+    # lists in first-use order.
     tc.assertEqual(list(res_fin.inputs), ["event_0", "event_1"])
     tc.assertEqual(list(res_fin.outputs), ["ack_0", "ack_1"])
 
@@ -488,22 +601,20 @@ try:
             ("Finite,Mealy", spot.tlsf_semantics_MealyFinite),
             ("Strict,Mealy", spot.tlsf_semantics_MealyStrict),
             ("Strict,Moore", spot.tlsf_semantics_MooreStrict)):
-        with open(filename, 'w') as f:
-            f.write("INFO { SEMANTICS: " + semantics_text + " }\n"
+        ordered = parse_tlsf("INFO { SEMANTICS: " + semantics_text + " }\n"
                     "GLOBAL {} MAIN { OUTPUTS { done; } }\n")
-        ordered = spot.parse_tlsf(filename)
+
         tc.assertFalse(ordered.errors,
                        f"{semantics_text} should parse cleanly; got: "
                        f"{[(e.first, e.second) for e in ordered.errors]}")
         tc.assertEqual(ordered.semantics, expected_semantics)
 
-    # Non-finite semantics must reject strong next, while finite
-    # semantics preserves it as Spot's strong_X operator.
-    with open(filename, 'w') as f:
-        f.write("INFO { SEMANTICS: Mealy }\n"
+    # Non-finite semantics must reject strong next; finite preserves it
+    # as strong_X.
+    nonfinite = parse_tlsf("INFO { SEMANTICS: Mealy }\n"
                 "GLOBAL {} MAIN { OUTPUTS { done; }\n"
                 "  GUARANTEE { X[!] done; } }\n")
-    nonfinite = spot.parse_tlsf(filename)
+
     tc.assertFalse(nonfinite.errors)
     nonfinite_errors = spot.parse_aut_error_list()
     nonfinite_result = spot.tlsf_to_ltl(
@@ -514,22 +625,101 @@ try:
                   f"expected finite-semantics diagnostic; got: "
                   f"{[e.second for e in nonfinite_errors]}")
 
-    # Fifth spec: regression pin for the dropped `X!` token.
-    # Source `X!done` falls through to `X` (next) + `!` (not)
-    # + `done` (AP) and translates to `X(!done)`, NOT strong-next.
-    # Spot's default printer renders this as `X!done` -- the
-    # textual match is coincidental but a useful confirmation
-    # that the operator kind is unchanged from a plain weak-X
-    # wrap of NOT.
-    with open(filename, 'w') as f:
-        f.write(
+    # The `!`-marked stacked next and bounded operators (TLSF v1.2
+    # SS4.8) accept the marker on either side of the brackets, print
+    # as the trailing-`!` spelling whatever they were parsed from, and
+    # lower to strong next.  The expected LTL is what syfco
+    # -f ltlxba-fin prints for the same guarantee.
+    for source, printed, expected in (
+            ("X[!2] done", "X[2!] done", "X[!]X[!]done"),
+            ("X[2!] done", "X[2!] done", "X[!]X[!]done"),
+            ("X[!n] done", "X[n!] done", "X[!]X[!]X[!]done"),
+            ("X[n!] done", "X[n!] done", "X[!]X[!]X[!]done"),
+            ("F[!1:3] done", "F[1:3!] done",
+             "X[!](done | X[!](done | X[!]done))"),
+            ("F[1:3!] done", "F[1:3!] done",
+             "X[!](done | X[!](done | X[!]done))"),
+            ("G[!1:3] done", "G[1:3!] done",
+             "X[!](done & X[!](done & X[!]done))"),
+            ("G[1:3!] done", "G[1:3!] done",
+             "X[!](done & X[!](done & X[!]done))"),
+            ("F[!3:1] done", "F[3:1!] done", "1"),
+    ):
+        spec = parse_tlsf("INFO { SEMANTICS: Mealy,Finite }\n"
+                          "GLOBAL { PARAMETERS { n = 3; } }\n"
+                          "MAIN { OUTPUTS { done; }\n"
+                          f"  GUARANTEE {{ {source}; }} }}\n")
+
+        tc.assertFalse(spec.errors,
+                       f"{source} should parse cleanly; got: "
+                       f"{[(e.first, e.second) for e in spec.errors]}")
+
+        # The canonical print picks the trailing-`!` spelling, and
+        # re-printing the re-parsed form reproduces it byte for byte.
+        ostr = spot.ostringstream()
+        spot.tlsf_print(ostr, spec)
+        canonical = ostr.str()
+        tc.assertIn(printed, canonical,
+                    f"{source} should print as `{printed}`; got: "
+                    f"{canonical}")
+        tc.assertFalse(parse_tlsf(canonical).errors,
+                       f"`{printed}` should re-parse cleanly; got: "
+                       f"{[(e.first, e.second) for e in spec.errors]}")
+        ostr2 = spot.ostringstream()
+        spot.tlsf_print(ostr2, parse_tlsf(canonical))
+        tc.assertEqual(ostr2.str(), canonical,
+                        f"printing `{source}` should be stable")
+
+        res = spot.tlsf_to_ltl(spec)
+        tc.assertTrue(bool(res.full_formula),
+                      f"tlsf_to_ltl({source}) returned a null formula")
+        tc.assertEqual(str(res.full_formula), expected,
+                        f"{source} should lower to {expected}; got: "
+                        f"{res.full_formula}")
+
+    # Both markers at once, and a `!` that is not glued to its bracket,
+    # are syntax errors -- and none of them may silently fall back to
+    # the plain `[a:b]` reading.
+    for bad in ("F[!1:3!] done", "G[!1:3!] done", "X[!2!] done",
+                "F[!1:3", "X[!2", "F[1:3! ] done"):
+        spec = parse_tlsf("INFO { SEMANTICS: Mealy,Finite }\n"
+                          "GLOBAL {} MAIN { OUTPUTS { done; }\n"
+                          f"  GUARANTEE {{ {bad}; }} }}\n")
+
+        tc.assertTrue(spec.errors,
+                      f"`{bad}` should be a syntax error")
+
+    # The strong flavours need a finite run just like `X[!]` does.
+    for bad in ("X[!2] done", "X[2!] done", "F[!1:3] done",
+                "F[1:3!] done", "G[!1:3] done", "G[1:3!] done"):
+        spec = parse_tlsf("INFO { SEMANTICS: Mealy }\n"
+                          "GLOBAL {} MAIN { OUTPUTS { done; }\n"
+                          f"  GUARANTEE {{ {bad}; }} }}\n")
+
+        tc.assertFalse(spec.errors,
+                       f"`{bad}` should parse cleanly; got: "
+                       f"{[(e.first, e.second) for e in spec.errors]}")
+        errs = spot.parse_aut_error_list()
+        res = spot.tlsf_to_ltl(spec, spot.tlsf_translator_options(), errs)
+        tc.assertFalse(bool(res.full_formula),
+                       f"`{bad}` should not translate under Mealy")
+        tc.assertTrue(any("requires finite semantics" in e.second
+                          for e in errs),
+                      f"`{bad}` should need finite semantics; got: "
+                      f"{[e.second for e in errs]}")
+
+    # Negative test for the dropped `X!` token: `X!done` parses as
+    # `X (!done)` (weak next of NOT, not strong next).  Spot's default
+    # printer renders this as `X!done` -- a textual coincidence, but a
+    # useful confirmation that the operator is unchanged.
+    weak = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {}\n"
             "MAIN {\n"
             "  OUTPUTS { done; }\n"
             "  GUARANTEE { X! done; }\n"
             "}\n")
-    weak = spot.parse_tlsf(filename)
+
     tc.assertFalse(weak.errors,
                    f"X! should still parse as X(!...); "
                    f"errors: {[(e.first, e.second) for e in weak.errors]}")
@@ -546,17 +736,12 @@ try:
                 f"X!done should still encode 'done' inside the "
                 f"formula; got: {repr_w}")
 
-    # Sixth spec: PARAMETERS end-to-end.
-    # PARAMETERS { N = 2; } is resolved at translate time.  The
-    # body uses `event[N - 1]` so the resolved value of N
-    # participates directly in the bus index -- a body that only
-    # referenced event[0] / event[1] would not exercise PARAMETERS
-    # resolution.  Translating once with no override (declared
-    # N=2 -> event_1) and once with a translate-time override
-    # (N=4 -> event_3) pins the layering code in translate.cc:
-    # declared defaults first, then opts.overrides on top.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test PARAMETERS end-to-end.  `event[N - 1]` makes the resolved
+    # value of N participate directly in the bus index.  Translating
+    # once with no override (declared N=2 -> event_1) and once with a
+    # translate-time override (N=4 -> event_3) pins that declared
+    # defaults come first, then opts.overrides on top.
+    param = parse_tlsf(
             "INFO {\n"
             "  SEMANTICS:   Mealy\n"
             "  TARGET:      Mealy\n"
@@ -569,7 +754,7 @@ try:
             "  OUTPUTS { done[N]; }\n"
             "  GUARANTEE { event[N - 1]; }\n"
             "}\n")
-    param = spot.parse_tlsf(filename)
+
     tc.assertFalse(param.errors,
                    f"parse_tlsf reported errors: "
                    f"{[(e.first, e.second) for e in param.errors]}")
@@ -591,8 +776,11 @@ try:
     tc.assertNotIn("event_3", fstr_decl,
                    f"declared N=2 must NOT produce 'event_3'; "
                    f"got: {fstr_decl}")
-    tc.assertEqual(list(res_decl.inputs), ["event_1"])
-    tc.assertEqual(list(res_decl.outputs), [])
+    # The formula only mentions event_1, but the declared bus widths
+    # (N=2) are registered eagerly, so both bits of each bus are
+    # listed.
+    tc.assertEqual(list(res_decl.inputs), ["event_0", "event_1"])
+    tc.assertEqual(list(res_decl.outputs), ["done_0", "done_1"])
 
     # Translate with translate-time override {N: 4}: the override
     # wins over the declared default, so `N - 1` resolves to 3
@@ -610,21 +798,22 @@ try:
                    f"override N=4 must NOT produce 'event_1'; "
                    f"got: {fstr_ovr}")
     tc.assertNotIn("event_2", fstr_ovr,
-                   f"override N=4 must NOT produce 'event_2'; "
-                   f"got: {fstr_ovr}")
-    tc.assertEqual(list(res_ovr.inputs), ["event_3"])
-    tc.assertEqual(list(res_ovr.outputs), [])
+                   f"override N=4 must NOT produce 'event_2' in the "
+                   f"formula; got: {fstr_ovr}")
+    # The override widens the declared buses to 4 bits; eager
+    # registration lists the whole declared range even though the
+    # formula only uses event_3.
+    tc.assertEqual(list(res_ovr.inputs),
+                   ["event_0", "event_1", "event_2", "event_3"])
+    tc.assertEqual(list(res_ovr.outputs),
+                   ["done_0", "done_1", "done_2", "done_3"])
 
-    # Seventh spec: parser-time overrides are mirrored onto
-    # parsed_tlsf::overrides, per public.hh's "mirrored here for
-    # documentation and round-trip printing" contract.  This pins
-    # the bug-fix in public.cc::populate_parsed which previously
-    # did NOT copy opts.overrides onto out.overrides.  The spec
-    # body itself is intentionally simple (no PARAMETERS block,
-    # no buses) so the only thing under test is the override
-    # mirror into the public.hh struct.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test that parser-time overrides are mirrored onto
+    # parsed_tlsf::overrides.  The spec body is intentionally simple
+    # so the only thing under test is the override mirror.
+    p_opts = spot.tlsf_parser_options()
+    p_opts.overrides["N"] = 7
+    parsed7 = parse_tlsf(
             "INFO {\n"
             "  SEMANTICS:   Mealy\n"
             "  TARGET:      Mealy\n"
@@ -636,31 +825,24 @@ try:
             "  INPUTS  { go; }\n"
             "  OUTPUTS { ack; }\n"
             "  GUARANTEE { go -> F ack; }\n"
-            "}\n")
-    p_opts = spot.tlsf_parser_options()
-    p_opts.overrides["N"] = 7
-    parsed7 = spot.parse_tlsf(filename, p_opts)
+            "}\n", p_opts)
     tc.assertFalse(parsed7.errors,
                    f"parse_tlsf reported errors: "
                    f"{[(e.first, e.second) for e in parsed7.errors]}")
-    # Pin the bug-fix: parser-time override is now mirrored.
+    # Pin the parser-time override mirror.
     # Use subscript (not .get()) because SWIG's std::map<string,int>
     # proxy exposes __getitem__ and __iter__ but not the .get method.
     tc.assertEqual(parsed7.overrides["N"], 7,
                    f"expected N=7 in parsed.overrides; got: "
                    f"{parsed7.overrides['N']}")
-    # Defense-in-depth: keys should be exactly what the parser
-    # caller passed in (no prior fixture data leaks through).
+    # Defense-in-depth: keys are exactly what the caller passed.
     keys = list(parsed7.overrides)
     tc.assertEqual(keys, ["N"],
                    f"expected keys=['N']; got: {keys}")
 
-    # Eighth spec: comparison-chain and nested quantifier ranges.
-    # The outer range binds i and the inner range binds j.  Both
-    # variables are used in the bus index, so a single implicit loop
-    # binding would either leave j unresolved or repeatedly use i.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test comparison-chain ranges and nested quantifier ranges.
+    # The outer range binds i and the inner range binds j.
+    ranges = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  PARAMETERS {\n"
@@ -674,7 +856,7 @@ try:
             "    &&[0 <= i < N] (||[1 <= j <= M] a[i + j]);\n"
             "  }\n"
             "}\n")
-    ranges = spot.parse_tlsf(filename)
+
     tc.assertFalse(ranges.errors,
                    f"comparison-chain ranges must parse cleanly; "
                    f"errors: {[(e.first, e.second) for e in ranges.errors]}")
@@ -687,14 +869,14 @@ try:
                     f"nested range should emit a_{index}; got: "
                     f"{range_text}")
     tc.assertEqual(set(range_result.inputs),
-                   {"a_1", "a_2", "a_3", "a_4"})
+                   # a_0 is never used in the formula, but the
+                   # declared width (5) is registered eagerly.
+                   {"a_0", "a_1", "a_2", "a_3", "a_4"})
 
-    # Ninth spec: arithmetic parameter expressions.  B refers to A,
-    # and B is used both as a bus size and as a quantifier upper bound.
-    # This exercises expression parsing, recursive parameter lookup,
-    # and the same evaluator in both integer contexts.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test arithmetic PARAMETERS: expression parsing, recursive
+    # parameter lookup, and the same evaluator in both bus-size and
+    # quantifier contexts.
+    arithmetic = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  PARAMETERS {\n"
@@ -706,7 +888,7 @@ try:
             "  INPUTS { b[B]; }\n"
             "  GUARANTEE { &&[0 <= k < B] b[k]; }\n"
             "}\n")
-    arithmetic = spot.parse_tlsf(filename)
+
     tc.assertFalse(arithmetic.errors,
                    f"arithmetic parameters must parse cleanly; "
                    f"errors: {[(e.first, e.second) for e in arithmetic.errors]}"
@@ -717,43 +899,32 @@ try:
     tc.assertEqual(set(arithmetic_result.inputs),
                    {"b_0", "b_1", "b_2", "b_3", "b_4", "b_5"})
 
-    # Tenth spec: parser-time overrides flow into translation.  The
+    # Test that parser-time overrides flow into translation, where the
     # translation-time value remains the more specific override.
     parser_options = spot.tlsf_parser_options()
     parser_options.overrides["N"] = 4
-    # Reuse the arithmetic fixture's A/B names to make sure the
-    # parser override is not accidentally treated as a declaration.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test that the parser override is not treated as a declaration.
+    parsed_override = parse_tlsf(
             "INFO {}\n"
             "GLOBAL { PARAMETERS { N = 2; } }\n"
             "MAIN { INPUTS { a[8]; }\n"
-            "  GUARANTEE { &&[0 <= i < N] a[i]; } }\n")
-    parsed_override = spot.parse_tlsf(filename, parser_options)
+            "  GUARANTEE { &&[0 <= i < N] a[i]; } }\n", parser_options)
     tc.assertFalse(parsed_override.errors)
     parser_result = spot.tlsf_to_ltl(parsed_override)
+    # a[8] is declared eagerly even though the formula only uses
+    # a_0..a_3.
     tc.assertEqual(set(parser_result.inputs),
-                   {"a_0", "a_1", "a_2", "a_3"})
+                   {f"a_{i}" for i in range(8)})
     translator_options = spot.tlsf_translator_options()
     translator_options.overrides["N"] = 2
     translator_result = spot.tlsf_to_ltl(parsed_override, translator_options)
-    tc.assertEqual(set(translator_result.inputs), {"a_0", "a_1"})
+    tc.assertEqual(set(translator_result.inputs),
+                   {f"a_{i}" for i in range(8)})
 
-    # Eleventh spec: DEFINITIONS expansion.
-    # Defines Gplus(x) = G x and verifies that user-defined function
-    # calls are expanded: the body is a parsed tlsf_expr_ptr AST node
-    # (no text / STRING fallback — TLSF v1.2 forbids STRING RHS for
-    # definition bodies; syfco's
-    # spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Global.hs
-    # `reminderParser` parses only `many1 exprParser`).  Expansion
-    # uses translator::subst_arg -- a structural clone-and-replace
-    # -- so the formal argument x is replaced with the actual
-    # argument expression, and the resulting formula is composed into
-    # the surrounding context.  Gplus(a) and Gplus(b) translate to
-    # G(a) and G(b), so the rendered formula must contain both APs and
-    # the G operator.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test DEFINITIONS expansion: with `Gplus(x) = G x`, calls are
+    # expanded structurally so `Gplus(a)` and `Gplus(b)` translate to
+    # G(a) and G(b).
+    deftest = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  DEFINITIONS {\n"
@@ -764,7 +935,7 @@ try:
             "  INPUTS  { a; b; }\n"
             "  GUARANTEE { Gplus(a) && Gplus(b); }\n"
             "}\n")
-    deftest = spot.parse_tlsf(filename)
+
     tc.assertFalse(deftest.errors,
                    f"parse_tlsf reported errors: "
                    f"{[(e.first, e.second) for e in deftest.errors]}")
@@ -783,44 +954,16 @@ try:
                    f"errors after expansion: "
                    f"{[(e.first, e.second) for e in deftest.errors]}")
 
-    # Ninth spec: same-name definitions of different arity.  Two
-    # definitions share the name `Both` -- one unary, one
-    # binary.  TLSF v1.2 (and syfco's tArgs map keyed by symbol
-    # name in spot/parsetlsf/refs/syfco/src/lib/Reader/Bindings.hs)
-    # enforces "one symbol = one definition", so the Bison
-    # `definition:` action (spot/parsetlsf/parsetlsf.yy) detects
-    # the duplicate via `def_first_loc` and emits BOTH
-    # diagnostics -- the full strings are
-    # "definition '<name>' is shadowed by a later re-definition"
-    # (anchored at the FIRST definition's location) and
-    # "definition '<name>' is already defined" (anchored at
-    # the SECOND location).  The substring asserts in this
-    # spec's `tc.assertTrue(any(...))` calls key on the
-    # unique substrings "shadowed" and "already defined"
-    # (verbatim quoted here so a future diagnostic-wording
-    # change cannot drift past the pin silently), and the
-    # second body is dropped.
-    with open(filename, 'w') as f:
-        f.write(
+    # Negative test: two definitions with the same name (here `Both`,
+    # one unary and one binary) violate "one symbol = one definition"
+    # and are rejected with two diagnostics: "shadowed" at the FIRST
+    # location and "already defined" at the SECOND.
+    arity = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  DEFINITIONS {\n"
-            # NOTE: TLSF distinguishes two comma/space conventions:
-            #   - `arg_list` (definition formal params, parsetlsf.yy)
-            #     is `arg_list: arg_list IDENTIFIER` -- SPACE-
-            #     separated, no commas.  Mirror the convention used
-            #     elsewhere in this file (`Pos(grid i j)` at the
-            #     top fixture).
-            #   - `arg_expr_list` (function-call actuals) IS
-            #     comma-separated (`MIN(a, b, c)`-style).  See the
-            #     call site `Both(b, c)` below for the comma form.
-            # The comma-separated form on the binary def: the new
-            # `arg_list` grammar (parsetlsf.yy) requires COMMAs in
-            # definition formal-arg lists, mirroring syfco's
-            # `commaSep tokenparser` parser in
-            # spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Global.hs.
-            # The previous "Both(x y)" would now hit a Bison
-            # syntax error rather than a definition duplicate.
+            # Both(x, y): definition formal parameters are
+            # comma-separated.
             '    Both(x) = G x;\n'
             '    Both(x, y) = G x && y;\n'
             "  }\n"
@@ -830,43 +973,25 @@ try:
             "  OUTPUTS { ok; }\n"
             "  GUARANTEE { G a; }\n"
             "}\n")
-    # Negative test: TLSF enforces "one symbol = one definition"
-    # (arXiv 1604.02284 §6.2, syfco's tArgs map keyed by symbol
-    # name in spot/parsetlsf/refs/syfco/src/lib/Reader/Bindings.hs);
-    # the new Bison semantic action for `definition:` mirrors that
-    # by emitting BOTH diagnostics on a duplicate-name pair -- one
-    # at the FIRST definition's location ("shadowed") and one at
-    # the SECOND definition's location ("already defined") --
-    # and the second body is dropped.
-    arity = spot.parse_tlsf(filename)
     tc.assertTrue(arity.errors,
                   f"parse_tlsf should reject same-name "
                   f"DEFINITIONS with a diagnostic; got none")
     err_strs = [e.second for e in arity.errors]
+    # Exactly two diagnostics are expected, but the count is not pinned
+    # here: grammar recovery rules could add extra "syntax error"
+    # entries on future regressions.
     tc.assertTrue(any("already defined" in s for s in err_strs),
                   f"expected an 'already defined' diagnostic at "
                   f"the second definition's location; got: {err_strs}")
     tc.assertTrue(any("shadowed" in s for s in err_strs),
                   f"expected a 'shadowed' diagnostic at the first "
                   f"definition's location; got: {err_strs}")
-    # Exactly two diagnostics are expected -- one per occurrence --
-    # but we deliberately do not pin the count here, since the
-    # grammar's `error SEMICOLON` recovery rules could emit extra
-    # "syntax error" entries on future grammar regressions, and the
-    # pin matters less than the presence of the two key substrings.
 
-    # Tenth spec: translator-side arity-mismatch diagnostic.
-    # This pins the explicit `def.args.size() != e.children.size()`
-    # branch in translate.cc's App case (spot/parsetlsf/translate.cc)
-    # which, under the new "one symbol = one definition" rule, can
-    # no longer be triggered by a duplicate-name def (that path is
-    # caught at parse time, exercise by fixture 9 above); instead,
-    # the mismatch comes from a call site that supplies the wrong
-    # number of actual arguments.  `Bar(x)` is unique, so the parser
-    # accepts the spec; the translator then sets failed_ on the
-    # arity-mismatch diagnostic and emits a null formula.
-    with open(filename, 'w') as f:
-        f.write(
+    # Negative test: a translator-side arity mismatch.  `Bar(x)` is
+    # unique so the spec parses cleanly, but the call `Bar(a, b)`
+    # supplies the wrong number of arguments, so translation yields a
+    # null formula and a diagnostic.
+    mismatch = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  DEFINITIONS {\n"
@@ -877,7 +1002,7 @@ try:
             "  INPUTS  { a; b; }\n"
             "  GUARANTEE { Bar(a, b); }\n"
             "}\n")
-    mismatch = spot.parse_tlsf(filename)
+
     tc.assertFalse(mismatch.errors,
                    f"unique-name spec should parse cleanly; "
                    f"errors: "
@@ -898,32 +1023,33 @@ try:
 
     # Bus validation: indexed references must resolve to declared,
     # positive-sized buses and stay inside their evaluated bounds.
-    with open(filename, 'w') as f:
-        f.write(
+    valid_bus = parse_tlsf(
             "INFO {}\n"
             "GLOBAL { PARAMETERS { N = 2; } }\n"
             "MAIN {\n"
             "  INPUTS { a[N]; scalar; }\n"
             "  GUARANTEE { a[0] && a[0] && a[N - 1]; }\n"
             "}\n")
-    valid_bus = spot.parse_tlsf(filename)
+
     tc.assertFalse(valid_bus.errors)
     valid_bus_errors = spot.parse_aut_error_list()
     valid_bus_result = spot.tlsf_to_ltl(
         valid_bus, spot.tlsf_translator_options(), valid_bus_errors)
     tc.assertTrue(bool(valid_bus_result.full_formula))
-    tc.assertEqual(list(valid_bus_result.inputs), ["a_0", "a_1"])
+    # `scalar` is declared but unused; eager registration (fixture
+    # 23) lists it after the bus bits.
+    tc.assertEqual(list(valid_bus_result.inputs),
+                   ["a_0", "a_1", "scalar"])
     tc.assertFalse(valid_bus_errors)
 
-    with open(filename, 'w') as f:
-        f.write(
+    invalid_index = parse_tlsf(
             "INFO {}\n"
             "GLOBAL { PARAMETERS { N = 2; } }\n"
             "MAIN {\n"
             "  INPUTS { a[N]; scalar; }\n"
             "  GUARANTEE { a[N]; }\n"
             "}\n")
-    invalid_index = spot.parse_tlsf(filename)
+
     tc.assertFalse(invalid_index.errors)
     invalid_index_errors = spot.parse_aut_error_list()
     invalid_index_result = spot.tlsf_to_ltl(
@@ -934,15 +1060,14 @@ try:
                   f"expected out-of-range diagnostic; got: "
                   f"{[e.second for e in invalid_index_errors]}")
 
-    with open(filename, 'w') as f:
-        f.write(
+    scalar_index = parse_tlsf(
             "INFO {}\n"
             "GLOBAL { PARAMETERS { N = 2; } }\n"
             "MAIN {\n"
             "  INPUTS { a[N]; scalar; }\n"
             "  GUARANTEE { scalar[0]; }\n"
             "}\n")
-    scalar_index = spot.parse_tlsf(filename)
+
     tc.assertFalse(scalar_index.errors)
     scalar_index_errors = spot.parse_aut_error_list()
     scalar_index_result = spot.tlsf_to_ltl(
@@ -953,15 +1078,14 @@ try:
                   f"expected scalar-index diagnostic; got: "
                   f"{[e.second for e in scalar_index_errors]}")
 
-    with open(filename, 'w') as f:
-        f.write(
+    negative_index = parse_tlsf(
             "INFO {}\n"
             "GLOBAL { PARAMETERS { N = 2; } }\n"
             "MAIN {\n"
             "  INPUTS { a[N]; }\n"
             "  GUARANTEE { a[N - 3]; }\n"
             "}\n")
-    negative_index = spot.parse_tlsf(filename)
+
     tc.assertFalse(negative_index.errors)
     negative_index_errors = spot.parse_aut_error_list()
     negative_index_result = spot.tlsf_to_ltl(
@@ -972,33 +1096,13 @@ try:
                   f"expected negative-index diagnostic; got: "
                   f"{[e.second for e in negative_index_errors]}")
 
-    # Eleventh fixture: round-trip regression for chomp.tlsf, whose
-    # content is embedded above in chomp_contents and written to the
-    # local `filename`.  Pins the clean-parse baseline: chomp.tlsf
-    # parses with zero errors, the canonical form deparses via
-    # tlsf_print, the canonical re-parses to the same AST shape, and
-    # deparse-on-deparse is idempotent.  A future regression that
-    # introduces any parse error in chomp.tlsf -- whether from
-    # a grammar change, a deparser divergence, or a token-
-    # stream change -- surfaces as a `len(errs) != 0` failure
-    # here.  The fixture additionally checks that round-tripping
-    # the canonical form does not introduce new diagnostics
-    # (catches a deparser producing an unparseable form).
-    #
-    # chomp.tlsf omits trailing `;` on its INFO items, which is
-    # the canonical form: Spot matches syfco exactly, so `;`
-    # after any INFO item is a SYNTAX ERROR.  Verified
-    # empirically against `syfco 1.2.1.2` (the canonical TLSF
-    # reference parser) on variants of the embedded fixture --
-    # the no-`;` canonical exits 0, and every variant that adds
-    # `;` to TITLE, DESCRIPTION, SEMANTICS, or TARGET exits 1
-    # with `unexpected ";" expecting TITLE/DESCRIPTION/SEMANTICS/
-    # TARGET/TAGS or "}"`.  See spot/parsetlsf/parsetlsf.yy for
-    # the grammar rationale (cites syfco's `infoContentParser`
-    # in spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Info.hs).
-    with open(filename, 'w') as f:
-        f.write(chomp_contents)
-    parsed_chomp = spot.parse_tlsf(filename)
+    # Round-trip regression for chomp.tlsf (embedded above): clean
+    # parse, canonical print, clean re-parse, idempotent deparse.
+    # chomp.tlsf omits the trailing `;` on INFO items; a `;` after
+    # any INFO item is a syntax error (the TLSF grammar treats `;`
+    # as optional there).
+    parsed_chomp = parse_tlsf(chomp_contents)
+
     errs_chomp = list(parsed_chomp.errors)
     tc.assertFalse(
         errs_chomp,
@@ -1011,18 +1115,13 @@ try:
         f'divergence and the deparser/grammar contract needs '
         f'investigation.')
 
-    # Round-trip: tlsf_print deparse, re-parse, then idempotence.
-    # The canonical form must re-parse to zero errors, the
-    # deparser must be deterministic (std::vector iteration
-    # only -- no unordered_map/set), and the canonical form
-    # must be byte-identical to a re-deparse of the round-
-    # tripped form.
+    # Round-trip: deparse to the canonical form, re-parse, then
+    # deparse again; the two canonical forms must be byte-identical.
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, parsed_chomp)
     canonical = ostr.str()
     # Structural pins: section skeletons always appear in the
-    # canonical form even though comments and blank lines are
-    # not preserved.
+    # canonical form (comments and blank lines are not preserved).
     tc.assertIn('INFO {', canonical)
     tc.assertIn('GLOBAL {', canonical)
     tc.assertIn('MAIN {', canonical)
@@ -1034,9 +1133,8 @@ try:
     tc.assertIn('REQUIRE {', canonical)
     tc.assertIn('ASSERT {', canonical)
     tc.assertIn('GUARANTEE {', canonical)
-    with open(filename, 'w') as f:
-        f.write(canonical)
-    parsed_rt = spot.parse_tlsf(filename)
+    parsed_rt = parse_tlsf(canonical)
+
     errs_rt = list(parsed_rt.errors)
     tc.assertFalse(
         errs_rt,
@@ -1046,9 +1144,8 @@ try:
         f'non-zero error count means the deparser emitted a '
         f'form the parser cannot ingest -- a deparser/'
         f'grammar divergence this fixture must catch.')
-    # Idempotence: tlsf_print walks std::vector containers in
-    # source order (no unordered_map/set iteration), so a
-    # second deparse must produce the same canonical form.
+    # Idempotence: a second deparse must produce the same canonical
+    # form.
     ostr2 = spot.ostringstream()
     spot.tlsf_print(ostr2, parsed_rt)
     canonical2 = ostr2.str()
@@ -1061,19 +1158,15 @@ try:
     # Benchmark translation smoke checks.  These fixtures use the
     # comparison-chain, nested-range, arithmetic-size, and finite
     # strong-next features exercised above in realistic definitions.
-    # chomp.tlsf is the embedded copy written to `filename`;
-    # tictactoe.tlsf and scutella1.tlsf are exercised when present
-    # at the top level of the source tree.
-    with open(filename, 'w') as f:
-        f.write(chomp_contents)
-    benchmark_files = [('chomp.tlsf', filename)]
-    for benchmark_name in ('tictactoe.tlsf', 'scutella1.tlsf'):
-        benchmark_path = os.path.join(os.path.dirname(__file__),
-                                      '..', '..', benchmark_name)
-        if os.path.exists(benchmark_path):
-            benchmark_files.append((benchmark_name, benchmark_path))
-    for benchmark_name, benchmark_path in benchmark_files:
-        benchmark = spot.parse_tlsf(benchmark_path)
+    # All three benchmarks are embedded above (chomp_contents,
+    # tictactoe_contents, scutella1_contents) so the checks run
+    # everywhere, without depending on files living outside the
+    # source tree.
+    benchmark_sources = [(chomp_contents, 'chomp.tlsf'),
+                         (tictactoe_contents, 'tictactoe.tlsf'),
+                         (scutella1_contents, 'scutella1.tlsf')]
+    for benchmark_source, benchmark_name in benchmark_sources:
+        benchmark = parse_tlsf(benchmark_source)
         tc.assertFalse(list(benchmark.errors),
                        f"{benchmark_name} must parse cleanly; got: "
                        f"{[(e.first, e.second) for e in benchmark.errors]}")
@@ -1086,12 +1179,10 @@ try:
                        f"{benchmark_name} translation produced errors: "
                        f"{[(e.first, e.second) for e in benchmark_errors]}")
 
-    # Twelfth spec: INFO TAGS.  Tests the new Tier-1 TAGS keyword
-    # (syfco 1.2.1.2 reference parser, refs/.../Reader/Parser/Info.hs).
-    # TAGS takes a comma-separated IDENTIFIER list.  Round-trips
-    # through tlsf_print -> parse_tlsf without diagnostic drift.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test support for the INFO TAGS line: a comma-separated
+    # IDENTIFIER list, mirrored on parsed.tags, kept through
+    # round-trips, and optional (absent -> empty list).
+    tagged = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"with tags\"\n"
             "  DESCRIPTION: \"fixture 12: TAGS keyword pin\"\n"
@@ -1105,41 +1196,31 @@ try:
             "  OUTPUTS { grant; }\n"
             "  GUARANTEE { G(!request || F grant); }\n"
             "}\n")
-    tagged = spot.parse_tlsf(filename)
+
     tc.assertFalse(tagged.errors,
                    f"parse_tlsf reported errors: "
                    f"{[(e.first, e.second) for e in tagged.errors]}")
     tc.assertEqual(list(tagged.tags), ["arbiter", "synth"],
                    f"expected tags ['arbiter','synth']; got: "
                    f"{list(tagged.tags)}")
-    # Note: `parsed.ast` is not exposed at all (the AST is an opaque
-    # private member of parsed_tlsf); the tags are mirrored onto
-    # `parsed.tags` by `spot::populate_parsed` (public.cc) where
-    # `out.tags = res.spec->tags;` -- the Python-side test pins
-    # `parsed.tags` directly, which matches the tags stored in the
-    # private AST.
-    # Round-trip: deparse + reparse yields the same tags (and no
-    # new diagnostics, which would indicate a parser/deparser
-    # grammar divergence on the comma-separated list).
+    # `parsed.ast` is not exposed (the tags are mirrored onto
+    # `parsed.tags`); deparse + reparse must round-trip the
+    # comma-separated list without new diagnostics.
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, tagged)
     can_tags = ostr.str()
     tc.assertIn("TAGS:", can_tags,
                 f"deparser should emit TAGS: line; got: {can_tags}")
-    with open(filename, 'w') as f:
-        f.write(can_tags)
-    tagged2 = spot.parse_tlsf(filename)
+    tagged2 = parse_tlsf(can_tags)
+
     tc.assertFalse(tagged2.errors,
                    f"round-trip must stay clean; got: "
                    f"{[(e.first, e.second) for e in tagged2.errors]}")
     tc.assertEqual(list(tagged2.tags), list(tagged.tags),
                    f"round-tripped tags should match source; "
                    f"got: {list(tagged2.tags)}")
-    # TAGS is OPTIONAL: a spec with no TAGS line yields the empty
-    # vector (not an error).  Pins the option-C alignment with
-    # syfco, which allows TAGS to be entirely omitted.
-    with open(filename, 'w') as f:
-        f.write(
+    # TAGS is optional: a spec with no TAGS line yields the empty list.
+    untagged = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"untagged\"\n"
             "  DESCRIPTION: \"fixture 12 neg: TAGS omitted\"\n"
@@ -1150,26 +1231,86 @@ try:
             "MAIN {\n"
             "  GUARANTEE { G p; }\n"
             "}\n")
-    untagged = spot.parse_tlsf(filename)
+
     tc.assertFalse(untagged.errors,
                    f"TAGS omission must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in untagged.errors]}")
     tc.assertEqual(list(untagged.tags), [])
 
-    # Thirteenth spec: plural MAIN keywords.  Tests the new
-    # MAIN/Require/Assert/Guarantee/Assume plural-alias Tier-1
-    # acceptance -- REQUIREMENTS, INVARIANTS, GUARANTEES, ASSUME,
-    # ASSUMPTIONS all point to the canonical body fields.  Each
-    # plural form produces the same require_body/assert_body/
-    # guarantee_body/assumptions_body shape as its singular
-    # counterpart; this fixture verifies that every plural form
-    # parses without diagnostics and that the formulas reach the
-    # right body vector.  (syfco reference:
-    # refs/.../Reader/Parser/Component.hs componentContentParser,
-    # which dispatches REQUIRE/REQUIREMENTS to the same
-    # `requirements` field, etc.)
-    with open(filename, 'w') as f:
-        f.write(
+    # An entry of a TAGS list is an identifier and nothing else: syfco
+    # reads each one with a raw identifier parser, so a tag may be
+    # spelled like any word of the language, and even like the key that
+    # follows the list.  The list is scanned in a state of its own in
+    # which no keyword is recognized.
+    words = ["G", "U", "AND", "true", "MAIN", "TAGS", "Mealy", "o'biter"]
+    wtagged = parse_tlsf(
+            "INFO {\n"
+            "  TITLE:       \"word tags\"\n"
+            "  DESCRIPTION: \"fixture 12: TAGS is a list of identifiers\"\n"
+            "  SEMANTICS:   Mealy\n"
+            "  TARGET:      Mealy\n"
+            "  TAGS:        " + ", ".join(words) + "\n"
+            "}\n"
+            "GLOBAL {}\n"
+            "MAIN {\n"
+            "  INPUTS  { p; }\n"
+            "  GUARANTEE { G p; }\n"
+            "}\n")
+
+    tc.assertFalse(wtagged.errors,
+                   f"tags named after words must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in wtagged.errors]}")
+    tc.assertEqual(list(wtagged.tags), words,
+                   f"expected tags {words}; got: {list(wtagged.tags)}")
+    # The deparser has to emit them, and re-parsing what it emits must
+    # give the same list back: the canonical print is the only way a
+    # word-shaped tag is observable.
+    wostr = spot.ostringstream()
+    spot.tlsf_print(wostr, wtagged)
+    can_words = wostr.str()
+    tc.assertIn("TAGS:        " + ", ".join(words) + "\n", can_words,
+                f"word-shaped tags must round-trip; got: {can_words}")
+    wtagged2 = parse_tlsf(can_words)
+
+    tc.assertFalse(wtagged2.errors,
+                   f"round-trip must stay clean; got: "
+                   f"{[(e.first, e.second) for e in wtagged2.errors]}")
+    tc.assertEqual(list(wtagged2.tags), words,
+                   f"round-tripped tags should match source; "
+                   f"got: {list(wtagged2.tags)}")
+    # A tag names nothing that the translation looks at, so the
+    # LTL formula must not depend on the list at all.
+    tc.assertEqual(str(spot.tlsf_to_ltl(wtagged).full_formula),
+                   str(spot.tlsf_to_ltl(untagged).full_formula),
+                   f"the tag list must not reach the translation; got: "
+                   f"{spot.tlsf_to_ltl(wtagged).full_formula}")
+    # syfco's list is built with `commaSep`, which takes no element at
+    # all, so a bare `TAGS:` is valid and yields no tag.
+    etagged = parse_tlsf(
+            "INFO {\n"
+            "  TITLE:       \"empty tags\"\n"
+            "  DESCRIPTION: \"fixture 12: an empty TAGS list\"\n"
+            "  SEMANTICS:   Mealy\n"
+            "  TARGET:      Mealy\n"
+            "  TAGS:\n"
+            "}\n"
+            "GLOBAL {}\n"
+            "MAIN {\n"
+            "  INPUTS  { p; }\n"
+            "  GUARANTEE { G p; }\n"
+            "}\n")
+
+    tc.assertFalse(etagged.errors,
+                   f"an empty TAGS list must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in etagged.errors]}")
+    tc.assertEqual(list(etagged.tags), [],
+                   f"an empty TAGS list must yield no tag; "
+                   f"got: {list(etagged.tags)}")
+
+    # Test support for the plural MAIN keywords (REQUIREMENTS,
+    # INVARIANTS, GUARANTEES, ASSUMPTIONS): each alias fills the same
+    # body vector as its singular counterpart.
+    plurals = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"plurals\"\n"
             "  DESCRIPTION: \"fixture 13: plural MAIN keywords\"\n"
@@ -1182,8 +1323,7 @@ try:
             "MAIN {\n"
             "  INPUTS  { a; b; }\n"
             "  OUTPUTS { ok; }\n"
-            # ASSUME + ASSUMPTIONS, both populating
-            # assumptions_body (newly added field).
+            # ASSUME + ASSUMPTIONS.
             "  ASSUME {\n"
             "    G(!a);\n"
             "  }\n"
@@ -1203,18 +1343,13 @@ try:
             "    G(b -> F ok);\n"
             "  }\n"
             "}\n")
-    plurals = spot.parse_tlsf(filename)
+
     tc.assertFalse(plurals.errors,
                    f"plural MAIN keywords must parse cleanly; "
                    f"errors: "
                    f"{[(e.first, e.second) for e in plurals.errors]}")
-    # The plural aliases must funnel into the same MAIN section as
-    # their singular counterparts.  parsed_tlsf no longer mirrors the
-    # bodies, so the per-section shapes are read back from the
-    # canonical print (which is generated from the private AST):
-    # ASSUME + ASSUMPTIONS -> 2 formulas under ASSUME;
-    # REQUIREMENTS -> 1 under REQUIRE; INVARIANTS -> 1 under ASSERT;
-    # GUARANTEES -> 1 under GUARANTEE.
+    # The aliases funnel into the same MAIN sections; the body
+    # shapes are read back from the canonical print.
     plurals_canon = spot.ostringstream()
     spot.tlsf_print(plurals_canon, plurals)
     plurals_text = plurals_canon.str()
@@ -1228,13 +1363,9 @@ try:
     tc.assertEqual(len(formulas_in_section(plurals_text,
                                            'GUARANTEE')), 1,
                    "expected 1 formula in GUARANTEE (from GUARANTEES)")
-    # Cross-check that mixed singular + plural for the SAME body
-    # type both funnel into the same vector.  This is what
-    # doesn't work without the `assert_body <- ASSERT |
-    # INVARIANTS` rule grouping on a shared `res.current_body`
-    # field.
-    with open(filename, 'w') as f:
-        f.write(
+    # Mixed singular + plural keywords for the same body type funnel
+    # into the same vector.
+    mixed = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"mixed sing/pl\"\n"
             "  DESCRIPTION: \"fixture 13: mixed singulars+plurals\"\n"
@@ -1250,7 +1381,7 @@ try:
             "    G(b);\n"
             "  }\n"
             "}\n")
-    mixed = spot.parse_tlsf(filename)
+
     tc.assertFalse(mixed.errors,
                    f"mixed singular/plural MUST parse cleanly; "
                    f"errors: "
@@ -1262,18 +1393,14 @@ try:
                    "expected 2 formulas in ASSERT "
                    "(ASSERT + INVARIANTS)")
 
-    # Fourteenth spec: quantifier range `l..hi` form.  Tests the
-    # new Tier-2 productions `&& [ lo DOTDOT hi ] body` /
-    # `|| [ lo DOTDOT hi ] body` (reuses the existing DOTDOT
-    # token; the bound is a synthesised SetRange AST node so the
-    # deparser prints `&& [{lo..hi}] body`).  Pin the deparse
-    # shape explicitly: the synthesised {..} braces are part of
-    # the round-trip contract.
-    with open(filename, 'w') as f:
-        f.write(
+    # Negative test: an un-braced quantifier range `&&[lo..hi]` is NOT
+    # valid TLSF.  A parser recovery rule swallows the bad bound,
+    # resumes parsing on the body, and diagnoses with the two
+    # supported bound forms.
+    qrange = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"quant range\"\n"
-            "  DESCRIPTION: \"fixture 14: &&[lo..hi]\"\n"
+            "  DESCRIPTION: \"fixture 14: &&[lo..hi] rejected\"\n"
             "  SEMANTICS:   Mealy\n"
             "  TARGET:      Mealy\n"
             "}\n"
@@ -1283,72 +1410,49 @@ try:
             "MAIN {\n"
             "  INPUTS  { a; }\n"
             "  OUTPUTS { ok; }\n"
-            # Both spells parse to the same quantifier AST kind
-            # (SetRange bound).  The un-braced source `&& [1..5] p`
-            # is normalised by the deparser to `&&[{1..5}] p`,
-            # which round-trips as the same shape (idempotent).
             "  GUARANTEE {\n"
             "    &&[1..5] a;\n"
             "    ||[0..3] a;\n"
             "  }\n"
             "}\n")
-    qrange = spot.parse_tlsf(filename)
-    tc.assertFalse(qrange.errors,
-                   f"quantifier range MUST parse cleanly; "
-                   f"errors: "
+
+    # Each bad bound yields the recovery rule's diagnostic: 4 entries
+    # for 2 bounds.
+    tc.assertEqual(len(list(qrange.errors)), 4,
+                   f"un-braced quantifier ranges must yield exactly "
+                   f"2 diagnostics; errors: "
                    f"{[(e.first, e.second) for e in qrange.errors]}")
-    # Round-trip emits SetRange with braces: spot's deparser
-    # unifies `&&[1..5]` (un-braced source) and `&&[{1..5}]`
-    # (already-braced source) to the same AST shape; assert
-    # both source forms lead to the same canonical string.
-    ostr = spot.ostringstream()
-    spot.tlsf_print(ostr, qrange)
-    can_qr = ostr.str()
-    tc.assertEqual(len(formulas_in_section(can_qr, 'GUARANTEE')), 2,
-                   "expected 2 quantifier formulas in GUARANTEE")
-    tc.assertIn("&&[{1..5}] a", can_qr,
-                f"expected '&&[{{1..5}}] a' canonical form; "
-                f"got: {can_qr}")
-    tc.assertIn("||[{0..3}] a", can_qr,
-                f"expected '||[{{0..3}}] a' canonical form; "
-                f"got: {can_qr}")
-    # Idempotence: reparse the canonical and re-deparse.
-    with open(filename, 'w') as f:
-        f.write(can_qr)
-    qrange2 = spot.parse_tlsf(filename)
-    tc.assertFalse(qrange2.errors,
-                   f"round-trip must stay clean; got: "
-                   f"{[(e.first, e.second) for e in qrange2.errors]}")
-    ostr = spot.ostringstream()
-    spot.tlsf_print(ostr, qrange2)
-    can_qr2 = ostr.str()
-    tc.assertEqual(can_qr2, can_qr,
-                   f"round-trip must be idempotent; "
-                   f"first:\n{can_qr}\nsecond:\n{can_qr2}")
-    # Negative cross-check: the SET-EXPLICIT form already
-    # accepted by Spot, `&& [{1,2,3}] body`, still parses.
-    with open(filename, 'w') as f:
-        f.write(
+    msgs = [e.second for e in qrange.errors]
+    tc.assertTrue(any('&&[0 <= i < N]' in m and '&&[i IN {0, 1}]' in m
+                      for m in msgs),
+                  f"the && diagnostic must show both supported forms; "
+                  f"errors: {msgs}")
+    tc.assertTrue(any('||[0 <= i < N]' in m and '||[i IN {0, 1}]' in m
+                      for m in msgs),
+                  f"the || diagnostic must show both supported forms; "
+                  f"errors: {msgs}")
+    # Positive cross-check: braced set bounds parse (variable-less
+    # bounds are a translation-time diagnostic).
+    set_explicit = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {}\n"
             "MAIN {\n"
             "  INPUTS  { a; }\n"
-            "  GUARANTEE { && [{1, 2, 3}] a; }\n"
+            "  GUARANTEE { && [{1, 2, 3}] a; && [{1..5}] a; }\n"
             "}\n")
-    set_explicit = spot.parse_tlsf(filename)
+
     tc.assertFalse(set_explicit.errors,
-                   f"set-explicit form (regression pin) must stay "
+                   f"braced set bounds (regression pin) must stay "
                    f"clean; got: "
                    f"{[(e.first, e.second) for e in set_explicit.errors]}")
 
-    # Fifteenth spec: TLSF v1.2 quantifier bounds must introduce an
-    # explicit iteration variable, either via a comparison chain
-    # (`&&[0 <= i < N]`) or via membership (`&&[i IN {0, 2, 4}]`).
-    # Set-valued and count-valued bounds that omit the variable -- set
-    # literals, ranges, CUP/CAP/SETMINUS combinations, and bare counts
-    # -- parse (for round-trip printing) but are diagnosed at
-    # translation as invalid TLSF, instead of silently iterating over
-    # an implicit `i`.
+    # Negative test: quantifier bounds must introduce an explicit
+    # iteration variable, either as a comparison chain
+    # (`&&[0 <= i < N]`) or membership (`&&[i IN {0, 2, 4}]`).
+    # Set-valued and count-valued bounds without a variable (set
+    # literals, ranges, CUP/CAP/SETMINUS, bare counts, empty sets)
+    # parse but are diagnosed at translation, instead of silently
+    # iterating over an implicit variable.
     set_cases = [
         "&&[{0, 2, 4}] a[i];",
         "&&[{1..3}] a[i];",
@@ -1358,12 +1462,11 @@ try:
     ]
     set_operator_case = None
     for set_body in set_cases:
-        with open(filename, 'w') as f:
-            f.write("INFO {}\n"
+        set_case = parse_tlsf("INFO {}\n"
                     "GLOBAL {}\n"
                     "MAIN { INPUTS { a[5]; }\n"
                     "  GUARANTEE { " + set_body + " } }\n")
-        set_case = spot.parse_tlsf(filename)
+
         tc.assertFalse(set_case.errors,
                        f"set domain must parse cleanly; got: "
                        f"{[(e.first, e.second) for e in set_case.errors]}")
@@ -1381,13 +1484,11 @@ try:
         if set_body.startswith("&&[CUP["):
             set_operator_case = set_case
 
-    # Empty sets as quantifier bounds are likewise variable-less and
-    # must be diagnosed, not folded to the empty-domain algebra
-    # identities.  They still parse as a real SetExplicit node.
-    with open(filename, 'w') as f:
-        f.write("INFO {}\nGLOBAL {}\nMAIN { INPUTS { a; }\n"
+    # Empty sets are likewise variable-less; they still parse as a
+    # real SetExplicit node but must be diagnosed at translation.
+    empty_set = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN { INPUTS { a; }\n"
                 "  GUARANTEE { &&[{}] a; ||[{}] a; } }\n")
-    empty_set = spot.parse_tlsf(filename)
+
     tc.assertFalse(empty_set.errors,
                    f"empty set must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in empty_set.errors]}")
@@ -1405,15 +1506,14 @@ try:
     # translate.  The set on the right may be a literal, a range, or a
     # set-algebra combination; the body is expanded over its elements
     # in set order.
-    with open(filename, 'w') as f:
-        f.write("INFO {}\nGLOBAL {}\nMAIN {\n"
+    membership = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN {\n"
                 "  INPUTS { a[5]; b[3]; }\n"
                 "  GUARANTEE {\n"
                 "    &&[i IN {0, 2, 4}] a[i];\n"
                 "    ||[j IN {1..2}] b[j];\n"
                 "    &&[k IN CUP[{0}, {3}]] a[k];\n"
                 "  }\n}\n")
-    membership = spot.parse_tlsf(filename)
+
     tc.assertFalse(membership.errors,
                    f"membership must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in membership.errors]}")
@@ -1429,8 +1529,11 @@ try:
         tc.assertIn(f"b_{index}", membership_text,
                     f"membership || should emit b_{index}; got: "
                     f"{membership_text}")
+    # Declared widths (a[5], b[3]) are registered eagerly even where
+    # the formula skips an index.
     tc.assertEqual(set(membership_result.inputs),
-                   {"a_0", "a_2", "a_3", "a_4", "b_1", "b_2"})
+                   {f"a_{i}" for i in range(5)}
+                   | {f"b_{i}" for i in range(3)})
     # A membership bound must round-trip through the deparser.
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, membership)
@@ -1438,22 +1541,20 @@ try:
     tc.assertIn("&&[i IN {0, 2, 4}] a[i]", membership_canonical,
                 f"membership bound must stay printable; got: "
                 f"{membership_canonical}")
-    with open(filename, 'w') as f:
-        f.write(membership_canonical)
-    membership_rt = spot.parse_tlsf(filename)
+    membership_rt = parse_tlsf(membership_canonical)
+
     tc.assertFalse(membership_rt.errors,
                    f"membership canonical form must reparse cleanly; got: "
                    f"{[(e.first, e.second) for e in membership_rt.errors]}")
 
-    # Count bounds (`&&[3]`) are the other variable-less legacy form
-    # and must be diagnosed, even when the body mentions `i`.
-    with open(filename, 'w') as f:
-        f.write("INFO {}\nGLOBAL {}\nMAIN {\n"
+    # Count bounds (`&&[3]`) are also variable-less and must be
+    # diagnosed, even when the body mentions `i`.
+    membership = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN {\n"
                 "  GUARANTEE {\n"
                 "    &&[3] (i IN {0, 2});\n"
                 "    ||[3] (i IN {0, 2});\n"
                 "  }\n}\n")
-    membership = spot.parse_tlsf(filename)
+
     tc.assertFalse(membership.errors,
                    f"membership must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in membership.errors]}")
@@ -1475,21 +1576,17 @@ try:
     set_canonical = ostr.str()
     tc.assertIn(" CUP ", set_canonical,
                 f"set algebra must remain printable; got: {set_canonical}")
-    with open(filename, 'w') as f:
-        f.write(set_canonical)
-    set_roundtrip = spot.parse_tlsf(filename)
+    set_roundtrip = parse_tlsf(set_canonical)
+
     tc.assertFalse(set_roundtrip.errors,
                    f"set canonical form must reparse cleanly; got: "
                    f"{[(e.first, e.second) for e in set_roundtrip.errors]}")
 
-    # Seventeenth spec: textual SyFCo operator aliases.  These
-    # aliases must lower to the same AST operators as punctuation and
-    # must remain usable in integer, comparison, and quantifier
-    # contexts.  Quantifier bounds must be comparison chains (TLSF v1.2
-    # requires an explicit iteration variable), so the textual
-    # comparison/quantifier aliases are exercised inside chains.
-    with open(filename, 'w') as f:
-        f.write(
+    # Test textual operator aliases (PLUS, MUL, DIV, MOD, MINUS,
+    # LE/LEQ/GE/GEQ, NOT, IMPLIES, EQUIV): they lower to the same
+    # AST operators as punctuation and work in integer, comparison,
+    # and quantifier-chain contexts.
+    aliases = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  PARAMETERS {\n"
@@ -1518,7 +1615,7 @@ try:
             "    G(b[0]);\n"
             "  }\n"
             "}\n")
-    aliases = spot.parse_tlsf(filename)
+
     tc.assertFalse(aliases.errors,
                    f"textual aliases must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in aliases.errors]}")
@@ -1540,11 +1637,9 @@ try:
                 "printer must canonicalize IMPLIES")
     tc.assertNotIn(" IMPLIES ", alias_print.str(),
                    "printer must not preserve textual aliases")
-    # Eighteenth spec: integer evaluator overflow and invalid
-    # arithmetic.  Every case must diagnose instead of relying on
-    # signed-overflow behavior from the C++ implementation.
-    with open(filename, 'w') as f:
-        f.write(
+    # Negative tests: integer overflow and invalid arithmetic must
+    # diagnose instead of relying on signed-overflow wrap-around.
+    overflow = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  PARAMETERS {\n"
@@ -1564,7 +1659,7 @@ try:
             "    a[PROD(N, 2)];\n"
             "  }\n"
             "}\n")
-    overflow = spot.parse_tlsf(filename)
+
     tc.assertFalse(overflow.errors,
                    f"overflow fixture must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in overflow.errors]}")
@@ -1601,10 +1696,52 @@ try:
                   f"missing minimum/-1 division diagnostic: "
                   f"{overflow_messages}")
 
+    # Bus sizes and parameter values are parsed ASTs: user
+    # parentheses survive the print -> reparse round-trip, and the
+    # evaluation honors them.  With N=4, M=2 the size (N+1)*M is 10,
+    # while the left-associative misprint N+1*M would be 6.
+    grouped = parse_tlsf(
+            "INFO {}\n"
+            "GLOBAL {\n"
+            "  PARAMETERS {\n"
+            "    N = 4;\n"
+            "    M = 2;\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS { a[(N+1)*M]; }\n"
+            "  OUTPUTS { z; }\n"
+            "  GUARANTEE { G(z -> a[9]); }\n"
+            "}\n")
+
+    tc.assertFalse(grouped.errors,
+                   f"grouped bus size must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in grouped.errors]}")
+    grouped_print = spot.ostringstream()
+    spot.tlsf_print(grouped_print, grouped)
+    tc.assertIn("a[(N + 1) * M];", grouped_print.str(),
+                "printer must keep user parentheses in bus sizes; "
+                f"got: {grouped_print.str()}")
+    tc.assertIn("N = 4;", grouped_print.str())
+    grouped_result = spot.tlsf_to_ltl(grouped)
+    tc.assertTrue(bool(grouped_result.full_formula),
+                  "grouped bus size must translate")
+    tc.assertEqual(set(grouped_result.inputs),
+                   {f"a_{i}" for i in range(10)},
+                   f"(N+1)*M must expand to 10 APs; got: "
+                   f"{list(grouped_result.inputs)}")
+    # The canonical form re-parses and re-prints identically.
+    grouped_rt = parse_tlsf(grouped_print.str())
+
+    tc.assertFalse(grouped_rt.errors)
+    grouped_rt_print = spot.ostringstream()
+    spot.tlsf_print(grouped_rt_print, grouped_rt)
+    tc.assertEqual(grouped_rt_print.str(), grouped_print.str(),
+                   "grouped bus size round-trip must be stable")
+
     # Literals that do not fit in a signed 64-bit integer must be
     # diagnosed at parse time, not silently truncated to 0.
-    with open(filename, 'w') as f:
-        f.write(
+    too_big = parse_tlsf(
             "INFO {}\n"
             "MAIN {\n"
             "  INPUTS { a[2]; }\n"
@@ -1612,21 +1749,16 @@ try:
             "    a[999999999999999999999999999];\n"
             "  }\n"
             "}\n")
-    too_big = spot.parse_tlsf(filename)
+
     too_big_messages = [e.second for e in too_big.errors]
     tc.assertTrue(any("integer literal is too large" in message
                       for message in too_big_messages),
                   f"missing too-large literal diagnostic: "
                   f"{too_big_messages}")
 
-    # Nineteenth spec: identifier letters `@` and `'`.  Tests
-    # the new Tier-2 lexer extension
-    # `[a-zA-Z_@][a-zA-Z0-9_@']*` matching syfco's
-    # Reader/Parser/Data.hs `identStart` /
-    # `identLetter` definitions.  `@` may lead an identifier
-    # (`@foo`); `'` may appear inside (`o'biter`).
-    with open(filename, 'w') as f:
-        f.write(
+    # Test support for `@` and `'` in identifiers: `@` may lead an
+    # identifier (`@event`); `'` may appear inside (`ack'0`).
+    weird = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"weird ids\"\n"
             "  DESCRIPTION: \"fixture 15: @ and ' in idents\"\n"
@@ -1652,7 +1784,7 @@ try:
             "    G(!@event[0] || F ack'0);\n"
             "  }\n"
             "}\n")
-    weird = spot.parse_tlsf(filename)
+
     tc.assertFalse(weird.errors,
                    f"@ and ' identifiers must parse cleanly; "
                    f"errors: "
@@ -1675,17 +1807,8 @@ try:
     tc.assertIn("ack'0",  fstr_weird,
                 f"output AP ack'0 should appear in formula; "
                 f"got: {fstr_weird}")
-    # Sixteenth spec: enum declarations.  Tests the new
-    # Tier-1#2 `enum` keyword in GLOBAL { DEFINITIONS { ... } }.
-    # Format per syfco
-    # (spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Global.hs
-    # enumParser): `enum Name = { Tag0:bits0, Tag1:bits1, ... };`
-    # -- a comma-separated list of `Tag:bits` pairs.  The bits
-    # width is the length of the first entry's bits string.
-    # Pin: 1 enum, 1 regular def in DEFINITIONS, source order
-    # of entries preserved, round-trip idempotent.
-    with open(filename, 'w') as f:
-        f.write(
+    # Tests the `enum` keyword in GLOBAL { DEFINITIONS { ... } }.
+    enum_test = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"with enum\"\n"
             "  DESCRIPTION: \"fixture 16: enum keyword pin\"\n"
@@ -1695,7 +1818,7 @@ try:
             "GLOBAL {\n"
             "  PARAMETERS { N = 2; }\n"
             "  DEFINITIONS {\n"
-            "    enum Color = {RED:00, GREEN:01, BLUE:10, BLACK:11};\n"
+            "    enum Color = RED: 00 GREEN: 01 BLUE: 10 BLACK: 11;\n"
             "    Gplus(x) = G x;\n"
             "  }\n"
             "}\n"
@@ -1704,45 +1827,43 @@ try:
             "  OUTPUTS { grant; }\n"
             "  GUARANTEE { Gplus(request); }\n"
             "}\n")
-    enum_test = spot.parse_tlsf(filename)
+
     tc.assertFalse(enum_test.errors,
                    f"parse_tlsf reported errors: "
                    f"{[(e.first, e.second) for e in enum_test.errors]}")
-    # The enum declaration is only observable through the canonical
-    # print (parsed_tlsf keeps its AST -- and the enumerations --
-    # opaque).  The exact canonical line below pins the decl name,
-    # the 4 entries, their order, and their bit strings.
-    # Don't-care bit `*` is also accepted: re-declare an enum
-    # whose first value uses `*` to verify the STAR branch.
-    with open(filename, 'w') as f:
-        f.write(
+    # The enum declaration is observable only through the canonical
+    # print (the AST is opaque).  The canonical line below pins the
+    # decl name, the 4 entries, their order, and their bit strings.
+    # Don't-care bit `*` is also accepted; a lone `*` tag must be
+    # the only tag of its enum (it overlaps every valuation).
+    sigs = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  DEFINITIONS {\n"
-            "    enum Sigs = {NONE:*, LOW:0, HIGH:1};\n"
+            "    enum Sigs = ANY: *;\n"
+            "    enum Lev = LOW: 0* HIGH: 11;\n"
             "  }\n"
             "}\n"
             "MAIN {\n"
             "  INPUTS  { p; }\n"
             "  GUARANTEE { G(p); }\n"
             "}\n")
-    sigs = spot.parse_tlsf(filename)
+
     tc.assertFalse(sigs.errors,
                    f"don't-care bit must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in sigs.errors]}")
-    # The `*` bit string is kept verbatim; observable through the
-    # canonical print of the opaque AST.
+    # The `*` bit string is kept verbatim in the canonical print.
     sigs_canon = spot.ostringstream()
     spot.tlsf_print(sigs_canon, sigs)
-    tc.assertIn("enum Sigs = {NONE:*, LOW:0, HIGH:1};",
+    tc.assertIn("enum Sigs = ANY:*;",
                 sigs_canon.str(),
                 "don't-care bits must round-trip verbatim")
     # Round-trip: deparse, re-parse, idempotent.
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, enum_test)
     can_enum = ostr.str()
-    tc.assertIn("enum Color = {", can_enum,
-                f"deparser should emit 'enum Color = {{'; got: "
+    tc.assertIn("enum Color = ", can_enum,
+                f"deparser should emit 'enum Color = '; got: "
                 f"{can_enum}")
     tc.assertIn("RED:00", can_enum,
                 f"deparser should emit 'RED:00'; got: {can_enum}")
@@ -1752,12 +1873,11 @@ try:
                 f"deparser should emit 'BLUE:10'; got: {can_enum}")
     tc.assertIn("BLACK:11", can_enum,
                 f"deparser should emit 'BLACK:11'; got: {can_enum}")
-    tc.assertIn("enum Color = {RED:00, GREEN:01, BLUE:10, BLACK:11};",
+    tc.assertIn("enum Color = RED:00 GREEN:01 BLUE:10 BLACK:11;",
                 can_enum,
                 "enum name, entries, order, and bits must round-trip")
-    with open(filename, 'w') as f:
-        f.write(can_enum)
-    enum_rt = spot.parse_tlsf(filename)
+    enum_rt = parse_tlsf(can_enum)
+
     tc.assertFalse(enum_rt.errors,
                    f"round-trip must stay clean; got: "
                    f"{[(e.first, e.second) for e in enum_rt.errors]}")
@@ -1768,32 +1888,327 @@ try:
     tc.assertEqual(can_enum2, can_enum,
                    f"enum deparse must be idempotent; "
                    f"first:\n{can_enum}\nsecond:\n{can_enum2}")
-    # Negative test: a mis-spelled bit character (e.g. `X`) inside
-    # the bits non-terminal is a syntax error (no token matches
-    # it: NUMBER rejects `X`, STAR rejects `X`).
-    with open(filename, 'w') as f:
-        f.write(
+    # Negative test: a mis-spelled bit character (e.g. `X`) is a
+    # syntax error: `0X` tokenises as the pattern `0` followed by a
+    # new entry tag `X` whose mandatory `:` is missing.
+    bad = parse_tlsf(
             "INFO {}\n"
             "GLOBAL {\n"
             "  DEFINITIONS {\n"
-            "    enum Bad = {X:0, Y:1};\n"
+            "    enum Bad = A: 0X;\n"
             "  }\n"
             "}\n"
             "MAIN {}\n")
-    bad = spot.parse_tlsf(filename)
+
     tc.assertTrue(bad.errors,
                   f"unknown bit character must yield a "
                   f"syntax error; got none")
 
-    # Seventeenth spec: enum-entry tag/bits (incl. don't-care-bit `**`)
-    # survival round-trip regression.  The enumerations are no longer
-    # reachable through parsed_tlsf (the AST is opaque), so the
-    # regression is pinned on the canonical text instead: the exact
+    # Negative tests: all four strict-parity violations are
+    # rejected: (a) the braced form -- no `{` after `=`;
+    # (b) the empty enum -- at least one entry is mandatory;
+    # (c) two DIFFERENT tags covering the same valuation;
+    # (d) a pattern shorter/longer than the first one (the whole
+    # list is parsed with a fixed width).
+    # Overlapping patterns WITHIN one tag stay legal (the `U: 11*,
+    # 1*1, *11` coverage union); tags may be named after a word the
+    # scanner is able to shadow, because the scanner's enum state
+    # recognizes no keywords.
+    def enum_neg(body):
+        res = parse_tlsf(
+                "INFO {}\n"
+                "GLOBAL {\n"
+                "  DEFINITIONS {\n"
+                "    " + body + "\n"
+                "  }\n"
+                "}\n"
+                "MAIN {}\n")
+
+        tc.assertTrue(res.errors,
+                      f"expected diagnostics for: {body}; got none")
+        return [(e.first, e.second) for e in res.errors]
+
+    enum_neg("enum C = { A: 00, B: 01 };")
+    enum_neg("enum C = ;")
+    errs = enum_neg("enum C = A: 0* B: 01;")
+    tc.assertTrue(any("share the same value: 01" in m for _, m in errs),
+                  f"overlap diagnostic should name the shared value; "
+                  f"got: {errs}")
+    errs = enum_neg("enum C = A: 0 B: 01;")
+    tc.assertTrue(any("width is fixed to 1" in m for _, m in errs),
+                  f"width diagnostic should mention the fixed width; "
+                  f"got: {errs}")
+
+    # Positive: the specification's own multi-pattern tag example
+    # (`UNDEF: 11*, 1*1, *11`) -- same-tag overlapping patterns are
+    # a coverage union, and the tag `U` must not be mangled into an
+    # LTL token.  Also legal: a duplicate tag with DISJOINT patterns
+    # and a comma gluing extra patterns onto one tag.
+    multi = parse_tlsf(
+            "INFO {}\n"
+            "GLOBAL {\n"
+            "  DEFINITIONS {\n"
+            "    enum B = U: 11*, 1*1, *11;\n"
+            "    enum D = A: 00 A: 11;\n"
+            "    enum E = V: 0*, 11;\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS  { p; }\n"
+            "  GUARANTEE { G(p); }\n"
+            "}\n")
+
+    tc.assertFalse(multi.errors,
+                   f"multi-pattern/keyword-tag enums must parse "
+                   f"cleanly; got: "
+                   f"{[(e.first, e.second) for e in multi.errors]}")
+    m_canon = spot.ostringstream()
+    spot.tlsf_print(m_canon, multi)
+    tc.assertIn("enum B = U:11*,1*1,*11;", m_canon.str(),
+                "multi-pattern tag must round-trip with commas")
+    tc.assertIn("enum D = A:00 A:11;", m_canon.str(),
+                "duplicate tags with disjoint patterns must survive")
+    tc.assertIn("enum E = V:0*,11;", m_canon.str(),
+                "comma-glued extra patterns must round-trip")
+
+    # A word the file declares as the name or a tag of an `enum` is an
+    # identifier, as in syfco: TLSF's word list is a scanner
+    # convention, not a reservation.  The scanner keeps the declared
+    # words and consults that set before returning a keyword, so a tag
+    # named U reads as the tag while the other meaning of that same
+    # word (`AND` below) still works.  The AST is opaque, so both
+    # readings are observed through the canonical print and through
+    # the LTL translation.
+    def enum_kw(tag_a, tag_b, name="E"):
+        return parse_tlsf(
+                f"INFO {{}}\n"
+                f"GLOBAL {{\n"
+                f"  DEFINITIONS {{\n"
+                f"    enum {name} = {tag_a}: 00 {tag_b}: 11;\n"
+                f"  }}\n"
+                f"}}\n"
+                f"MAIN {{\n"
+                f"  INPUTS  {{ {name} b; c; }}\n"
+                f"  OUTPUTS {{ grant; }}\n"
+                f"  GUARANTEE {{ G(((b == {tag_a}) AND (b != {tag_b}))"
+                f" -> grant); }}\n"
+                f"}}\n")
+
+    kw = enum_kw("U", "V")
+
+    tc.assertFalse(kw.errors,
+                   f"tags named after words must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in kw.errors]}")
+    k_canon = spot.ostringstream()
+    spot.tlsf_print(k_canon, kw)
+    tc.assertIn("enum E = U:00 V:11;", k_canon.str(),
+                f"tags named after words must round-trip; got: "
+                f"{k_canon.str()}")
+    kw_rt = parse_tlsf(k_canon.str())
+    tc.assertFalse(kw_rt.errors,
+                   f"re-parsing the canonical print must stay clean; got: "
+                   f"{[(e.first, e.second) for e in kw_rt.errors]}")
+    # The word tags have to resolve to the values they are declared
+    # with, so the specification must translate to the same formula as
+    # the same one with neutral tag names.
+    k_ltl = str(spot.tlsf_to_ltl(kw).full_formula)
+    ref = enum_kw("Z", "W")
+    tc.assertFalse(ref.errors,
+                   f"the reference specification must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in ref.errors]}")
+    tc.assertEqual(k_ltl, str(spot.tlsf_to_ltl(ref).full_formula),
+                   f"a tag named after a word must read as the tag, not "
+                   f"as a word; got: {k_ltl}")
+    # The very same word, used where its own trigger is present, is
+    # still the word: `AND` in the guarantee above is the conjunction,
+    # and had it been read as a tag the two constraints would have been
+    # nonsense rather than `b == U`.
+    tc.assertIn("b_0 & !b_1", k_ltl,
+                f"AND should still be the conjunction; got: {k_ltl}")
+    # A word the scanner cannot tell from an identifier, because
+    # nothing in the syntax follows it, stays reserved: `G` is usable
+    # as the always word, and the tag may not be referred to.
+    for w in ["G", "F", "X", "NOT", "SIZEOF", "true", "false"]:
+        res = parse_tlsf(
+                "INFO {}\n"
+                "GLOBAL {\n"
+                "  DEFINITIONS {\n"
+                "    enum E = " + w + ": 0;\n"
+                "  }\n"
+                "}\n"
+                "MAIN {\n"
+                "  INPUTS  { E b; }\n"
+                "  OUTPUTS { grant; }\n"
+                "  GUARANTEE { G(b[0]) -> grant; }\n"
+                "}\n")
+
+        tc.assertFalse(res.errors,
+                       f"a tag named {w} must leave that word alone; got: "
+                       f"{[(e.first, e.second) for e in res.errors]}")
+    # Referring to such a tag is a syntax error, though: the scanner
+    # cannot tell that this occurrence is a value and not the word.
+    res = parse_tlsf(
+            "INFO {}\n"
+            "GLOBAL {\n"
+            "  DEFINITIONS {\n"
+            "    enum E = G: 0;\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS  { E b; }\n"
+            "  OUTPUTS { grant; }\n"
+            "  GUARANTEE { G(b[0] == G) -> grant; }\n"
+            "}\n")
+
+    tc.assertTrue(res.errors,
+                  f"a word with no trigger must stay reserved; got none")
+    # A word is not matched by prefix: `U2` is an identifier of its own.
+    near = enum_kw("U2", "V")
+
+    tc.assertFalse(near.errors,
+                   f"a word is not a prefix; got: "
+                   f"{[(e.first, e.second) for e in near.errors]}")
+
+    # The enum grammar of TLSF v1.2 SS4.4 has no terminator, so the
+    # `;` is optional when the enum is the last item of the
+    # DEFINITIONS block: the `}` that closes the block ends the body.
+    # This is the paper's own `Position` example, verbatim but without
+    # the `;`.  The AST is opaque, so the `;`-less and the `;`-full
+    # forms are compared through the canonical print.
+    def enum_spec(body):
+        return parse_tlsf(
+                "INFO {\n"
+                "  TITLE:       \"optional enum terminator\"\n"
+                "  DESCRIPTION: \"fixture 21: `;`-less enum\"\n"
+                "  SEMANTICS:   Mealy\n"
+                "  TARGET:      Mealy\n"
+                "}\n"
+                "GLOBAL {\n"
+                "  DEFINITIONS {\n" + body +
+                "  }\n"
+                "}\n"
+                "MAIN {\n"
+                "  INPUTS  { req; }\n"
+                "  OUTPUTS { grant; }\n"
+                "  GUARANTEE { G(grant <-> req); }\n"
+                "}\n")
+
+    def canon(spec):
+        out = spot.ostringstream()
+        spot.tlsf_print(out, spec)
+        return out.str()
+
+    position = "    enum Position =\n" \
+               "      ZERO:    0000\n" \
+               "      ONE:     0001\n" \
+               "      TWO:     0010\n" \
+               "      THREE:   0011\n" \
+               "      INVALID: 1111\n"
+    no_semi = enum_spec(position)
+    tc.assertFalse(no_semi.errors,
+                   f"a `;`-less last enum must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in no_semi.errors]}")
+    # The `;` is optional on the last item of the block only, so for
+    # each combination below the canonical form is the same whether or
+    # not the final terminator is written.
+    position_semi = position + "    ;\n"
+    other = "    enum Other = X: 00;\n"
+    last = "    enum Last = Y: 11;\n"
+    for body, terminated in ((position, position_semi),
+                             (position_semi + other,
+                              position_semi + other.rstrip(";\n") + "\n"),
+                             (position_semi + other + last,
+                              position_semi + other
+                              + last.rstrip(";\n") + "\n")):
+        plain = enum_spec(body)
+        tc.assertFalse(plain.errors,
+                       f"must parse cleanly: {body!r}; got: "
+                       f"{[(e.first, e.second) for e in plain.errors]}")
+        tc.assertEqual(canon(plain), canon(enum_spec(terminated)),
+                       f"the `;` must not change: {body!r}")
+    # A `;`-less enum may NOT be followed by another item: the `;` is
+    # mandatory between two def_list items, and syfco agrees -- its
+    # enumVParserL consumes the following identifier before requiring
+    # the `:` of a tag, so it cannot end the entry list there either.
+    # Each of the three below is rejected with a single syntax error
+    # reported where the next item starts.
+    for following in ("    Gplus(x) = G x;\n",
+                      "    hmm = 2;\n",
+                      "    enum Other = X: 00\n"):
+        errs = enum_neg(position + following)
+        tc.assertEqual(len(errs), 1,
+                       f"{following!r} after a `;`-less enum should give "
+                       f"one diagnostic, got: {errs}")
+        tc.assertTrue(any("syntax error" in m for _, m in errs),
+                      f"the diagnostic should be a syntax error: {errs}")
+    # The parameterless case above used to be reported as
+    # "unexpected character '2'" instead: the `=` trailing context of
+    # the enumdecl identifier rule took `hmm =` for the enumeration's
+    # name and stranded the scanner in the enum body, where `2` is not
+    # a pattern.  The name is now scanned in a state of its own, so
+    # nothing but a syntax error is reported.
+    # Restoring the `;` makes each of them parse, and the definition
+    # that follows is a real item: the printed form shows the boundary.
+    follows = enum_spec(position + "    ;\n" + "    Gplus(x) = G x;\n")
+    tc.assertFalse(follows.errors,
+                   f"a definition after a terminated enum must parse "
+                   f"cleanly; "
+                   f"got: {[(e.first, e.second) for e in follows.errors]}")
+    lines = [x.strip() for x in canon(follows).splitlines()]
+    tc.assertIn("Gplus(x) = G x;", lines,
+                f"`Gplus` should be a definition line; got: {lines}")
+    tc.assertEqual([x for x in lines if x.startswith("enum Position =")],
+                   ["enum Position = ZERO:0000 ONE:0001 TWO:0010 "
+                    "THREE:0011 INVALID:1111;"],
+                   "the enum body should end at the last tag")
+    # A parameterless definition after the `;` is fine too: the `=` of
+    # a definition must not be mistaken for the enumeration's name.
+    parmless = enum_spec(position + "    ;\n" + "    hmm = 2;\n")
+    tc.assertFalse(parmless.errors,
+                   f"got: {[(e.first, e.second) for e in parmless.errors]}")
+
+    # A pattern is a single maximal run of `0`, `1` and `*` characters
+    # (TLSF v1.2 SS4.4), so two juxtaposed runs are a misparse.  They
+    # must not be merged into one longer pattern -- that would also
+    # redefine the enum's width -- and the missing separator is
+    # reported once, where the second run starts.  A comment between
+    # the runs does not separate them either.
+    errs = enum_neg("enum C = A: 10 01 B: 11;")
+    tc.assertEqual(len(errs), 1,
+                   f"one juxtaposed run should give one diagnostic, "
+                   f"got: {errs}")
+    tc.assertTrue(any("missing ',' between bit patterns" in m
+                      for _, m in errs),
+                  f"the diagnostic should name the missing separator; "
+                  f"got: {errs}")
+    errs = enum_neg("enum C = A: 10 /* c */ 01 B: 11;")
+    tc.assertTrue(any("missing ',' between bit patterns" in m
+                      for _, m in errs),
+                  f"a comment does not separate two runs; got: {errs}")
+    # The offending run is dropped, not merged: the canonical print of
+    # the rejected declaration keeps the first run alone, so the enum
+    # keeps the width 2 and no `1001` pattern ever exists.
+    joined = enum_spec("    enum C = A: 10 01 B: 11;\n")
+    tc.assertIn("enum C = A:10 B:11;", canon(joined),
+                f"juxtaposed runs must not be merged: {canon(joined)}")
+    tc.assertNotIn("1001", canon(joined),
+                   f"the merged pattern must not be built: {canon(joined)}")
+    # With the comma, the very same declaration is accepted: the two
+    # runs are two patterns of tag A, and the width stays 2.
+    comma = enum_spec("    enum C = A: 10, 01 B: 11;\n")
+    tc.assertFalse(comma.errors,
+                   f"comma-separated runs must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in comma.errors]}")
+    tc.assertIn("enum C = A:10,01 B:11;", canon(comma),
+                f"both patterns must survive: {canon(comma)}")
+
+    # Regression: enum tag/bits (incl. don't-care `**`) survival
+    # round-trip.  The enumerations are unreachable through
+    # parsed_tlsf (the AST is opaque), so the exact canonical
     # `enum Color = {...}` line must survive parse -> deparse ->
     # reparse verbatim (catching tag/bits rewrites, dropped entries,
     # and `*`-to-`0`/`1` corruption) and deparse must be idempotent.
-    with open(filename, 'w') as f:
-        f.write(
+    parsed_enum = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"enum round-trip\"\n"
             "  DESCRIPTION: \"fixture 17: tag+bits+star survival\"\n"
@@ -1802,69 +2217,50 @@ try:
             "}\n"
             "GLOBAL {\n"
             "  DEFINITIONS {\n"
-            "    enum Color = {RED:00, GREEN:01, BLUE:10, YELLOW:**};\n"
+            "    enum Color = RED: 00 GREEN: 01 BLUE: 10 YELLOW: 11;\n"
+            "    enum Any = ALL: **;\n"
             "  }\n"
             "}\n"
             "MAIN {\n"
             "  INPUTS  { p; }\n"
             "  GUARANTEE { G(p); }\n"
             "}\n")
-    parsed_enum = spot.parse_tlsf(filename)
+
     tc.assertFalse(parsed_enum.errors,
                    f"source enum must parse cleanly; got: "
                    f"{[(e.first, e.second) for e in parsed_enum.errors]}")
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, parsed_enum)
     canonical = ostr.str()
-    with open(filename, 'w') as f:
-        f.write(canonical)
-    enum_rt = spot.parse_tlsf(filename)
+    enum_rt = parse_tlsf(canonical)
+
     tc.assertFalse(enum_rt.errors,
                    f"round-trip must stay clean; got: "
                    f"{[(e.first, e.second) for e in enum_rt.errors]}")
-    # The tag/bits pairs (including the `**` don't-care pattern)
-    # survive parse -> deparse -> reparse.  Pin the exact canonical
-    # line and the deparse idempotence; the enumerations are not
-    # reachable through parsed_tlsf anymore.
-    tc.assertIn("enum Color = {RED:00, GREEN:01, BLUE:10, YELLOW:**};",
+    # The tag/bits pairs (including the `**` don't-care pattern in
+    # its own single-tag enum) survive parse -> deparse -> reparse.
+    tc.assertIn("enum Color = RED:00 GREEN:01 BLUE:10 YELLOW:11;",
                 canonical,
-                "tag/bits pairs (with **) must survive round-trip")
+                "tag/bits pairs must survive round-trip")
+    tc.assertIn("enum Any = ALL:**;",
+                canonical,
+                "the ** don't-care pattern must survive round-trip")
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, enum_rt)
     tc.assertEqual(ostr.str(), canonical,
                    "enum deparse must be idempotent after round-trip")
 
-    # Eighteenth spec: AST-clone-and-substitute-with-eager-
-    # expansion architecture regression test.
-    #
-    # The deliberate heavy-usage shape: 102 uses of
-    # `MultiUse(MyDef(a))`, distributed across all 6 MAIN
-    # subsections (INITIALLY / PRESET / REQUIRE /
-    # ASSERT / GUARANTEE / ASSUME) at 17 uses per section.
-    # Each use triggers TWO levels of expansion:
-    #   - expand_ast flattens the inner `MyDef(a)` App call to
-    #     `G a` (an UnaryOp AST) before subst_arg runs, so the
-    #     outer splice lands with no nested App in the actual;
-    #     then
-    #   - expand_ast then flattens the 5 nested `MyDef(x)`
-    #     leaves inside MultiUse.body against that already-flat
-    #     `G a` AST.
-    # 102 use sites × (1 eager-expand on actual + 1 recursive
-    # expand on the cloned body + 5 subst_arg walks on the
-    # leaf App calls re-firing at translate time) ≈ 1500 AST
-    # clone-and-replace operations.
-    #
-    # Pin mechanism (the suite fails loudly under a regression):
-    # every body slot carries exactly 17 MultiUse uses (6*17 =
-    # 102 total); `tlsf_to_ltl` returns a non-null formula;
-    # round-trip (deparse -> reparse -> deparse) is byte-
-    # identical (idempotence).
+    # Heavy-usage regression: 102 uses of `MultiUse(MyDef(a))`,
+    # spread over all 6 MAIN subsections at 17 uses per section.
+    # Each use triggers two levels of expansion (inner MyDef, outer
+    # MultiUse with 5 nested MyDef leaves), for roughly 1500 AST
+    # clone-and-replace operations.  Pins: every body slot carries
+    # exactly 17 uses, translation succeeds, and the deparse ->
+    # reparse -> deparse round-trip is byte-identical.
 
     USES_PER_SECTION = 17  # 17 * 6 sections = 102 use sites.
-    # The 6 MAIN subsection keywords generated below.  Each keyword
-    # parses into its own private-AST body vector (plural aliases are
-    # exercised by fixture 13); the per-section counts are read back
-    # from the canonical print since parsed_tlsf keeps its AST opaque.
+    # The 6 MAIN subsection keywords generated below; the per-section
+    # counts are read back from the canonical print.
     SECS_18 = [
         'INITIALLY',
         'PRESET',
@@ -1884,9 +2280,8 @@ try:
         'GLOBAL {\n',
         '  DEFINITIONS {\n',
         '    MyDef(x) = G x;\n',
-        # MultiUse's body references MyDef FIVE times; each
-        # App(MyDef, ...) child is what the App-case `subst_arg`
-        # walk descends into on every MultiUse use.
+        # MultiUse's body references MyDef FIVE times; each App
+        # child is what substitution descends into on every use.
         '    MultiUse(x) = MyDef(x) || MyDef(x) || '
         'MyDef(x) || MyDef(x) || MyDef(x);\n',
         '  }\n',
@@ -1901,10 +2296,8 @@ try:
         spec_lines.append('  }\n')
     spec_lines.append('}\n')
     contents_18 = ''.join(spec_lines)
-    with open(filename, 'w') as f:
-        f.write(contents_18)
 
-    parsed_18 = spot.parse_tlsf(filename)
+    parsed_18 = parse_tlsf(contents_18)
     res_18 = spot.tlsf_to_ltl(parsed_18)
 
     # same shape `MultiUse(MyDef(a))` -- the parser must accept
@@ -1923,24 +2316,12 @@ try:
         f"fixture 18: errors leaked from translate (arity, "
         f"unknown def, or active_defs_ cycle); got "
         f"{[(e.first, e.second) for e in parsed_18.errors]}")
-    # The translator returned a non-null formula -- pins
-    # that all 510 MyDef expansions (102 × 5) produced valid
-    # G a sub-formulas.
-    tc.assertTrue(
-        bool(res_18.full_formula),
-        f"fixture 18: tlsf_to_ltl returned a null formula; "
-        f"expected a non-null result after 102 MultiUse uses")
-    # The formula may simplify completely to true because every
-    # section contains the same implication, so do not rely on an
-    # unsimplified formula spelling to prove expansion happened.
+    # A null formula would indicate a dead end in the expansion
+    # path; the formula itself may simplify to true, so it is not
+    # spelled out here.
 
-    # Structural pin: every section carries EXACTLY 17 use
-    # sites.  Total 6 * 17 = 102.  A regression where the body
-    # route shortcuts (e.g., a def that drops one of its 5
-    # children during cloning) would change this count; the
-    # arithmetic pin catches it here.  The counts are read from the
-    # canonical print of the private AST (one ';'-terminated line
-    # per use site).
+    # Structural pin: every section carries EXACTLY 17 use sites
+    # (6 * 17 = 102 total), read from the canonical print.
     count_18 = spot.ostringstream()
     spot.tlsf_print(count_18, parsed_18)
     can_counts_18 = count_18.str()
@@ -1956,17 +2337,13 @@ try:
                    "fixture 18: 102 use sites must appear in the "
                    "canonical print")
 
-    # Idempotence: the cached AST bodies produce a canonical
-    # form that re-parses cleanly and re-deparses byte-
-    # identically.  This is the deparser's deterministic-
-    # iteration contract (std::vector only -- no
-    # unordered_map/set, no implicit clone paths).
+    # Round-trip: the canonical form re-parses cleanly and
+    # re-deparses byte-identically (deterministic iteration).
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, parsed_18)
     can_18 = ostr.str()
-    with open(filename, 'w') as f:
-        f.write(can_18)
-    parsed_18b = spot.parse_tlsf(filename)
+    parsed_18b = parse_tlsf(can_18)
+
     tc.assertFalse(
         list(parsed_18b.errors),
         f"fixture 18: round-trip (parse+deparse+reparse) must "
@@ -1981,37 +2358,23 @@ try:
         f"canon/parse/canon; first canonical \\n{can_18!r}\\n"
         f"second canonical \\n{can_18b!r}")
 
-    # Nineteenth spec: guard clauses and recursion in DEFINITIONS.
-    # TLSF v1.2 §4.6 lets a definition body be a sequence of clauses
-    # `ec ≡ e | eB : e | eP : e` whose first true guard wins, and a
-    # guarded definition may call itself while its constant integer
-    # arguments shrink toward a guard-selected base case (the
-    # `mone` mutual-exclusion helper of full_arbiter.tlsf is the
-    # canonical example).  This fixture pins four behaviors:
+    # Guards and recursion in DEFINITIONS.  A definition body may be
+    # a sequence of `guard : expr` clauses whose first true guard
+    # wins (`otherwise` is the catch-all), and a guarded definition
+    # may call itself with constant integer arguments that shrink
+    # toward a guard-selected base case.  Four behaviors are pinned:
     #
-    #   1. Guard selection: the first clause whose guard holds is
-    #      translated; `otherwise` is the catch-all.  `sel(3)` must
-    #      pick the `x > 2 : b` clause (not `x > 5 : a`), so the
-    #      translated GUARANTEE is exactly `b`.
-    #   2. The deparser round-trips guard clauses (canonical print
-    #      -> reparse -> translate stays byte-clean and semantic).
-    #   3. Terminating guarded recursion: `one(g,0,2)` (exactly-one
-    #      over a 3-wide bus, halving the index range at each level
-    #      exactly like full_arbiter's mone) must unfold to a
-    #      formula equivalent to the hand-written XOR conjunction.
-    #      This is the regression pin for the constant-argument
-    #      folding in the translate_expr App case: without it each
-    #      recursion level wraps its argument in another layer of
-    #      arithmetic, and the substituted trees grow linearly deep
-    #      with the recursion instead of staying constant-sized.
-    #   4. Non-terminating recursion (an unguarded self call, or a
+    #   1. First-true-wins selection: `sel(3)` picks `x > 2 : b`.
+    #   2. The deparser round-trips guard clauses.
+    #   3. Terminating guarded recursion (the `one` exactly-one
+    #      helper) unfolds to a formula equivalent to hand-written
+    #      XORs -- pins constant-argument folding in expansion.
+    #   4. Non-terminating recursion (unguarded self call, or a
     #      guard that never fires) is diagnosed exactly ONCE, with
     #      the diagnostic naming the definition that STARTED the
-    #      expansion chain (not the leaf call that happened to trip
-    #      the depth budget), instead of hanging or flooding one
-    #      message per call site.
-    with open(filename, 'w') as f:
-        f.write(
+    #      expansion chain, not the leaf call that hit the depth
+    #      budget.
+    guarded = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"guards\"\n"
             "  DESCRIPTION: \"guard clauses\"\n"
@@ -2030,7 +2393,7 @@ try:
             "  INPUTS { a; b; c; }\n"
             "  GUARANTEE { sel(3); }\n"
             "}\n")
-    guarded = spot.parse_tlsf(filename)
+
     tc.assertFalse(
         list(guarded.errors),
         f"fixture 19: guard clauses must parse cleanly; got "
@@ -2054,9 +2417,8 @@ try:
     tc.assertIn('otherwise : c', can_g,
                 f"fixture 19: otherwise clause lost in canonical "
                 f"print; got:\n{can_g}")
-    with open(filename, 'w') as f:
-        f.write(can_g)
-    guarded_b = spot.parse_tlsf(filename)
+    guarded_b = parse_tlsf(can_g)
+
     tc.assertFalse(
         list(guarded_b.errors),
         f"fixture 19: canonical print must reparse cleanly; got "
@@ -2068,10 +2430,9 @@ try:
 
     # Terminating guarded recursion: `one(bus,i,j)` holds iff exactly
     # one element of bus[i..j] is set; the recursion halves the range
-    # like full_arbiter's mone.  `one(g,0,2)` must be equivalent to
-    # the hand-written XOR of the three flattened APs.
-    with open(filename, 'w') as f:
-        f.write(
+    # toward a base case.  `one(g,0,2)` must be equivalent to the
+    # hand-written XOR of the three flattened APs.
+    recursive = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"one\"\n"
             "  DESCRIPTION: \"guarded recursion\"\n"
@@ -2094,7 +2455,7 @@ try:
             "  INPUTS { g[3]; }\n"
             "  GUARANTEE { one(g, 0, 2); }\n"
             "}\n")
-    recursive = spot.parse_tlsf(filename)
+
     tc.assertFalse(
         list(recursive.errors),
         f"fixture 19: recursive definition must parse cleanly; got "
@@ -2120,8 +2481,7 @@ try:
     # Non-terminating recursion 1: an unguarded self call.  The
     # translator must diagnose it exactly once (not flood one
     # message per call site) and name the cyclic definition.
-    with open(filename, 'w') as f:
-        f.write(
+    loop1 = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"loop\"\n"
             "  DESCRIPTION: \"non-terminating recursion\"\n"
@@ -2137,7 +2497,7 @@ try:
             "  INPUTS { a; }\n"
             "  GUARANTEE { f(1); }\n"
             "}\n")
-    loop1 = spot.parse_tlsf(filename)
+
     tc.assertFalse(list(loop1.errors))
     loop1_errors = spot.parse_aut_error_list()
     res_loop1 = spot.tlsf_to_ltl(
@@ -2158,13 +2518,11 @@ try:
                 f"fixture 19: unexpected wording; got: "
                 f"{loop1_msgs[0]}")
 
-    # Non-terminating recursion 2: the guardless doubling variant of
-    # full_arbiter's mone.  Its argument tree doubles at every level,
-    # so it exercises the total-work budget (the depth bound alone
-    # cannot stop an exponential tree).  The diagnostic must name
-    # `mone`, not the `none` leaf that happens to trip the limit.
-    with open(filename, 'w') as f:
-        f.write(
+    # Non-terminating recursion 2: the guardless doubling variant.
+    # Its argument tree doubles at every level, so it exercises the
+    # total-work budget (the depth bound alone cannot stop an
+    # exponential tree).  The diagnostic must name `mone`.
+    loop2 = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"loop2\"\n"
             "  DESCRIPTION: \"non-terminating doubling\"\n"
@@ -2185,7 +2543,7 @@ try:
             "  INPUTS { g[2]; }\n"
             "  GUARANTEE { mone(g, 0, 1); }\n"
             "}\n")
-    loop2 = spot.parse_tlsf(filename)
+
     tc.assertFalse(list(loop2.errors))
     loop2_errors = spot.parse_aut_error_list()
     res_loop2 = spot.tlsf_to_ltl(
@@ -2203,32 +2561,21 @@ try:
                 f"definition (not the none leaf); got: "
                 f"{loop2_msgs[0]}")
 
-    # Twentieth spec: the two corpus conformance gaps of the
-    # DEFINITIONS/INFO syntax.  TLSF v1.2 and the canonical syfco
-    # parser treat `;` as a SEPARATOR between DEFINITIONS entries
-    # (`sepBy assignmentParser (rOp ";")` in
-    # spot/parsetlsf/refs/syfco/src/lib/Reader/Parser/Global.hs): it
-    # is required between two definitions, but the LAST one may omit
-    # it (project-root M.tlsf relies on this).  And syfco's
-    # stringParser accepts STRINGs spanning several lines with `\"`
-    # as the single escape (spot/parsetlsf/refs/syfco/src/lib/Reader/
-    # Parser/Utils.hs) -- tictactoe_1.tlsf carries a whole prose
-    # DESCRIPTION paragraph this way.  This fixture pins:
-    #   1. a last definition without `;` parses and translates
-    #      (and `;` between two definitions plus none after the last
-    #      works too);
+    # Final `;` handling in DEFINITIONS and multi-line INFO strings.
+    # `;` separates definitions so it is required between two of
+    # them, but the LAST one may omit it.  INFO strings may span
+    # several lines with `\"` as the single escape.  Pinned:
+    #   1. a last definition without `;` parses and translates;
     #   2. two `;`-less definitions juxtaposed still fail -- the
     #      second one's head is munched into the first one's body
-    #      (maximal munch, like syfco), so the parse dies at the
-    #      second `=`;
-    #   3. a DESCRIPTION spanning lines keeps its embedded newlines
-    #      and `\"` unescapes to a quote, and parse->print->parse is
-    #      lossless (the deparser escapes quotes, see
-    #      escape_info_string in spot/parsetlsf/public.cc);
+    #      (maximal munch), so the parse dies at the second `=`;
+    #   3. a DESCRIPTION spanning lines keeps its embedded newlines,
+    #      `\"` unescapes to a quote, `\\` unescapes to one backslash,
+    #      any other `\x` is kept verbatim, and parse->print->parse is
+    #      lossless (the deparser escapes quotes and backslashes back);
     #   4. an unterminated string is diagnosed instead of silently
     #      eating the rest of the file.
-    with open(filename, 'w') as f:
-        f.write(
+    m_style = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"M\"\n"
             "  DESCRIPTION: \"M\"\n"
@@ -2247,7 +2594,7 @@ try:
             "    M(a, b);\n"
             "  }\n"
             "}\n")
-    m_style = spot.parse_tlsf(filename)
+
     tc.assertFalse(
         list(m_style.errors),
         f"fixture 20: a final definition without `;` must parse; "
@@ -2259,8 +2606,7 @@ try:
                    f"fixture 20: unexpected formula: "
                    f"{res_m.full_formula}")
     # `;` between the two definitions, none after the last.
-    with open(filename, 'w') as f:
-        f.write(
+    two_defs = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"two\"\n"
             "  DESCRIPTION: \"two\"\n"
@@ -2280,7 +2626,7 @@ try:
             "    P(a, b) && Q(c);\n"
             "  }\n"
             "}\n")
-    two_defs = spot.parse_tlsf(filename)
+
     tc.assertFalse(
         list(two_defs.errors),
         f"fixture 20: `A; B` (B without trailing `;`) must parse; "
@@ -2290,10 +2636,8 @@ try:
                   "fixture 20: two-definition spec must translate")
     # Two `;`-less definitions juxtaposed: maximal munch merges the
     # second head into the first body, so the parse fails at the
-    # second `=` -- exactly where syfco fails (verified against the
-    # reference parser).
-    with open(filename, 'w') as f:
-        f.write(
+    # second `=`.
+    nosemi = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"nosi\"\n"
             "  DESCRIPTION: \"nosi\"\n"
@@ -2311,40 +2655,41 @@ try:
             "  OUTPUTS { a; }\n"
             "  ASSERT { P(a, b) && Q(c); }\n"
             "}\n")
-    nosemi = spot.parse_tlsf(filename)
+
     tc.assertTrue(
         list(nosemi.errors),
         "fixture 20: two juxtaposed `;`-less definitions must be "
         "rejected (second `=` is munched into the first body)")
     # Multi-line DESCRIPTION with an escaped quote, plus the lossless
     # parse->print->parse round trip.
-    with open(filename, 'w') as f:
-        f.write(
+    multiline = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"multi\"\n"
             "  DESCRIPTION: \"first line\n"
-            "second line with a \\\"quote\\\" and \\ prose\"\n"
+            "second line with a \\\"quote\\\", a \\\\ backslash, and "
+            "\\ prose\"\n"
             "  SEMANTICS:   Mealy\n"
             "  TARGET:      Mealy\n"
             "}\n"
             "MAIN {\n"
             "  GUARANTEE { true; }\n"
             "}\n")
-    multiline = spot.parse_tlsf(filename)
+
     tc.assertFalse(
         list(multiline.errors),
         f"fixture 20: multi-line DESCRIPTION must parse; got "
         f"{[(e.first, e.second) for e in multiline.errors]}")
     tc.assertEqual(
         multiline.description,
-        'first line\nsecond line with a "quote" and \\ prose',
-        f"fixture 20: embedded newlines and the `\\\"` escape must "
-        f"be preserved; got: {multiline.description!r}")
+        'first line\nsecond line with a "quote", a \\ backslash, and '
+        '\\ prose',
+        f"fixture 20: embedded newlines and the `\\\"` / `\\\\` escapes "
+        f"must be preserved, and any other `\\x` kept verbatim; got: "
+        f"{multiline.description!r}")
     ostr_20 = spot.ostringstream()
     spot.tlsf_print(ostr_20, multiline)
-    with open(filename, 'w') as f:
-        f.write(ostr_20.str())
-    multiline_b = spot.parse_tlsf(filename)
+    multiline_b = parse_tlsf(ostr_20.str())
+
     tc.assertFalse(
         list(multiline_b.errors),
         f"fixture 20: canonical print of a multi-line description "
@@ -2355,8 +2700,7 @@ try:
                    "canonical round trip losslessly")
     # Unterminated string: one clear diagnostic, not a cascade of
     # "unexpected character" errors chewing through the file.
-    with open(filename, 'w') as f:
-        f.write(
+    unclosed = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"oops\"\n"
             "  DESCRIPTION: \"never closed\n"
@@ -2364,10 +2708,977 @@ try:
             "  TARGET:      Mealy\n"
             "}\n"
             "MAIN { }\n")
-    unclosed = spot.parse_tlsf(filename)
+
     tc.assertTrue(
         any('unclosed string' in e.second for e in unclosed.errors),
         f"fixture 20: unterminated string must be diagnosed; got "
         f"{[e.second for e in unclosed.errors]}")
+
+    # Quantifier under a unary operator.  Regression pin for a
+    # printer oscillation: the UnaryOp deparse case wraps an
+    # unparenthesized Quantifier child in parens, but the Quantifier
+    # case ignored its own `parenthesized` flag, so
+    #   round 1: `G (&&[..] p)`   (UnaryOp wraps its child)
+    #   round 2: `G &&[..] p`     (flagged Quantifier reprinted bare)
+    # never reached a fixed point.  The fix makes the Quantifier
+    # case honor e.parenthesized; these assertions pin the result:
+    # for each form below, print -> parse -> print must be
+    # byte-identical (a fixed point from the FIRST print).
+    quantunary = parse_tlsf(
+            "INFO {\n"
+            "  TITLE:       \"quantifier under unary operator\"\n"
+            "  DESCRIPTION: \"round-trip regression for the printer "
+            "oscillation\"\n"
+            "  SEMANTICS:   Mealy,Finite\n"
+            "  TARGET:      Mealy\n"
+            "}\n"
+            "GLOBAL {\n"
+            "  PARAMETERS {\n"
+            "    N = 2;\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS {\n"
+            "    req[N];\n"
+            "  }\n"
+            "  OUTPUTS {\n"
+            "    ack[N];\n"
+            "    idle;\n"
+            "  }\n"
+            "  ASSUME {\n"
+            "    // unparenthesized quantifier under G "
+            "(round_robin_arbiter)\n"
+            "    G &&[0 <= i < N] (req[i] -> X req[i]);\n"
+            "    // quantifier under X inside a binary op (load_balancer)\n"
+            "    G (idle && X &&[0 <= i < N] ! ack[i] -> X idle);\n"
+            "    // parenthesized quantifier under X (load_balancer)\n"
+            "    ! idle -> X (&&[0 <= i < N] ! ack[i]);\n"
+            "    // quantifier under X F inside a binary op "
+            "(generalized_buffer)\n"
+            "    &&[0 <= i < N] (req[i] -> X F ||[0 <= i < N] ack[i]);\n"
+            "    // quantifier as the right operand of a binary op\n"
+            "    G idle -> &&[0 <= i < N] ack[i];\n"
+            "  }\n"
+            "  GUARANTEE {\n"
+            "    G (idle <-> &&[0 <= i < N] ! req[i]);\n"
+            "  }\n"
+            "}\n")
+
+    tc.assertFalse(
+        list(quantunary.errors),
+        f"fixture 21: quantifier-under-unary fixture must parse "
+        f"cleanly; got {[(e.first, e.second) for e in quantunary.errors]}")
+    ostr_q = spot.ostringstream()
+    spot.tlsf_print(ostr_q, quantunary)
+    can_q = ostr_q.str()
+    # The UnaryOp case wraps an unparenthesized quantifier child;
+    # pin that form (it used to be the first half of the cycle).
+    tc.assertIn('G (&&[0 <= i < N] (req[i] -> X req[i]));', can_q,
+                f"fixture 21: unparenthesized quantifier child of G "
+                f"must be wrapped by the deparser; got:\n{can_q}")
+    tc.assertIn('G (idle && X (&&[0 <= i < N] ! ack[i]) -> X idle);',
+                can_q,
+                f"fixture 21: quantifier under X inside a binary op "
+                f"must be wrapped; got:\n{can_q}")
+    # A quantifier the user parenthesized in the source must keep its
+    # parens in every print (this is the other half of the cycle).
+    tc.assertIn('! idle -> X (&&[0 <= i < N] ! ack[i]);', can_q,
+                f"fixture 21: source-parenthesized quantifier must "
+                f"keep its parens; got:\n{can_q}")
+    quantunary_b = parse_tlsf(can_q)
+
+    tc.assertFalse(
+        list(quantunary_b.errors),
+        f"fixture 21: canonical print must reparse; got "
+        f"{[(e.first, e.second) for e in quantunary_b.errors]}")
+    ostr_q2 = spot.ostringstream()
+    spot.tlsf_print(ostr_q2, quantunary_b)
+    can_q2 = ostr_q2.str()
+    tc.assertEqual(
+        can_q2, can_q,
+        f"fixture 21: print/parse/print must be a fixed point "
+        f"(printer oscillation regression); first print:\n{can_q!r}\n\n"
+        f"second print:\n{can_q2!r}")
+    # One more cycle for good measure: the previously oscillating
+    # forms alternate every round, so two stable rounds are the
+    # minimal meaningful pin.
+    quantunary_c = parse_tlsf(can_q2)
+
+    tc.assertFalse(
+        list(quantunary_c.errors),
+        f"fixture 21: second round-trip must reparse; got "
+        f"{[(e.first, e.second) for e in quantunary_c.errors]}")
+    ostr_q3 = spot.ostringstream()
+    spot.tlsf_print(ostr_q3, quantunary_c)
+    tc.assertEqual(
+        ostr_q3.str(), can_q,
+        f"fixture 21: third print must equal the first (an "
+        f"oscillation would flip between two forms)")
+
+    # Typed enum buses and parameterless definitions.  Pins:
+    #   1. `enumtype BUS;` declares a bus whose size is the enum's
+    #      width, expanded to BUS_0..BUS_{w-1} APs;
+    #   2. `BUS == tag` / `BUS != tag` fold to the tag's bit pattern
+    #      (pattern bit k is AP BUS_k, `1` positive, `0` negated);
+    #   3. valuations matched by no tag are excluded by an explicit
+    #      constraint (the missing-valuation rule);
+    #   4. a parameterless definition (`m = log2(n);`) evaluates in
+    #      integer position (bus size) and LTL position, including a
+    #      recursive definition like `log2`;
+    #   5. the canonical print is a round-trip fixed point that
+    #      keeps `enumtype BUS;` and the `m = ...;` form;
+    #   6. an unknown enum type, an un-indexed typed-bus use, and an
+    #      out-of-range index are diagnosed.
+    spec_t = (
+        "INFO {\n"
+        "  TITLE:       \"typedbus\"\n"
+        "  DESCRIPTION: \"typed enum buses and parameterless defs\"\n"
+        "  SEMANTICS:   Mealy\n"
+        "  TARGET:      Mealy\n"
+        "}\n"
+        "GLOBAL {\n"
+        "  PARAMETERS {\n"
+        "    n = 8;\n"
+        "  }\n"
+        "  DEFINITIONS {\n"
+        "    enum hburst =\n"
+        "      SINGLE: 01\n"
+        "      INCR:   00\n"
+        "      BURST4: 10;\n"
+        "    m = log2(n);\n"
+        "    log2(x) =\n"
+        "      x <= 1     : 1\n"
+        "      otherwise : 1 + log2(x / 2);\n"
+        "    p = ack && X ack;\n"
+        "  }\n"
+        "}\n"
+        "MAIN {\n"
+        "  INPUTS {\n"
+        "    hburst HBURST;\n"
+        "  }\n"
+        "  OUTPUTS {\n"
+        "    grant[m];\n"
+        "    ack;\n"
+        "  }\n"
+        "  GUARANTEE {\n"
+        "    p;\n"
+        "    G((HBURST == INCR) -> ack);\n"
+        "    G((HBURST != SINGLE) || grant[3]);\n"
+        "  }\n"
+        "}\n")
+    typed = parse_tlsf(spec_t)
+
+    tc.assertFalse(
+        list(typed.errors),
+        f"fixture 22: typed-bus fixture must parse cleanly; got "
+        f"{[(e.first, e.second) for e in typed.errors]}")
+    t_errors = spot.parse_aut_error_list()
+    res_t = spot.tlsf_to_ltl(
+        typed, spot.tlsf_translator_options(), t_errors)
+    tc.assertFalse(
+        list(t_errors),
+        f"fixture 22: typed-bus fixture must translate cleanly; got "
+        f"{[(e.first, e.second) for e in t_errors]}")
+    tc.assertTrue(bool(res_t.full_formula),
+                  "fixture 22: typed-bus fixture must translate")
+    f_t = str(res_t.full_formula)
+    # (1) The typed bus expands to width-2 APs HBURST_0/HBURST_1.
+    tc.assertIn('HBURST_0', f_t, f"fixture 22: got: {f_t}")
+    tc.assertIn('HBURST_1', f_t, f"fixture 22: got: {f_t}")
+    # (2) INCR is pattern 00; != SINGLE negates the SINGLE pattern 01.
+    tc.assertIn('!HBURST_0 & !HBURST_1', f_t, f"fixture 22: got: {f_t}")
+    tc.assertIn('!(!HBURST_0 & HBURST_1)', f_t, f"fixture 22: got: {f_t}")
+    # (3) Valuation 11 matches no tag: excluded explicitly.
+    tc.assertIn('G(!HBURST_0 | !HBURST_1)', f_t, f"fixture 22: got: {f_t}")
+    # (4) The LTL-position zero-argument definition `p` is expanded,
+    # and grant is sized by m = log2(8) = 4: grant[3] is in range
+    # (it would be out of range if m were mis-evaluated as 3).
+    tc.assertIn('ack & Xack', f_t, f"fixture 22: got: {f_t}")
+    # (5) The canonical print keeps the typed declaration and the
+    # bare `m = ...;` form, and is a round-trip fixed point.
+    ostr_t = spot.ostringstream()
+    spot.tlsf_print(ostr_t, typed)
+    can_t = ostr_t.str()
+    tc.assertIn('hburst HBURST;', can_t,
+                f"fixture 22: typed declaration must survive the print; "
+                f"got:\n{can_t}")
+    tc.assertIn('m = log2(n);', can_t,
+                f"fixture 22: parameterless definition must print "
+                f"without empty parens; got:\n{can_t}")
+    typed_b = parse_tlsf(can_t)
+
+    tc.assertFalse(
+        list(typed_b.errors),
+        f"fixture 22: canonical print must reparse; got "
+        f"{[(e.first, e.second) for e in typed_b.errors]}")
+    ostr_t2 = spot.ostringstream()
+    spot.tlsf_print(ostr_t2, typed_b)
+    tc.assertEqual(
+        ostr_t2.str(), can_t,
+        f"fixture 22: print/parse/print must be a fixed point; "
+        f"first print:\n{can_t!r}\n\nsecond print:\n"
+        f"{ostr_t2.str()!r}")
+    # (6a) Unknown enum type in the declaration.  The negative
+    # variants are derived from the original source text (not from
+    # can_t) so the replacements cannot be defeated by printer
+    # spacing.
+    bad1 = parse_tlsf(spec_t.replace('hburst HBURST;', 'noenum HBURST;'))
+
+    b1_errors = spot.parse_aut_error_list()
+    res_b1 = spot.tlsf_to_ltl(
+        bad1, spot.tlsf_translator_options(), b1_errors)
+    b1_msgs = ([e.second for e in b1_errors]
+               + [e.second for e in bad1.errors])
+    tc.assertTrue(
+        any('not declared' in m for m in b1_msgs),
+        f"fixture 22: unknown enum type must be diagnosed; got "
+        f"{b1_msgs}")
+    tc.assertFalse(
+        bool(res_b1.full_formula),
+        "fixture 22: unknown enum type must null the formula")
+    # (6b) Un-indexed use of a typed bus.
+    bad2 = parse_tlsf(spec_t.replace('G((HBURST == INCR) -> ack);',
+                               'G(HBURST);'))
+
+    b2_errors = spot.parse_aut_error_list()
+    res_b2 = spot.tlsf_to_ltl(
+        bad2, spot.tlsf_translator_options(), b2_errors)
+    b2_msgs = ([e.second for e in b2_errors]
+               + [e.second for e in bad2.errors])
+    tc.assertTrue(
+        any('without an index' in m for m in b2_msgs),
+        f"fixture 22: un-indexed typed-bus use must be diagnosed; "
+        f"got {b2_msgs}")
+    tc.assertFalse(
+        bool(res_b2.full_formula),
+        "fixture 22: un-indexed typed-bus use must null the formula")
+    # (6c) Index m = 4 on the 4-bit grant bus is out of range.
+    bad3 = parse_tlsf(spec_t.replace('G((HBURST != SINGLE) || grant[3]);',
+                               'G(grant[m]);'))
+
+    b3_errors = spot.parse_aut_error_list()
+    res_b3 = spot.tlsf_to_ltl(
+        bad3, spot.tlsf_translator_options(), b3_errors)
+    b3_msgs = ([e.second for e in b3_errors]
+               + [e.second for e in bad3.errors])
+    tc.assertTrue(
+        any('outside bus' in m for m in b3_msgs),
+        f"fixture 22: out-of-range index must be diagnosed; got "
+        f"{b3_msgs}")
+    tc.assertFalse(
+        bool(res_b3.full_formula),
+        "fixture 22: out-of-range index must null the formula")
+
+    # Eager signal registration: declared signals appear in the
+    # flattened lists even when the formula never mentions them,
+    # and declaration errors (unknown enum type, bad size
+    # expression) fire even on unreferenced buses.
+    unused = parse_tlsf(
+            "INFO {\n"
+            "  TITLE:       \"unused\"\n"
+            "  DESCRIPTION: \"eager signal registration\"\n"
+            "  SEMANTICS:   Mealy\n"
+            "  TARGET:      Mealy\n"
+            "}\n"
+            "GLOBAL {\n"
+            "  PARAMETERS {\n"
+            "    n = 2;\n"
+            "  }\n"
+            "  DEFINITIONS {\n"
+            "    enum hburst =\n"
+            "      SINGLE: 01\n"
+            "      INCR:   00\n"
+            "      BURST4: 10;\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS {\n"
+            "    b;\n"
+            "    y[n];\n"
+            "    hburst HB;\n"
+            "  }\n"
+            "  OUTPUTS {\n"
+            "    w[2];\n"
+            "    z;\n"
+            "  }\n"
+            "  GUARANTEE { G(b -> z); }\n"
+            "}\n")
+
+    tc.assertFalse(
+        list(unused.errors),
+        f"fixture 23: unused-declaration fixture must parse cleanly; "
+        f"got {[(e.first, e.second) for e in unused.errors]}")
+    # parsed_tlsf.inputs/outputs hold declaration names; the
+    # flattened per-bit names appear on the translation result.
+    tc.assertEqual(
+        list(unused.inputs),
+        ['b', 'y', 'HB'],
+        f"fixture 23: declarations must be listed; got "
+        f"{list(unused.inputs)}")
+    unused_errors = spot.parse_aut_error_list()
+    res_unused = spot.tlsf_to_ltl(
+        unused, spot.tlsf_translator_options(), unused_errors)
+    tc.assertFalse(
+        list(unused_errors),
+        f"fixture 23: unused-declaration fixture must translate "
+        f"cleanly; got {[(e.first, e.second) for e in unused_errors]}")
+    tc.assertEqual(
+        list(res_unused.inputs),
+        ['b', 'y_0', 'y_1', 'HB_0', 'HB_1'],
+        f"fixture 23: declared-but-unused input signals must be "
+        f"registered; got {list(res_unused.inputs)}")
+    tc.assertEqual(
+        list(res_unused.outputs),
+        ['w_0', 'w_1', 'z'],
+        f"fixture 23: declared-but-unused output signals must be "
+        f"registered; got {list(res_unused.outputs)}")
+    # Unknown enum type on an unreferenced bus: diagnosed, formula
+    # nulled.
+    unusedbad = parse_tlsf(
+            "INFO {\n"
+            "  TITLE:       \"unusedbad\"\n"
+            "  DESCRIPTION: \"unknown enum on unreferenced bus\"\n"
+            "  SEMANTICS:   Mealy\n"
+            "  TARGET:      Mealy\n"
+            "}\n"
+            "GLOBAL {\n"
+            "  DEFINITIONS {\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS {\n"
+            "    noenum HB;\n"
+            "  }\n"
+            "  OUTPUTS { ack; }\n"
+            "  GUARANTEE { G(ack); }\n"
+            "}\n")
+
+    tc.assertFalse(
+        list(unusedbad.errors),
+        f"fixture 23: the enum check is a translation-time check; "
+        f"got {[(e.first, e.second) for e in unusedbad.errors]}")
+    ub_errors = spot.parse_aut_error_list()
+    res_ub = spot.tlsf_to_ltl(
+        unusedbad, spot.tlsf_translator_options(), ub_errors)
+    ub_msgs = [e.second for e in ub_errors]
+    tc.assertTrue(
+        any('not declared' in m for m in ub_msgs),
+        f"fixture 23: unknown enum on an unreferenced bus must be "
+        f"diagnosed; got {ub_msgs}")
+    tc.assertFalse(
+        bool(res_ub.full_formula),
+        "fixture 23: unknown enum on an unreferenced bus must null "
+        "the formula")
+
+    # Raise-the-tlsf-errors options: with raise_errors enabled, a
+    # translation-time failure surfaces as a RuntimeError instead of
+    # populating the error list.
+    raisecyc = parse_tlsf(
+            "INFO {\n"
+            "  TITLE:       \"raisecyc\"\n"
+            "  DESCRIPTION: \"cyclic params with raise_errors\"\n"
+            "  SEMANTICS:   Mealy\n"
+            "  TARGET:      Mealy\n"
+            "}\n"
+            "GLOBAL {\n"
+            "  PARAMETERS {\n"
+            "    A = B + 1;\n"
+            "    B = A + 1;\n"
+            "  }\n"
+            "  DEFINITIONS {\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS { a; }\n"
+            "  OUTPUTS { z; }\n"
+            "  GUARANTEE { G(a); }\n"
+            "}\n")
+
+    tc.assertFalse(
+        list(raisecyc.errors),
+        "fixture 24: cyclic parameters are a translation-time "
+        "diagnostic")
+    opts = spot.tlsf_translator_options()
+    opts.raise_errors = True
+    tc.assertRaises(
+        RuntimeError, lambda: spot.tlsf_to_ltl(raisecyc, opts))
+
+    # The same raised-failure path applies when a section (not the
+    # parameters) fails to translate -- e.g. an integer literal in LTL
+    # position.
+    raisebad = parse_tlsf(
+            "INFO {\n"
+            "  TITLE:       \"raisebadltl\"\n"
+            "  DESCRIPTION: \"section failure with raise_errors\"\n"
+            "  SEMANTICS:   Mealy\n"
+            "  TARGET:      Mealy\n"
+            "}\n"
+            "GLOBAL {\n"
+            "  DEFINITIONS {\n"
+            "  }\n"
+            "}\n"
+            "MAIN {\n"
+            "  INPUTS { a; }\n"
+            "  OUTPUTS { z; }\n"
+            "  GUARANTEE { G(5); }\n"
+            "}\n")
+
+    tc.assertFalse(
+        list(raisebad.errors),
+        "fixture 24: G(5) parses fine; the failure is in "
+        "translation")
+    tc.assertRaises(
+        RuntimeError, lambda: spot.tlsf_to_ltl(raisebad, opts))
+
+    # Lexer-level coverage gaps: CRLF line endings, C-style block
+    # comments, a CRLF inside a TITLE string, a lone CR inside a
+    # DESCRIPTION string, and comments inside an enum declaration.
+    # Each is serviced by a dedicated scan rule ([\\r\\n]+, "/*"...*/",
+    # <str>\\r\\n, <str>\\r, <enumdecl>"//", <enumdecl>"/*") that no
+    # other fixture triggers (the rest of this file uses LF newlines,
+    # `//` comments only, and CR-free strings).
+    lexer_gaps = parse_tlsf(
+            "INFO {\r\n"
+            "  TITLE:       \"cr line\r\nbreak\"\r\n"
+            "  DESCRIPTION: \"para\rpara2\"\r\n"
+            "  SEMANTICS:   /* a */ Mealy\r\n"
+            "  TARGET:      Mealy\r\n"
+            "}\r\n"
+            "GLOBAL {\r\n"
+            "  PARAMETERS { /* empty */ }\r\n"
+            "  DEFINITIONS {\r\n"
+            "    /* before */ enum Mode = U: 11*, // in-enum\r\n"
+            "      1*1, /* mid */ *11;\r\n"
+            "  }\r\n"
+            "}\r\n"
+            "MAIN {\r\n"
+            "  INPUTS { /* i */ x; }\r\n"
+            "  GUARANTEE { G(x); }\r\n"
+            "}\r\n")
+
+    tc.assertFalse(
+        list(lexer_gaps.errors),
+        f"CRLF/comment spec must parse cleanly; got: "
+        f"{[(e.first, e.second) for e in lexer_gaps.errors]}")
+    lg_can = spot.ostringstream()
+    spot.tlsf_print(lg_can, lexer_gaps)
+    lg_canon = lg_can.str()
+    # The deparser escapes the double quote and the backslash, so the
+    # CRLF and the lone CR inside the INFO strings come back
+    # byte-for-byte.
+    tc.assertIn("\r\nbreak", lg_canon,
+                "CRLF inside a TITLE string must round-trip")
+    tc.assertIn("para\rpara2", lg_canon,
+                "lone CR inside a DESCRIPTION must round-trip")
+    # Comments and CRLF line endings are dropped by the deparser; the
+    # enum body survives compacted (comma-separated patterns).
+    tc.assertIn("enum Mode = U:11*,1*1,*11;", lg_canon,
+                "in-enum comments must not corrupt the entries")
+    lg_rt = parse_tlsf(lg_canon)
+    tc.assertFalse(
+        list(lg_rt.errors),
+        f"canonical round-trip must stay clean; got: "
+        f"{[(e.first, e.second) for e in lg_rt.errors]}")
+    lg_can2 = spot.ostringstream()
+    spot.tlsf_print(lg_can2, lg_rt)
+    tc.assertEqual(lg_can2.str(), lg_canon,
+                   "canonical deparse must be idempotent")
+
+    # Enum coverage of wide buses.  The coverage constraint used to be
+    # one disjunct per *uncovered* valuation, so a bus needed at least
+    # 17 bits before the formula outgrew formula::nary's 65535
+    # children; the exception was not caught on its way out of the
+    # translator, and the process died with SIGABRT.  The translator
+    # now emits the factored coverage formula (one term per tag, one
+    # literal per bit the tag pins) and only falls back to the
+    # per-valuation complement when that is smaller.  These checks pin
+    # both the size (so a valuation-sized blow-up cannot come back) and
+    # the semantics (the constraint must accept exactly the valuations
+    # some tag covers).
+    def enum_spec(entries, decl="b"):
+        # The `;` terminates the enum as a whole, not each tag, and a
+        # pattern list takes no trailing comma: `enum E = T0:00,01
+        # T1:1*;` is the canonical (deparsed) shape, while
+        # `T0:00;T1:11;` and `T0:00,\n T1:11;` are syntax errors.
+        tags = " ".join("T%d:%s" % (i, ",".join(patterns))
+                        for i, patterns in enumerate(entries))
+        return ("INFO {\n"
+                "  TITLE:       \"wide enum bus\"\n"
+                "  DESCRIPTION: \"enum coverage constraint\"\n"
+                "  SEMANTICS:   Mealy\n"
+                "  TARGET:      Mealy\n"
+                "}\n"
+                "GLOBAL {\n"
+                "  DEFINITIONS {\n"
+                f"    enum E = {tags};\n"
+                "  }\n"
+                "}\n"
+                "MAIN {\n"
+                f"  INPUTS {{ E {decl}; }}\n"
+                "  OUTPUTS { o; }\n"
+                "  GUARANTEE { o; }\n"
+                "}\n")
+
+    def coverage(entries):
+        p = parse_tlsf(enum_spec(entries))
+        tc.assertFalse(
+            list(p.errors),
+            f"enum {entries} must parse cleanly; got: "
+            f"{[(e.first, e.second) for e in p.errors]}")
+        errs = spot.parse_aut_error_list()
+        r = spot.tlsf_to_ltl(p, spot.tlsf_translator_options(), errs)
+        tc.assertFalse(
+            list(errs),
+            f"enum {entries} must translate cleanly; got: "
+            f"{[(e.first, e.second) for e in errs]}")
+        return r.require
+
+    def apname(f):
+        return f.apname_from_apid(f.apid())
+
+    def holds(f, bits):
+        """Evaluate a (propositional) coverage constraint under `bits`,
+        a dict mapping 'b_<i>' to a bool."""
+        kind = f.kindstr()
+        if kind in ('AP', 'ap'):
+            return bits[apname(f)]
+        if kind in ('true', 'True', 'tt', 'TT'):
+            return True
+        if kind in ('false', 'False', 'ff', 'FF'):
+            return False
+        if kind in ('not', 'Not'):
+            return not holds(f[0], bits)
+        if kind in ('and', 'And', '&&'):
+            return all(holds(c, bits) for c in f)
+        if kind in ('or', 'Or', '||'):
+            return any(holds(c, bits) for c in f)
+        raise AssertionError(f"unexpected operator {kind} in {f}")
+
+    def nleaves(f):
+        """Number of atomic propositions in a propositional formula.
+        (`formula::size()` only counts the children of the top node,
+        so it is 17 for a 17-bit factored term but 2 for a 32-bit
+        enum with two tags.)"""
+        kind = f.kindstr()
+        if kind in ('AP', 'ap'):
+            return 1
+        if kind in ('true', 'True', 'tt', 'TT',
+                    'false', 'False', 'ff', 'FF'):
+            return 0
+        if kind in ('not', 'Not'):
+            return nleaves(f[0])
+        return sum(nleaves(c) for c in f)
+
+    def covers(entries, w, v):
+        """True if some pattern of some tag matches valuation v."""
+        for patterns in entries:
+            for pat in patterns:
+                if all(c == '*' or (c == '1') == bool((v >> k) & 1)
+                       for k, c in enumerate(reversed(pat))):
+                    return True
+        return False
+
+    def probes(entries, w, exhaustive_upto=12):
+        """The valuations to compare the constraint against: everything
+        for a narrow bus, and for a wide one the interesting corners
+        plus valuations taken from, and adjacent to, the patterns."""
+        if w <= exhaustive_upto:
+            return range(1 << w)
+        seen = set()
+        out = [0, (1 << w) - 1]
+        for k in range(w):
+            out.append(1 << k)
+            out.append((1 << w) - 1 - (1 << k))
+        rng = random.Random(0)
+        for patterns in entries:
+            for pat in patterns:
+                for bits in (0, (1 << w) - 1, rng.randrange(1 << w)):
+                    v = 0
+                    for k, c in enumerate(reversed(pat)):
+                        if c == '1':
+                            v |= 1 << k
+                        elif bits >> k & 1:
+                            v |= 1 << k
+                    out.append(v)
+                    # a valuation that differs in one pinned bit must
+                    # not be covered
+                    for k, c in enumerate(reversed(pat)):
+                        if c != '*':
+                            out.append(v ^ (1 << k))
+                            break
+        out += [rng.randrange(1 << w) for _ in range(64)]
+        return [v for v in out if not (v in seen or seen.add(v))]
+
+    def check_coverage(entries, w):
+        """The constraint must accept exactly the covered valuations."""
+        f = coverage(entries)
+        for v in probes(entries, w):
+            bits = {f'b_{k}': bool((v >> k) & 1) for k in range(w)}
+            tc.assertEqual(
+                holds(f, bits), covers(entries, w, v),
+                f"coverage of {entries} at valuation {v}: got {f}")
+        return f
+
+    # A 17-bit bus with one concrete tag: one term of 17 literals.
+    # This is the case that used to abort the process.
+    wide = check_coverage([['0' * 17]], 17)
+    tc.assertEqual(nleaves(wide), 17,
+                   f"a 17-bit enum needs one literal per bit: got {wide}")
+    # A 32-bit bus with two tags: two terms, still linear in the width.
+    wide2 = check_coverage([['0' * 32], ['1' * 32]], 32)
+    tc.assertEqual(nleaves(wide2), 64,
+                   f"two 32-bit tags need 64 literals: got {wide2}")
+    # A 20-bit all-wildcard tag covers every valuation, so no
+    # constraint is emitted at all.
+    tc.assertTrue(coverage([['*' * 20]]).is_tt(),
+                  "an all-wildcard tag must not constrain the bus")
+    # Wildcards are still honoured inside a tag, and the leftmost
+    # character of a pattern is the most significant bit: `1*` is a
+    # 2-bit pattern pinning bit 1, so the constraint is a single
+    # literal rather than 4 valuation-sized terms.
+    star = check_coverage([['1*']], 2)
+    tc.assertEqual(str(star), 'b_1',
+                   f"a half-cover wildcard needs one literal: got {star}")
+    # ... and the complement is still preferred when it is smaller, as
+    # for the width-2 hburst of fixture 22: 3 tags cover 3 of the 4
+    # valuations, so the missing one gets a 2-literal disjunct.
+    small = check_coverage([['01'], ['00'], ['10']], 2)
+    tc.assertEqual(str(small), '!b_0 | !b_1',
+                   f"narrow enums keep the complement form: got {small}")
+    # Several patterns in one tag are alternatives, not a conjunction:
+    # `00,11` on 2 bits is the "bits are equal" condition, so it must
+    # come out as a disjunction (an And would be unsatisfiable, and a
+    # per-valuation expansion would have cost 4 disjuncts).
+    multi = check_coverage([['00', '11']], 2)
+    tc.assertEqual(str(multi), '(!b_0 & !b_1) | (b_0 & b_1)',
+                   f"alternatives of a tag must be unioned: got {multi}")
+    # A wildcard next to a pinned bit pins only the latter: `1*0` on
+    # 3 bits.
+    pins = check_coverage([['1*0']], 3)
+    tc.assertEqual(str(pins), '!b_0 & b_2',
+                   f"a wildcard must add no literal: got {pins}")
+    # Tags that together cover everything constrain nothing.
+    tc.assertTrue(coverage([['0*'], ['1*']]).is_tt(),
+                  "a total enumeration must not constrain the bus")
+    # A 12-bit enum with a single tag: exhaustive over all 4096
+    # valuations, and the factored form is used.
+    mid = check_coverage([['1' * 11 + '0']], 12)
+    tc.assertEqual(nleaves(mid), 12,
+                   f"a 12-bit enum needs one literal per bit: got {mid}")
+
+    # Comparisons between two integer expressions in LTL position.
+    # TLSF v1.2 SS4.3 defines an LTL expression as a boolean
+    # expression -- which includes eN <eN> -- plus signals and temporal
+    # operators, so `(SIZEOF b) == 4`, `N >= 4`, or `m(2) == 2` are
+    # valid even though the comparison operators have no LTL
+    # counterpart.  Both operands are known at translation time, so
+    # the comparison is a constant: the translator folds it, like the
+    # `IN` membership it has always accepted.  `lte` is a
+    # Boolean-valued definition, so `lte(1, 2)` reaches the same fold
+    # through the expansion of a body that is a comparison.
+    def intcmp(expr):
+        """Translate `expr` as the sole GUARANTEE of a small spec, and
+        return (translation result, [diagnostic messages])."""
+        p = parse_tlsf(
+                "INFO {}\n"
+                "GLOBAL {\n"
+                "  PARAMETERS { N = 4; }\n"
+                "  DEFINITIONS {\n"
+                "    m(x) = x;\n"
+                "    lte(x, y) = x <= y;\n"
+                "  }\n"
+                "}\n"
+                "MAIN {\n"
+                "  INPUTS { a; b; s; bus[N]; }\n"
+                "  OUTPUTS { o; }\n"
+                "  GUARANTEE { %s }\n"
+                "}\n" % expr)
+        tc.assertFalse(
+            list(p.errors),
+            f"fixture 25: {expr} must parse cleanly; got: "
+            f"{[(e.first, e.second) for e in p.errors]}")
+        errs = spot.parse_aut_error_list()
+        r = spot.tlsf_to_ltl(p, spot.tlsf_translator_options(), errs)
+        return r, [e.second for e in errs]
+
+    for expr in ('G((SIZEOF bus) == 4)',  # SIZEOF of a declared bus
+                 'G(N >= 4)',             # a parameter
+                 'G(m(2) == 2)',          # an integer-valued definition
+                 'G(lte(1, 2))',          # a Boolean-valued body
+                 'G(1 < 2 && 2 <= 2 && 3 > 2 && 3 >= 3)'):
+        r, errs = intcmp(expr)
+        tc.assertFalse(errs, f"fixture 25: {expr} must not diagnose; got: "
+                             f"{errs}")
+        tc.assertTrue(r.guarantee.is_tt(),
+                      f"fixture 25: {expr} is a true constant; got "
+                      f"{r.guarantee}")
+
+    for expr in ('G((SIZEOF bus) == 5)',  # SIZEOF of a declared bus
+                 'G(N < 4)',              # a parameter
+                 'G(m(2) != 2)',          # an integer-valued definition
+                 'G(2 != 2)'):            # literals
+        r, errs = intcmp(expr)
+        tc.assertFalse(errs, f"fixture 25: {expr} must not diagnose; got: "
+                             f"{errs}")
+        tc.assertTrue(r.guarantee.is_ff(),
+                      f"fixture 25: {expr} is a false constant; got "
+                      f"{r.guarantee}")
+
+    # A folded false is a false subterm, not a rejected one: the
+    # comparison disappears from the disjunction it guards.
+    r, errs = intcmp('G((SIZEOF bus) == 5 || a)')
+    tc.assertFalse(errs, f"fixture 25: must not diagnose; got: {errs}")
+    tc.assertTrue(spot.are_equivalent(r.guarantee, spot.formula('G a')),
+                  f"fixture 25: the false comparison must fold away; got "
+                  f"{r.guarantee}")
+
+    # A comparison that involves a signal has no constant value and is
+    # still rejected.  A signal on both sides is a plain rejection
+    # (`a == b`), while a mistake inside an operand is reported first
+    # and only then is the enclosing comparison rejected.
+    for expr, expected in (('G(a == b)',
+                            ["arithmetic/comparison op '==' is not "
+                             "supported in LTL position"]),
+                           ('G(lte(a, b))',
+                            ["arithmetic/comparison op '<=' is not "
+                             "supported in LTL position"]),
+                           ('G(SIZEOF(s) == 1)',
+                            ["SIZEOF of scalar AP 's'",
+                             "arithmetic/comparison op '==' is not "
+                             "supported in LTL position"]),
+                           ('G(NOPE(1) == 1)',
+                            ["function call 'NOPE' is not supported in "
+                             "integer position",
+                             "arithmetic/comparison op '==' is not "
+                             "supported in LTL position"])):
+        r, errs = intcmp(expr)
+        tc.assertFalse(bool(r.full_formula),
+                       f"fixture 25: {expr} must yield a null formula; got "
+                       f"{r.full_formula}")
+        tc.assertEqual(errs, expected,
+                       f"fixture 25: diagnostics for {expr}")
+    # ----------------------------------------------------------------
+    # TLSF v1.2 SS1.2/SS1.3/SS1.4: the cross-section validations.
+
+    def diags(errors):
+        """[(line, column, message)] of a list of parse diagnostics."""
+        return [(e.first.begin.line, e.first.begin.column, e.second)
+                for e in errors]
+
+    # One symbol, one definition: a name declared twice is a
+    # collision whichever declaration spaces the two declarations come
+    # from, and both of them are reported.
+    full_info = ('INFO {\n'
+                 '  TITLE:       "clash"\n'
+                 '  DESCRIPTION: "one symbol, one definition"\n'
+                 '  SEMANTICS:   Mealy\n'
+                 '  TARGET:      Mealy\n'
+                 '}\n')
+    # Each pair of declarations is reported on both sides.
+    p = parse_tlsf(full_info
+                   + 'GLOBAL {\n'
+                   '  PARAMETERS { p = 1; }\n'
+                   '  DEFINITIONS { p = 2; }\n'
+                   '}\n'
+                   'MAIN {\n'
+                   '  INPUTS  { q; }\n'
+                   '  OUTPUTS { o; }\n'
+                   '  GUARANTEE { G(q); }\n'
+                   '}\n')
+    tc.assertEqual(diags(p.errors),
+                   [(8, 16, "'p' is shadowed by a later declaration as "
+                     "a definition"),
+                    (9, 17, "'p' is already declared as a parameter")],
+                   "a parameter redefined by a definition must be "
+                   "reported on both declarations")
+
+    p = parse_tlsf(full_info
+                   + 'GLOBAL {\n'
+                   '  PARAMETERS { p = 1; }\n'
+                   '  DEFINITIONS {\n'
+                   '    enum e = E: 0*;\n'
+                   '    e = 2;\n'
+                   '  }\n'
+                   '}\n'
+                   'MAIN {\n'
+                   '  INPUTS  { q; }\n'
+                   '  OUTPUTS { o; }\n'
+                   '  GUARANTEE { G(q); }\n'
+                   '}\n')
+    tc.assertEqual([e[2] for e in diags(p.errors)],
+                   ["'e' is shadowed by a later declaration as a "
+                    "definition",
+                    "'e' is already declared as an enumeration"],
+                   "an enumeration and a definition of the same name "
+                   "collide too")
+
+    p = parse_tlsf(full_info
+                   + 'GLOBAL {\n'
+                   '}\n'
+                   'MAIN {\n'
+                   '  INPUTS  { sig; }\n'
+                   '  OUTPUTS { sig; }\n'
+                   '  GUARANTEE { G(sig); }\n'
+                   '}\n')
+    tc.assertEqual([e[2] for e in diags(p.errors)],
+                   ["'sig' is shadowed by a later declaration as an "
+                    "output signal",
+                    "'sig' is already declared as an input signal"],
+                   "a signal listed in both INPUTS and OUTPUTS must be "
+                   "reported on both declarations")
+
+    # The four mandatory INFO items are required by default, and
+    # reported at the INFO section (or at the start of the file when
+    # there is no INFO section at all).
+    p = spot.parse_tlsf('INFO {}\nGLOBAL {}\nMAIN {}\n')
+    tc.assertEqual([e[2] for e in diags(p.errors)],
+                   ["missing mandatory INFO item 'TITLE:'",
+                    "missing mandatory INFO item 'DESCRIPTION:'",
+                    "missing mandatory INFO item 'SEMANTICS:'",
+                    "missing mandatory INFO item 'TARGET:'"],
+                   "an empty INFO section lacks all four mandatory items")
+    tc.assertEqual([(e[0], e[1]) for e in diags(p.errors)],
+                   [(1, 1)] * 4,
+                   "a missing item is reported at the INFO section")
+
+    p = spot.parse_tlsf('GLOBAL {}\nMAIN {}\n')
+    tc.assertEqual([e[2] for e in diags(p.errors)],
+                   ["missing mandatory INFO item 'TITLE:'",
+                    "missing mandatory INFO item 'DESCRIPTION:'",
+                    "missing mandatory INFO item 'SEMANTICS:'",
+                    "missing mandatory INFO item 'TARGET:'"],
+                   "a file without an INFO section lacks them all")
+    tc.assertEqual([(e[0], e[1]) for e in diags(p.errors)],
+                   [(1, 1)] * 4,
+                   "a missing INFO section is reported at the file start")
+
+    # A partial INFO section names only what is missing.
+    p = spot.parse_tlsf('INFO {\n'
+                        '  TITLE:       "partial"\n'
+                        '  SEMANTICS:   Mealy\n'
+                        '}\n'
+                        'GLOBAL {}\n'
+                        'MAIN {}\n')
+    tc.assertEqual([e[2] for e in diags(p.errors)],
+                   ["missing mandatory INFO item 'DESCRIPTION:'",
+                    "missing mandatory INFO item 'TARGET:'"],
+                   "only the absent items are reported")
+
+    # check_info = False turns the requirement off, and nothing else.
+    o = spot.tlsf_parser_options()
+    o.check_info = False
+    p = spot.parse_tlsf('INFO {}\nGLOBAL {}\nMAIN {}\n', o)
+    tc.assertFalse(list(p.errors),
+                   f"check_info = False must accept a bare INFO; got "
+                   f"{diags(p.errors)}")
+
+    # A duplicated INFO item is a grammar-level mistake, and is
+    # reported whatever check_info says.  The first value wins, so the
+    # specification still translates.
+    for opts in (None, o):
+        p = spot.parse_tlsf('INFO {\n'
+                            '  TITLE:       "first"\n'
+                            '  TITLE:       "second"\n'
+                            '  TAGS:        t1\n'
+                            '  TAGS:        t2\n'
+                            '  DESCRIPTION: "d"\n'
+                            '  SEMANTICS:   Mealy\n'
+                            '  TARGET:      Mealy\n'
+                            '}\n'
+                            'MAIN { INPUTS { a; } OUTPUTS { b; }\n'
+                            '  GUARANTEE { G(a -> b); } }\n', opts)
+        tc.assertEqual(diags(p.errors),
+                       [(3, 3, "duplicate INFO item 'TITLE:'"),
+                        (5, 3, "duplicate INFO item 'TAGS:'")],
+                       f"duplicate INFO items (check_info = "
+                       f"{None if opts is None else opts.check_info})")
+        tc.assertEqual(p.title, 'first',
+                       "the first value of a duplicated item wins")
+        tc.assertEqual(list(p.tags), ['t1'],
+                       "the first TAGS list wins")
+
+    # SEMANTICS and TARGET are parsed by a sub-production of their
+    # INFO item, so their value used to be assigned before the
+    # duplicate could be rejected.  The first value must win there too.
+    p = spot.parse_tlsf('INFO {\n'
+                        '  TITLE:       "dup model"\n'
+                        '  DESCRIPTION: "d"\n'
+                        '  SEMANTICS:   Mealy,Finite\n'
+                        '  SEMANTICS:   Moore\n'
+                        '  TARGET:      Mealy\n'
+                        '  TARGET:      Moore\n'
+                        '}\n'
+                        'MAIN { INPUTS { a; } OUTPUTS { b; }\n'
+                        '  GUARANTEE { G(a -> b); } }\n')
+    tc.assertEqual(diags(p.errors),
+                   [(5, 3, "duplicate INFO item 'SEMANTICS:'"),
+                    (7, 3, "duplicate INFO item 'TARGET:'")],
+                   "duplicate SEMANTICS / TARGET items")
+    tc.assertEqual(p.semantics, spot.tlsf_semantics_MealyFinite,
+                   "the first SEMANTICS wins")
+    tc.assertEqual(p.target, spot.tlsf_target_Mealy,
+                   "the first TARGET wins")
+
+    # SEMANTICS and TARGET must agree on the system model.
+    for semantics, target, model in (('Moore', 'Mealy', 'Moore'),
+                                     ('Mealy,Finite', 'Moore', 'Mealy'),
+                                     ('Moore,Strict', 'Mealy', 'Moore')):
+        p = spot.parse_tlsf('INFO {\n'
+                            '  TITLE:       "mismatch"\n'
+                            '  DESCRIPTION: "SEMANTICS vs TARGET"\n'
+                            f'  SEMANTICS:   {semantics}\n'
+                            f'  TARGET:      {target}\n'
+                            '}\n'
+                            'MAIN { INPUTS { a; } OUTPUTS { b; }\n'
+                            '  GUARANTEE { G(a -> b); } }\n')
+        tc.assertFalse(list(p.errors),
+                       f"{semantics} vs {target}: an ambiguous "
+                       f"specification still parses; got "
+                       f"{diags(p.errors)}")
+        tc.assertEqual(diags(p.warnings),
+                       [(4, 3, f"SEMANTICS declares a {model} system "
+                         f"model, but TARGET declares {target}; the "
+                         f"specification is ambiguous, the {model} "
+                         f"composition is used")],
+                       f"{semantics} vs {target}: warning at SEMANTICS")
+
+    # A specification that agrees with itself says nothing, and a
+    # specification that only spells out one of the two cannot be
+    # compared, so neither of them warns.
+    for info in ('  SEMANTICS:   Moore\n  TARGET:      Moore\n',
+                 '  SEMANTICS:   Moore\n',
+                 '  TARGET:      Moore\n',
+                 ''):
+        p = parse_tlsf('INFO {\n'
+                       '  TITLE:       "t"\n'
+                       '  DESCRIPTION: "d"\n'
+                       f'{info}'
+                       '}\n'
+                       'MAIN { INPUTS { a; } OUTPUTS { b; }\n'
+                       '  GUARANTEE { G(a -> b); } }\n')
+        tc.assertFalse(list(p.errors),
+                       f"the INFO items {info!r} must be accepted; got "
+                       f"{diags(p.errors)}")
+        tc.assertFalse(list(p.warnings),
+                       f"the INFO items {info!r} must not warn; got "
+                       f"{diags(p.warnings)}")
+
+    # A name that clashes is rejected, and so is a specification that
+    # is both ambiguous and clashing, while the ambiguous-only one
+    # translates.  The validations do not hide each other.
+    p = spot.parse_tlsf('INFO {\n'
+                        '  TITLE:       "both"\n'
+                        '  DESCRIPTION: "clash and mismatch"\n'
+                        '  SEMANTICS:   Moore\n'
+                        '  TARGET:      Mealy\n'
+                        '}\n'
+                        'MAIN { INPUTS { sig; } OUTPUTS { sig; }\n'
+                        '  GUARANTEE { G(sig); } }\n')
+    tc.assertEqual(len(list(p.errors)), 2,
+                   f"the clash and the missing items are all reported; "
+                   f"got {diags(p.errors)}")
+    tc.assertEqual(len(list(p.warnings)), 1,
+                   "the ambiguity is reported even when the file also "
+                   "has errors")
 finally:
     os.unlink(filename)

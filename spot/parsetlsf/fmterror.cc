@@ -23,10 +23,12 @@
 namespace spot
 {
   bool
-  parsed_tlsf::format_errors(std::ostream& os)
+  format_tlsf_diagnostics(std::ostream& os,
+                          const std::string& filename,
+                          const parse_tlsf_error_list& diags)
   {
     bool printed = false;
-    for (const auto& err : errors)
+    for (const auto& err : diags)
       {
         if (!filename.empty() && filename != "-")
           os << filename << ':';
@@ -36,5 +38,17 @@ namespace spot
         printed = true;
       }
     return printed;
+  }
+
+  bool
+  parsed_tlsf::format_errors(std::ostream& os)
+  {
+    return format_tlsf_diagnostics(os, filename, errors);
+  }
+
+  bool
+  parsed_tlsf::format_warnings(std::ostream& os)
+  {
+    return format_tlsf_diagnostics(os, filename, warnings);
   }
 }

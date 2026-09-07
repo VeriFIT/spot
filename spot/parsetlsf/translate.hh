@@ -98,20 +98,56 @@ namespace spot
 
     private:
       // \brief Recursively translate \a e into a spot::formula.
-      spot::formula translate_expr(const tlsf_expr& e);
+      formula translate_expr(const tlsf_expr& e);
 
       // \brief Evaluate \a e as an integer; false on type/unknown
       // error.
       bool eval_int(const tlsf_expr& e, long long& out);
 
-      // \brief Evaluate an integer expression stored as source text.
-      bool eval_int_string(const std::string& s, long long& out);
+      // \brief Apply a user-defined definition in integer position.
+      //
+      // Called from eval_int's Identifier case (zero-argument defs
+      // used as bare identifiers, e.g. amba's `HMASTER[m]` with
+      // `m = log2(n);`) and from eval_int's App case (arity-matching
+      // calls like `bit(v,i)`).  \a actuals must already be folded
+      // to LiteralInt nodes with size == def.args.size().  Selects
+      // the first clause whose guard holds (select_def_clause) and
+      // evaluates it via eval_int, under the shared
+      // def_app_budget limits (max_def_depth /
+      // max_def_expansions_total in translate.cc); int_def_depth_
+      // bounds the integer-position recursion, and expansion_depth_
+      // is kept in sync so a body that falls back to LTL-position
+      // expansion nests correctly under the same chain.
+      bool eval_def_int(const tlsf_definition& def,
+                        const std::vector<tlsf_expr_ptr>& actuals,
+                        const tlsf_expr& call,
+                        long long& out);
+
+      // \brief Shared budget check for one definition application
+      // (see def_app_budget in translate.cc).  \a depth is the
+      // caller's current recursion depth (expansion_depth_ on the
+      // LTL path, int_def_depth_ on the integer path); on true the
+      // caller must pop expansion_depth_ when its expansion is
+      // done.  Returns false once either limit trips, with exactly
+      // one diagnostic emitted (expansion_exhausted_ is sticky).
+      bool def_app_budget(const std::string& name,
+                          const tlsf_expr& call, unsigned depth);
 
       // \brief Evaluate an integer set, preserving source order.
       bool eval_set(const tlsf_expr& e, std::vector<long long>& out);
 
-      void diag(const spot::location& loc, const std::string& msg);
+      void diag(const location& loc, const std::string& msg);
       void diag(const tlsf_expr& e, const std::string& msg);
+
+      // \brief Check that the file's SEMANTICS admits strong next.
+      //
+      // The LTLf flavour of the temporal operators -- `X[!]`, and the
+      // `!`-marked stacked next and bounded forms `X[!n]`/`X[n!]`,
+      // `F[!a:b]`/`F[a:b!]`, `G[!a:b]`/`G[a:b!]` -- is only defined
+      // for a finite run, and syfco rejects it otherwise.  Returns
+      // true when the semantics are finite, false after emitting one
+      // diagnostic naming the offending expression.
+      bool require_finite_semantics(const tlsf_expr& e);
 
       // \brief Evaluate \a e as a compile-time Boolean: returns 0
       // or 1 when the value is decidable with the current
@@ -152,6 +188,40 @@ namespace spot
       // \brief Find a declared input/output AP by base name.
       const tlsf_ap_decl* find_decl(const std::string& name) const;
 
+      // \brief Find a DEFINITION by name (nullptr if none).
+      //
+      // TLSF's "one symbol = one definition" rule (enforced by the
+      // parser's duplicate diagnostics) makes the name lookup
+      // unambiguous.
+      const tlsf_definition* find_def(const std::string& name) const;
+
+      // \brief Find an ENUM declaration by name (nullptr if none).
+      const tlsf_enum_decl* find_enum(const std::string& name) const;
+
+      // \brief Resolve the width of an input/output declaration.
+      //
+      // Returns true and sets \a out on success.  A scalar has
+      // width 1; a size bus evaluates its parsed size expression
+      // (AST); a typed bus takes the bit width of its named enum
+      // (diag on unknown enum).  The declaration is an error case
+      // only via diag(); a false return always corresponds to a
+      // diagnostic (or a failed size evaluation) already emitted.
+      bool eval_ap_width(const tlsf_ap_decl& d, long long& out);
+
+      // \brief Lower an enum comparison to a Boolean formula.
+      //
+      // `BUS == const` folds to the OR of the constant's bit
+      // patterns, each pattern a conjunction over the expanded
+      // `bus_0..bus_{w-1}` APs (bit k of the pattern constrains
+      // `bus_k`: '1' positive, '0' negated, '*' omitted).
+      // `BUS != const` is the negation of the `==` fold.  A width
+      // mismatch between the two sides is a diagnostic, and the
+      // expanded APs are registered as inputs/outputs per the bus
+      // declaration.
+      formula translate_enum_cmp(const tlsf_expr& e,
+                                 const tlsf_ap_decl& bus,
+                                 bool equal);
+
       // (cache_key helpers removed in favour of using def.name
       // directly: TLSF's parse-time duplicate-detection enforces
       // "one symbol = one definition" (see the `definition:`
@@ -170,9 +240,12 @@ namespace spot
       bool diags_quiet_ = false;
 
       // Parameter values: AST-declared defaults are loaded first,
-      // then opts.overrides are applied on top.
+      // then opts.overrides are applied on top.  param_exprs_ holds
+      // the unevaluated value expression of each declared parameter
+      // (a parsed AST, shared with the main AST), used when one
+      // parameter references another.
       std::map<std::string, long long> params_;
-      std::map<std::string, std::string> param_exprs_;
+      std::map<std::string, tlsf_expr_ptr> param_exprs_;
       std::set<std::string> active_params_;
 
       // Loop-variable bindings during quantifier expansion. Bindings
@@ -223,6 +296,21 @@ namespace spot
       // returns ff() silently so the diagnostics stay limited to the
       // first overflow instead of flooding one message per call site.
       bool expansion_exhausted_ = false;
+
+      // Depth of the current integer-position definition expansion
+      // (eval_int's Identifier/App cases via eval_def_int).
+      // Definitions are usable wherever an integer is expected --
+      // bus sizes (`HMASTER[m]` with amba's parameterless
+      // `m = log2(n);`) and guard expressions -- including guarded
+      // recursive ones (`log2(x) =
+      // x <= 1 : 1; otherwise : 1 + log2(x / 2);`).  The LTL path
+      // budgets recursion with expansion_depth_; this counter is the
+      // analogous safety valve for integer evaluation, where a body
+      // like `k = 1 + k;` would otherwise recurse until the C++
+      // stack overflows.  Both counters feed the same def_app_budget
+      // check (max_def_depth / max_def_expansions_total in
+      // translate.cc), so the limits are shared across paths.
+      unsigned int_def_depth_ = 0;
 
       // Name of the definition that started the currently-active
       // expansion chain (the first App seen at expansion_depth_ 0).

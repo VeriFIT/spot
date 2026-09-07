@@ -18,13 +18,14 @@
 
 // This private header (NOT installed) holds the whole TLSF AST:
 // the expression node type `tlsf_expr` (tagged struct), the enum
-// declarations, the helper predicates and deparser that operate on
-// expression nodes, the input/output/parameter/definition
-// declaration records, and the root `tlsf_ast` struct.  Only the
+// declarations, the helper predicates, the
+// input/output/parameter/definition declaration records, and the root
+// `tlsf_ast` struct.  Only the
 // forward declaration of `tlsf_ast` (and of `tlsf_expr` where it
 // appears in public signatures) escapes through
 // spot/parsetlsf/public.hh; the field layouts live here so they can
-// evolve without breaking ABI.
+// evolve without breaking ABI.  The deparser that renders an
+// expression node is private to spot/parsetlsf/public.cc.
 
 #pragma once
 
@@ -33,7 +34,6 @@
 #include <spot/parsetlsf/public.hh>
 #include <cstdint>
 #include <memory>
-#include <ostream>
 #include <string>
 #include <vector>
 
@@ -70,12 +70,28 @@ namespace spot
     F,
     X,
     StrongNext,        //!< LTLf `X[!]`
-    // Stacked next `X[n] phi` (TLSF v1.2 SS4.8): n nested next
-    // operators.  Stored as a Quantifier node whose bound is the
-    // integer expression `n`; the printer emits the `X[n] phi`
-    // surface syntax and the translator expands it at LTL-conversion
-    // time.
+    // Stacked next `X[n] phi`: n nested next operators.  Stored as a
+    // Quantifier node whose bound is the integer expression `n`; the
+    // printer emits the `X[n] phi` surface syntax and the translator
+    // expands it at LTL-conversion time.
     XStack,
+    // `StrongXStack` is the LTLf flavour `X[!n] phi` / `X[n!] phi`,
+    // lowered with strong next instead of weak next.
+    StrongXStack,
+    // Bounded temporal operators `F[a:b] phi` / `G[a:b] phi`
+    // Stored as a Quantifier node with three children
+    // [lower bound, upper bound, body]; the bounds are integer
+    // expressions while the body is an LTL expression.  The printer
+    // emits the `F[a:b] phi` surface syntax and the translator
+    // lowers them to plain LTL.
+    FBounded,
+    GBounded,
+    // `StrongFBounded` and `StrongGBounded` are the LTLf flavours
+    // `F[!a:b] phi` / `F[a:b!] phi` and `G[!a:b] phi` /
+    // `G[a:b!] phi`; the printer carries the `!` marker and the
+    // translator lowers them with strong next.
+    StrongFBounded,
+    StrongGBounded,
 
     // Boolean binary
     And,
@@ -123,7 +139,8 @@ namespace spot
   /// round-trip is stable.
   struct SPOT_API tlsf_expr
   {
-    spot::location loc;
+    /// Source location of the node, for diagnostics.
+    location loc;
 
     // The three small fields below occupy one byte each thanks to the
     // enums' std::uint8_t underlying type -- a plain member of such an
@@ -176,123 +193,6 @@ namespace spot
 
   // --- helpers: classes and predicates ---------------------------------
 
-  inline bool tlsf_op_is_ltl_unary(tlsf_op op)
-  {
-    return op == tlsf_op::G || op == tlsf_op::F || op == tlsf_op::X
-      || op == tlsf_op::StrongNext;
-  }
-
-  inline bool tlsf_op_is_ltl_binary(tlsf_op op)
-  {
-    return op == tlsf_op::U || op == tlsf_op::R || op == tlsf_op::W;
-  }
-
-  inline bool tlsf_op_is_boolean(tlsf_op op)
-  {
-    return op == tlsf_op::Not || op == tlsf_op::And || op == tlsf_op::Or
-      || op == tlsf_op::Implies || op == tlsf_op::Equiv;
-  }
-
-  /// True iff \a op is right-associative in the TLSF grammar.
-  ///
-  /// The deparser needs this to decide when to wrap an LHS BinaryOp
-  /// child: a right-assoc parent declared at the same precedence would
-  /// otherwise steal the LHS (e.g., `a -> b -> c` re-parses as
-  /// `a -> (b -> c)`, not `(a -> b) -> c`).
-  inline bool tlsf_op_is_right_associative(tlsf_op op)
-  {
-    return op == tlsf_op::Implies || op == tlsf_op::Equiv
-      || op == tlsf_op::W || op == tlsf_op::U
-      || op == tlsf_op::SetDifference
-      || op == tlsf_op::Div || op == tlsf_op::Mod;
-  }
-
-  /// Lower number = looser binding.  Used by tlsf_print_expr to decide
-  /// when a child needs its own parenthesisation.
-  /// The precedence values follow the order of Table 1 in TLSF v1.2,
-  /// inverted so that larger values bind more tightly.  This is also the
-  /// convention used by the deparser below.
-  inline int tlsf_op_precedence(tlsf_op op)
-  {
-    switch (op)
-      {
-      case tlsf_op::None:
-        return 0;
-      case tlsf_op::Guard:
-        return 0;
-      case tlsf_op::R:
-        return 1;
-      case tlsf_op::U:
-        return 2;
-      case tlsf_op::W:
-        return 3;
-      case tlsf_op::Implies:
-        return 4;
-      case tlsf_op::Equiv:
-        return 4;
-      case tlsf_op::Or:
-        return 5;
-      case tlsf_op::And:
-        return 6;
-      case tlsf_op::Not:
-        return 7;
-      case tlsf_op::F:
-        return 7;
-      case tlsf_op::G:
-        return 7;
-      case tlsf_op::X:
-        return 7;
-      case tlsf_op::StrongNext:
-        return 7;
-      case tlsf_op::XStack:
-        return 7;
-      case tlsf_op::In:
-        return 8;
-      case tlsf_op::Eq:
-        return 9;
-      case tlsf_op::Neq:
-        return 9;
-      case tlsf_op::Lt:
-        return 9;
-      case tlsf_op::Le:
-        return 9;
-      case tlsf_op::Gt:
-        return 9;
-      case tlsf_op::Ge:
-        return 9;
-      case tlsf_op::SetUnion:
-        return 10;
-      case tlsf_op::SetIntersection:
-        return 11;
-      case tlsf_op::SetDifference:
-        return 12;
-      case tlsf_op::Add:
-        return 13;
-      case tlsf_op::Sub:
-        return 13;
-      case tlsf_op::Div:
-        return 14;
-      case tlsf_op::Mod:
-        return 14;
-      case tlsf_op::Mul:
-        return 15;
-      }
-    return 0;
-  }
-
-  /// Return the effective precedence of an expression node.  Quantifiers
-  /// and unary operators both occupy Table 1's precedence-11 tier, even
-  /// though a quantifier's operator tag is also used for its Boolean fold.
-  inline int tlsf_expr_precedence(const tlsf_expr& e)
-  {
-    if (e.type == tlsf_expr_type::Quantifier
-        || e.type == tlsf_expr_type::UnaryOp)
-      return 7;
-    if (e.type == tlsf_expr_type::BinaryOp)
-      return tlsf_op_precedence(e.op);
-    return 100;
-  }
-
   /// Render an operator tag back to canonical TLSF punctuation.
   inline std::string tlsf_format_op(tlsf_op op)
   {
@@ -306,9 +206,16 @@ namespace spot
         return "G";
       case tlsf_op::XStack:
         return "X";
+      case tlsf_op::FBounded:
+      case tlsf_op::StrongFBounded:
+        return "F";
+      case tlsf_op::GBounded:
+      case tlsf_op::StrongGBounded:
+        return "G";
       case tlsf_op::F:
         return "F";
       case tlsf_op::X:
+      case tlsf_op::StrongXStack:
         return "X";
       case tlsf_op::StrongNext:
         return "X[!]";
@@ -364,7 +271,8 @@ namespace spot
 
   // --- constructor helpers used by parsetlsf.yy -----------------------
 
-  inline tlsf_expr_ptr tlsf_make_int(spot::location loc, long long v)
+  /// \brief Build a LiteralInt node for integer literal \a v at \a loc.
+  inline tlsf_expr_ptr tlsf_make_int(location loc, long long v)
   {
     auto e = std::make_shared<tlsf_expr>();
     e->loc = loc;
@@ -373,7 +281,8 @@ namespace spot
     return e;
   }
 
-  inline tlsf_expr_ptr tlsf_make_ident(spot::location loc, std::string name)
+  /// \brief Build an Identifier node named \a name at \a loc.
+  inline tlsf_expr_ptr tlsf_make_ident(location loc, std::string name)
   {
     auto e = std::make_shared<tlsf_expr>();
     e->loc = loc;
@@ -382,7 +291,9 @@ namespace spot
     return e;
   }
 
-  inline tlsf_expr_ptr tlsf_make_busref(spot::location loc,
+  /// \brief Build a BusRef node \a name at \a loc, with optional index
+  /// expression \a index (a scalar reference when it is null).
+  inline tlsf_expr_ptr tlsf_make_busref(location loc,
                                         std::string name,
                                         tlsf_expr_ptr index)
   {
@@ -395,7 +306,11 @@ namespace spot
     return e;
   }
 
-  inline tlsf_expr_ptr tlsf_make_app(spot::location loc,
+  /// \brief Build an App node calling \a name on \a args at \a loc.
+  ///
+  /// This covers both built-in functions (MIN/MAX/SUM/PROD/SIZEOF)
+  /// and calls to user-defined DEFINITIONS entries.
+  inline tlsf_expr_ptr tlsf_make_app(location loc,
                                      std::string name,
                                      std::vector<tlsf_expr_ptr> args)
   {
@@ -407,7 +322,11 @@ namespace spot
     return e;
   }
 
-  inline tlsf_expr_ptr tlsf_make_unop(tlsf_op op, spot::location loc,
+  /// \brief Build a UnaryOp node applying \a op to \a child at \a loc.
+  ///
+  /// A null \a child is tolerated by the parser while it recovers
+  /// from an error; the node is then built without children.
+  inline tlsf_expr_ptr tlsf_make_unop(tlsf_op op, location loc,
                                       tlsf_expr_ptr child)
   {
     auto e = std::make_shared<tlsf_expr>();
@@ -419,7 +338,12 @@ namespace spot
     return e;
   }
 
-  inline tlsf_expr_ptr tlsf_make_binop(tlsf_op op, spot::location loc,
+  /// \brief Build a BinaryOp node \a lhs \a op \a rhs at \a loc.
+  ///
+  /// A null \a lhs or \a rhs is tolerated by the parser while it
+  /// recovers from an error; the node is then built with fewer
+  /// children.
+  inline tlsf_expr_ptr tlsf_make_binop(tlsf_op op, location loc,
                                        tlsf_expr_ptr lhs, tlsf_expr_ptr rhs)
   {
     auto e = std::make_shared<tlsf_expr>();
@@ -433,14 +357,11 @@ namespace spot
     return e;
   }
 
-  inline bool tlsf_is_comparison(tlsf_op op)
-  {
-    return op == tlsf_op::Eq || op == tlsf_op::Neq
-      || op == tlsf_op::Lt || op == tlsf_op::Le
-      || op == tlsf_op::Gt || op == tlsf_op::Ge;
-  }
-
-  inline tlsf_expr_ptr tlsf_make_quantifier(tlsf_op op, spot::location loc,
+  /// \brief Build a Quantifier node \a op[\a bound] \a body at \a loc.
+  ///
+  /// \a op is Forall or Exists; a null \a bound or \a body is
+  /// tolerated by the parser while it recovers from an error.
+  inline tlsf_expr_ptr tlsf_make_quantifier(tlsf_op op, location loc,
                                             tlsf_expr_ptr bound,
                                             tlsf_expr_ptr body)
   {
@@ -455,8 +376,35 @@ namespace spot
     return e;
   }
 
+  /// \brief Build a bounded-temporal Quantifier node `op[lo:hi] body`.
+  ///
+  /// \a op is FBounded, GBounded, StrongFBounded or StrongGBounded --
+  /// the two Strong tags being the LTLf flavour, whose printer output
+  /// carries the `!` marker.  Unlike \ref tlsf_make_quantifier,
+  /// the node carries three children: the lower bound, the upper bound
+  /// (both integer expressions), and the body.  A null bound or body is
+  /// tolerated while the parser recovers from an error.
+  inline tlsf_expr_ptr tlsf_make_bounded(tlsf_op op, location loc,
+                                         tlsf_expr_ptr lo,
+                                         tlsf_expr_ptr hi,
+                                         tlsf_expr_ptr body)
+  {
+    auto e = std::make_shared<tlsf_expr>();
+    e->loc = loc;
+    e->type = tlsf_expr_type::Quantifier;
+    e->op = op;
+    if (lo)
+      e->children.push_back(std::move(lo));
+    if (hi)
+      e->children.push_back(std::move(hi));
+    if (body)
+      e->children.push_back(std::move(body));
+    return e;
+  }
+
+  /// \brief Build a SetExplicit node listing \a elements at \a loc.
   inline tlsf_expr_ptr tlsf_make_set_explicit(
-      spot::location loc,
+      location loc,
       std::vector<tlsf_expr_ptr> elements)
   {
     auto e = std::make_shared<tlsf_expr>();
@@ -466,7 +414,8 @@ namespace spot
     return e;
   }
 
-  inline tlsf_expr_ptr tlsf_make_set_range(spot::location loc,
+  /// \brief Build a SetRange node {\a lo .. \a hi} at \a loc.
+  inline tlsf_expr_ptr tlsf_make_set_range(location loc,
                                             tlsf_expr_ptr lo,
                                             tlsf_expr_ptr hi)
   {
@@ -485,7 +434,7 @@ namespace spot
   /// more operands for these operators; an empty list is represented by
   /// the empty set so the algebra keeps its usual identity behavior.
   inline tlsf_expr_ptr tlsf_make_nary_setop(
-      tlsf_op op, spot::location loc,
+      tlsf_op op, location loc,
       std::vector<tlsf_expr_ptr> operands)
   {
     if (operands.empty())
@@ -497,37 +446,32 @@ namespace spot
     return result;
   }
 
-  /// \brief A single value (Tag : bits) entry of an enum decl.
+  /// \brief A single value (Tag : patterns) entry of an enum decl.
   ///
-  /// The bits string is kept as raw text: a sequence of `0`,
-  /// `1`, and (syfco's don't-care) `*` characters.  Length
-  /// determines the enum's bit width; syfco enforces uniform
-  /// length across entries (refs/.../Reader/Parser/Global.hs
-  /// enumVParserL n), but Spot does not (yet) enforce
-  /// uniformity -- the translator (translate.cc) is the right
-  /// place for that check, since the bits width participates in
-  /// bus-sizing for typed AP declarations.
+  /// A tag is followed by one or more comma-separated bit patterns,
+  /// e.g.  `UNDEF: 11*, 1*1, *11`.  Each pattern is kept as raw text:
+  /// a sequence of `0`, `1`, and (don't-care) `*` characters.  The
+  /// enum's bit width is the length of the first pattern; the parser
+  /// rejects entries whose patterns do not all have that width.
   struct SPOT_API tlsf_enum_value
   {
-    /// Source location of the entry (covers the LHS through `:`).
-    spot::location loc;
+    /// Source location of the entry (tag through its last pattern).
+    location loc;
     /// Symbolic tag name.
     std::string tag;
-    /// Raw bits string (e.g. "00", "01", "1*0").
-    std::string bits;
+    /// Bit patterns bound to this tag (usually exactly one),
+    /// each a raw string such as "00", "01", or "1*0".
+    std::vector<std::string> patterns;
   };
 
   /// \brief An `enum` declaration from GLOBAL/DEFINITIONS.
   ///
-  /// Mirrors syfco's `EnumDefinition` (Data.Enum) record
-  /// (spot/parsetlsf/refs/syfco/src/lib/Data/Enum.hs).  Spot
-  /// stores only the source-derived name + entries; the
-  /// `analyze` step (syfco's coverage / duplicate detection) is
-  /// deferred to the translator.
+  /// Spot stores only the name and entries; coverage and duplicate
+  /// detection is deferred to the translator.
   struct SPOT_API tlsf_enum_decl
   {
     /// Source location of the decl (covers `enum` through `;`).
-    spot::location loc;
+    location loc;
     /// Enum name.
     std::string name;
     /// Entries in source order.
@@ -536,58 +480,63 @@ namespace spot
 
   /// \brief An input or output declaration from the MAIN block.
   ///
-  /// A declaration is either a simple variable (`oti;`) or a bus of
-  /// size given by either a numeric literal (`os[8];`) or a
-  /// parameter name (`ix[N];`).  In all three cases, the AST
-  /// remembers the raw size expression as a string so the
-  /// translator can resolve it once parameter overrides are known.
+  /// A declaration is either a simple variable (`oti;`), a bus of
+  /// size given by either a numeric literal (`os[8];`) or a parameter
+  /// name (`ix[N];`), or a typed bus whose width comes from a
+  /// declared enumeration (`hburst HBURST;`).  In all cases the
+  /// translator resolves the width once parameter overrides are known
+  /// (typed buses get the enum's bit width).
   struct tlsf_ap_decl
   {
     /// Source location of the declaration.
-    spot::location loc;
+    location loc;
     /// Variable or bus name.
     std::string name;
-    /// Raw size expression; empty string means a single (scalar) AP.
-    std::string size;
+    /// Parsed bus-size expression (arithmetic over literals,
+    /// parameters, and definitions, as in `os[N*M];`); null means
+    /// a single (scalar) AP or a typed bus (see enum_type).  The
+    /// translator evaluates it to an integer width with eval_int
+    /// once parameter overrides are known.
+    tlsf_expr_ptr size;
+    /// Enum type name for a typed-bus declaration
+    /// (`enumType SIGNAL;`); empty for scalars and size buses.
+    /// The signal's width is the bit width of the named enum.
+    std::string enum_type;
   };
 
   /// \brief A PARAMETERS block entry from GLOBAL.
   struct tlsf_parameter_decl
   {
     /// Source location of the entry.
-    spot::location loc;
+    location loc;
     /// Parameter name.
     std::string name;
-    /// Raw value expression, as written in the file.  The translator
-    /// parses it as an integer when overrides are applied.
-    std::string value;
+    /// Parsed value expression, as written in the file.  The
+    /// translator evaluates it to an integer when overrides are
+    /// applied.
+    tlsf_expr_ptr value;
   };
 
   /// \brief A DEFINITIONS block entry from GLOBAL.
   ///
-  /// Mirror of syfco's `BindExpr` (Data/Binding.hs): the body is a
-  /// list of clause expressions (LTL ops, boolean ops, bus
-  /// references, integer arithmetic), not text.  Expansion uses the
-  /// AST directly: spot::tlsf_expr substitution clones the clauses
-  /// and replaces each formal-argument Identifier with the call-site
-  /// actual.  No reparse is needed -- the body is parsed exactly
-  /// once, at the source level, by parse_tlsf.
+  /// The body is a list of clause expressions (LTL ops, boolean ops,
+  /// bus references, integer arithmetic), not text.  Expansion uses
+  /// the AST directly: spot::tlsf_expr substitution clones the
+  /// clauses and replaces each formal-argument Identifier with the
+  /// call-site actual.  No reparse is needed -- the body is parsed
+  /// exactly once, at the source level, by parse_tlsf.
   ///
   /// TLSF v1.2 SS4.6 lets a definition body be one or more guarded
   /// clauses `(ec)+` with `ec ≡ e | eB : e | eP : e`; the function
   /// binds to the first clause whose guard holds.  Each element of
   /// `body` is one clause: either a plain expression (implicit guard
   /// `true`) or a BinaryOp with tlsf_op::Guard whose children are
-  /// [guard, value].  The TLSF reference grammar (syfco's
-  /// `Reader/Parser/Global.hs` `reminderParser`) parses the body
-  /// with `many1 exprParser`, i.e. the clauses are juxtaposed
-  /// maximal expressions; this parser mirrors that with a
-  /// `body: expr | body expr` rule.  Quoted STRING literals are
-  /// only legal in the INFO section (TITLE: / DESCRIPTION:).
+  /// [guard, value].  The clauses are juxtaposed maximal
+  /// expressions, parsed as a `body: expr | body expr` rule.
   struct tlsf_definition
   {
     /// Source location of the entry (covers the LHS up through '=').
-    spot::location loc;
+    location loc;
     /// Definition name.
     std::string name;
     /// Argument names (empty if no parameter list).
@@ -599,23 +548,51 @@ namespace spot
     std::vector<tlsf_expr_ptr> body;
   };
 
-  /// Root of a parsed TLSF specification.
+  /// \brief The INFO items a parsed file may carry.
   ///
-  /// Phase 2 fills every field of the AST with structured expression
-  /// nodes (no longer raw text).  Each MAIN subsection stores a list
-  /// of stand-alone formulas, separated by `;` in the source.  An
-  /// empty subsection yields an empty vector.
-  ///
-  /// The type is forward-declared in spot/parsetlsf/public.hh; this
-  /// private header (NOT installed) holds the real definition, so
-  /// the field layout can evolve without breaking ABI.
+  /// TLSF v1.2 SS1.2 makes TITLE, DESCRIPTION, SEMANTICS and TARGET
+  /// mandatory and allows TAGS at most once.  Their values alone
+  /// cannot answer whether an item was written: the default of a
+  /// missing TITLE is the empty string, and the default of a missing
+  /// SEMANTICS (Mealy) is a value a file may well spell out.  The
+  /// `info_item` action of spot/parsetlsf/parsetlsf.yy therefore
+  /// records the items it saw in tlsf_ast::info_seen, which both the
+  /// duplicate check and the cross-section validator
+  /// (spot/parsetlsf/public.cc) rely on.
+  enum tlsf_info_item : unsigned
+  {
+    TLSF_INFO_TITLE       = 1u << 0,
+    TLSF_INFO_DESCRIPTION = 1u << 1,
+    TLSF_INFO_SEMANTICS   = 1u << 2,
+    TLSF_INFO_TARGET      = 1u << 3,
+    TLSF_INFO_TAGS        = 1u << 4,
+  };
+
+  /// \brief Root of a parsed TLSF specification.
   struct tlsf_ast
   {
     /// Source location of the AST (typically the start of the file).
-    spot::location loc;
+    location loc;
 
     //--- INFO section (metadata) ----------------------------------
 
+    /// Location of the `INFO` keyword, or -- when the file has no
+    /// INFO section at all -- the default-constructed location
+    /// (line 0), which is how the validator tells the two apart and
+    /// picks the start of the file as the anchor of a diagnostic
+    /// about a whole missing section.
+    location info_loc;
+    /// Union of the tlsf_info_item flags of the items that the file
+    /// spelled out.  TAGS is not mandatory, but like the other items
+    /// it may appear at most once.
+    unsigned info_seen = 0;
+    /// Location of the first `SEMANTICS:` item (of the mandatory
+    /// item's own span, i.e. the keyword and its colon).  Used to
+    /// anchor the SEMANTICS / TARGET mismatch warning; stays at line
+    /// 0 when the item is absent.
+    location semantics_loc;
+    /// Location of the first `TARGET:` item, same convention.
+    location target_loc;
     /// Title from the INFO section (empty if missing).
     std::string title;
     /// Description from the INFO section (empty if missing).
@@ -625,8 +602,7 @@ namespace spot
     /// Target declared in the file.
     tlsf_target target = tlsf_target::Mealy;
     /// Tags declared in INFO { TAGS: foo, bar; }.  Empty when the
-    /// INFO section omits TAGS.  Order matches source order.  See
-    /// syfco's `tagsParser` (refs/.../Reader/Parser/Info.hs).
+    /// INFO section omits TAGS.  Order matches source order.
     std::vector<std::string> tags;
 
     //--- GLOBAL section -------------------------------------------
@@ -638,13 +614,12 @@ namespace spot
     std::vector<tlsf_definition> definitions;
 
     /// Enumerations declared inside GLOBAL { DEFINITIONS { ... } }
-    /// via `enum X = { V0:00, V1:01, ... };`.  Mirrors syfco's
-    /// `enumerations` field (Reader/Parser/Data.hs Specification
-    /// record).  Empty when no enums are declared; the
-    /// `tlsf_to_ltl` translator will eventually consume them to
-    /// resolve typed-bus declarations (`ap E;` where E names
-    /// an enum); that wiring is a follow-up.  The current scope
-    /// is the parser accepting the source shape.
+    /// via `enum X = T0:patterns0 T1:patterns1 ...;`.  Consumed by
+    /// the translator to (a) resolve typed-bus declarations (`hburst
+    /// HBURST;` in INPUTS / OUTPUTS: the signal is expanded to
+    /// `name_0..name_{w-1}` where w is the enum's bit width) and (b)
+    /// fold enum comparisons (`HBURST == INCR`) into Boolean formulas
+    /// over the expanded bits.
     std::vector<tlsf_enum_decl> enumerations;
 
     //--- MAIN section ---------------------------------------------
@@ -661,192 +636,15 @@ namespace spot
     /// back to TLSF for round-trip.  Empty when the subsection was
     /// absent.
     std::vector<tlsf_expr_ptr> initially_body;
+    /// Parsed formulas of MAIN { PRESET { ... } }.
     std::vector<tlsf_expr_ptr> preset_body;
+    /// Parsed formulas of MAIN { REQUIRE / REQUIREMENTS { ... } }.
     std::vector<tlsf_expr_ptr> require_body;
+    /// Parsed formulas of MAIN { ASSERT / INVARIANTS { ... } }.
     std::vector<tlsf_expr_ptr> assert_body;
+    /// Parsed formulas of MAIN { GUARANTEE / GUARANTEES { ... } }.
     std::vector<tlsf_expr_ptr> guarantee_body;
     /// Parsed formulas of MAIN { ASSUME / ASSUMPTIONS { ... } }.
-    /// New section added alongside REQUIREMENTS / INVARIANTS /
-    /// GUARANTEES; mirrors syfco's four separate `requirements` /
-    /// `assumptions` / `invariants` / `guarantees` fields
-    /// (refs/.../Reader/Parser/Component.hs).
     std::vector<tlsf_expr_ptr> assumptions_body;
   };
-
-  // --- deparser --------------------------------------------------------
-  //
-  // tlsf_print_expr() recurses through the AST and emits the canonical
-  // surface syntax. The parenthesized flag is preserved verbatim: every
-  // round-tripped source paren reappears in the output. For an
-  // operator child whose precedence is strictly lower than its parent's
-  // we wrap it in parens to keep grouping stable across deparse.
-
-  inline void tlsf_print_expr(std::ostream& os, const tlsf_expr& e)
-  {
-    switch (e.type)
-      {
-      case tlsf_expr_type::LiteralInt:
-        os << e.val;
-        return;
-      case tlsf_expr_type::Identifier:
-        os << e.name;
-        return;
-      case tlsf_expr_type::BusRef:
-        os << e.name;
-        if (!e.children.empty())
-          {
-            os << '[';
-            tlsf_print_expr(os, *e.children[0]);
-            os << ']';
-          }
-        return;
-      case tlsf_expr_type::App:
-        os << e.name << '(';
-        for (size_t i = 0; i < e.children.size(); ++i)
-          {
-            if (i)
-              os << ", ";
-            tlsf_print_expr(os, *e.children[i]);
-          }
-        os << ')';
-        return;
-      case tlsf_expr_type::UnaryOp:
-        if (e.parenthesized)
-          {
-            os << '(' << tlsf_format_op(e.op);
-            if (!e.children.empty())
-              {
-                os << ' ';
-                tlsf_print_expr(os, *e.children[0]);
-              }
-            os << ')';
-            return;
-          }
-        // Unary ops (BANG, G, F, X, X[!]) bind tightest in this grammar;
-        // an unwrapped BinaryOp child would re-parse as
-        // ``(BANG LHS) OP RHS`` rather than ``BANG (LHS OP RHS)``, so
-        // emit parens to preserve the AST grouping through round-trip.
-        // The same applies to Quantifier children: writing
-        // ``! &&[:i]p`` instead of ``! (&&[:i]p)`` is ambiguous when
-        // combined with trailing operators.
-        if (!e.children.empty() && e.children[0]
-            && !e.children[0]->parenthesized
-            && (e.children[0]->type == tlsf_expr_type::BinaryOp
-                || e.children[0]->type == tlsf_expr_type::Quantifier))
-          {
-            os << tlsf_format_op(e.op) << " (";
-            tlsf_print_expr(os, *e.children[0]);
-            os << ')';
-            return;
-          }
-        os << tlsf_format_op(e.op);
-        if (!e.children.empty() && e.children[0])
-          {
-            os << ' ';
-            tlsf_print_expr(os, *e.children[0]);
-          }
-        return;
-      case tlsf_expr_type::BinaryOp:
-        if (e.parenthesized)
-          {
-            os << '(';
-            tlsf_print_expr(os, *e.children[0]);
-            os << ' ' << tlsf_format_op(e.op) << ' ';
-            tlsf_print_expr(os, *e.children[1]);
-            os << ')';
-            return;
-          }
-        // Wrap child operands according to the effective precedence of
-        // every expression node.  This mirrors Table 1 and preserves the
-        // AST grouping through a print/parse round-trip.
-        {
-          bool par_is_right_ass =
-            tlsf_op_is_right_associative(e.op);
-          int par_prec = tlsf_op_precedence(e.op);
-          // LHS
-          if (e.children.size() >= 1 && e.children[0])
-            {
-              const auto& lhs = *e.children[0];
-              bool wrap = false;
-              if (!lhs.parenthesized)
-                {
-                  if (lhs.type == tlsf_expr_type::BinaryOp
-                      || lhs.type == tlsf_expr_type::UnaryOp
-                      || lhs.type == tlsf_expr_type::Quantifier)
-                    {
-                      int lhs_prec = tlsf_expr_precedence(lhs);
-                      wrap = par_is_right_ass
-                        ? lhs_prec <= par_prec
-                        : lhs_prec < par_prec;
-                    }
-                }
-              if (wrap)
-                {
-                  os << '(';
-                  tlsf_print_expr(os, lhs);
-                  os << ')';
-                }
-              else
-                {
-                  tlsf_print_expr(os, lhs);
-                }
-            }
-          os << ' ' << tlsf_format_op(e.op) << ' ';
-          // RHS
-          if (e.children.size() >= 2 && e.children[1])
-            {
-              const auto& rhs = *e.children[1];
-              bool wrap = false;
-              if (!rhs.parenthesized
-                  && (rhs.type == tlsf_expr_type::BinaryOp
-                      || rhs.type == tlsf_expr_type::UnaryOp
-                      || rhs.type == tlsf_expr_type::Quantifier))
-                {
-                  int rhs_prec = tlsf_expr_precedence(rhs);
-                  wrap = par_is_right_ass
-                    ? rhs_prec < par_prec
-                    : rhs_prec <= par_prec;
-                }
-              if (wrap)
-                {
-                  os << '(';
-                  tlsf_print_expr(os, rhs);
-                  os << ')';
-                }
-              else
-                {
-                  tlsf_print_expr(os, rhs);
-                }
-            }
-        }
-        return;
-      case tlsf_expr_type::Quantifier:
-        os << tlsf_format_op(e.op) << '[';
-        if (e.children.size() >= 1 && e.children[0])
-          tlsf_print_expr(os, *e.children[0]);
-        os << "] ";
-        if (e.children.size() >= 2 && e.children[1])
-          tlsf_print_expr(os, *e.children[1]);
-        return;
-      case tlsf_expr_type::SetExplicit:
-        os << '{';
-        for (size_t i = 0; i < e.children.size(); ++i)
-          {
-            if (i)
-              os << ", ";
-            tlsf_print_expr(os, *e.children[i]);
-          }
-        os << '}';
-        return;
-      case tlsf_expr_type::SetRange:
-        os << '{';
-        if (e.children.size() >= 1 && e.children[0])
-          tlsf_print_expr(os, *e.children[0]);
-        os << "..";
-        if (e.children.size() >= 2 && e.children[1])
-          tlsf_print_expr(os, *e.children[1]);
-        os << '}';
-        return;
-      }
-  }
 }

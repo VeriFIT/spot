@@ -63,6 +63,47 @@ from spot.aux import \
      str_to_svg as _str_to_svg, \
      ostream_to_svg as _ostream_to_svg
 
+import spot.impl as impl
+
+
+def parse_tlsf(source, opts=None):
+    """Parse a TLSF specification.
+
+    `source` is one of the following:
+
+      - the name of a file holding the specification;
+      - a string containing the specification itself, detected by the
+        presence of a newline character;
+      - a shell command producing the specification on its standard
+        output, written with a trailing `|` that is not passed to the
+        shell.  A non-zero exit status of the command is reported as
+        a `subprocess.CalledProcessError`.
+
+    The optional `opts` is a `tlsf_parser_options` instance.
+    """
+    if len(source) > 1 and source[-1] == '|':
+        proc = subprocess.Popen(source[:-1], shell=True,
+                                preexec_fn=os.setsid,
+                                text=True,
+                                stdout=subprocess.PIPE)
+        try:
+            if opts is None:
+                return impl.parse_tlsf(proc.stdout.fileno(), source[:-1])
+            return impl.parse_tlsf(proc.stdout.fileno(), source[:-1],
+                                   opts)
+        finally:
+            proc.stdout.close()
+            ret = proc.wait()
+            if ret and sys.exc_info()[0] is None:
+                raise subprocess.CalledProcessError(ret, source[:-1])
+    if '\n' in source:
+        if opts is None:
+            opts = impl.tlsf_parser_options()
+        return impl.parse_tlsf(source, "<string>", opts)
+    if opts is None:
+        return impl.parse_tlsf(source)
+    return impl.parse_tlsf(source, opts)
+
 
 # The parameters used by default when show() is called on an automaton.
 _show_default = None
@@ -71,7 +112,7 @@ _show_default = None
 def setup(**kwargs):
     """Configure Spot for fancy display.
 
-    This is manly useful in Jupyter/IPython.
+    This is mainly useful in Jupyter/IPython.
 
     Note that this function needs to be called before any automaton is
     displayed.  Afterwards it will have no effect (you should restart

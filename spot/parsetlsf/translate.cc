@@ -107,6 +107,32 @@ namespace spot
       // is unreachable on real inputs.
       constexpr unsigned max_def_expansions_total = 100000;
 
+      // Evaluate a comparison operator on two already-computed
+      // integers.  \a op must be one of Eq, Neq, Lt, Le, Gt, Ge;
+      // this is the integer semantics of the comparison operators,
+      // shared by eval_int (which returns 0/1) and by the LTL-position
+      // fold of translate_expr (which returns tt/ff).
+      bool compare_ints(tlsf_op op, long long lhs, long long rhs)
+      {
+        switch (op)
+          {
+          case tlsf_op::Eq:
+            return lhs == rhs;
+          case tlsf_op::Neq:
+            return lhs != rhs;
+          case tlsf_op::Lt:
+            return lhs < rhs;
+          case tlsf_op::Le:
+            return lhs <= rhs;
+          case tlsf_op::Gt:
+            return lhs > rhs;
+          case tlsf_op::Ge:
+            return lhs >= rhs;
+          default:
+            SPOT_UNREACHABLE();
+          }
+      }
+
       bool checked_add(long long lhs, long long rhs, long long& result)
       {
         if ((rhs > 0 && lhs > (std::numeric_limits<long long>::max)() - rhs)
@@ -181,7 +207,7 @@ namespace spot
 
     translator::~translator() = default;
 
-    void translator::diag(const spot::location& loc,
+    void translator::diag(const location& loc,
                           const std::string& msg)
     {
       if (diags_quiet_)
@@ -195,6 +221,15 @@ namespace spot
     void translator::diag(const tlsf_expr& e, const std::string& msg)
     {
       diag(e.loc, msg);
+    }
+
+    bool translator::require_finite_semantics(const tlsf_expr& e)
+    {
+      if (ast_.semantics == tlsf_semantics::MealyFinite
+          || ast_.semantics == tlsf_semantics::MooreFinite)
+        return true;
+      diag(e, "strong next requires finite semantics");
+      return false;
     }
 
     tlsf_expr_ptr
@@ -272,158 +307,6 @@ namespace spot
           subst_arg(body->children[i], arg_name, replacement,
                     child_shadowed));
       return clone;
-    }
-
-    bool translator::eval_int_string(const std::string& s,
-                                     long long& out)
-    {
-      class parser
-      {
-      public:
-        explicit parser(const std::string& text)
-          : text_(text)
-        {
-        }
-
-        tlsf_expr_ptr parse()
-        {
-          auto result = parse_additive();
-          skip_space();
-          if (!result || pos_ != text_.size())
-            return nullptr;
-          return result;
-        }
-
-      private:
-        void skip_space()
-        {
-          while (pos_ < text_.size()
-                 && std::isspace(static_cast<unsigned char>(text_[pos_])))
-            ++pos_;
-        }
-
-        bool take(char c)
-        {
-          skip_space();
-          if (pos_ >= text_.size() || text_[pos_] != c)
-            return false;
-          ++pos_;
-          return true;
-        }
-
-        tlsf_expr_ptr parse_additive()
-        {
-          auto result = parse_multiplicative();
-          while (result)
-            {
-              skip_space();
-              if (pos_ >= text_.size()
-                  || (text_[pos_] != '+' && text_[pos_] != '-'))
-                break;
-              char op = text_[pos_++];
-              auto rhs = parse_multiplicative();
-              if (!rhs)
-                return nullptr;
-              result = tlsf_make_binop(
-                op == '+' ? tlsf_op::Add : tlsf_op::Sub,
-                spot::location(), result, rhs);
-            }
-          return result;
-        }
-
-        tlsf_expr_ptr parse_multiplicative()
-        {
-          auto result = parse_unary();
-          while (result)
-            {
-              skip_space();
-              if (pos_ >= text_.size()
-                  || (text_[pos_] != '*' && text_[pos_] != '/'
-                      && text_[pos_] != '%'))
-                break;
-              char op = text_[pos_++];
-              auto rhs = parse_unary();
-              if (!rhs)
-                return nullptr;
-              tlsf_op tag = op == '*' ? tlsf_op::Mul
-                : op == '/' ? tlsf_op::Div : tlsf_op::Mod;
-              result = tlsf_make_binop(tag, spot::location(), result, rhs);
-            }
-          return result;
-        }
-
-        tlsf_expr_ptr parse_unary()
-        {
-          skip_space();
-          if (pos_ < text_.size()
-              && (text_[pos_] == '+' || text_[pos_] == '-'))
-            {
-              char op = text_[pos_++];
-              auto child = parse_unary();
-              if (!child)
-                return nullptr;
-              if (op == '+')
-                return child;
-              return tlsf_make_binop(tlsf_op::Sub, spot::location(),
-                                     tlsf_make_int(spot::location(), 0),
-                                     child);
-            }
-          return parse_primary();
-        }
-
-        tlsf_expr_ptr parse_primary()
-        {
-          skip_space();
-          if (pos_ >= text_.size())
-            return nullptr;
-          if (take('('))
-            {
-              auto result = parse_additive();
-              if (!result || !take(')'))
-                return nullptr;
-              result->parenthesized = true;
-              return result;
-            }
-          if (std::isdigit(static_cast<unsigned char>(text_[pos_])))
-            {
-              size_t begin = pos_++;
-              while (pos_ < text_.size()
-                     && std::isdigit(static_cast<unsigned char>(text_[pos_])))
-                ++pos_;
-              try
-                {
-                  return tlsf_make_int(spot::location(),
-                                       std::stoll(text_.substr(
-                                         begin, pos_ - begin)));
-                }
-              catch (...)
-                {
-                  return nullptr;
-                }
-            }
-          if (std::isalpha(static_cast<unsigned char>(text_[pos_]))
-              || text_[pos_] == '_' || text_[pos_] == '@')
-            {
-              size_t begin = pos_++;
-              while (pos_ < text_.size()
-                     && (std::isalnum(static_cast<unsigned char>(text_[pos_]))
-                         || text_[pos_] == '_' || text_[pos_] == '@'
-                         || text_[pos_] == '\''))
-                ++pos_;
-              return tlsf_make_ident(spot::location(),
-                                     text_.substr(begin, pos_ - begin));
-            }
-          return nullptr;
-        }
-
-        const std::string& text_;
-        size_t pos_ = 0;
-      };
-
-      auto parsed = parser(s).parse();
-      if (!parsed)
-        return false;
-      return eval_int(*parsed, out);
     }
 
     tlsf_expr_ptr
@@ -584,6 +467,207 @@ namespace spot
       return false;
     }
 
+    const tlsf_definition*
+    translator::find_def(const std::string& name) const
+    {
+      for (const auto& d : ast_.definitions)
+        if (d.name == name)
+          return &d;
+      return nullptr;
+    }
+
+    const tlsf_enum_decl*
+    translator::find_enum(const std::string& name) const
+    {
+      for (const auto& e : ast_.enumerations)
+        if (e.name == name)
+          return &e;
+      return nullptr;
+    }
+
+    bool
+    translator::eval_ap_width(const tlsf_ap_decl& d, long long& out)
+    {
+      if (!d.enum_type.empty())
+        {
+          const tlsf_enum_decl* en = find_enum(d.enum_type);
+          if (!en)
+            {
+              diag(d.loc, "typed bus '" + d.name + "' uses enum '"
+                   + d.enum_type + "' which is not declared");
+              return false;
+            }
+          // Parser invariant: every accepted enum entry carries at
+          // least one pattern, and all patterns share the first
+          // one's width.
+          assert(!en->entries.empty());
+          assert(!en->entries[0].patterns.empty());
+          out = static_cast<long long>(en->entries[0].patterns[0].size());
+          return out > 0;
+        }
+      // Every caller (register_decl, BusRef, SIZEOF, and the enum
+      // comparison / missing-valuation paths) filters scalar APs out
+      // before asking for a width, so a size-less declaration cannot
+      // reach this point.
+      assert(d.size);
+      return eval_int(*d.size, out);
+    }
+
+    formula
+    translator::translate_enum_cmp(const tlsf_expr& e,
+                                   const tlsf_ap_decl& bus,
+                                   bool equal)
+    {
+      // Shape (see the BinaryOp Eq/Neq case in translate_expr):
+      // children[0] is the typed-bus base identifier, children[1]
+      // the enum-constant identifier.
+      const tlsf_enum_decl* en = find_enum(bus.enum_type);
+      if (!en)
+        {
+          diag(e, "typed bus '" + bus.name + "' uses enum '"
+                 + bus.enum_type + "' which is not declared");
+          return formula::ff();
+        }
+      assert(!e.children.empty() && e.children[1]);
+      const std::string& tag = e.children[1]->name;
+      const tlsf_enum_value* val = nullptr;
+      for (const auto& v : en->entries)
+        if (v.tag == tag)
+          {
+            val = &v;
+            break;
+          }
+      if (!val)
+        {
+          diag(e, "enum '" + en->name + "' has no value named '"
+                 + tag + "'");
+          return formula::ff();
+        }
+      // Width of the bus (== width of the enum).
+      long long width;
+      // The enum was found above, so eval_ap_width cannot fail here.
+      if (!eval_ap_width(bus, width))
+        SPOT_UNREACHABLE();
+      // run()'s register_decl pass (see run()) records every bit of
+      // every declared bus before any translation, so the flattened
+      // names below are guaranteed to already be registered (in
+      // seen_outputs_ or seen_inputs_ depending on the direction of
+      // the bus).
+      assert([&] {
+          bool out = base_is_output(bus.name);
+          for (long long i = 0; i < width; ++i)
+            {
+              const std::string name = bus.name + '_' + std::to_string(i);
+              if (out ? !seen_outputs_.count(name)
+                      : !seen_inputs_.count(name))
+                return false;
+            }
+          return true;
+        }());
+      // Build the OR of the per-pattern conjunctions; bit k of a
+      // pattern constrains AP `bus.name_k` ('1' positive, '0'
+      // negated, '*' omitted).
+      std::vector<formula> alts;
+      alts.reserve(val->patterns.size());
+      for (const std::string& pat : val->patterns)
+        {
+          std::vector<formula> bits;
+          for (size_t k = 0; k < pat.size() && k < static_cast<size_t>(width);
+               ++k)
+            {
+              if (pat[k] == '*')
+                continue;
+              formula ap = formula::ap(
+                bus.name + '_' + std::to_string(k));
+              bits.push_back(pat[k] == '1' ? ap
+                             : formula::Not(ap));
+            }
+          alts.push_back(bits.empty()
+                         ? formula::tt()
+                         : formula::And(bits));
+        }
+      formula res = alts.empty()
+        ? formula::ff()
+        : (alts.size() == 1
+           ? alts[0] : formula::Or(alts));
+      return equal ? res : formula::Not(res);
+    }
+
+    // Shared budget check for one user-definition application.
+    // Used by the translate_expr App case (LTL position) and by
+    // eval_def_int (integer position, i.e. eval_int's Identifier
+    // and App cases for zero-argument and arity-matching
+    // definitions).
+    //
+    // \a depth is the caller's current recursion depth: the LTL
+    // path passes expansion_depth_, the integer path passes
+    // int_def_depth_.  Depth 0 means the call starts a fresh
+    // expansion chain, so expansion_root_name_ is (re)anchored to
+    // it: the depth limit trips on whichever App happens to
+    // overflow -- for a recursive definition that is often a LEAF
+    // call inside the cyclic def's own clause (e.g. the `none`
+    // calls inside full_arbiter's recursive `mone`) -- and this
+    // anchor makes the diagnostic blame the def that STARTED the
+    // chain instead.
+    //
+    // Returns true when the application may proceed; false means
+    // the caller must fold the call to ff() (LTL) or report
+    // failure (integer) without further expansion.  Once either
+    // budget trips, expansion_exhausted_ goes sticky and every
+    // later application is refused silently, so a non-terminating
+    // spec yields exactly one diagnostic.  A true return has
+    // pushed one frame onto expansion_depth_; the caller must pop
+    // it (--expansion_depth_) once its expansion is done.
+    bool
+    translator::def_app_budget(const std::string& name,
+                               const tlsf_expr& call, unsigned depth)
+    {
+      if (expansion_exhausted_)
+        return false;
+      if (depth == 0)
+        expansion_root_name_ = name;
+      if (++expansion_depth_ > max_def_depth
+          || ++expansion_total_ > max_def_expansions_total)
+        {
+          expansion_exhausted_ = true;
+          diag(call,
+               "definition expansion limit exceeded; "
+               "the expansion of definition '"
+               + expansion_root_name_ + "' is cyclic or "
+               "does not reach a base case");
+          --expansion_depth_;
+          return false;
+        }
+      return true;
+    }
+
+    bool
+    translator::eval_def_int(const tlsf_definition& def,
+                             const std::vector<tlsf_expr_ptr>& actuals,
+                             const tlsf_expr& call,
+                             long long& out)
+    {
+      // The callers evaluate each actual to a LiteralInt (or pass
+      // no actuals at all) before coming here, so the
+      // guard-selection substitution below sees constant
+      // arguments.
+      assert(actuals.size() == def.args.size());
+      if (!def_app_budget(def.name, call, int_def_depth_))
+        return false;
+      // Keep both depth counters incremented while the clause body
+      // is evaluated: nested definition calls inside the body (or
+      // inside a guard, via eval_guard_bool -> eval_int_quiet) must
+      // see the enlarged depth for the budgets to bound the chain.
+      ++int_def_depth_;
+      tlsf_expr_ptr clause = select_def_clause(def, actuals, call);
+      bool ok = false;
+      if (clause)
+        ok = eval_int(*clause, out);
+      --int_def_depth_;
+      --expansion_depth_;
+      return ok;
+    }
+
     bool translator::eval_set(const tlsf_expr& e,
                               std::vector<long long>& out)
     {
@@ -591,11 +675,7 @@ namespace spot
         {
           for (const auto& child : e.children)
             {
-              if (!child)
-                {
-                  diag(e, "null element in integer set");
-                  return false;
-                }
+              assert(child);
               long long value;
               if (!eval_int(*child, value))
                 return false;
@@ -873,8 +953,12 @@ namespace spot
                            + e.name + "'");
                     return false;
                   }
+                // The parameter's value is a parsed AST (the
+                // PARAMETERS block uses the same expression nodes as
+                // everything else); evaluate it with the current
+                // bindings so a parameter may reference another one.
                 long long value = 0;
-                bool ok = eval_int_string(pe->second, value);
+                bool ok = pe->second && eval_int(*pe->second, value);
                 active_params_.erase(e.name);
                 if (ok)
                   {
@@ -883,7 +967,25 @@ namespace spot
                     return true;
                   }
                 diag(e, "could not evaluate parameter '" + e.name
-                       + "' expression '" + pe->second + "'");
+                       + "'");
+                return false;
+              }
+            // A zero-argument definition (`m = log2(n);`) used as a
+            // bare identifier in integer position: expand it now
+            // (amba_case_study's `HMASTER[m]` bus size).  Callers
+            // that need a *name* in this position (SIZEOF, ap
+            // registration) look up declarations before reaching
+            // this fallback.
+            if (const tlsf_definition* def = find_def(e.name))
+              {
+                if (def->args.empty())
+                  {
+                    std::vector<tlsf_expr_ptr> no_args;
+                    return eval_def_int(*def, no_args, e, out);
+                  }
+                diag(e, "definition '" + e.name + "' expects "
+                       + std::to_string(def->args.size())
+                       + " argument(s); used with none");
                 return false;
               }
             diag(e, "expected an integer; identifier '"
@@ -951,11 +1053,7 @@ namespace spot
             }
           if (e.name == "SIZEOF")
             {
-              if (e.children.size() != 1)
-                {
-                  diag(e, "SIZEOF expects exactly one argument");
-                  return false;
-                }
+              assert(e.children.size() == 1);
               const auto& arg = *e.children[0];
               if (arg.type != tlsf_expr_type::Identifier)
                 {
@@ -963,38 +1061,67 @@ namespace spot
                   return false;
                 }
               // Search inputs and outputs for a matching bus decl.
+              // A typed bus (`hburst HBURST;`) has an empty `size`
+              // but is a real bus: its width comes from the enum.
               for (const auto& d : ast_.inputs)
                 if (d.name == arg.name)
                   {
-                    if (d.size.empty())
+                    if (!d.size && d.enum_type.empty())
                       {
                         diag(e, "SIZEOF of scalar AP '" + arg.name + "'");
                         return false;
                       }
-                    return eval_int_string(d.size, out);
+                    return eval_ap_width(d, out);
                   }
               for (const auto& d : ast_.outputs)
                 if (d.name == arg.name)
                   {
-                    if (d.size.empty())
+                    if (!d.size && d.enum_type.empty())
                       {
                         diag(e, "SIZEOF of scalar AP '" + arg.name + "'");
                         return false;
                       }
-                    return eval_int_string(d.size, out);
+                    return eval_ap_width(d, out);
                   }
               diag(e, "SIZEOF: unknown bus '" + arg.name + "'");
               return false;
+            }
+          // A user-defined definition with an arity-matching call
+          // can be evaluated in integer position too (e.g. amba's
+          // `bit(v,i)` feeding `value'`'s guard arithmetic).  Each
+          // actual is folded to a LiteralInt first (same policy as
+          // the translate_expr App case) so the guard-selection
+          // substitution sees constant arguments; a non-constant
+          // actual cannot appear here because integer-position
+          // expressions only contain literals, parameters, loop
+          // variables, builtins, and other definitions -- all of
+          // which fold.
+          if (const tlsf_definition* def = find_def(e.name))
+            {
+              if (def->args.size() != e.children.size())
+                {
+                  diag(e, "definition '" + e.name + "' expects "
+                         + std::to_string(def->args.size())
+                         + " argument(s); called with "
+                         + std::to_string(e.children.size()));
+                  return false;
+                }
+              std::vector<tlsf_expr_ptr> actuals;
+              actuals.reserve(e.children.size());
+              for (const auto& c : e.children)
+                {
+                  long long v;
+                  if (!eval_int(*c, v))
+                    return false;
+                  actuals.push_back(tlsf_make_int(c->loc, v));
+                }
+              return eval_def_int(*def, actuals, e, out);
             }
           diag(e, "function call '" + e.name + "' is not supported "
                  "in integer position");
           return false;
         case tlsf_expr_type::UnaryOp:
-          if (e.children.empty())
-            {
-              diag(e, "unary op with no operand");
-              return false;
-            }
+          assert(e.children.size() == 1);
           if (e.op == tlsf_op::Not)
             {
               // The parser does not produce unary minus/plus; we
@@ -1010,12 +1137,8 @@ namespace spot
                  + "' is not supported in integer position");
           return false;
         case tlsf_expr_type::BinaryOp:
-          if (e.children.size() < 2)
-            {
-              diag(e, "binary op with fewer than two operands");
-              return false;
-            }
           {
+            assert(e.children.size() == 2);
             long long l;
             if (!eval_int(*e.children[0], l))
               return false;
@@ -1081,22 +1204,12 @@ namespace spot
                 out = l % r;
                 return true;
               case tlsf_op::Lt:
-                out = l < r ? 1 : 0;
-                return true;
               case tlsf_op::Le:
-                out = l <= r ? 1 : 0;
-                return true;
               case tlsf_op::Gt:
-                out = l > r ? 1 : 0;
-                return true;
               case tlsf_op::Ge:
-                out = l >= r ? 1 : 0;
-                return true;
               case tlsf_op::Eq:
-                out = l == r ? 1 : 0;
-                return true;
               case tlsf_op::Neq:
-                out = l != r ? 1 : 0;
+                out = compare_ints(e.op, l, r) ? 1 : 0;
                 return true;
               default:
                 diag(e, "binary op '" + tlsf_format_op(e.op)
@@ -1112,36 +1225,61 @@ namespace spot
           diag(e, "set is not an integer expression");
           return false;
         }
-      diag(e, "internal: unknown tlsf_expr_type");
-      return false;
+      // All nine tlsf_expr_type values have a case in this switch.
+      SPOT_UNREACHABLE();
     }
 
-    spot::formula translator::translate_expr(const tlsf_expr& e)
+    formula translator::translate_expr(const tlsf_expr& e)
     {
       switch (e.type)
         {
         case tlsf_expr_type::LiteralInt:
           diag(e, "integer literal in LTL position");
-          return spot::formula::ff();
+          return formula::ff();
         case tlsf_expr_type::Identifier:
           {
             if (e.name == "true")
-              return spot::formula::tt();
+              return formula::tt();
             if (e.name == "false")
-              return spot::formula::ff();
+              return formula::ff();
             // Loop variables and parameters are integer-valued only;
             // they have no Boolean meaning on their own.
             if (loop_vars_.count(e.name))
               {
                 diag(e, "loop variable '" + e.name
                        + "' used in LTL position");
-                return spot::formula::ff();
+                return formula::ff();
               }
             if (params_.count(e.name))
               {
                 diag(e, "parameter '" + e.name
                        + "' used in LTL position");
-                return spot::formula::ff();
+                return formula::ff();
+              }
+            // A zero-argument macro definition used as a bare
+            // identifier in LTL position: expand it via the same
+            // eager-flattening machinery the App case uses, so a
+            // plain-macro def behaves identically spelled `f` or
+            // `f()`.  A guarded or multi-clause body needs the
+            // guard-selecting App path; diagnose it (a bare
+            // identifier cannot carry actuals for guard selection).
+            if (const tlsf_definition* def = find_def(e.name))
+              {
+                if (def->args.empty() && def->body.size() == 1
+                    && def->body[0]
+                    && !(def->body[0]->type == tlsf_expr_type::BinaryOp
+                         && def->body[0]->op == tlsf_op::Guard))
+                  return translate_expr(
+                    *expand_ast(tlsf_make_app(e.loc, e.name, {})));
+                diag(e, "definition '" + e.name
+                       + (def->args.empty()
+                          ? "' has a guarded or multi-clause body; "
+                            "call it as '"
+                          : "' expects "
+                          + std::to_string(def->args.size())
+                          + " argument(s); called as '")
+                       + e.name + "()' to expand it");
+                return formula::ff();
               }
             // A declared SCALAR AP used here is recorded in
             // first-use order in inputs_/outputs_ (mirroring the
@@ -1156,78 +1294,72 @@ namespace spot
             // the handling of undeclared identifiers).
             const std::string& base = e.name;
             const tlsf_ap_decl* decl = find_decl(base);
-            if (decl && decl->size.empty())
+            // A typed bus is never a Boolean AP by itself: it must
+            // be indexed (BusRef) or compared against an enum value
+            // (Eq/Neq below).
+            if (decl && !decl->enum_type.empty())
               {
-                bool is_out = base_is_output(base);
-                if (is_out)
-                  {
-                    if (seen_outputs_.insert(base).second)
-                      outputs_.push_back(base);
-                  }
-                else if (seen_inputs_.insert(base).second)
-                  inputs_.push_back(base);
+                diag(e, "typed bus '" + base
+                       + "' used without an index; compare it against "
+                         "an enum value or index it");
+                return formula::ff();
               }
-            return spot::formula::ap(base);
+            // A declared scalar AP was always already registered (under
+            // its bare name) by run()'s register_decl pass.
+            assert(!decl || decl->size || [&] {
+                bool is_out = base_is_output(base);
+                return is_out ? seen_outputs_.count(base) != 0
+                              : seen_inputs_.count(base) != 0;
+              }());
+            return formula::ap(base);
           }
         case tlsf_expr_type::BusRef:
           {
-            // Flatten bus[i] to "base_index" and emit as AP.
-            if (e.children.empty())
-              {
-                diag(e, "bus reference '"
-                       + e.name + "' missing its index expression");
-                return spot::formula::ff();
-              }
+            assert(e.children.size() == 1);
             long long idx;
             if (!eval_int(*e.children[0], idx))
-              return spot::formula::ff();
+              return formula::ff();
             const tlsf_ap_decl* decl = find_decl(e.name);
             if (!decl)
               {
                 diag(e, "indexed reference uses undeclared bus '"
                        + e.name + "'");
-                return spot::formula::ff();
+                return formula::ff();
               }
-            if (decl->size.empty())
+            if (!decl->size && decl->enum_type.empty())
               {
                 diag(e, "indexed reference uses scalar AP '"
                        + e.name + "'");
-                return spot::formula::ff();
+                return formula::ff();
               }
             long long size;
-            if (!eval_int_string(decl->size, size))
+            if (!eval_ap_width(*decl, size))
               {
                 diag(e, "could not evaluate size of bus '" + e.name
                        + "'");
-                return spot::formula::ff();
+                return formula::ff();
               }
             if (size <= 0)
               {
                 diag(e, "bus '" + e.name + "' has non-positive size");
-                return spot::formula::ff();
+                return formula::ff();
               }
             if (idx < 0 || idx >= size)
               {
                 diag(e, "index " + std::to_string(idx)
                        + " is outside bus '" + e.name + "' of size "
                        + std::to_string(size));
-                return spot::formula::ff();
+                return formula::ff();
               }
-            bool out = base_is_output(e.name);
+            // A declared bus bit was always already registered (under its
+            // flattened name) by run()'s register_decl pass.
             std::ostringstream flat;
             flat << e.name << '_' << idx;
-            std::string name = flat.str();
-            if (out)
-              {
-                if (seen_outputs_.insert(name).second)
-                  outputs_.push_back(name);
-              }
-            else
-              {
-                if (seen_inputs_.insert(name).second)
-                  inputs_.push_back(name);
-              }
-            return spot::formula::ap(name);
+            const std::string name = flat.str();
+            assert(base_is_output(e.name)
+                   ? seen_outputs_.count(name) != 0
+                   : seen_inputs_.count(name) != 0);
+            return formula::ap(name);
           }
         case tlsf_expr_type::App:
           {
@@ -1241,10 +1373,9 @@ namespace spot
             // result still flows through.
             //
             // TLSF enforces "one symbol = one definition" (see
-            // spot/parsetlsf/parsetlsf.yy: definition semantic action
-            // and the syfco tArgs map keyed by symbol name in
-            // spot/parsetlsf/refs/syfco/src/lib/Reader/Bindings.hs),
-            // so the lookup is by name alone.  An arity mismatch
+            // spot/parsetlsf/parsetlsf.yy: definition semantic
+            // action), so the lookup is by name alone.  An arity
+            // mismatch
             // gets a dedicated diagnostic that explains BOTH the
             // declared arity and the call-site arity, so the user
             // can fix the call without grepping the DEFINITIONS
@@ -1259,7 +1390,7 @@ namespace spot
             if (!def)
               {
                 diag(e, "definition '" + e.name + "' is not defined");
-                return spot::formula::ff();
+                return formula::ff();
               }
             if (def->args.size() != e.children.size())
               {
@@ -1268,7 +1399,7 @@ namespace spot
                        + std::to_string(def->args.size())
                        + " argument(s); called with "
                        + std::to_string(e.children.size()));
-                return spot::formula::ff();
+                return formula::ff();
               }
             // Recursion is legitimate in TLSF: a guarded definition
             // may call itself while its constant arguments shrink
@@ -1276,36 +1407,19 @@ namespace spot
             // full_arbiter.tlsf's `mone` halves its index range at
             // every level).  We therefore do NOT reject re-entry
             // into a definition that is already being expanded;
-            // expansion_depth_ below bounds the recursion depth and
-            // expansion_total_ bounds the total work, so bodies that
-            // never reach a base case get diagnosed instead of
-            // hanging.  Once either bound trips, expansion_exhausted_
-            // goes sticky: every later definition application returns
-            // ff() silently and only the first overflow is reported,
-            // so a non-terminating spec yields one diagnostic rather
-            // than one per call site.
-            if (expansion_exhausted_)
-              return spot::formula::ff();
-            // The depth limit trips on whichever App happens to
-            // overflow -- for a recursive definition that is often a
-            // LEAF call inside the cyclic def's own clause (e.g. the
-            // `none` calls inside full_arbiter's recursive `mone`),
-            // which would misattribute the cycle.  Record the name of
-            // the def that STARTED the current expansion chain (the
-            // first App seen at depth 0) and report that one.
-            if (expansion_depth_ == 0)
-              expansion_root_name_ = e.name;
-            if (++expansion_depth_ > max_def_depth
-                || ++expansion_total_ > max_def_expansions_total)
-              {
-                expansion_exhausted_ = true;
-                diag(e, "definition expansion limit exceeded; "
-                        "the expansion of definition '"
-                        + expansion_root_name_ + "' is cyclic or "
-                        "does not reach a base case");
-                --expansion_depth_;
-                return spot::formula::ff();
-              }
+            // def_app_budget below bounds the recursion depth and
+            // total work, so bodies that never reach a base case
+            // get diagnosed instead of hanging.  Once either bound
+            // trips, expansion_exhausted_ goes sticky: every later
+            // definition application returns ff() silently and only
+            // the first overflow is reported, so a non-terminating
+            // spec yields one diagnostic rather than one per call
+            // site.  depth==0 re-anchors expansion_root_name_ to
+            // this call; a LEAF call overflowing the depth limit
+            // (e.g. the `none` calls inside full_arbiter's recursive
+            // `mone`) is then not misattributed.
+            if (!def_app_budget(e.name, e, expansion_depth_))
+              return formula::ff();
             // Fold constant actuals (literals, parameters, loop
             // variables, and arithmetic over them -- e.g. the
             // `(i+j)/2+1` arguments of full_arbiter.tlsf's
@@ -1355,54 +1469,43 @@ namespace spot
             if (!chosen)
               {
                 --expansion_depth_;
-                return spot::formula::ff();
+                return formula::ff();
               }
             // Translate the selected clause while this application
             // is still on the expansion stack, so nested calls to
             // the same (or any) definition accumulate depth.
-            spot::formula res = translate_expr(*chosen);
+            formula res = translate_expr(*chosen);
             --expansion_depth_;
             return res;
           }
         case tlsf_expr_type::UnaryOp:
           {
-            if (e.children.empty())
-              {
-                diag(e, "unary op with no operand");
-                return spot::formula::ff();
-              }
-            spot::formula c = translate_expr(*e.children[0]);
+            // The parser always attaches exactly one operand.
+            assert(e.children.size() == 1);
+            formula c = translate_expr(*e.children[0]);
             switch (e.op)
               {
               case tlsf_op::Not:
-                return spot::formula::Not(c);
+                return formula::Not(c);
               case tlsf_op::G:
-                return spot::formula::G(c);
+                return formula::G(c);
               case tlsf_op::F:
-                return spot::formula::F(c);
+                return formula::F(c);
               case tlsf_op::X:
-                return spot::formula::X(c);
+                return formula::X(c);
               case tlsf_op::StrongNext:
-                if (ast_.semantics != tlsf_semantics::MealyFinite
-                    && ast_.semantics != tlsf_semantics::MooreFinite)
-                  {
-                    diag(e, "strong next X[!] requires finite semantics");
-                    return spot::formula::ff();
-                  }
-                return spot::formula::strong_X(c);
+                if (!require_finite_semantics(e))
+                  return formula::ff();
+                return formula::strong_X(c);
               default:
-                diag(e, "unary op '" + tlsf_format_op(e.op)
-                       + "' is not supported in LTL position");
-                return spot::formula::ff();
+                // The parser only produces Not/G/F/X/X[!] unary ops;
+                // any other op in LTL position reaches the notifier.
+                SPOT_UNREACHABLE();
               }
           }
         case tlsf_expr_type::BinaryOp:
           {
-            if (e.children.size() < 2)
-              {
-                diag(e, "binary op with fewer than two operands");
-                return spot::formula::ff();
-              }
+            assert(e.children.size() == 2);
             // Comparison and arithmetic operators decide based on
             // context.  Spot has no Eq/Lt/etc. operators, so anything
             // not collapsible to a Boolean subterm gets a diagnostic.
@@ -1416,53 +1519,122 @@ namespace spot
               case tlsf_op::R:
               case tlsf_op::W:
                 {
-                  spot::formula l = translate_expr(*e.children[0]);
-                  spot::formula r = translate_expr(*e.children[1]);
+                  formula l = translate_expr(*e.children[0]);
+                  formula r = translate_expr(*e.children[1]);
                   switch (e.op)
                     {
                     case tlsf_op::And:
-                      return spot::formula::And({l, r});
+                      return formula::And({l, r});
                     case tlsf_op::Or:
-                      return spot::formula::Or({l, r});
+                      return formula::Or({l, r});
                     case tlsf_op::Implies:
-                      return spot::formula::Implies(l, r);
+                      return formula::Implies(l, r);
                     case tlsf_op::Equiv:
-                      return spot::formula::Equiv(l, r);
+                      return formula::Equiv(l, r);
                     case tlsf_op::U:
-                      return spot::formula::U(l, r);
+                      return formula::U(l, r);
                     case tlsf_op::R:
-                      return spot::formula::R(l, r);
+                      return formula::R(l, r);
                     case tlsf_op::W:
-                      return spot::formula::W(l, r);
+                      return formula::W(l, r);
                     default:
                       SPOT_UNREACHABLE();
                     }
                 }
+              case tlsf_op::Eq:
+              case tlsf_op::Neq:
+                // Enum comparison over a typed bus: `HBURST == INCR`
+                // folds to the OR of the value's bit patterns over
+                // the expanded bus APs (translate_enum_cmp); `!=` is
+                // its negation.  Both sides may be swapped.
+                if (!e.children.empty() && e.children[0]
+                    && e.children[0]->type == tlsf_expr_type::Identifier
+                    && e.children[1]
+                    && e.children[1]->type == tlsf_expr_type::Identifier)
+                  {
+                    const tlsf_ap_decl* lhs = find_decl(
+                      e.children[0]->name);
+                    const tlsf_ap_decl* rhs = find_decl(
+                      e.children[1]->name);
+                    if (lhs && !lhs->enum_type.empty())
+                      return translate_enum_cmp(e, *lhs,
+                                                e.op == tlsf_op::Eq);
+                    if (rhs && !rhs->enum_type.empty())
+                      return translate_enum_cmp(e, *rhs,
+                                                e.op == tlsf_op::Eq);
+                  }
+                [[fallthrough]];
+              case tlsf_op::Lt:
+              case tlsf_op::Le:
+              case tlsf_op::Gt:
+              case tlsf_op::Ge:
+                // A comparison of two integer expressions is a
+                // constant.  Section 4.3 makes an LTL expression a
+                // boolean expression plus signals and temporal
+                // operators, and a boolean expression may compare two
+                // integer expressions, so `(SIZEOF b) == 4`,
+                // `N >= 4`, or `m(2) == 2` are valid LTL expressions
+                // even though the comparison operators have no LTL
+                // counterpart.  Fold them like the `In` case below.
+                // This also covers a definition whose body is a
+                // comparison of two integer expressions (amba's
+                // `bit(v,i) = ... : v % 2`), once the actual arguments
+                // have been substituted and the body reaches this
+                // point.
+                //
+                // The evaluation is quiet: a non-constant operand
+                // (a signal, a bus) simply fails here and is
+                // rejected below with the dedicated diagnostic.
+                {
+                  long long l;
+                  long long r;
+                  if (eval_int_quiet(*e.children[0], l)
+                      && eval_int_quiet(*e.children[1], r))
+                    return compare_ints(e.op, l, r)
+                           ? formula::tt() : formula::ff();
+                }
+                // Not constant, so at least one operand is a signal,
+                // a bus, or something built from one.  Re-evaluate
+                // the operands that are not plain leaves so a
+                // mistake inside one of them is reported where it
+                // happens ("function call 'SIZE' is not supported in
+                // integer position" for an unknown function, "SIZEOF
+                // of scalar AP 's'" for a non-bus, ...) instead of
+                // being hidden behind the rejection of the enclosing
+                // comparison.  A leaf is understood already: a
+                // signal or a bus has no integer value, and a literal
+                // always has one.
+                for (const auto& c : e.children)
+                  if (c && c->type != tlsf_expr_type::Identifier
+                      && c->type != tlsf_expr_type::BusRef
+                      && c->type != tlsf_expr_type::LiteralInt)
+                    {
+                      long long v;
+                      eval_int(*c, v);
+                    }
+                diag(e, "arithmetic/comparison op '"
+                       + tlsf_format_op(e.op)
+                       + "' is not supported in LTL position");
+                return formula::ff();
               case tlsf_op::Add:
               case tlsf_op::Sub:
               case tlsf_op::Mul:
               case tlsf_op::Div:
               case tlsf_op::Mod:
-              case tlsf_op::Eq:
-              case tlsf_op::Neq:
-              case tlsf_op::Lt:
-              case tlsf_op::Le:
-              case tlsf_op::Gt:
-              case tlsf_op::Ge:
                 diag(e, "arithmetic/comparison op '"
                        + tlsf_format_op(e.op)
                        + "' is not supported in LTL position");
-                return spot::formula::ff();
+                return formula::ff();
               case tlsf_op::In:
                 {
                   long long value;
                   std::vector<long long> values;
                   if (!eval_int(*e.children[0], value)
                       || !eval_set(*e.children[1], values))
-                    return spot::formula::ff();
+                    return formula::ff();
                   return std::find(values.begin(), values.end(), value)
-                    != values.end() ? spot::formula::tt()
-                    : spot::formula::ff();
+                    != values.end() ? formula::tt()
+                    : formula::ff();
                 }
               case tlsf_op::Guard:
                 // A guard clause `eB : e` is meaningful only as a
@@ -1472,42 +1644,107 @@ namespace spot
                 // (e.g. written directly in a MAIN subsection).
                 diag(e, "guard clause ':' is only meaningful inside "
                         "a definition body");
-                return spot::formula::ff();
+                return formula::ff();
               default:
                 diag(e, "unknown binary op");
-                return spot::formula::ff();
+                return formula::ff();
               }
           }
         case tlsf_expr_type::Quantifier:
           {
-            if (e.children.size() < 2 || !e.children[0]
-                || !e.children[1])
+            // `X[n] phi`: unfold the stack of n next operators.  n is
+            // an integer expression evaluated with the current
+            // parameter bindings.  The strong (LTLf) flavour
+            // `X[!n] phi`/`X[n!] phi` unfolds strong next instead.
+            if (e.op == tlsf_op::XStack || e.op == tlsf_op::StrongXStack)
               {
-                diag(e, "quantifier with fewer than two operands");
-                return spot::formula::ff();
-              }
-
-            // `X[n] phi` (TLSF v1.2 SS4.8): unfold the stack of n
-            // next operators.  n is an integer expression evaluated
-            // with the current parameter bindings.
-            if (e.op == tlsf_op::XStack)
-              {
+                if (e.op == tlsf_op::StrongXStack
+                    && !require_finite_semantics(e))
+                  return formula::ff();
+                assert(e.children.size() == 2
+                       && e.children[0] && e.children[1]);
                 long long n;
                 if (!eval_int(*e.children[0], n))
-                  return spot::formula::ff();
+                  return formula::ff();
                 if (n < 0)
                   {
                     diag(e, "X[...] requires a non-negative number "
                             "of next steps");
-                    return spot::formula::ff();
+                    return formula::ff();
                   }
-                spot::formula f = translate_expr(*e.children[1]);
-                for (long long i = 0; i < n; ++i)
-                  f = spot::formula::X(f);
-                return f;
+                if (static_cast<unsigned long long>(n)
+                    >= formula::unbounded())
+                  {
+                    diag(e, "X[...] bound exceeds the maximum supported"
+                            " repetition");
+                    return formula::ff();
+                  }
+                formula body = translate_expr(*e.children[1]);
+                unsigned steps = static_cast<unsigned>(n);
+                if (e.op == tlsf_op::StrongXStack)
+                  return formula::strong_X(steps, body);
+                return formula::X(steps, body);
               }
 
-            // TLSF v1.2 requires every quantifier to introduce an
+            // Bounded temporal operators `F[a:b] phi` / `G[a:b] phi`
+            // children = [lower, upper, body].  The strong (LTLf)
+            // flavour `F[!a:b] phi`/`F[a:b!] phi` (and likewise for G)
+            // is the same operator built on strong next, so its
+            // expansion differs only in the operator each repeated
+            // step is combined with: `formula::nested_unop_range` on
+            // op::strong_X with op::Or (resp. op::And) yields exactly
+            // what syfco prints for `F[!a:b]` (resp. `G[!a:b]`).
+            if (e.op == tlsf_op::FBounded || e.op == tlsf_op::GBounded
+                || e.op == tlsf_op::StrongFBounded
+                || e.op == tlsf_op::StrongGBounded)
+              {
+                const bool strong = e.op == tlsf_op::StrongFBounded
+                                    || e.op == tlsf_op::StrongGBounded;
+                if (strong && !require_finite_semantics(e))
+                  return formula::ff();
+                // F[a:b]/G[a:b] always carry [lower, upper, body].
+                assert(e.children.size() == 3 && e.children[2]);
+                long long lo;
+                long long hi;
+                if (!eval_int(*e.children[0], lo)
+                    || !eval_int(*e.children[1], hi))
+                  return formula::ff();
+                if (lo < 0 || hi < 0)
+                  {
+                    diag(e, "temporal bound must be non-negative");
+                    return formula::ff();
+                  }
+                // An inverted bound (a > b) makes the operator
+                // vacuous: `F[a:b]`/`G[a:b]` is then `true`.  This
+                // test has to precede the nested_unop_range() calls
+                // below, which would silently swap the two bounds.
+                if (lo > hi)
+                  return formula::tt();
+                if (static_cast<unsigned long long>(hi)
+                    >= formula::unbounded())
+                  {
+                    diag(e, "temporal bound exceeds the maximum supported"
+                            " repetition");
+                    return formula::ff();
+                  }
+                formula body = translate_expr(*e.children[2]);
+                unsigned min = static_cast<unsigned>(lo);
+                unsigned max = static_cast<unsigned>(hi);
+                if (e.op == tlsf_op::FBounded
+                    || e.op == tlsf_op::StrongFBounded)
+                  {
+                    if (strong)
+                      return formula::nested_unop_range(op::strong_X, op::Or,
+                                                        min, max, body);
+                    return formula::F(min, max, body);
+                  }
+                if (strong)
+                  return formula::nested_unop_range(op::strong_X, op::And,
+                                                    min, max, body);
+                return formula::G(min, max, body);
+              }
+
+            // TLSF requires every quantifier to introduce an
             // explicit iteration variable.  The bound is kept verbatim
             // in children[0], and its two valid shapes are recognized
             // here, at translation time:
@@ -1515,9 +1752,13 @@ namespace spot
             //     `(lo <= i) < hi`, with `<=`/`<` in any combination);
             //   * membership `i in set`, where the set is a literal,
             //     a range, or a CUP/CAP/SETMINUS combination.
-            // The legacy variable-less bounds (`&&[N]`, `&&[lo..hi]`,
-            // `&&[{...}]`) are not valid TLSF and are diagnosed here
-            // rather than silently iterating over an implicit `i`.
+            // Variable-less bounds (`&&[N]`, `&&[{...}]`)
+            // are not valid TLSF and are diagnosed here.
+            if (e.children.size() < 2 || !e.children[0] || !e.children[1])
+              {
+                diag(e, "quantifier with fewer than two operands");
+                return formula::ff();
+              }
             const auto& bound = *e.children[0];
             std::string variable;
             std::vector<long long> values;
@@ -1547,7 +1788,7 @@ namespace spot
                 if (!eval_int(*lower_cmp.children[0], lower)
                     || !eval_int(*bound.children[1], upper))
                   return e.op == tlsf_op::And
-                    ? spot::formula::tt() : spot::formula::ff();
+                    ? formula::tt() : formula::ff();
                 if (lower <= upper)
                   {
                     const auto span = integer_range_span(lower, upper);
@@ -1555,7 +1796,7 @@ namespace spot
                       {
                         diag(e, "quantifier range is too large");
                         return e.op == tlsf_op::And
-                          ? spot::formula::tt() : spot::formula::ff();
+                          ? formula::tt() : formula::ff();
                       }
                     values.reserve(static_cast<size_t>(span + 1));
                     long long value = lower;
@@ -1583,7 +1824,7 @@ namespace spot
                 variable = bound.children[0]->name;
                 if (!eval_set(*bound.children[1], values))
                   return e.op == tlsf_op::And
-                    ? spot::formula::tt() : spot::formula::ff();
+                    ? formula::tt() : formula::ff();
               }
             else
               {
@@ -1591,13 +1832,13 @@ namespace spot
                         "variable (e.g. `&&[0 <= i < N]` or "
                         "`&&[i IN {0, 1}]`)");
                 return e.op == tlsf_op::And
-                  ? spot::formula::tt() : spot::formula::ff();
+                  ? formula::tt() : formula::ff();
               }
 
             auto previous = loop_vars_.find(variable);
             bool had_previous = previous != loop_vars_.end();
             long long previous_value = had_previous ? previous->second : 0;
-            std::vector<spot::formula> parts;
+            std::vector<formula> parts;
             parts.reserve(values.size());
             for (long long value : values)
               {
@@ -1610,31 +1851,32 @@ namespace spot
               loop_vars_.erase(variable);
 
             if (e.op == tlsf_op::And)
-              return spot::formula::And(parts);
+              return formula::And(parts);
             if (e.op == tlsf_op::Or)
-              return spot::formula::Or(parts);
-            diag(e, "unsupported quantifier op");
-            return spot::formula::ff();
+              return formula::Or(parts);
+            // XStack, FBounded, GBounded and their strong flavours
+            // returned above.
+            SPOT_UNREACHABLE();
           }
         case tlsf_expr_type::SetExplicit:
           diag(e, "set literal in LTL position");
-          return spot::formula::ff();
+          return formula::ff();
         case tlsf_expr_type::SetRange:
           diag(e, "set range in LTL position");
-          return spot::formula::ff();
+          return formula::ff();
         }
-      diag(e, "internal: unhandled tlsf_expr_type");
-      return spot::formula::ff();
+      // All nine tlsf_expr_type values have a case in this switch.
+      SPOT_UNREACHABLE();
     }
 
     tlsf_translation_result translator::run()
     {
       tlsf_translation_result result;
 
-      // 1. Resolve parameters. Keep source expressions until all
-      // declarations are known, so a parameter may refer to one that
-      // appears later in the PARAMETERS block. Overrides take
-      // precedence over declared expressions.
+      // 1. Resolve parameters. Keep source expressions (as parsed
+      // ASTs) until all declarations are known, so a parameter may
+      // refer to one that appears later in the PARAMETERS block.
+      // Overrides take precedence over declared expressions.
       for (const auto& p : ast_.parameters)
         param_exprs_[p.name] = p.value;
       for (const auto& kv : opts_.overrides)
@@ -1644,9 +1886,9 @@ namespace spot
           if (params_.count(p.name))
             continue;
           long long value = 0;
-          if (!eval_int_string(p.value, value))
+          if (!p.value || !eval_int(*p.value, value))
             diag(p.loc, "could not evaluate parameter '" + p.name
-                   + "' expression '" + p.value + "'");
+                   + "'");
           else
             params_[p.name] = value;
         }
@@ -1655,28 +1897,273 @@ namespace spot
         throw std::runtime_error("tlsf translator: parameter parsing "
                                  "failed");
 
+      // 1b. Register every declared signal eagerly, in declaration
+      // order.  This makes a bad bus size or an unknown enum type a
+      // declaration error even when the bus is never referenced.  A
+      // zero size is silently empty.  The seen_* sets make this a
+      // no-op for signals that first-use registration already
+      // handled (first-use order still wins for anything used before
+      // this pass would run -- but this pass runs first, so it fully
+      // determines the order).
+      auto register_decl = [&](const tlsf_ap_decl& d)
+        {
+          // A scalar AP is registered under its bare name; a bus
+          // (sized or typed) contributes name_0..name_{w-1}.  The
+          // seen_* sets make this a no-op if a first-use registration
+          // already handled the signal (first-use order still wins
+          // for anything recorded before this pass).
+          if (!d.size && d.enum_type.empty())
+            {
+              if (base_is_output(d.name))
+                {
+                  if (seen_outputs_.insert(d.name).second)
+                    outputs_.push_back(d.name);
+                }
+              else if (seen_inputs_.insert(d.name).second)
+                inputs_.push_back(d.name);
+              return;
+            }
+          long long w;
+          if (!eval_ap_width(d, w))
+            return;           // diagnosed by eval_ap_width
+          for (long long i = 0; i < w; ++i)
+            {
+              std::string name = d.name + '_' + std::to_string(i);
+              if (base_is_output(d.name))
+                {
+                  if (seen_outputs_.insert(name).second)
+                    outputs_.push_back(name);
+                }
+              else if (seen_inputs_.insert(name).second)
+                inputs_.push_back(name);
+            }
+        };
+      for (const auto& d : ast_.inputs)
+        register_decl(d);
+      for (const auto& d : ast_.outputs)
+        register_decl(d);
+
       // 2. Translate each MAIN subsection as the conjunction of its
       //    body.  An empty body folds to tt(); a singleton body is
       //    returned as-is when wrapping in tt()∧x would just simplify
       //    to x anyway.
       auto conjunction =
-        [&](const std::vector<tlsf_expr_ptr>& body) -> spot::formula
+        [&](const std::vector<tlsf_expr_ptr>& body) -> formula
         {
           if (body.empty())
-            return spot::formula::tt();
-          std::vector<spot::formula> parts;
+            return formula::tt();
+          std::vector<formula> parts;
           parts.reserve(body.size());
           for (const auto& e : body)
             parts.push_back(translate_expr(*e));
-          return spot::formula::And(parts);
+          return formula::And(parts);
         };
 
-      spot::formula initially = conjunction(ast_.initially_body);
-      spot::formula preset    = conjunction(ast_.preset_body);
-      spot::formula require   = conjunction(ast_.require_body);
-      spot::formula assumptions = conjunction(ast_.assumptions_body);
-      spot::formula assertion = conjunction(ast_.assert_body);
-      spot::formula guarantee = conjunction(ast_.guarantee_body);
+      formula initially = conjunction(ast_.initially_body);
+      formula preset    = conjunction(ast_.preset_body);
+      formula require   = conjunction(ast_.require_body);
+      formula assumptions = conjunction(ast_.assumptions_body);
+      formula assertion = conjunction(ast_.assert_body);
+      formula guarantee = conjunction(ast_.guarantee_body);
+
+      // 2b. Coverage constraints of typed buses.
+      //
+      // A typed bus may only carry a valuation that one of its enum
+      // tags covers; this keeps the environment from driving an
+      // uninterpreted pattern.  Two exact encodings of that set are
+      // available and the smaller one is used.
+      //
+      //  * The factored coverage formula: the disjunction over tags
+      //    of the conjunction over the tag's patterns of the
+      //    conjunction over each pattern's pinned bits.  Its size is
+      //    bounded by the source text, because a pattern with k stars
+      //    contributes the bits it pins, not the 2^k valuations it
+      //    covers.  It is therefore always available.
+      //
+      //  * Its complement: one disjunct ("some bit differs") per
+      //    valuation that no tag covers.  More compact when the enum
+      //    covers most of the space, but 2^w terms wide.
+      //
+      // The complement used to be the only encoding, which built a
+      // 65535-term formula for a 16-bit bus and overflowed
+      // formula::nary's child limit for anything wider; that overflow
+      // is signalled by an exception the translator did not catch, so
+      // a perfectly ordinary 17-bit enum aborted the process.
+      //
+      // Input buses contribute to REQUIRE, output buses to ASSERT.
+      static constexpr long long max_formula_children = 65535;
+      // Widest bus for which the covered valuations are enumerated to
+      // compare the two encodings.  Above it the factored form is
+      // used without looking, since 2^w valuations cannot be walked
+      // anyway and the factored form is a sound, compact answer.
+      static constexpr long long max_scan_width = 20;
+
+      auto enum_coverage =
+        [&](const std::vector<tlsf_ap_decl>& decls) -> formula
+        {
+          std::vector<formula> parts;
+          for (const auto& d : decls)
+            {
+              if (d.enum_type.empty())
+                continue;
+              const tlsf_enum_decl* en = find_enum(d.enum_type);
+              if (!en)
+                continue;   // already diagnosed by eval_ap_width
+              long long w;
+              if (!eval_ap_width(d, w) || w <= 0)
+                continue;   // diagnosed, or a zero-width bus
+              // The bus bits are APs registered by run()'s
+              // register_decl pass (see run()) before any section is
+              // translated.
+              auto bit_ap = [&](long long i)
+                {
+                  return formula::ap(d.name + '_' + std::to_string(i));
+                };
+              // A pattern covers v iff every non-star bit of p equals
+              // the corresponding bit of v, so the conjunction over p's
+              // fixed bits denotes exactly the valuations p covers.
+              // Pattern position k is significance order, i.e. bit
+              // w-1-k of the valuation.
+              std::vector<formula> tag_terms;
+              // Sum over the patterns of 2^(number of stars): an
+              // upper bound on the number of covered valuations, used
+              // below to pick the encoding without enumerating.  It
+              // saturates so a wide bus cannot overflow the shift.
+              long long span_bound = 0;
+              for (const auto& entry : en->entries)
+                {
+                  std::vector<formula> pattern_terms;
+                  for (const auto& pat : entry.patterns)
+                    {
+                      if (pat.size() != static_cast<size_t>(w))
+                        continue;   // diagnosed by the parser
+                      std::vector<formula> lits;
+                      unsigned stars = 0;
+                      for (long long k = 0; k < w; ++k)
+                        {
+                          const char c =
+                            pat[static_cast<size_t>(w - 1 - k)];
+                          if (c == '*')
+                            {
+                              ++stars;
+                              continue;
+                            }
+                          lits.push_back(c == '1'
+                                         ? bit_ap(k)
+                                         : formula::Not(bit_ap(k)));
+                        }
+                      // An all-star pattern pins nothing, and covers
+                      // every valuation.
+                      pattern_terms.push_back(lits.empty()
+                                              ? formula::tt()
+                                              : formula::And(lits));
+                      span_bound = stars < 31
+                        ? span_bound + (1LL << stars) : (1LL << 31);
+                    }
+                  // A tag's pattern list is a union of alternatives,
+                  // as in the canonical `UNDEF: 11*, 1*1, *11`.
+                  if (!pattern_terms.empty())
+                    tag_terms.push_back(formula::Or(pattern_terms));
+                }
+              if (tag_terms.empty())
+                continue;   // no usable pattern, nothing to constrain
+              const formula factored = formula::Or(tag_terms);
+              // The factored form is the smaller one as soon as the
+              // tags pin at most half of the space; that bound needs
+              // no enumeration and settles the common case.
+              if (w > max_scan_width || span_bound <= (1LL << (w - 1)))
+                {
+                  parts.push_back(factored);
+                  continue;
+                }
+              // Otherwise count the covered valuations exactly, by
+              // expanding the stars of each pattern (cheap: the work
+              // follows the number of stars, not 2^w).
+              std::vector<long long> covered;
+              for (const auto& entry : en->entries)
+                for (const auto& pat : entry.patterns)
+                  {
+                    if (pat.size() != static_cast<size_t>(w))
+                      continue;   // diagnosed by the parser
+                    long long base = 0;
+                    std::vector<long long> free_pos;
+                    for (long long k = 0; k < w; ++k)
+                      {
+                        const char c =
+                          pat[static_cast<size_t>(w - 1 - k)];
+                        if (c == '*')
+                          free_pos.push_back(k);
+                        else if (c == '1')
+                          base |= 1LL << k;
+                      }
+                    for (long long sub = 0, span = 1LL << free_pos.size();
+                         sub < span; ++sub)
+                      {
+                        long long v = base;
+                        for (size_t b = 0; b < free_pos.size(); ++b)
+                          if ((sub >> b) & 1)
+                            v |= 1LL << free_pos[b];
+                        covered.push_back(v);
+                      }
+                  }
+              std::sort(covered.begin(), covered.end());
+              covered.erase(std::unique(covered.begin(), covered.end()),
+                            covered.end());
+              const long long ncovered =
+                static_cast<long long>(covered.size());
+              const long long nmissing = (1LL << w) - ncovered;
+              // Take the complement only when it is both smaller than
+              // the factored form and small enough to fit in a
+              // formula; otherwise keep the factored form.
+              if (nmissing > max_formula_children
+                  || nmissing >= ncovered)
+                {
+                  parts.push_back(factored);
+                  continue;
+                }
+              std::vector<formula> disjoint;
+              disjoint.reserve(static_cast<size_t>(nmissing));
+              size_t next = 0;
+              for (long long v = 0, end = 1LL << w; v < end; ++v)
+                {
+                  if (next < covered.size() && covered[next] == v)
+                    {
+                      ++next;
+                      continue;
+                    }
+                  // Or_i (bit i of the bus differs from bit i of v)
+                  std::vector<formula> differs;
+                  differs.reserve(static_cast<size_t>(w));
+                  for (long long i = 0; i < w; ++i)
+                    differs.push_back(((v >> i) & 1)
+                                      ? formula::Not(bit_ap(i))
+                                      : bit_ap(i));
+                  disjoint.push_back(formula::Or(differs));
+                }
+              parts.push_back(formula::And(disjoint));
+            }
+          if (parts.empty())
+            return formula::tt();
+          while (parts.size() > max_formula_children)
+            {
+              // A pathological number of typed buses: fold the
+              // collected constraints pairwise, so that no single
+              // conjunction exceeds the child limit of formula::nary.
+              std::vector<formula> folded;
+              folded.reserve((parts.size() + 1) / 2);
+              for (size_t i = 0; i < parts.size(); i += 2)
+                folded.push_back(i + 1 < parts.size()
+                                 ? formula::And({parts[i],
+                                                       parts[i + 1]})
+                                 : parts[i]);
+              parts.swap(folded);
+            }
+          return formula::And(parts);
+        };
+      formula covered_in = enum_coverage(ast_.inputs);
+      formula covered_out = enum_coverage(ast_.outputs);
+      require = formula::And({require, covered_in});
+      assertion = formula::And({assertion, covered_out});
 
       // Expose each subsection's translation on the result so
       // callers can inspect the individual pieces of the composed
@@ -1708,33 +2195,33 @@ namespace spot
       //                ∧ (G(REQUIRE) ∧ ASSUME) → GUARANTEE)
       //                ∧ (ASSERT W ¬REQUIRE))
 
-      spot::formula environment =
-        spot::formula::And({spot::formula::G(require), assumptions});
+      formula environment =
+        formula::And({formula::G(require), assumptions});
 
       const bool strict =
         ast_.semantics == tlsf_semantics::MealyStrict
         || ast_.semantics == tlsf_semantics::MooreStrict;
 
-      spot::formula system = strict
+      formula system = strict
         ? guarantee
-        : spot::formula::And({spot::formula::G(assertion), guarantee});
-      spot::formula conditional =
-        spot::formula::Implies(environment, system);
+        : formula::And({formula::G(assertion), guarantee});
+      formula conditional =
+        formula::Implies(environment, system);
 
-      spot::formula core;
+      formula core;
       if (strict)
         {
-          spot::formula w =
-            spot::formula::W(assertion, spot::formula::Not(require));
-          core = spot::formula::And({preset, conditional, w});
+          formula w =
+            formula::W(assertion, formula::Not(require));
+          core = formula::And({preset, conditional, w});
         }
       else
         {
-          core = spot::formula::And({preset, conditional});
+          core = formula::And({preset, conditional});
         }
 
-      result.full_formula = spot::formula::Implies(initially, core);
-      result.full_formula = failed_ ? spot::formula(nullptr)
+      result.full_formula = formula::Implies(initially, core);
+      result.full_formula = failed_ ? formula(nullptr)
                                     : result.full_formula;
       result.inputs = std::move(inputs_);
       result.outputs = std::move(outputs_);

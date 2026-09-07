@@ -45,23 +45,24 @@ namespace spot
   /// \a res must outlive the scanner; in practice, parse_tlsf()
   /// declares \a res on the stack and passes its address here.
   int tlsfyyopen(const std::string& name, void** scanner,
-                 spot::tlsf_result& res);
+                 tlsf_result& res);
 
   /// \brief Open a TLSF scanner on an open file descriptor.
   ///
   /// The fd is \c fdopen(3)-ed for reading and is NOT closed by the
   /// scanner; callers retain ownership.
-  int tlsfyyopen(int fd, void** scanner, spot::tlsf_result& res);
+  int tlsfyyopen(int fd, void** scanner, tlsf_result& res);
+
+  /// \brief Open a TLSF scanner on a NUL-terminated string.
+  ///
+  /// The scanner reads from \a data directly (no copy); \a data must
+  /// stay valid until the scanner is closed.
+  int tlsfyystring(const char* data, void** scanner,
+                   tlsf_result& res);
 
   /// \brief Close a TLSF scanner.
   ///
   /// Frees only the flex-generated scanner state; \a tlsf_result is
   /// owned by the caller.
   void tlsfyyclose(void* scanner);
-
-  /// \brief Reset a TLSF scanner back to its fresh state.
-  ///
-  /// Resets the start condition (INITIAL) and clears the body-capture
-  /// bookkeeping in \c yyextra.  Does NOT close \c yyin.
-  void tlsfyyreset(void* scanner);
 }

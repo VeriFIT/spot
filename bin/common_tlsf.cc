@@ -112,6 +112,11 @@ read_tlsf_with_spot(const std::string& filename,
   auto parsed = spot::parse_tlsf(filename, popts);
   if (parsed->format_errors(std::cerr))
     return false;
+  // The parse succeeded, but the specification may still be
+  // questionable (SS1.4: SEMANTICS and TARGET disagreeing).  Report
+  // it without failing: the composition the translator builds is
+  // well-defined, the file is just ambiguous about it.
+  parsed->format_warnings(std::cerr);
 
   // The flags may require the SEMANTICS declaration of the
   // specification to be Finite, or to not be Finite.  The syfco
@@ -138,8 +143,7 @@ read_tlsf_with_spot(const std::string& filename,
   auto conv = spot::tlsf_to_ltl(*parsed, {}, &errors);
   if (!conv.full_formula || !errors.empty())
     {
-      for (auto& e: errors)
-        std::cerr << e.first << ": " << e.second << '\n';
+      spot::format_tlsf_diagnostics(std::cerr, filename, errors);
       return false;
     }
 
