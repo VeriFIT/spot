@@ -250,6 +250,12 @@ int main()
     for (auto& [m, alpha] : c.mafins_split())
       std::cout << m << ' ' << alpha << '\n';
   };
+  auto print_mafins_split_improved =
+    [](const spot::acc_cond::acc_code& c)
+    {
+      for (auto& [m, f, alpha] : c.mafins_split_improved())
+        std::cout << m << ' ' << alpha << '\n';
+    };
 
   // Not a disjunction: single entry (mafins(φ), φ).
   print_mafins_split(spot::acc_cond::acc_code("Fin(0) & Inf(1)"));
@@ -290,6 +296,9 @@ int main()
     " | Fin(3)&Fin(4)&Inf(10) | Fin(3)&Fin(4)&Inf(11)"
     " | Fin(5)&Fin(6)&(Inf(12)|Fin(14))"
     " | Fin(5)&Fin(6)&(Inf(13)|Fin(14))"));
+
+  print_mafins_split_improved(spot::acc_cond::acc_code(
+    "Fin(0)&Inf(1) | Fin(1)&(Inf(2)|Fin(0))"));
 
   return 0;
 }

@@ -2792,7 +2792,7 @@ namespace spot
         case acc_cond::acc_op::Fin:
           {
             auto m = pos[-1].mark;
-            return {acc_cond::acc_code::fin({f}),
+            return {acc_cond::acc_code::t(),
                     acc_cond::acc_code::fin(m - acc_cond::mark_t{f})};
           }
         case acc_cond::acc_op::And:
@@ -2808,6 +2808,17 @@ namespace spot
             auto right = acc_cond::acc_code::f();
             do
               {
+                if (pos->sub.op == acc_cond::acc_op::Fin)
+                  if (auto m = pos[-1].mark; m.has(f))
+                    {
+                      left = acc_cond::acc_code::t();
+                      auto tmp =
+                        acc_cond::acc_code::fin(m - acc_cond::mark_t{f});
+                      tmp |= std::move(right);
+                      std::swap(right, tmp);
+                      pos -= pos->sub.size + 1;
+                      continue;
+                    }
                 acc_cond::mark_t mf = mafins_rec(pos);
                 if (mf.has(f))
                   {
@@ -2858,6 +2869,20 @@ namespace spot
   }
 
   std::tuple<int, acc_cond::acc_code, acc_cond::acc_code>
+  acc_cond::acc_code::fin_one_split() const
+  {
+    if (SPOT_UNLIKELY(is_t() || is_f()))
+    err:
+      throw std::runtime_error("fin_one_split(): no Fin");
+    const acc_cond::acc_word* pos = &back();
+    int selected_fin = fin_one();
+    if (selected_fin < 0)
+      goto err;
+    acc_cond::mark_t fo_m = {(unsigned) selected_fin};
+    return {selected_fin, extract_fin(pos, fo_m), force_inf(fo_m)};
+  }
+
+  std::tuple<int, acc_cond::acc_code, acc_cond::acc_code>
   acc_cond::acc_code::fin_unit_one_split() const
   {
     if (SPOT_UNLIKELY(is_t() || is_f()))
@@ -2880,6 +2905,12 @@ namespace spot
   std::tuple<int, acc_cond::acc_code, acc_cond::acc_code>
   acc_cond::acc_code::fin_unit_one_split_improved() const
   {
+    // Unlike fin_unit_one_split(), this path uses split_top_fin<true>()
+    // after a Fin(i) has already been selected.  The improvement is not
+    // in the choice of i itself, but in how a top-level disjunction is
+    // split once i is fixed: deeper occurrences of Fin(i) inside one
+    // disjunct are extracted into the left side, while the remainder is
+    // kept on the right side with that occurrence rewritten to Inf(i).
     if (SPOT_UNLIKELY(is_t() || is_f()))
     err:
       throw std::runtime_error("fin_unit_one_split_improved(): no Fin");
@@ -3096,7 +3127,9 @@ namespace spot
       };
     const acc_word* pos = &back();
     if (pos->sub.op != acc_op::Or)
-      return {{mafins_rec(pos), *this}};
+      return {
+        {mafins_rec(pos), *this}
+      };
 
     // Extract all top-level disjuncts with their mafins.
     auto start = pos - pos->sub.size;
@@ -3172,26 +3205,124 @@ namespace spot
       else
         add_to_last(std::move(code), m);
 
-    // Stabilize: an accepted group whose mafins intersect M_last would violate
+    // Finish: an accepted group whose mafins intersect M_last would violate
     // the pairwise-disjoint constraint (constraint 2) against the last entry.
-    // Move such groups to last; this can only shrink M_last, so it terminates.
-    bool changed = true;
-    while (changed)
-      {
-        changed = false;
-        for (auto it = result.begin(); it != result.end();)
-          if (it->first & M_last)
-            {
-              add_to_last(std::move(it->second), it->first);
-              it = result.erase(it);
-              changed = true;
-            }
-          else
-            ++it;
-      }
+    // Move such groups to last.
+    for (auto it = result.begin(); it != result.end();)
+      if (it->first & M_last)
+        {
+          add_to_last(std::move(it->second), it->first);
+          it = result.erase(it);
+        }
+      else
+        {
+          ++it;
+        }
 
     if (has_last)
       result.push_back({last_code.mafins(), std::move(last_code)});
+    return result;
+  }
+
+  std::vector<std::tuple<acc_cond::mark_t, acc_cond::mark_t,
+                         acc_cond::acc_code>>
+  acc_cond::acc_code::mafins_split_improved() const
+  {
+    if (empty())
+      return {
+        {mark_t(), mark_t(), *this}
+      };
+    const acc_word* pos = &back();
+    if (pos->sub.op != acc_op::Or)
+      {
+        auto mafins = mafins_rec(pos);
+        auto fins = used_inf_fin_sets().second;
+        return {
+          {mafins, fins, *this}
+        };
+      }
+
+    auto start = pos - pos->sub.size;
+    --pos;
+    struct group
+    {
+      mark_t fins;
+      acc_code code;
+    };
+    std::map<mark_t, group> clean_groups;
+    acc_code last_code = acc_code::f();
+    bool has_last = false;
+    mark_t last_mafins{};
+    mark_t last_fins{};
+
+    auto add_to_last = [&](acc_code code, mark_t mafins, mark_t fins)
+    {
+      if (!has_last)
+        {
+          has_last = true;
+          last_mafins = mafins;
+          last_fins = fins;
+          last_code = std::move(code);
+        }
+      else
+        {
+          last_mafins &= mafins;
+          last_fins |= fins;
+          last_code |= std::move(code);
+        }
+    };
+
+    mark_t seen_fins{};
+    std::vector<std::tuple<mark_t, mark_t, acc_code>> result;
+    do
+      {
+        acc_code code(pos);
+        auto mafins = mafins_rec(pos);
+        auto fins = code.used_inf_fin_sets().second;
+        if (!mafins)
+          {
+            add_to_last(std::move(code), mafins, fins);
+          }
+        else
+          {
+            auto it = clean_groups.find(mafins);
+            if (it == clean_groups.end())
+              {
+                clean_groups.emplace(mafins, group{fins, std::move(code)});
+              }
+            else
+              {
+                it->second.fins |= fins;
+                it->second.code |= std::move(code);
+              }
+          }
+        pos -= pos->sub.size + 1;
+      }
+    while (pos > start);
+
+    for (auto& [mafins, g] : clean_groups)
+      if (!(g.fins & seen_fins))
+        {
+          seen_fins |= g.fins;
+          result.emplace_back(mafins, g.fins, std::move(g.code));
+        }
+      else
+        add_to_last(std::move(g.code), mafins, g.fins);
+
+    for (auto it = result.begin(); it != result.end();)
+      {
+        if (std::get<1>(*it) & last_fins)
+          {
+            add_to_last(std::move(std::get<2>(*it)), std::get<0>(*it),
+                        std::get<1>(*it));
+            it = result.erase(it);
+          }
+        else
+          ++it;
+      }
+
+    if (has_last)
+      result.emplace_back(last_mafins, last_fins, std::move(last_code));
     return result;
   }
 

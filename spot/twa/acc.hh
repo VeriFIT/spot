@@ -1324,12 +1324,51 @@ namespace spot
       /// is such that left contains all disjuncts containing Fin(i)
       /// (at any depth), and right contains the original formula
       /// where Fin(i) has been replaced by false.
+      ///
+      /// `fin_unit_one_split_improved()` behaves like
+      /// `fin_unit_one_split()`, but once `Fin(i)` has been selected, it
+      /// performs a finer split of the top-level disjunction.  In the
+      /// plain version, if a disjunct contains `Fin(i)` only deeper in
+      /// the tree, that whole disjunct is kept on the right-hand side.
+      /// In the improved version, that disjunct is still split: the part
+      /// containing `Fin(i)` is moved to the left-hand side, while the
+      /// remaining part is kept on the right-hand side with that
+      /// occurrence converted to `Inf(i)`.
       /// @{
       std::tuple<int, acc_cond::acc_code, acc_cond::acc_code>
       fin_unit_one_split() const;
       std::tuple<int, acc_cond::acc_code, acc_cond::acc_code>
       fin_unit_one_split_improved() const;
       /// @}
+
+      /// \brief Split an acceptance condition on some Fin(i)
+      /// selected arbitrarily.
+      ///
+      /// This calls fin_one() to select a Fin(i) that appears in the
+      /// acceptance condition, then it splits the acceptance condition
+      /// into two parts: left and right.
+      ///
+      /// If the input acceptance condition is a disjunction, the left
+      /// part will contain all disjuncts where Fin(i) appears, with
+      /// Fin(i) replaced by true. The right part will contain the
+      /// original acceptance condition with Fin(i) replaced by false.
+      /// Note that the disjuncts where Fin(i) does not appear are copied
+      /// verbatim to the right part.
+      ///
+      /// If the input acceptance condition is not a disjunction, the
+      /// left part contains the original condition with Fin(i) replaced
+      /// by true, and the right part has the original condition with
+      /// Fin(i) replaced by false.
+      ///
+      /// Returns a triple `(i, left, right)`.
+      ///
+      /// For instance, if the input is
+      /// `(Inf(0)&(Fin(1)|Fin(3))) | (Fin(4)&Inf(5))`
+      /// and if fin_one() returns 1, then fin_one_split()
+      /// will return
+      /// `(1, Inf(0), (Inf(0)&Fin(3)) | (Fin(4)&Inf(5)))`.
+      std::tuple<int, acc_cond::acc_code, acc_cond::acc_code>
+      fin_one_split() const;
 
       /// \brief Split an acceptance conditions into disjuncts
       /// according to mandatory fins.
@@ -1348,6 +1387,19 @@ namespace spot
       ///   - Φ = α₁∨α₂∨...∨αₙ
       std::vector<std::pair<acc_cond::mark_t, acc_cond::acc_code>>
       mafins_split() const;
+
+      /// \brief Split an acceptance condition into disjuncts according to
+      /// mandatory fins, keeping Fin colors disjoint between the results.
+      ///
+      /// If φ is a disjunction, this should return
+      /// a list of pairs [(M₁,F₁,α₁), ..., (Mₙ,Fₙ,αₙ)] such that
+      ///   - Mᵢ = mafins(αᵢ), Fᵢ=fins(αᵢ)
+      ///   - for any i and j, Fᵢ and Fⱼ do not intersect
+      ///   - only the last Mₙ may be empty
+      ///   - Φ = α₁∨α₂∨...∨αₙ
+      std::vector<std::tuple<acc_cond::mark_t, acc_cond::mark_t,
+                             acc_cond::acc_code>>
+      mafins_split_improved() const;
 
       /// \brief Help closing accepting or rejecting cycle.
       ///
@@ -2267,6 +2319,18 @@ namespace spot
       return result;
     }
 
+    /// \see acc_cond::acc_code::mafins_split_improved
+    std::vector<std::tuple<mark_t, mark_t, acc_cond>>
+    mafins_split_improved() const
+    {
+      auto v = code_.mafins_split_improved();
+      std::vector<std::tuple<mark_t, mark_t, acc_cond>> result;
+      result.reserve(v.size());
+      for (auto& [m, f, c] : v)
+        result.emplace_back(m, f, acc_cond(num_, c));
+      return result;
+    }
+
     /// \brief Find a `Inf(i)` that is a unit clause.
     ///
     /// This return a mark_t `{i}` such that `Inf(i)` appears as a
@@ -2318,6 +2382,33 @@ namespace spot
       return {f, {num_sets(), std::move(c)}};
     }
 
+    /// \brief Split an acceptance condition on some Fin(i)
+    /// selected arbitrarily.
+    ///
+    /// This calls fin_one() to select a Fin(i) that appears in the
+    /// acceptance condition, then it splits the acceptance condition
+    /// into two parts: left and right.
+    ///
+    /// If the input acceptance condition is a disjunction, the left
+    /// part will contain all disjuncts where Fin(i) appears, with
+    /// Fin(i) replaced by true. The right part will contain the
+    /// original acceptance condition with Fin(i) replaced by false.
+    /// Note that the disjuncts where Fin(i) does not appear are copied
+    /// verbatim to the right part.
+    ///
+    /// If the input acceptance condition is not a disjunction, the
+    /// left part contains the original condition with Fin(i) replaced
+    /// by true, and the right part has the original condition with
+    /// Fin(i) replaced by false.
+    ///
+    /// Returns a triple `(i, left, right)`.
+    std::tuple<int, acc_cond, acc_cond>
+    fin_one_split() const
+    {
+      auto [f, l, r] = code_.fin_one_split();
+      return {f, {num_sets(), std::move(l)}, {num_sets(), std::move(r)}};
+    }
+
     /// \brief Split an acceptance condition, trying to select one
     /// unit-Fin.
     ///
@@ -2335,6 +2426,22 @@ namespace spot
     /// is such that left contains all disjuncts containing Fin(i)
     /// (at any depth), and right contains the original formula
     /// where Fin(i) has been replaced by false.
+    ///
+    /// `fin_unit_one_split_improved()` behaves like
+    /// `fin_unit_one_split()`, but once `Fin(i)` has been selected, it
+    /// performs a finer split of the top-level disjunction.  In the
+    /// plain version, if a disjunct contains `Fin(i)` only deeper in the
+    /// tree, that whole disjunct is kept on the right-hand side.  In the
+    /// improved version, that disjunct is still split: the part
+    /// containing `Fin(i)` is moved to the left-hand side, while the
+    /// remaining part is kept on the right-hand side with that
+    /// occurrence converted to `Inf(i)`.
+    ///
+    /// This matters for formulas such as `Fin(0)|Fin(1)|Fin(0)&Inf(0)`: both
+    /// variants select `0`, but the plain split yields
+    /// `(0, f, Fin(0)|Fin(1))`, while the improved split yields
+    /// `(0, t, Fin(1))` because the last disjunct is split at the
+    /// deeper `Fin(0)`.
     /// @{
     std::tuple<int, acc_cond, acc_cond>
     fin_unit_one_split() const

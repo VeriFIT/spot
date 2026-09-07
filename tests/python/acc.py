@@ -52,12 +52,51 @@ tc.assertEqual(str(a.fin_unit_one_split()),
                '"(Fin(0) & (Fin(1) | Inf(5)) & (Fin(2) | Inf(3))) | '
                '((Fin(0) | Inf(5)) & (Fin(1) | Inf(3)) & Fin(2))"))')
 
+
+a = spot.acc_cond('Fin(0)|Fin(1)|Fin(0)&Inf(0)')
+tc.assertEqual(str(a.fin_unit_one_split()),
+               '(0, spot.acc_cond(2, "t"), '
+               'spot.acc_cond(2, "Fin(1)"))')
+tc.assertEqual(str(a.fin_unit_one_split_improved()),
+               '(0, spot.acc_cond(2, "t"), '
+               'spot.acc_cond(2, "Fin(1)"))')
+
+a = spot.acc_cond('Fin(0)&Inf(2) | Fin(1)&Inf(3)')
+tc.assertEqual(str(a.fin_one_split()),
+               '(0, spot.acc_cond(4, "Inf(2)"), '
+               'spot.acc_cond(4, "Fin(1) & Inf(3)"))')
+
+a = spot.acc_cond('Fin(0)|Fin(1)|(Fin(0)&Inf(2))')
+tc.assertEqual(str(a.fin_one_split()),
+               '(0, spot.acc_cond(3, "t"), '
+               'spot.acc_cond(3, "Fin(1)"))')
+tc.assertEqual(str(a.fin_unit_one_split()),
+               '(0, spot.acc_cond(3, "t"), '
+               'spot.acc_cond(3, "Fin(1)"))')
+tc.assertEqual(str(a.fin_unit_one_split_improved()),
+               '(0, spot.acc_cond(3, "t"), '
+               'spot.acc_cond(3, "Fin(1)"))')
+
+a = spot.acc_cond('(Fin(0)&Inf(3)) | '
+                  '(Fin(0)&Inf(2)) | '
+                  '(Fin(4)&(Fin(0)|Inf(1))) |'
+                  '(Inf(5)&(Fin(0)|Inf(1)))')
+tc.assertEqual(str(a.fin_unit_one_split()),
+               '(0, spot.acc_cond(6, "Inf(3) | Inf(2)"), '
+               'spot.acc_cond(6, "(Fin(4) & (Fin(0) | Inf(1))) '
+               '| (Inf(5) & (Fin(0) | Inf(1)))"))')
+tc.assertEqual(str(a.fin_unit_one_split_improved()),
+               '(0, spot.acc_cond(6, "Inf(3) | Inf(2) | Inf(5)"), '
+               'spot.acc_cond(6, "(Fin(4) & (Fin(0) | Inf(1))) '
+               '| (Inf(1)&Inf(5))"))')
+
+
 def report_missing_exception():
     raise RuntimeError("missing exception")
 
 a.set_acceptance("Inf(0)")
 try:
-    a.fin_unit_one_split()
+    a.fin_one_split()
 except RuntimeError as e:
     tc.assertIn('no Fin', str(e))
 else:

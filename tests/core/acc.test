@@ -105,6 +105,7 @@ Inf(0) | Fin(2)
 {1,2} Fin(1) & Fin(2) & Inf(9)
 {3,4} (Fin(3) & Fin(4) & Inf(11)) | (Fin(3) & Fin(4) & Inf(10))
 $long
+{} (Fin(0) & Inf(1)) | (Fin(1) & (Inf(2) | Fin(0)))
 EOF
 
 run 0 ../acc > stdout

@@ -310,16 +310,21 @@ def run_bench(automata):
         res3f = spot.generic_emptiness_check(aut)
         spot.generic_emptiness_check_select_version("spot216")
         res3g = spot.generic_emptiness_check(aut)
+        spot.generic_emptiness_check_select_version("spot217")
+        res3h = spot.generic_emptiness_check(aut)
+        spot.generic_emptiness_check_select_version("spot217lw")
+        res3i = spot.generic_emptiness_check(aut)
         spot.generic_emptiness_check_select_version("spot29")
         res2 = spot.remove_fin(aut).is_empty()
         res1 = generic_emptiness2(aut)
         res = (str(res1)[0] + str(res2)[0] + str(res3a)[0]
                + str(res3b)[0] + str(res3c)[0] + str(res3d)[0]
                + str(res3e)[0] + str(res3f)[0] + str(res4)[0]
-               + str(res5)[0] + str(res3g)[0])
+               + str(res5)[0] + str(res3g)[0] + str(res3h)[0]
+               + str(res3i)[0])
         print(res)
-        tc.assertIn(res, ('TTTTTTTTTTT', 'FFFFFFFFFFF'))
-        if res == 'FFFFFFFFFFF':
+        tc.assertIn(res, ('TTTTTTTTTTTTT', 'FFFFFFFFFFFFF'))
+        if res == 'FFFFFFFFFFFFF':
             run3 = spot.generic_accepting_run(aut)
             tc.assertTrue(run3.replay(spot.get_cout()))
 
