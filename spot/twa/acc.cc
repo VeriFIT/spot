@@ -803,7 +803,7 @@ namespace spot
             assert(i > 0);
             unsigned j = m1.max_set(); // == n+1
             do
-              if (!m2.has(j++))
+              if (j == SPOT_MAX_ACCSETS || !m2.has(j++))
                 return false;
             while (--i);
             seen_fin |= m1;
@@ -906,10 +906,9 @@ namespace spot
             assert(i > 0);
             unsigned j = m1.max_set(); // == n+1
             do
-              if (!m2.has(j++))
+              if (j == SPOT_MAX_ACCSETS || !m2.has(j++))
                 return false;
             while (--i);
-
             seen_inf |= m1;
             seen_fin |= m2;
           }
