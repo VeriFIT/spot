@@ -463,9 +463,12 @@ output_formula_checked(spot::formula f, spot::process_timer* ptimer,
     }
   output_formula(*out, f, ptimer, filename, linenum, index, prefix, suffix);
   *out << output_terminator;
-  // Make sure we abort if we can't write to std::cout anymore
-  // (like disk full or broken pipe with SIGPIPE ignored).
-  check_cout();
+  if (outputnamer)
+    *out << std::flush;
+  else
+    // Make sure we abort if we can't write to std::cout anymore
+    // (like disk full or broken pipe with SIGPIPE ignored).
+    check_cout();
 }
 
 void output_formula_checked(spot::formula f,
