@@ -49,6 +49,10 @@ New in spot 2.16.0.dev  (not yet released)
     acceptance formulas that use the maximum number of colors
     supported by Spot.
 
+  - writing to files using `-o PATTERN.out` will now flush after each
+    formula or automaton is output.  This ensure that the file can be
+    properly read even if the tool hasn't yet closed it (because it
+    might append to it later).
 
 New in spot 2.16  (2026-09-03)
 

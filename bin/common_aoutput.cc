@@ -696,7 +696,10 @@ automaton_printer::print(const spot::twa_graph_ptr& aut,
                        ptimer, csv_prefix, csv_suffix) << '\n';
       break;
     }
-  flush_cout();
+  if (!opt_output)
+    flush_cout();
+  else
+    *out << std::flush;
 }
 
 void automaton_printer::add_stat(char c, const spot::printable* p)
