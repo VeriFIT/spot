@@ -110,14 +110,23 @@ static const argp_option options[] =
       "  generalized-Buchi RANGE\n"
       "  generalized-co-Buchi RANGE\n"
       "  Rabin RANGE\n"
+      "  Rabin-like RANGE\n"
+      "  Rabin-like RANGE PROBABILITY\n"
       "  Streett RANGE\n"
+      "  Streett-like RANGE\n"
+      "  Streett-like RANGE PROBABILITY\n"
       "  generalized-Rabin INT RANGE RANGE ... RANGE\n"
       "  parity (min|max|rand) (odd|even|rand) RANGE\n"
       "  random RANGE\n"
       "  random RANGE PROBABILITY\n"
-      "The random acceptance condition uses each set only once, "
-      "unless a probability (to reuse the set again every time it is used) "
-      "is given.", 2 },
+      "For Rabin and Streett, RANGE is the number of pairs, and each "
+      "acceptance set is used only once.  For Rabin-like and "
+      "Streett-like, RANGE is the number of distinct acceptance sets "
+      "to use; each of them is used at least once, and, with the given "
+      "PROBABILITY (0 if omitted), may be reused one or more additional "
+      "times.  The random acceptance condition uses each set only once, "
+      "unless a probability (to reuse the set again every time it is "
+      "used) is given.", 2 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
     { nullptr, 0, nullptr, 0, nullptr, 0 }

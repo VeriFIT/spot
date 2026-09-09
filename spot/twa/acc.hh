@@ -820,6 +820,40 @@ namespace spot
         return res;
       }
 
+      /// \brief Build a random Rabin-like condition using n colors.
+      ///
+      /// This builds a formula similar to the one produced by
+      /// rabin(), except that the number of pairs is not fixed:
+      /// instead, \a n gives the number of distinct acceptance sets
+      /// ("colors") that should appear in the formula, and each of
+      /// them may occur more than once.  For each color 0≤i<n, that
+      /// color is used at least once; then, with probability
+      /// \a reuse, it is used again (and again, as long as our
+      /// [0,1) random number generator keeps returning a value
+      /// ≤reuse).  (Do not set reuse≥1.0 as that will give an
+      /// infinite loop.)
+      ///
+      /// All the resulting occurrences of the n colors are then
+      /// shuffled, and consecutive pairs (a0,b0), (a1,b1), ... are
+      /// used to build the formula
+      /// `(Fin(a0)&Inf(b0))|(Fin(a1)&Inf(b1))|...`.
+      /// If the number of occurrences is odd, the last one (say
+      /// a(k)) is used alone, restricted to its first (Fin) term,
+      /// contributing a single `Fin(a(k))` disjunct.
+      static acc_code rabin_like(unsigned n, double reuse = 0.0);
+
+      /// \brief Build a random Streett-like condition using n colors.
+      ///
+      /// This is the Streett counterpart of rabin_like(): \a n gives
+      /// the number of distinct acceptance sets ("colors") used to
+      /// build the formula, following the same \a reuse semantics.
+      /// The resulting formula has the shape
+      /// `(Fin(a0)|Inf(b0))&(Fin(a1)|Inf(b1))&...`, and if the number
+      /// of occurrences of colors is odd, the last one (say a(k)) is
+      /// used alone, restricted to its first (Fin) term, contributing
+      /// a single `Fin(a(k))` conjunct.
+      static acc_code streett_like(unsigned n, double reuse = 0.0);
+
       /// \brief Build a generalized Rabin condition.
       ///
       /// The two iterators should point to a range of integers, each

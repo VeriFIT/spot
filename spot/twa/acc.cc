@@ -935,6 +935,65 @@ namespace spot
             && (seen_inf | seen_fin) == all_sets());
   }
 
+  namespace
+  {
+    // Build a list of set numbers ("colors") to use for building a
+    // random Rabin-like/Streett-like condition.  There are N
+    // distinct colors, numbered 0 to n-1, each of them occurring at
+    // least once.  With probability REUSE, a color may occur again
+    // (and again, ...) instead of moving on to the next color; this
+    // is why the length of the resulting vector is only known once
+    // the vector has been built.  The list is then shuffled, so
+    // that pairing consecutive entries together (to form the
+    // Fin/Inf terms of each pair) does not systematically pair a
+    // color with itself.
+    static std::vector<unsigned>
+    rabin_random_colors(unsigned n, double reuse)
+    {
+      std::vector<unsigned> colors;
+      for (unsigned i = 0; i < n; ++i)
+        {
+          colors.push_back(i);
+          if (reuse > 0.0 && drand() < reuse)
+            --i;
+        }
+      mrandom_shuffle(colors.begin(), colors.end());
+      return colors;
+    }
+  }
+
+  acc_cond::acc_code
+  acc_cond::acc_code::rabin_like(unsigned n, double reuse)
+  {
+    if (reuse >= 1.0)
+      throw std::runtime_error("probability for set reuse should be <1");
+    std::vector<unsigned> colors = rabin_random_colors(n, reuse);
+    acc_cond::acc_code res = f();
+    unsigned sz = colors.size();
+    unsigned i = 0;
+    for (; i + 1 < sz; i += 2)
+      res |= inf({colors[i + 1]}) & fin({colors[i]});
+    if (i < sz)
+      res |= fin({colors[i]});
+    return res;
+  }
+
+  acc_cond::acc_code
+  acc_cond::acc_code::streett_like(unsigned n, double reuse)
+  {
+    if (reuse >= 1.0)
+      throw std::runtime_error("probability for set reuse should be <1");
+    std::vector<unsigned> colors = rabin_random_colors(n, reuse);
+    acc_cond::acc_code res = t();
+    unsigned sz = colors.size();
+    unsigned i = 0;
+    for (; i + 1 < sz; i += 2)
+      res &= inf({colors[i + 1]}) | fin({colors[i]});
+    if (i < sz)
+      res &= fin({colors[i]});
+    return res;
+  }
+
   acc_cond::acc_code
   acc_cond::acc_code::parity(bool max, bool odd, unsigned sets)
   {
@@ -2399,6 +2458,22 @@ namespace spot
       return n;
     }
 
+    // Parse an optional trailing PROBABILITY used to indicate that
+    // an acceptance set may be reused (defaults to 0.0 if absent).
+    // GIVEN is set to whether a probability was actually present.
+    static double parse_optional_reuse(const char*& input, bool& given)
+    {
+      skip_space(input);
+      given = *input;
+      if (!given)
+        return 0.0;
+      auto setreuse = input;
+      double reuse = parse_proba(input);
+      if (reuse >= 1.0)
+        syntax_error(setreuse, "probability for set reuse should be <1.");
+      return reuse;
+    }
+
     static acc_cond::acc_code parse_term(const char*& input)
     {
       acc_cond::acc_code res;
@@ -2540,15 +2615,33 @@ namespace spot
         input += 20;
         c = acc_cond::acc_code::generalized_co_buchi(parse_range(input));
       }
+    else if (!strncmp(input, "Rabin-like", 10))
+      {
+        input += 10;
+        unsigned n = parse_range(input);
+        bool given;
+        double reuse = parse_optional_reuse(input, given);
+        c = acc_cond::acc_code::rabin_like(n, reuse);
+      }
     else if (!strncmp(input, "Rabin", 5))
       {
         input += 5;
-        c = acc_cond::acc_code::rabin(parse_range(input));
+        unsigned n = parse_range(input);
+        c = acc_cond::acc_code::rabin(n);
+      }
+    else if (!strncmp(input, "Streett-like", 12))
+      {
+        input += 12;
+        unsigned n = parse_range(input);
+        bool given;
+        double reuse = parse_optional_reuse(input, given);
+        c = acc_cond::acc_code::streett_like(n, reuse);
       }
     else if (!strncmp(input, "Streett", 7))
       {
         input += 7;
-        c = acc_cond::acc_code::streett(parse_range(input));
+        unsigned n = parse_range(input);
+        c = acc_cond::acc_code::streett(n);
       }
     else if (!strncmp(input, "generalized-Rabin", 17))
       {
@@ -2575,11 +2668,8 @@ namespace spot
       {
         input += 6;
         unsigned n = parse_range(input);
-        skip_space(input);
-        auto setreuse = input;
-        double reuse = (*input) ? parse_proba(input) : 0.0;
-        if (reuse >= 1.0)
-          syntax_error(setreuse, "probability for set reuse should be <1.");
+        bool given;
+        double reuse = parse_optional_reuse(input, given);
         c = acc_cond::acc_code::random(n, reuse);
       }
     else

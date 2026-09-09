@@ -187,6 +187,47 @@ grep 'randaut: --spin.*--acceptance' stderr
 randaut --ba --acceptance='random 2' 2 2>stderr && exit 1
 grep 'randaut: --acceptance.*--ba' stderr
 
+# Rabin RANGE and Streett RANGE build a fixed number of pairs, using
+# two fresh sets each.  Rabin-like RANGE and Streett-like RANGE
+# instead use RANGE as the number of distinct sets, each of them
+# used at least once, and possibly reused with the optional
+# PROBABILITY; the odd colors are shuffled and paired, and a
+# trailing unpaired color yields a lone Fin(x) term.
+(
+    randaut -n 2 -Q5 -A 'Rabin-like 4' -H 2 --seed=0
+    randaut -n 2 -Q5 -A 'Rabin-like 5 0.4' -H 2 --seed=0
+    randaut -n 2 -Q5 -A 'Streett-like 4' -H 2 --seed=0
+    randaut -n 2 -Q5 -A 'Streett-like 5 0.4' -H 2 --seed=0
+) | grep -E '(acc-name:|Acceptance:)' > output
+cat output
+
+# Build the two long expected acceptance lines via variables, so that
+# this file passes sanity/80columns.test.  (Program output cannot be
+# wrapped.)
+rabinlike5="Fin(2) | (Fin(2) & Inf(1)) | (Fin(2) & Inf(3))"
+rabinlike5="$rabinlike5 | (Fin(1) & Inf(3)) | (Fin(4) & Inf(0))"
+streettlike5="Fin(2) & (Fin(2) | Inf(1)) & (Fin(2) | Inf(3))"
+streettlike5="$streettlike5 & (Fin(1) | Inf(3)) & (Fin(4) | Inf(0))"
+cat >expected <<EOF
+Acceptance: 4 (Fin(3) & Inf(1)) | (Fin(2) & Inf(0))
+Acceptance: 4 (Fin(0) & Inf(3)) | (Fin(1) & Inf(2))
+Acceptance: 5 Fin(2) | (Fin(0) & Inf(1)) | (Fin(4) & Inf(3))
+Acceptance: 5 $rabinlike5
+Acceptance: 4 (Fin(3) | Inf(1)) & (Fin(2) | Inf(0))
+Acceptance: 4 (Fin(0) | Inf(3)) & (Fin(1) | Inf(2))
+Acceptance: 5 Fin(2) & (Fin(0) | Inf(1)) & (Fin(4) | Inf(3))
+Acceptance: 5 $streettlike5
+EOF
+diff output expected
+
+# RANGE is mandatory, and PROBABILITY (when given) must be <1.
+randaut -A 'Rabin-like' 2 -q 2>stderr && exit 1
+grep 'randaut:.*invalid range' stderr
+randaut -A 'Rabin-like 3 1' 2 -q 2>stderr && exit 1
+grep 'randaut:.*probability for set reuse should be <1' stderr
+randaut -A 'Streett-like 3 1' 2 -q 2>stderr && exit 1
+grep 'randaut:.*probability for set reuse should be <1' stderr
+
 randaut -n 10 2..4 -H | grep AP: > output
 cat output
 cat >expected <<EOF

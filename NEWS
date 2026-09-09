@@ -11,6 +11,16 @@ New in spot 2.16.0.dev  (not yet released)
 
   Tools:
 
+  - randaut's -A option, used to specify the acceptance condition to
+    generate, learned two new patterns: "Rabin-like RANGE" and
+    "Streett-like RANGE", each optionally followed by a PROBABILITY.
+    Unlike "Rabin RANGE" and "Streett RANGE" (where RANGE is a number
+    of acceptance pairs, each using two fresh acceptance sets), for
+    "Rabin-like" and "Streett-like" RANGE gives the number of distinct
+    acceptance sets to use: each of them is used at least once, and,
+    with the given PROBABILITY (0 by default), may be reused one or
+    more additional times, in a randomly shuffled order.
+
   - ltlsynt, ltlfsynt, and ltlf2dfa no longer call the external
     "syfco" tool to convert their --tlsf FILENAME input into LTL/LTLf:
     they now use a TLSF parser embedded in Spot.  The new
@@ -20,6 +30,11 @@ New in spot 2.16.0.dev  (not yet released)
     built-in parser is incomplete.
 
   Library:
+
+  - acc_cond::acc_code::rabin_like() and
+    acc_cond::acc_code::streett_like() are two new functions to build
+    randomized Rabin-like and Streett-like acceptance conditions from
+    a number of acceptance sets and an optional reuse probability.
 
   - As a consequence of the move from PicoSAT to CaDiCaL,
     minimize_mealy() lost its "satlogdimacs" option to print the

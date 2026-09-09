@@ -423,6 +423,7 @@ TESTS_python = \
   python/acc.py \
   python/acd.py \
   python/accparse2.py \
+  python/accrabinlike.py \
   python/alarm.py \
   python/aliases.py \
   python/aiger.py \
