@@ -569,6 +569,13 @@ namespace std {
   %template(pairmark_t) pair<spot::acc_cond::mark_t, spot::acc_cond::mark_t>;
   %template(pairintacccode) pair<int, spot::acc_cond::acc_code>;
   %template(pairintacccond) pair<int, spot::acc_cond>;
+  %template(pairmarkacccode)
+    pair<spot::acc_cond::mark_t, spot::acc_cond::acc_code>;
+  %template(pairmarkacccond) pair<spot::acc_cond::mark_t, spot::acc_cond>;
+  %template(vectorpairmarkacccode)
+    vector<pair<spot::acc_cond::mark_t, spot::acc_cond::acc_code>>;
+  %template(vectorpairmarkacccond)
+    vector<pair<spot::acc_cond::mark_t, spot::acc_cond>>;
   %template(vectorformula) vector<spot::formula>;
   %template(vectorcolors) vector<spot::acc_cond::mark_t>;
   %template(vectorunsigned) vector<unsigned>;
@@ -668,6 +675,46 @@ namespace std {
                              swig::from(std::get<0>(v)),
                              swig::from(std::get<1>(v)),
                              swig::from(std::get<2>(v)));
+  }
+%}
+// Must occur before the twa declaration
+%typemap(out) SWIGTYPE spot::acc_cond::acc_code::mafins_split_improved %{
+  {
+      using tup_t = std::tuple<spot::acc_cond::mark_t,
+                                spot::acc_cond::mark_t,
+                                spot::acc_cond::acc_code>;
+      auto& v = static_cast<const std::vector<tup_t>&>($1);
+      Py_ssize_t sz = static_cast<Py_ssize_t>(v.size());
+      $result = PyList_New(sz);
+      for (Py_ssize_t i = 0; i < sz; ++i)
+        {
+          auto& t = v[i];
+          PyList_SetItem($result, i,
+                         PyTuple_Pack(3,
+                                      swig::from(std::get<0>(t)),
+                                      swig::from(std::get<1>(t)),
+                                      swig::from(std::get<2>(t))));
+        }
+  }
+%}
+// Must occur before the twa declaration
+%typemap(out) SWIGTYPE spot::acc_cond::mafins_split_improved %{
+  {
+      using tup_t = std::tuple<spot::acc_cond::mark_t,
+                                spot::acc_cond::mark_t,
+                                spot::acc_cond>;
+      auto& v = static_cast<const std::vector<tup_t>&>($1);
+      Py_ssize_t sz = static_cast<Py_ssize_t>(v.size());
+      $result = PyList_New(sz);
+      for (Py_ssize_t i = 0; i < sz; ++i)
+        {
+          auto& t = v[i];
+          PyList_SetItem($result, i,
+                         PyTuple_Pack(3,
+                                      swig::from(std::get<0>(t)),
+                                      swig::from(std::get<1>(t)),
+                                      swig::from(std::get<2>(t))));
+        }
   }
 %}
 

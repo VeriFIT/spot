@@ -91,6 +91,24 @@ tc.assertEqual(str(a.fin_unit_one_split_improved()),
                '| (Inf(1)&Inf(5))"))')
 
 
+a = spot.acc_cond('Fin(0) & Inf(1) | Fin(2) & Inf(3)')
+tc.assertEqual([(str(m), str(c)) for m, c in a.mafins_split()],
+               [('{0}', '(4, Fin(0) & Inf(1))'),
+                ('{2}', '(4, Fin(2) & Inf(3))')])
+tc.assertEqual([(str(m), str(f), str(c))
+                for m, f, c in a.mafins_split_improved()],
+               [('{0}', '{0}', '(4, Fin(0) & Inf(1))'),
+                ('{2}', '{2}', '(4, Fin(2) & Inf(3))')])
+
+code = a.get_acceptance()
+tc.assertEqual([(str(m), str(c)) for m, c in code.mafins_split()],
+               [('{0}', 'Fin(0) & Inf(1)'), ('{2}', 'Fin(2) & Inf(3)')])
+tc.assertEqual([(str(m), str(f), str(c))
+                for m, f, c in code.mafins_split_improved()],
+               [('{0}', '{0}', 'Fin(0) & Inf(1)'),
+                ('{2}', '{2}', 'Fin(2) & Inf(3)')])
+
+
 def report_missing_exception():
     raise RuntimeError("missing exception")
 
