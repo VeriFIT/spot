@@ -2751,6 +2751,35 @@ namespace spot
       return res;
     }
 
+    // Return the union of all Fin(i)/FinNeg(i) marks used in the
+    // subtree rooted at pos, without materializing that subtree as
+    // an acc_code.  This is the same linear scan used by
+    // acc_code::used_sets()/used_inf_fin_sets(), except that it is
+    // bounded to the subtree denoted by pos (using pos->sub.size)
+    // instead of running all the way to the front of the acc_code.
+    static acc_cond::mark_t fin_sets_of(const acc_cond::acc_word* pos)
+    {
+      acc_cond::mark_t res{};
+      auto end = pos - pos->sub.size;
+      while (pos > end)
+        switch (pos->sub.op)
+          {
+          case acc_cond::acc_op::And:
+          case acc_cond::acc_op::Or:
+            --pos;
+            break;
+          case acc_cond::acc_op::Fin:
+          case acc_cond::acc_op::FinNeg:
+            res |= pos[-1].mark;
+            pos -= 2;
+            break;
+          case acc_cond::acc_op::Inf:
+          case acc_cond::acc_op::InfNeg:
+            pos -= 2;
+            break;
+          }
+      return res;
+    }
 
     int has_top_fin(const acc_cond::acc_word* pos)
     {
@@ -3412,6 +3441,177 @@ namespace spot
 
     if (has_last)
       result.emplace_back(last_mafins, last_fins, std::move(last_code));
+    return result;
+  }
+
+  std::vector<acc_cond::acc_code>
+  acc_cond::acc_code::fins_split() const
+  {
+    // f() has no disjuncts at all.
+    if (is_f())
+      return {};
+    // If not a top-level disjunction, return [φ].
+    if (empty())
+      return { *this };
+    const acc_word* pos = &back();
+    if (pos->sub.op != acc_op::Or)
+      return { *this };
+
+    // Walk the top-level disjuncts once, without copying them: we
+    // only remember a pointer to the top of each one, together with
+    // its Fin(i) sets (computed once and reused below, both for the
+    // union-find and for building the resulting groups).  A
+    // disjunct that is a lone Fin(M) (i.e., a single Fin word,
+    // possibly encoding several sets at once as in
+    // Fin(1)|Fin(8)|Fin(9)) is special-cased: since it is nothing
+    // but a union of one-set Fin(i) terms, it can always be
+    // distributed among the other groups (or form new singleton
+    // groups) once those have been computed, without ever needing
+    // to be unioned in the union-find below.  We just remember the
+    // union of all the sets it contains in lone_fins, and deal with
+    // them at the end.
+    auto start = pos - pos->sub.size;
+    --pos;
+    std::vector<std::pair<mark_t, const acc_word*>> disjuncts;
+    mark_t lone_fins = {};
+    do
+      {
+        if (pos->sub.op == acc_op::Fin)
+          lone_fins |= pos[-1].mark;
+        else
+          disjuncts.emplace_back(fin_sets_of(pos), pos);
+        pos -= pos->sub.size + 1;
+      }
+    while (pos > start);
+    unsigned n = disjuncts.size();
+
+    // Union-find over the (non-lone) disjunct indices.  Two
+    // disjuncts end up in the same set as soon as they are
+    // connected by a chain of shared Fin(i) terms.  We never build
+    // the "shares a Fin(i) with" graph explicitly: for each Fin(i),
+    // it is enough to union the disjunct currently examined with
+    // the first disjunct in which Fin(i) was seen, since path
+    // compression will transitively connect all disjuncts using
+    // that Fin(i) anyway.
+    std::vector<unsigned> parent(n);
+    std::vector<unsigned> rank(n, 0);
+    for (unsigned i = 0; i < n; ++i)
+      parent[i] = i;
+    auto find = [&](unsigned x)
+    {
+      while (parent[x] != x)
+        {
+          parent[x] = parent[parent[x]];
+          x = parent[x];
+        }
+      return x;
+    };
+    auto merge = [&](unsigned a, unsigned b)
+    {
+      a = find(a);
+      b = find(b);
+      if (a == b)
+        return;
+      if (rank[a] < rank[b])
+        std::swap(a, b);
+      parent[b] = a;
+      if (rank[a] == rank[b])
+        ++rank[a];
+    };
+
+    std::vector<int> first_seen(mark_t::max_accsets(), -1);
+    for (unsigned i = 0; i < n; ++i)
+      for (unsigned s : disjuncts[i].first.sets())
+        {
+          int& j = first_seen[s];
+          if (j < 0)
+            j = i;
+          else
+            merge(i, j);
+        }
+
+    // Build the resulting groups, one per connected component,
+    // preserving the order in which each component was first
+    // encountered.  owner_group remembers, for each Fin(i), which
+    // resulting group (if any) already uses it: this is filled on
+    // the fly and used below to redistribute the lone Fin(M)
+    // disjuncts.
+    std::vector<int> group_of(n, -1);
+    std::vector<int> owner_group(mark_t::max_accsets(), -1);
+    std::vector<acc_code> result;
+    for (unsigned i = 0; i < n; ++i)
+      {
+        auto& [fins, dpos] = disjuncts[i];
+        int& g = group_of[find(i)];
+        if (g < 0)
+          {
+            g = result.size();
+            result.emplace_back(dpos);
+          }
+        else
+          {
+            result[g] |= dpos;
+          }
+        for (unsigned s : fins.sets())
+          owner_group[s] = g;
+      }
+
+    // Redistribute the lone Fin(M) disjuncts: each of their Fin(i)
+    // sets either belongs to an existing group (in which case
+    // Fin(i) is added to it), or starts a brand new singleton
+    // group of its own.
+    std::vector<mark_t> extra(result.size());
+    mark_t new_groups = {};
+    for (unsigned s : lone_fins.sets())
+      {
+        int g = owner_group[s];
+        if (g >= 0)
+          extra[g] |= mark_t({s});
+        else
+          new_groups |= mark_t({s});
+      }
+    for (unsigned g = 0; g < result.size(); ++g)
+      if (extra[g])
+        result[g] |= acc_code::fin(extra[g]);
+    for (unsigned s : new_groups.sets())
+      result.emplace_back(acc_code::fin(mark_t({s})));
+
+    return result;
+  }
+
+  std::vector<std::pair<acc_cond::mark_t, acc_cond::acc_code>>
+  acc_cond::acc_code::fins_split_improved() const
+  {
+    auto groups = fins_split();
+    std::vector<std::pair<mark_t, acc_code>> result;
+    result.reserve(groups.size());
+    // Since fins_split() already guarantees that the fins() of each
+    // group are pairwise disjoint, so are their mafins() (which are
+    // subsets of fins()): no two non-empty Mᵢ can ever collide, so
+    // each group with a non-empty mafins can be moved straight into
+    // the result.  Only groups with an empty mafins need special
+    // care, since several of them could occur: these are merged
+    // together (via |=) into a single last entry, appended once all
+    // groups have been examined.
+    acc_code last_code;
+    bool has_last = false;
+    for (auto& g : groups)
+      {
+        mark_t m = g.mafins();
+        if (m)
+          result.emplace_back(m, std::move(g));
+        else if (!has_last)
+          {
+            has_last = true;
+            last_code = std::move(g);
+          }
+        else
+          {
+            last_code |= g;
+          }
+      }
+    if (has_last)
+      result.emplace_back(mark_t{}, std::move(last_code));
     return result;
   }
 

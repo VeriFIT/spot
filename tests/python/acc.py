@@ -109,6 +109,87 @@ tc.assertEqual([(str(m), str(f), str(c))
                 ('{2}', '{2}', 'Fin(2) & Inf(3)')])
 
 
+a = spot.acc_cond('Fin(0) & Inf(1) | Fin(2) & Inf(3)')
+tc.assertEqual([str(c) for c in a.fins_split()],
+               ['(4, Fin(0) & Inf(1))', '(4, Fin(2) & Inf(3))'])
+tc.assertEqual([str(c) for c in a.get_acceptance().fins_split()],
+               ['Fin(0) & Inf(1)', 'Fin(2) & Inf(3)'])
+
+# Disjuncts that share a Fin(i) must end in the same group, and this
+# must work transitively even though only the first disjunct where a
+# given Fin(i) occurred is connected to later ones sharing it.
+a = spot.acc_cond('(Inf(0)&Fin(1)) | (Fin(1)&Fin(2)) | '
+                   '(Fin(3)&Inf(4)) | Inf(5)')
+tc.assertEqual([str(c) for c in a.get_acceptance().fins_split()],
+               ['(Fin(1) & Fin(2)) | (Inf(0) & Fin(1))',
+                'Fin(3) & Inf(4)',
+                'Inf(5)'])
+
+# A single "lone Fin(M)" disjunct (the compact internal representation
+# of Fin(i)|Fin(j)|Fin(k)) is split among the groups of the other
+# disjuncts that share one of its Fin(i)'s, or turned into its own
+# singleton group when no other disjunct shares any of its Fin(i)'s.
+a = spot.acc_cond('(Fin(0)&Inf(1)) | Fin(2) | (Fin(2)&Inf(3)) | Fin(4)')
+tc.assertEqual([str(c) for c in a.get_acceptance().fins_split()],
+               ['Fin(0) & Inf(1)', 'Fin(2) | (Fin(2) & Inf(3))', 'Fin(4)'])
+
+# When every disjunct is a lone Fin(M), the whole formula stays as
+# one single group, using the compact internal representation.
+a = spot.acc_cond('Fin(0)|Fin(1)|Fin(2)')
+tc.assertEqual([str(c) for c in a.get_acceptance().fins_split()],
+               ['Fin(0)|Fin(1)|Fin(2)'])
+
+# t() and non-disjunction acceptance conditions are returned as-is.
+a = spot.acc_cond('t')
+tc.assertEqual([str(c) for c in a.get_acceptance().fins_split()], ['t'])
+
+a = spot.acc_cond('Inf(0)')
+tc.assertEqual([str(c) for c in a.get_acceptance().fins_split()], ['Inf(0)'])
+
+# f() has no disjuncts, so fins_split() returns an empty list.
+a = spot.acc_cond('f')
+tc.assertEqual(list(a.get_acceptance().fins_split()), [])
+tc.assertEqual(list(a.fins_split()), [])
+
+# fins_split_improved() further annotates each group with its
+# mafins(), merging all groups with an empty mafins() into a single
+# last entry (since fins_split() already guarantees that the fins()
+# -- and hence the mafins() -- of distinct groups are disjoint,
+# non-empty mafins() can never clash between groups).
+a = spot.acc_cond('Fin(0) & Inf(1) | Fin(2) & Inf(3)')
+tc.assertEqual([(str(m), str(c)) for m, c in a.fins_split_improved()],
+               [('{0}', '(4, Fin(0) & Inf(1))'),
+                ('{2}', '(4, Fin(2) & Inf(3))')])
+tc.assertEqual([(str(m), str(c))
+                for m, c in a.get_acceptance().fins_split_improved()],
+               [('{0}', 'Fin(0) & Inf(1)'), ('{2}', 'Fin(2) & Inf(3)')])
+
+a = spot.acc_cond('(Inf(0)&Fin(1)) | (Fin(1)&Fin(2)) | '
+                   '(Fin(3)&Inf(4)) | Inf(5)')
+tc.assertEqual([(str(m), str(c))
+                for m, c in a.get_acceptance().fins_split_improved()],
+               [('{1}', '(Fin(1) & Fin(2)) | (Inf(0) & Fin(1))'),
+                ('{3}', 'Fin(3) & Inf(4)'),
+                ('{}', 'Inf(5)')])
+
+# Groups with no mandatory fin (empty mafins()) are merged together
+# into a single group, even when there is more than one of them.
+a = spot.acc_cond('Inf(0) | Inf(1)')
+tc.assertEqual([(str(m), str(c))
+                for m, c in a.get_acceptance().fins_split_improved()],
+               [('{}', 'Inf(1) | Inf(0)')])
+
+# t() and f() behave as with fins_split().
+a = spot.acc_cond('t')
+tc.assertEqual([(str(m), str(c))
+                for m, c in a.get_acceptance().fins_split_improved()],
+               [('{}', 't')])
+
+a = spot.acc_cond('f')
+tc.assertEqual(list(a.get_acceptance().fins_split_improved()), [])
+tc.assertEqual(list(a.fins_split_improved()), [])
+
+
 def report_missing_exception():
     raise RuntimeError("missing exception")
 

@@ -24,7 +24,8 @@ namespace spot
   namespace
   {
     enum genem_version_t { spot28, atva19, spot29, spot210, spot211,
-                           spot212, spot216, spot217, spot217lw };
+                           spot212, spot216, spot217, spot217lw,
+                           spot218, spot218b, spot218c };
     static genem_version_t genem_version = spot29;
   }
 
@@ -32,12 +33,18 @@ namespace spot
   {
     if (emversion == nullptr || !strcasecmp(emversion, "spot29"))
       genem_version = spot29;
-    else if (!strcasecmp(emversion, "spot216"))
-      genem_version = spot216;
+    else if (!strcasecmp(emversion, "spot218"))
+      genem_version = spot218;
+    else if (!strcasecmp(emversion, "spot218b"))
+      genem_version = spot218b;
+    else if (!strcasecmp(emversion, "spot218c"))
+      genem_version = spot218c;
     else if (!strcasecmp(emversion, "spot217"))
       genem_version = spot217;
     else if (!strcasecmp(emversion, "spot217lw"))
       genem_version = spot217lw;
+    else if (!strcasecmp(emversion, "spot216"))
+      genem_version = spot216;
     else if (!strcasecmp(emversion, "spot212"))
       genem_version = spot212;
     else if (!strcasecmp(emversion, "spot211"))
@@ -52,7 +59,7 @@ namespace spot
       throw std::invalid_argument("generic_emptiness_check version should be "
                                   "one of {spot28, atva19, spot29, spot210, "
                                   "spot211, spot212, spot216, spot217, "
-                                  "spot217lw}");
+                                  "spot217lw, spot218, spot218b, spot218c}");
   }
 
   namespace
@@ -97,7 +104,12 @@ namespace spot
     {
       if (genem_version == spot211
           || genem_version == spot212
-          || genem_version == spot210)
+          || genem_version == spot210
+          || genem_version == spot216
+          || genem_version == spot217
+          || genem_version == spot217lw
+          || genem_version == spot218
+          || genem_version == spot218b)
         tocut |= acc.mafins();
       scc_and_mark_filter filt(si, scc, tocut);
       filt.override_acceptance(acc);
@@ -140,6 +152,97 @@ namespace spot
             acc = acc.force_inf(fo_m);
           }
         while (!acc.is_f());
+      else if (genem_version == spot218b)
+        {
+          do
+            {
+              acc_cond::acc_code residual = acc_cond::acc_code::f();
+              for (auto& subacc: acc.fins_split())
+                {
+                  acc_cond::mark_t mafins = subacc.mafins();
+                  if (mafins)
+                    {
+                      if (!scc_split_check<EarlyStop, Extra>
+                          (si, scc, subacc, extra, mafins))
+                        if constexpr (EarlyStop)
+                          return false;
+                      continue;
+                    }
+
+                  auto [fo, fpart, rest] = subacc.fin_one_split();
+                  acc_cond::mark_t fo_m = {(unsigned) fo};
+                  if (!scc_split_check<EarlyStop, Extra>
+                      (si, scc, fpart, extra, fo_m))
+                    if constexpr (EarlyStop)
+                      return false;
+                  residual |= rest.get_acceptance();
+                }
+              acc = std::move(residual);
+            }
+          while (!acc.is_f());
+        }
+      else if (genem_version == spot218)
+        {
+          do
+            {
+              bool changed = false;
+              for (auto& [mafins, subacc]: acc.fins_split_improved())
+                {
+                  if (mafins)
+                    {
+                      if (!scc_split_check<EarlyStop, Extra>
+                          (si, scc, subacc, extra, mafins))
+                        if constexpr (EarlyStop)
+                          return false;
+                      continue;
+                    }
+
+                  // only one pair has empty mafins
+                  assert(!changed);
+                  changed = true;
+
+                  auto [fo, fpart, rest] = subacc.fin_one_split();
+                  acc_cond::mark_t fo_m = {(unsigned) fo};
+                  if (!scc_split_check<EarlyStop, Extra>
+                      (si, scc, fpart, extra, fo_m))
+                    if constexpr (EarlyStop)
+                      return false;
+                  acc = rest;
+                }
+              if (!changed)
+                break;
+            }
+          while (!acc.is_f());
+        }
+      else if (genem_version == spot218c)
+        {
+          do
+            {
+              acc_cond::acc_code residual = acc_cond::acc_code::f();
+              for (auto& subacc: acc.top_disjuncts())
+                {
+                  acc_cond::mark_t mafins = subacc.mafins();
+                  if (mafins)
+                    {
+                      if (!scc_split_check<EarlyStop, Extra>
+                          (si, scc, subacc, extra, mafins))
+                        if constexpr (EarlyStop)
+                          return false;
+                      continue;
+                    }
+
+                  auto [fo, fpart, rest] = subacc.fin_one_split();
+                  acc_cond::mark_t fo_m = {(unsigned) fo};
+                  if (!scc_split_check<EarlyStop, Extra>
+                      (si, scc, fpart, extra, fo_m))
+                    if constexpr (EarlyStop)
+                      return false;
+                  residual |= rest.get_acceptance();
+                }
+              acc = std::move(residual);
+            }
+          while (!acc.is_f());
+        }
       else if (genem_version == spot211)
         {
           do

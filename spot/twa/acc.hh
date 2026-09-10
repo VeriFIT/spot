@@ -1046,47 +1046,61 @@ namespace spot
       }
 #endif // SWIG
 
-      /// \brief Disjunct the current condition in place with \a r.
-      acc_code& operator|=(const acc_code& r)
+      /// \brief Disjunct the current condition in place with the
+      /// subformula whose root word is \a pos.
+      ///
+      /// \a pos must point to the last word of some acceptance
+      /// subformula, i.e., a subtree that could equivalently be
+      /// copied out via `acc_code(pos)`.  This overload lets
+      /// callers disjunct such a subtree in place without having to
+      /// materialize an intermediate `acc_code` copy of it first.
+      ///
+      /// \a pos must not point inside the storage of `*this`: this
+      /// method may reallocate or shift the elements of `*this`
+      /// (via pop_back(), erase(), insert()), which would invalidate
+      /// \a pos if it aliased `*this`.
+      acc_code& operator|=(const acc_word* pos)
       {
-        if (is_t() || r.is_f())
+        auto start = pos - pos->sub.size;
+        bool pos_is_f = (pos->sub.op == acc_op::Fin && !pos[-1].mark);
+        if (is_t() || pos_is_f)
           return *this;
-        if (is_f() || r.is_t())
+        bool pos_is_t = (pos->sub.op == acc_op::Inf && !pos[-1].mark);
+        if (is_f() || pos_is_t)
           {
-            *this = r;
+            assign(start, pos + 1);
             return *this;
           }
         unsigned s = size() - 1;
-        unsigned rs = r.size() - 1;
         // Fin(a) | Fin(b) = Fin(a | b)
         if (((*this)[s].sub.op == acc_op::Fin
-             && r[rs].sub.op == acc_op::Fin)
+             && pos->sub.op == acc_op::Fin)
             || ((*this)[s].sub.op == acc_op::FinNeg
-                && r[rs].sub.op == acc_op::FinNeg))
+                && pos->sub.op == acc_op::FinNeg))
           {
-            (*this)[s - 1].mark |= r[rs - 1].mark;
+            (*this)[s - 1].mark |= pos[-1].mark;
             return *this;
           }
 
         // In the more complex scenarios, left and right may both
         // be disjunctions, and Fin(x) might be a member of each
         // side.  Find it if it exists.
-        // left_inf points to the left Inf mark if any.
-        // right_inf points to the right Inf mark if any.
+        // left_fin points to the left Fin mark if any.
+        // right_fin points to the right Fin mark if any.
         acc_word* left_fin = nullptr;
         if ((*this)[s].sub.op == acc_op::Or)
           {
-            auto start = &(*this)[s] - (*this)[s].sub.size;
-            auto pos = &(*this)[s] - 1;
+            auto lstart = &(*this)[s] - (*this)[s].sub.size;
+            auto lpos = &(*this)[s] - 1;
             pop_back();
-            while (pos > start)
+            while (lpos > lstart)
               {
-                if (pos->sub.op == acc_op::Fin)
+                if (lpos->sub.op == acc_op::Fin)
                   {
-                    left_fin = pos - 1;
+                    left_fin = lpos - 1;
                     break;
                   }
-                pos -= pos->sub.size + 1;
+                lpos -= lpos->sub.size + 1;
               }
           }
         else if ((*this)[s].sub.op == acc_op::Fin)
@@ -1095,19 +1109,21 @@ namespace spot
           }
 
         const acc_word* right_fin = nullptr;
-        auto right_end = &r.back();
+        auto right_end = pos;
         if (right_end->sub.op == acc_op::Or)
           {
-            auto start = &r[0];
-            auto pos = --right_end;
-            while (pos > start)
+            // Skip the RHS's own Or marker word: its operands will
+            // be flattened directly into the new Or built below, so
+            // right_end must no longer include that marker word.
+            auto rpos = --right_end;
+            while (rpos > start)
             {
-              if (pos->sub.op == acc_op::Fin)
+              if (rpos->sub.op == acc_op::Fin)
                 {
-                  right_fin = pos - 1;
+                  right_fin = rpos - 1;
                   break;
                 }
-              pos -= pos->sub.size + 1;
+              rpos -= rpos->sub.size + 1;
             }
           }
         else if (right_end->sub.op == acc_op::Fin)
@@ -1119,13 +1135,13 @@ namespace spot
         if (left_fin && right_fin)
           {
             carry = left_fin->mark;
-            auto pos = (left_fin - &(*this)[0]);
-            this->erase(begin() + pos, begin() + pos + 2);
+            auto p = (left_fin - &(*this)[0]);
+            this->erase(begin() + p, begin() + p + 2);
           }
         auto sz = size();
-        insert(end(), &r[0], right_end + 1);
+        insert(end(), start, right_end + 1);
         if (carry)
-          (*this)[sz + (right_fin - &r[0])].mark |= carry;
+          (*this)[sz + (right_fin - start)].mark |= carry;
         acc_word w = {};
         w.sub.op = acc_op::Or;
         auto new_size = size();
@@ -1134,6 +1150,19 @@ namespace spot
         w.sub.size = new_size;
         emplace_back(w);
         return *this;
+      }
+
+      /// \brief Disjunct the current condition in place with \a r.
+      acc_code& operator|=(const acc_code& r)
+      {
+        if (is_t() || r.is_f())
+          return *this;
+        if (is_f() || r.is_t())
+          {
+            *this = r;
+            return *this;
+          }
+        return *this |= &r.back();
       }
 
 #ifndef SWIG
@@ -1434,6 +1463,56 @@ namespace spot
       std::vector<std::tuple<acc_cond::mark_t, acc_cond::mark_t,
                              acc_cond::acc_code>>
       mafins_split_improved() const;
+
+      /// \brief Split an acceptance condition into disjuncts according
+      /// to the Fin(i) they share.
+      ///
+      /// Let us assume that φ designates the current condition.
+      /// If the condition is not a disjunction, this simply returns
+      /// a single-element vector containing φ.
+      ///
+      /// If φ is a disjunction φ=β₁∨β₂∨...∨βₖ, consider the graph
+      /// whose nodes are the βⱼ, with an edge between βⱼ and βₗ
+      /// whenever they share some Fin(i).  This partitions the βⱼ
+      /// into groups, one for each connected component of that
+      /// graph: two disjuncts end up in the same group if and only
+      /// if they are connected through a (possibly indirect) chain
+      /// of shared Fin(i) terms.
+      ///
+      /// This returns a list [α₁, ..., αₙ], one per group, such
+      /// that
+      ///   - αᵢ is the disjunction of the βⱼ belonging to the i-th
+      ///     group
+      ///   - for any i and j, fins(αᵢ) and fins(αⱼ) do not
+      ///     intersect
+      ///   - Φ = α₁∨α₂∨...∨αₙ
+      ///
+      /// The connected components are computed without building
+      /// the graph explicitly: for each Fin(i), it suffices to
+      /// connect the disjunct where it is currently processed to
+      /// the first disjunct in which Fin(i) was seen, using a
+      /// union-find data structure.  This runs in time quasi-linear
+      /// in the size of the acceptance condition.
+      std::vector<acc_cond::acc_code>
+      fins_split() const;
+
+      /// \brief Split an acceptance condition into disjuncts
+      /// according to the Fin(i) they share, further annotated
+      /// with mandatory fins.
+      ///
+      /// This is similar to fins_split(), except that the result
+      /// is a list of pairs [(M₁,α₁), ..., (Mₙ,αₙ)] where
+      ///   - Mᵢ = mafins(αᵢ)
+      ///   - the αᵢ are the same groups fins_split() would produce
+      ///   - only one Mᵢ may be empty: since fins_split() already
+      ///     guarantees that fins(αᵢ) and fins(αⱼ) are disjoint for
+      ///     i≠j, so are their mafins(αᵢ)⊆fins(αᵢ); the only groups
+      ///     that could otherwise clash by both having an empty
+      ///     mafins are merged together into a single last α with
+      ///     Mₙ=∅.
+      ///   - Φ = α₁∨α₂∨...∨αₙ
+      std::vector<std::pair<acc_cond::mark_t, acc_cond::acc_code>>
+      fins_split_improved() const;
 
       /// \brief Help closing accepting or rejecting cycle.
       ///
@@ -2362,6 +2441,28 @@ namespace spot
       result.reserve(v.size());
       for (auto& [m, f, c] : v)
         result.emplace_back(m, f, acc_cond(num_, c));
+      return result;
+    }
+
+    /// \see acc_cond::acc_code::fins_split
+    std::vector<acc_cond> fins_split() const
+    {
+      auto v = code_.fins_split();
+      std::vector<acc_cond> result;
+      result.reserve(v.size());
+      for (auto& c : v)
+        result.emplace_back(num_, c);
+      return result;
+    }
+
+    /// \see acc_cond::acc_code::fins_split_improved
+    std::vector<std::pair<mark_t, acc_cond>> fins_split_improved() const
+    {
+      auto v = code_.fins_split_improved();
+      std::vector<std::pair<mark_t, acc_cond>> result;
+      result.reserve(v.size());
+      for (auto& [m, c] : v)
+        result.emplace_back(m, acc_cond(num_, c));
       return result;
     }
 
