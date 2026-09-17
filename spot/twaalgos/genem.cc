@@ -24,7 +24,7 @@ namespace spot
   namespace
   {
     enum genem_version_t { spot28, atva19, spot29, spot210, spot211,
-                           spot212, spot216, spot217, spot217lw,
+                           spot212, spot216,
                            spot218, spot218b, spot218c };
     static genem_version_t genem_version = spot29;
   }
@@ -39,10 +39,6 @@ namespace spot
       genem_version = spot218b;
     else if (!strcasecmp(emversion, "spot218c"))
       genem_version = spot218c;
-    else if (!strcasecmp(emversion, "spot217"))
-      genem_version = spot217;
-    else if (!strcasecmp(emversion, "spot217lw"))
-      genem_version = spot217lw;
     else if (!strcasecmp(emversion, "spot216"))
       genem_version = spot216;
     else if (!strcasecmp(emversion, "spot212"))
@@ -58,8 +54,8 @@ namespace spot
     else
       throw std::invalid_argument("generic_emptiness_check version should be "
                                   "one of {spot28, atva19, spot29, spot210, "
-                                  "spot211, spot212, spot216, spot217, "
-                                  "spot217lw, spot218, spot218b, spot218c}");
+                                  "spot211, spot212, spot216, "
+                                  "spot218, spot218b, spot218c}");
   }
 
   namespace
@@ -106,8 +102,6 @@ namespace spot
           || genem_version == spot212
           || genem_version == spot210
           || genem_version == spot216
-          || genem_version == spot217
-          || genem_version == spot217lw
           || genem_version == spot218
           || genem_version == spot218b)
         tocut |= acc.mafins();
@@ -301,59 +295,6 @@ namespace spot
                 }
               if (!changed)
                 break;
-            }
-          while (!acc.is_f());
-        }
-      else if (genem_version == spot217)
-        {
-          do
-            {
-              bool changed = false;
-              for (auto& [mafins, fins, subacc]:
-                     acc.mafins_split_improved())
-                {
-                  if (mafins)
-                    {
-                      if (!scc_split_check<EarlyStop, Extra>
-                          (si, scc, subacc, extra, mafins))
-                        if constexpr (EarlyStop)
-                          return false;
-                      continue;
-                    }
-                  // Only the last triple of
-                  // acc.mafins_split_improved() can have mafins == 0.
-                  assert(!changed);
-                  changed = true;
-
-                  auto [fo, fpart, rest] = subacc.fin_one_split();
-                  acc_cond::mark_t fo_m = {(unsigned) fo};
-                  if (!scc_split_check<EarlyStop, Extra>
-                      (si, scc, fpart, extra, fo_m))
-                    if constexpr (EarlyStop)
-                      return false;
-                  acc = rest;
-                }
-              if (!changed)
-                break;
-            }
-          while (!acc.is_f());
-        }
-      else if (genem_version == spot217lw)
-        {
-          do
-            {
-              if (acc_cond::mark_t mafins = acc.mafins(); mafins)
-                return scc_split_check<EarlyStop, Extra>
-                  (si, scc, acc, extra, mafins);
-
-              int fo = acc.fin_one();
-              assert(fo >= 0);
-              acc_cond::mark_t fo_m = {(unsigned) fo};
-              if (!scc_split_check<EarlyStop, Extra>
-                  (si, scc, acc, extra, fo_m))
-                if constexpr (EarlyStop)
-                  return false;
-              acc = acc.force_inf(fo_m);
             }
           while (!acc.is_f());
         }

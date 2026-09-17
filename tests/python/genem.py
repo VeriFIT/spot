@@ -310,16 +310,12 @@ def run_bench(automata):
         res3f = spot.generic_emptiness_check(aut)
         spot.generic_emptiness_check_select_version("spot216")
         res3g = spot.generic_emptiness_check(aut)
-        spot.generic_emptiness_check_select_version("spot217")
-        res3h = spot.generic_emptiness_check(aut)
-        spot.generic_emptiness_check_select_version("spot217lw")
-        res3i = spot.generic_emptiness_check(aut)
         spot.generic_emptiness_check_select_version("spot218b")
-        res3j = spot.generic_emptiness_check(aut)
+        res3h = spot.generic_emptiness_check(aut)
         spot.generic_emptiness_check_select_version("spot218")
-        res3k = spot.generic_emptiness_check(aut)
+        res3i = spot.generic_emptiness_check(aut)
         spot.generic_emptiness_check_select_version("spot218c")
-        res3l = spot.generic_emptiness_check(aut)
+        res3j = spot.generic_emptiness_check(aut)
         spot.generic_emptiness_check_select_version("spot29")
         res2 = spot.remove_fin(aut).is_empty()
         res1 = generic_emptiness2(aut)
@@ -327,11 +323,10 @@ def run_bench(automata):
                + str(res3b)[0] + str(res3c)[0] + str(res3d)[0]
                + str(res3e)[0] + str(res3f)[0] + str(res4)[0]
                + str(res5)[0] + str(res3g)[0] + str(res3h)[0]
-               + str(res3i)[0] + str(res3j)[0] + str(res3k)[0]
-               + str(res3l)[0])
+               + str(res3i)[0] + str(res3j)[0])
         print(res)
-        tc.assertIn(res, ('TTTTTTTTTTTTTTTT', 'FFFFFFFFFFFFFFFF'))
-        if res == 'FFFFFFFFFFFFFFFF':
+        tc.assertIn(res, ('TTTTTTTTTTTTTT', 'FFFFFFFFFFFFFF'))
+        if res == 'FFFFFFFFFFFFFF':
             run3 = spot.generic_accepting_run(aut)
             tc.assertTrue(run3.replay(spot.get_cout()))
 

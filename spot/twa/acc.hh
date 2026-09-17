@@ -1451,19 +1451,6 @@ namespace spot
       std::vector<std::pair<acc_cond::mark_t, acc_cond::acc_code>>
       mafins_split() const;
 
-      /// \brief Split an acceptance condition into disjuncts according to
-      /// mandatory fins, keeping Fin colors disjoint between the results.
-      ///
-      /// If φ is a disjunction, this should return
-      /// a list of pairs [(M₁,F₁,α₁), ..., (Mₙ,Fₙ,αₙ)] such that
-      ///   - Mᵢ = mafins(αᵢ), Fᵢ=fins(αᵢ)
-      ///   - for any i and j, Fᵢ and Fⱼ do not intersect
-      ///   - only the last Mₙ may be empty
-      ///   - Φ = α₁∨α₂∨...∨αₙ
-      std::vector<std::tuple<acc_cond::mark_t, acc_cond::mark_t,
-                             acc_cond::acc_code>>
-      mafins_split_improved() const;
-
       /// \brief Split an acceptance condition into disjuncts according
       /// to the Fin(i) they share.
       ///
@@ -2429,18 +2416,6 @@ namespace spot
       result.reserve(v.size());
       for (auto& [m, c] : v)
         result.emplace_back(m, acc_cond(num_, c));
-      return result;
-    }
-
-    /// \see acc_cond::acc_code::mafins_split_improved
-    std::vector<std::tuple<mark_t, mark_t, acc_cond>>
-    mafins_split_improved() const
-    {
-      auto v = code_.mafins_split_improved();
-      std::vector<std::tuple<mark_t, mark_t, acc_cond>> result;
-      result.reserve(v.size());
-      for (auto& [m, f, c] : v)
-        result.emplace_back(m, f, acc_cond(num_, c));
       return result;
     }
 
