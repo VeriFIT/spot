@@ -167,7 +167,7 @@ three calls to [[https://github.com/reactive-systems/syfco][=syfco=]].
 #+END_SRC
 #+RESULTS:
 : running: syfco -f ltlxba-fin -m fully chomp.tlsf
-: running: syfco --print-output-signals chomp.tlsf
+: running: syfco -f ltlxba-fin --print-output-signals chomp.tlsf
 : running: syfco --print-target chomp.tlsf
 
 The first command converts the TLSF specification into LTLf. =-f
@@ -229,12 +229,16 @@ this example already produces a pretty large formula:
 (iy_2))))))) && ((os_0) U ((! (os_0)) && (oti))))))
 #+end_example
 
-The second command simply extracts the list of output propositions.
-In this case the authors of the TLSF file used the convention that
-every output proposition starts with =o=, but that is not mandatory.
+The second command extracts the list of output propositions.  It uses
+the same =-f ltlxba-fin= option as the first command, so that syfco
+applies the same transformations to the signal names (in the =ltlxba=
+syntax, upper-case letters may be confused with LTL operators, so
+syfco lower-cases the signal names).  In this case the authors of the
+TLSF file used the convention that every output proposition starts
+with =o=, but that is not mandatory.
 
 #+BEGIN_SRC sh
-  syfco --print-output-signals chomp.tlsf
+  syfco -f ltlxba-fin --print-output-signals chomp.tlsf
 #+END_SRC
 #+RESULTS:
 : oto, oti, os_0, os_1, os_2, os_3, os_4, os_5, os_6, os_7, os_8, oy_0, oy_1, oy_2, ox_0, ox_1, ox_2
@@ -280,7 +284,7 @@ of specifications:
 
 #+BEGIN_SRC sh :export code
 LTL=$(syfco -f ltlxba-fin -m fully chomp.tlsf)  # <- bad idea!
-OUT=$(syfco --print-output-signals chomp.tlsf)
+OUT=$(syfco -f ltlxba-fin --print-output-signals chomp.tlsf)
 SEM=$(syfco --print-target chomp.tlsf)
 ltlfsynt --formula="$LTL" --outs="$OUT" --semantics="$SEM" --realizability
 #+END_SRC
@@ -293,7 +297,7 @@ temporary file or via using a pipe as in the following (=-F -= will
 read the formula from standard input).
 
 #+BEGIN_SRC sh :export code
-OUT=$(syfco --print-output-signals chomp.tlsf)
+OUT=$(syfco -f ltlxba-fin --print-output-signals chomp.tlsf)
 SEM=$(syfco --print-target chomp.tlsf)
 syfco -f ltlxba-fin -m fully chomp.tlsf |
   ltlfsynt -F - --outs="$OUT" --semantics="$SEM" --realizability

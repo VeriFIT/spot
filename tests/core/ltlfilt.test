@@ -1059,6 +1059,32 @@ cat > exp<<EOF
 EOF
 diff exp out
 
+# Atomic propositions are case-sensitive, so --ins/--outs (as well as
+# the declarations of a --part-file) are now used verbatim: they are
+# no longer converted to lower case.  This makes the --save-part /
+# --part-file round-trip work on formulas using upper-case APs.
+run 0 ltlfilt -f 'Afoo U Bar U Cbaz' --ins=Afoo --outs=Bar,Cbaz \
+              --save-part=upper.part >out
+cat > exp<<EOF
+Afoo U (Bar U Cbaz)
+EOF
+diff exp out
+cat > exp.part<<EOF
+.inputs Afoo
+.outputs Bar Cbaz
+EOF
+diff exp.part upper.part
+run 0 ltlfilt -f 'Afoo U Bar U Cbaz' --part-file=upper.part \
+              --relabel=io >out
+cat > exp<<EOF
+i0 U (o0 U o1)
+EOF
+diff exp out
+# Lower-case names do not match upper-case APs anymore.
+run 2 ltlfilt -f 'Afoo U Bar U Cbaz' --ins=afoo --outs=bar,cbaz \
+              --relabel=io 2>err
+grep "one of --ins or --outs should match 'Cbaz'" err
+
 
 test 22 = `ltlfilt -c --satisfiable formulas -f 'GFa & FG!a'`
 test 3 = `ltlfilt -v -c --satisfiable formulas -f 'GFa & FG!a'`

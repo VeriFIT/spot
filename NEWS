@@ -54,6 +54,18 @@ New in spot 2.16.0.dev  (not yet released)
     properly read even if the tool hasn't yet closed it (because it
     might append to it later).
 
+  - The --ins, --outs, and --unobservable-ins options of ltlfilt,
+    ltlsynt, ltlfsynt, and ltlmix, as well as the atomic propositions
+    declared in a --part-file, are no longer converted to lower case:
+    atomic propositions are case-sensitive, so those identifiers are
+    now used verbatim.  This makes it possible to work on formulas
+    that use upper-case atomic propositions (in particular ltlfilt's
+    --save-part/--part-file round-trips now preserve the case of the
+    identifiers).  In the TLSF conversion performed by the external
+    "syfco" tool, the list of output signals is now requested with the
+    same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
+    syfco is the one performing the lower-casing.  (Issue #654.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:

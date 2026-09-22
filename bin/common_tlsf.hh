@@ -83,6 +83,11 @@ struct tlsf_conversion_result
   spot::formula formula;
 
   // The flattened list of output signals, in declaration order.
+  // The names are taken verbatim from the specification (their case
+  // is preserved) when the "spot" backend is used, while the "syfco"
+  // backend asks syfco to print them in the "ltlxba" syntax, which
+  // currently lower-cases them.  Either way they match the atomic
+  // propositions of FORMULA.
   // Unchanged when TLSF_IGNORE_SIGNALS is set.
   std::vector<std::string> outputs;
 

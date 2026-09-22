@@ -34,7 +34,10 @@ extern std::optional<std::vector<std::string>> all_input_aps;
 // --unobservable-ins
 extern std::optional<std::vector<std::string>> all_unobs_aps;
 
-// Comma-separated list of strings, such as those passed to --ins/--outs
+// Comma-separated list of strings, such as those passed to
+// --ins/--outs.  The names are used verbatim: in particular their
+// case is not changed, since the atomic propositions of a formula are
+// case-sensitive.
 void split_aps(const std::string& arg, std::vector<std::string>& where);
 
 // process the all_output_aps and all_input_aps above to

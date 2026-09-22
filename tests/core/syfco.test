@@ -76,6 +76,37 @@ test 2 = `grep out_0 out3 | wc -l`
 test 1 = `grep out_1 out3 | wc -l`
 test 1 = `grep out_2 out3 | wc -l`
 
+# Signals declared with upper-case letters must be handled
+# consistently: the built-in parser preserves their case, while syfco
+# lower-cases the atomic propositions of the LTL formula it outputs
+# (upper-case letters may be confused with LTL operators in the
+# ltlxba syntax).  When the syfco backend is used, the list of output
+# signals is therefore requested with the same "-f ltlxba" option as
+# the formula, so that the signal names match the formula's APs.
+cat >upper.tlsf <<EOF
+INFO {
+  TITLE:       "upper"
+  DESCRIPTION: "signals with upper-case letters"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { AIn; }
+  OUTPUTS { BOut; }
+  GUARANTEE { G(AIn <-> X BOut); }
+}
+EOF
+if test $backend = spot; then
+  expected_aps='AP: 2 "AIn" "BOut"'
+else
+  expected_aps='AP: 2 "ain" "bout"'
+fi
+test REALIZABLE = `ltlsynt --tlsf upper.tlsf --realizability`
+ltlsynt --tlsf upper.tlsf >upper.hoa
+test "$expected_aps" = "`grep '^AP:' upper.hoa`"
+# In both cases the only output signal is the controllable AP.
+test "controllable-AP: 1" = "`grep '^controllable-AP:' upper.hoa`"
+
 # Finite semantics
 sed '/SEMANTICS:/s/Mealy/&,Finite/' test.tlsf >testf.tlsf
 test `ltlfsynt --tlsf testf.tlsf/n=3 --real` = "UNREALIZABLE"

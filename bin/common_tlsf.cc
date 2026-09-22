@@ -27,6 +27,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <iostream>
 #include <sys/stat.h>
 #include <utility>
@@ -155,15 +156,15 @@ read_tlsf_with_spot(const std::string& filename,
   return true;
 }
 
-// Run "syfco [-op VAR=VAL]... EXTRA FILENAME" and return its
+// Run "syfco [-op VAR=VAL]... EXTRA... FILENAME" and return its
 // standard output.  A failure to run syfco is fatal, as it was
 // before the built-in parser existed.  OP_ARGS carries the parameter
-// assignments; EXTRA, when non-null, is an additional option such as
+// assignments; EXTRA lists additional options such as
 // --print-output-signals.
 static std::string
 run_syfco(std::vector<char*>& command,
           const std::vector<std::string>& op_args,
-          const char* extra,
+          std::initializer_list<const char*> extra,
           const std::string& filename,
           std::ostream* verbose)
 {
@@ -174,8 +175,8 @@ run_syfco(std::vector<char*>& command,
       command.push_back(argop);
       command.push_back(const_cast<char*>(a.c_str()));
     }
-  if (extra)
-    command.push_back(const_cast<char*>(extra));
+  for (const char* e: extra)
+    command.push_back(const_cast<char*>(e));
   command.push_back(const_cast<char*>(filename.c_str()));
   command.push_back(nullptr);
   return read_stdout_of_command(command, verbose);
@@ -213,8 +214,8 @@ read_tlsf_with_syfco(const std::string& filename,
     finite = false;
   else
     {
-      static char arg[] = "--print-semantics";
-      std::string sem = run_syfco(command, {}, arg, filename, verbose);
+      std::string sem = run_syfco(command, {}, {"--print-semantics"},
+                                  filename, verbose);
       auto not_space = [](unsigned char c){ return !std::isspace(c); };
       sem.erase(std::find_if(sem.rbegin(), sem.rend(),
                              not_space).base(), sem.end());
@@ -253,16 +254,24 @@ read_tlsf_with_syfco(const std::string& filename,
 
   if (!(flags & tlsf_flags::TLSF_IGNORE_SIGNALS))
     {
-      static char arg[] = "--print-output-signals";
-      std::string signals = run_syfco(command, assignments, arg,
-                                      filename, verbose);
+      // Ask for the signals in the same output format as the formula
+      // above: this way, syfco itself applies whatever transformation
+      // the "ltlxba" syntax requires for the signal names (it
+      // currently lower-cases them), so the signals are guaranteed to
+      // match the atomic propositions of the formula.  This is why
+      // split_aps() must not change the case of any identifier.
+      std::string signals =
+        run_syfco(command, assignments,
+                  {"-f", finite ? "ltlxba-fin" : "ltlxba",
+                   "--print-output-signals"},
+                  filename, verbose);
       split_aps(signals, res.outputs);
     }
 
   if (!(flags & tlsf_flags::TLSF_IGNORE_TARGET))
     {
-      static char arg[] = "--print-target";
-      std::string target = run_syfco(command, {}, arg, filename, verbose);
+      std::string target = run_syfco(command, {}, {"--print-target"},
+                                     filename, verbose);
       auto not_space = [](unsigned char c){ return !std::isspace(c); };
       target.erase(std::find_if(target.rbegin(), target.rend(),
                                 not_space).base(), target.end());

@@ -2364,16 +2364,20 @@ if syfco --version >/dev/null 2>&1; then
   syfco -f ltlxba -m fully small.tlsf > syfco-small.f
   ../parsetlsf -e "`cat syfco-small.f`" small.tlsf
   # Compare signal sets, not their order: syfco and spot are free to
-  # list signals in different orders.
-  syfco --print-input-signals small.tlsf | tr ', ' '\n' | sort -u \
-    > syfco-small.in
-  run 0 ../parsetlsf --print-input-signals small.tlsf \
-    | tr ', ' '\n' | sort -u > our-small.in
+  # list signals in different orders.  Ask syfco for the signals in the
+  # same `ltlxba` format as the formula: in that syntax upper-case
+  # letters are reserved for LTL operators, so syfco lower-cases the
+  # signal names, whereas spot preserves the case declared in the TLSF.
+  # Hence the case-insensitive comparison.
+  syfco -f ltlxba --print-input-signals small.tlsf \
+    | tr ', ' '\n' | tr 'A-Z' 'a-z' | sort -u > syfco-small.in
+  ../parsetlsf --print-input-signals small.tlsf \
+    | tr ', ' '\n' | tr 'A-Z' 'a-z' | sort -u > our-small.in
   cmp syfco-small.in our-small.in
-  syfco --print-output-signals small.tlsf | tr ', ' '\n' | sort -u \
-    > syfco-small.out
-  run 0 ../parsetlsf --print-output-signals small.tlsf \
-    | tr ', ' '\n' | sort -u > our-small.out
+  syfco -f ltlxba --print-output-signals small.tlsf \
+    | tr ', ' '\n' | tr 'A-Z' 'a-z' | sort -u > syfco-small.out
+  ../parsetlsf --print-output-signals small.tlsf \
+    | tr ', ' '\n' | tr 'A-Z' 'a-z' | sort -u > our-small.out
   cmp syfco-small.out our-small.out
   test "`syfco --print-target small.tlsf`" = \
        "`../parsetlsf --print-target small.tlsf`"
@@ -2388,15 +2392,15 @@ if syfco --version >/dev/null 2>&1; then
     # Every native signal must be listed by syfco.
     ../parsetlsf $opts --print-input-signals "$spec.tlsf" \
       > our-in
-    syfco $opts --print-input-signals "$spec.tlsf" > syfco-in
-    tr ', ' '\n' < our-in | sort -u > our-in.sorted
-    tr ', ' '\n' < syfco-in | sort -u > syfco-in.sorted
+    syfco -f ltlxba $opts --print-input-signals "$spec.tlsf" > syfco-in
+    tr ', ' '\n' < our-in | tr 'A-Z' 'a-z' | sort -u > our-in.sorted
+    tr ', ' '\n' < syfco-in | tr 'A-Z' 'a-z' | sort -u > syfco-in.sorted
     test -z "`comm -23 our-in.sorted syfco-in.sorted`"
     ../parsetlsf $opts --print-output-signals "$spec.tlsf" \
       > our-out
-    syfco $opts --print-output-signals "$spec.tlsf" > syfco-out
-    tr ', ' '\n' < our-out | sort -u > our-out.sorted
-    tr ', ' '\n' < syfco-out | sort -u > syfco-out.sorted
+    syfco -f ltlxba $opts --print-output-signals "$spec.tlsf" > syfco-out
+    tr ', ' '\n' < our-out | tr 'A-Z' 'a-z' | sort -u > our-out.sorted
+    tr ', ' '\n' < syfco-out | tr 'A-Z' 'a-z' | sort -u > syfco-out.sorted
     test -z "`comm -23 our-out.sorted syfco-out.sorted`"
     test "`syfco $opts --print-target "$spec.tlsf"`" = \
          "`../parsetlsf $opts --print-target "$spec.tlsf"`"

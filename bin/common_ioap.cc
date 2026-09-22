@@ -36,14 +36,10 @@ std::unordered_map<std::string, ap_type> identifier_map;
 
 static bool a_part_file_was_read = false;
 
-static std::string
-str_tolower(std::string s)
-{
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c){ return std::tolower(c); });
-  return s;
-}
-
+// The names are kept as-is (in particular their case is preserved):
+// atomic propositions are case-sensitive, so the identifiers read by
+// split_aps() and read_part_file() are later compared verbatim with
+// the APs that appear in the formula.
 void
 split_aps(const std::string& arg, std::vector<std::string>& where)
 {
@@ -52,7 +48,7 @@ split_aps(const std::string& arg, std::vector<std::string>& where)
   while (std::getline(aps, ap, ','))
     {
       ap.erase(remove_if(ap.begin(), ap.end(), isspace), ap.end());
-      where.push_back(str_tolower(ap));
+      where.push_back(ap);
     }
 }
 
@@ -358,15 +354,15 @@ void read_part_file(const char* filename)
         }
       else if (mode == Input)
         {
-          all_input_aps->push_back(str_tolower(word));
+          all_input_aps->push_back(word);
         }
       else if (mode == Unobs)
         {
-          all_unobs_aps->push_back(str_tolower(word));
+          all_unobs_aps->push_back(word);
         }
       else /* mode == Output */
         {
-          all_output_aps->push_back(str_tolower(word));
+          all_output_aps->push_back(word);
         }
     }
   a_part_file_was_read = true;
