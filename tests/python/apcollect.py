@@ -79,3 +79,28 @@ f = spot.formula('1')
 b = spot.atomic_prop_collect_as_bdd(f, aut2)
 tc.assertEqual(b, buddy.bddtrue)
 tc.assertEqual(len(aut2.ap()), 0)
+
+# Test collect_literals() on some formulas.
+for f, lits in [(spot.formula('(a & b) | c'), ['a', 'b', 'c']),
+                (spot.formula('a'), ['a']),
+                (spot.formula('F(a & Gb)'), ['a', 'b'])]:
+    tc.assertEqual(sorted(str(x) for x in spot.collect_literals(f)), lits)
+
+# Test the apid<->name round trip.
+for f in [spot.formula('a'), spot.formula('b')]:
+    tc.assertEqual(spot.formula.apname_from_apid(f.apid()), f.ap_name())
+try:
+    spot.formula.apname_from_apid(123456)
+    exit(2)
+except RuntimeError as e:
+    tc.assertIn('incorrect id', str(e))
+
+# list_formula_props() lists the elementary properties of a formula.
+props = [p for p in spot.list_formula_props(spot.formula('F G a'))]
+for p in ['without Boolean sugar', 'in negative normal form',
+          'syntactic stutter invariant', 'LTL formula', 'PSL formula']:
+    tc.assertIn(p, props)
+leaf = [p for p in spot.list_formula_props(spot.formula('a'))]
+tc.assertIn('without Boolean sugar', leaf)
+tc.assertIn('LTL formula', leaf)
+tc.assertIn('syntactic stutter invariant', leaf)

@@ -20,6 +20,7 @@
 # Make sure scc_filter preserves state-names (suggested by Juraj
 # Major)
 
+import buddy
 import spot
 from unittest import TestCase
 tc = TestCase()
@@ -59,3 +60,11 @@ State: 0 "bar"
 State: 1 "foo" {0}
 [t] 1
 --END--""")
+
+# scc_filter_susp() removes the states that are only usable on accepting
+# cycles when a suspension predicate is not seen.
+susp = buddy.bdd_ithvar(a.register_ap('s'))
+tc.assertEqual(spot.scc_filter_susp(a, True, susp, buddy.bddfalse,
+                                   False, None).num_states(), 2)
+tc.assertEqual(spot.scc_filter_susp(a, True, susp, buddy.bddfalse,
+                                   True, None).num_states(), 2)

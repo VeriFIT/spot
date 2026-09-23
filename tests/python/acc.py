@@ -192,3 +192,27 @@ except RuntimeError as e:
     tc.assertIn('no Fin', str(e))
 else:
     report_missing_exception()
+
+# Test acc_code comparisons, and the cnf/dnf tests.
+c1 = spot.acc_code('Inf(0)&Inf(1)|Fin(2)')
+c2 = spot.acc_code('Inf(0)')
+tc.assertTrue(c2 < c1)
+tc.assertFalse(c1 < c2)
+tc.assertTrue(c1 == c1)
+tc.assertTrue(c1 != c2)
+tc.assertFalse(c1.is_cnf())
+tc.assertTrue(spot.acc_code('Inf(0)&Inf(1)').is_cnf())
+tc.assertTrue(c1.is_dnf())
+tc.assertTrue(c2.is_dnf())
+
+# Test the various textual representations of an acc_code.
+c3 = spot.acc_code('Inf(0) | Fin(1) & Inf(2)')
+c3.to_text(spot.get_cout())
+c3.to_html(spot.get_cout())
+c3.to_latex(spot.get_cout())
+tc.assertEqual(spot.acc_code('Fin(0)|Inf(1)').strip(spot.mark_t([0]),
+                                                   True).is_f(), False)
+
+# mark_t::as_string() prints the set of colors in braces.
+tc.assertEqual(spot.mark_t([0, 1, 5]).as_string(), '{0,1,5}')
+tc.assertEqual(spot.mark_t([]).as_string(), '{}')

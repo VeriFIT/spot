@@ -85,3 +85,15 @@ tc.assertEqual(40, sum(p.size()
 tc.assertEqual(32, sum(p.num_states()
                        for p in gen.aut_patterns((gen.AUT_L_NBA, 1, 3),
                                                  (gen.AUT_KS_NCA, 5))))
+
+# aut_pattern_max() returns the largest size supported by each pattern.
+for pat in [gen.AUT_KS_NCA, gen.AUT_L_NBA, gen.AUT_L_DSA, gen.AUT_M_NBA,
+            gen.AUT_CYCLE_LOG_NBA, gen.AUT_CYCLE_ONEHOT_NBA,
+            gen.AUT_CYCLIST_PROOF_DBA, gen.AUT_CYCLIST_TRACE_NBA,
+            gen.AUT_EL_EMPTY]:
+    tc.assertEqual(gen.aut_pattern_max(pat), 0)
+try:
+    gen.aut_pattern_max(9999)
+    exit(2)
+except RuntimeError as e:
+    tc.assertIn('unsupported pattern', str(e))

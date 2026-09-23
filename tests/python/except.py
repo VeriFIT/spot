@@ -373,3 +373,46 @@ except RuntimeError as e:
                 str(e))
 else:
     report_missing_exception()
+
+# Misuse of formula::min() / max() / apid() / ap() / apname_from_apid().
+f = spot.formula('F(a)')
+try:
+    f.min()
+    report_missing_exception()
+except (RuntimeError, ValueError) as e:
+    tc.assertIn('min() only works on Star and FStar nodes', str(e))
+try:
+    f.max()
+    report_missing_exception()
+except (RuntimeError, ValueError) as e:
+    # max() borrows the same (awkward) message as min().
+    tc.assertIn('min() only works on Star and FStar nodes', str(e))
+try:
+    f.apid()
+    report_missing_exception()
+except RuntimeError as e:
+    tc.assertIn('apid() called on non-AP formula', str(e))
+try:
+    spot.formula.ap(f)
+    report_missing_exception()
+except (RuntimeError, ValueError) as e:
+    tc.assertIn('atomic propositions cannot be constructed from '
+                'arbitrary formulas', str(e))
+ap = spot.formula('a')
+try:
+    spot.formula.apname_from_apid(123456)
+    report_missing_exception()
+except RuntimeError as e:
+    tc.assertIn('incorrect id', str(e))
+finally:
+    tc.assertEqual(spot.formula.apname_from_apid(ap.apid()), 'a')
+
+# product() on a "weak" automaton whose acceptance does not allow it.
+weak = spot.translate('a')
+weak.set_acceptance(spot.acc_cond('all'))
+weak.prop_weak(spot.trival(False))
+try:
+    spot.product(weak, spot.translate('b'))
+    report_missing_exception()
+except RuntimeError as e:
+    tc.assertIn('declared not weak', str(e))

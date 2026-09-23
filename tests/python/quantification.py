@@ -130,3 +130,16 @@ tc.assertTrue(spot.product_xor(spot.quantify_exists(a1, "unused"),
                               a1).is_empty())
 tc.assertTrue(spot.product_xor(spot.quantify_forall(a1, "unused"),
                               a1).is_empty())
+
+# Formula-level quantification via formula.quantify().
+qf = spot.formula.quantify(spot.op_exists, spot.formula('a'),
+                           spot.formula('F(a)'))
+tc.assertEqual(str(qf), r'\exists a: Fa')
+qf2 = spot.formula.quantify(spot.op_forall,
+                            [spot.formula('a'), spot.formula('b')],
+                            spot.formula('a & b'))
+tc.assertEqual(str(qf2), r'\forall a, b: (a & b)')
+# Quantifying an atomic proposition factorizes a conjunction.
+qf3 = spot.formula.quantify(spot.op_exists, spot.formula('a'),
+                            spot.formula('a & b'))
+tc.assertEqual(str(qf3), r'\exists a: (a & b)')

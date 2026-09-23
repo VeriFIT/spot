@@ -677,3 +677,64 @@ auts = spot.split_2step(aut)
 spot.minimize_mealy(auts, -1)
 spot.minimize_mealy(auts, 0)
 spot.minimize_mealy(auts, 1)
+
+# is_input_deterministic_mealy() checks that each input-only part of
+# the transition conditions is disjoint per state.
+det_mealy = spot.automaton("""HOA: v1
+States: 1
+Start: 0
+AP: 2 "i" "o"
+Acceptance: 0 t
+--BODY--
+State: 0
+[!0&1] 0
+[0&1] 0
+--END--""")
+spot.set_synthesis_outputs(
+    det_mealy, buddy.bdd_ithvar(det_mealy.register_ap('o')))
+tc.assertTrue(spot.is_mealy(det_mealy))
+tc.assertTrue(spot.is_input_deterministic_mealy(det_mealy))
+
+nondet_mealy = spot.automaton("""HOA: v1
+States: 1
+Start: 0
+AP: 2 "i" "o"
+Acceptance: 0 t
+--BODY--
+State: 0
+[!0&!1] 0
+[!0&1] 0
+[0&1] 0
+--END--""")
+spot.set_synthesis_outputs(nondet_mealy,
+                          buddy.bdd_ithvar(nondet_mealy.register_ap('o')))
+tc.assertTrue(spot.is_mealy(nondet_mealy))
+tc.assertFalse(spot.is_input_deterministic_mealy(nondet_mealy))
+
+# is_input_deterministic_mealy() detects non-deterministic inputs.
+nd = spot.automaton("""HOA: v1
+States: 1
+Start: 0
+AP: 2 "i" "o"
+Acceptance: 0 t
+--BODY--
+State: 0
+[!0&1] 0
+[!0&!1] 0
+[0&1] 0
+--END--""")
+spot.set_synthesis_outputs(nd, buddy.bdd_ithvar(nd.register_ap('o')))
+tc.assertTrue(spot.is_mealy(nd))
+tc.assertFalse(spot.is_input_deterministic_mealy(nd))
+dm = spot.automaton("""HOA: v1
+States: 1
+Start: 0
+AP: 2 "i" "o"
+Acceptance: 0 t
+--BODY--
+State: 0
+[!0&1] 0
+[0&1] 0
+--END--""")
+spot.set_synthesis_outputs(dm, buddy.bdd_ithvar(dm.register_ap('o')))
+tc.assertTrue(spot.is_input_deterministic_mealy(dm))

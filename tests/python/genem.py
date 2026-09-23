@@ -332,3 +332,14 @@ def run_bench(automata):
 
 
 run_bench([a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a360, act])
+
+# accepting_transitions() returns a Boolean vector whose entries are
+# indexed by edge numbers; the entry 0 (the dummy edge at the beginning
+# of the edge vector) is always False.
+# accepting_transitions() returns a Boolean vector indexed by edge
+# numbers (dummy edge at 0 is always False).
+gf = spot.translate('GFa')
+res = spot.accepting_transitions(gf, gf.acc())
+tc.assertEqual(len(res), gf.num_edges() + 1)
+tc.assertFalse(res[0])
+tc.assertTrue(any(res[1:]))

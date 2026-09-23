@@ -150,3 +150,48 @@ tc.assertTrue(si.is_accepting_scc(1))
 tc.assertFalse(si.is_rejecting_scc(1))
 tc.assertTrue(si.is_rejecting_scc(0))
 tc.assertFalse(si.is_accepting_scc(0))
+
+# highlight_semidet_sccs() colors the states of semi-deterministic SCCs.
+hd = spot.automaton("""HOA: v1
+States: 2
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0
+[0] 0 {0}
+State: 1
+--END--""")
+sd = spot.scc_info(hd)
+spot.highlight_semidet_sccs(sd, 4)
+dot = sd.get_aut().to_str('dot')
+if 'style="bold", color="#33A02C"' not in dot:
+    exit(1)
+
+# Invalid option combinations raise informative errors.
+neg = spot.translate('GFa')
+si0 = spot.scc_info_with_options(neg, spot.scc_info_options_NONE)
+try:
+    si0.succ(0)
+    exit(2)
+except RuntimeError as e:
+    tc.assertIn('TRACK_SUCCS', str(e))
+try:
+    si0.split_on_sets(0, spot.mark_t([0]))
+    exit(2)
+except RuntimeError as e:
+    tc.assertIn('TRACK_STATES', str(e))
+si_def = spot.scc_info(neg)
+r = spot.twa_run(neg)
+try:
+    si_def.get_accepting_run(0, r)
+    exit(2)
+except RuntimeError as e:
+    tc.assertIn('STOP_ON_ACC', str(e))
+si_det = spot.scc_info_with_options(
+    neg, spot.scc_info_options_STOP_ON_ACC | spot.scc_info_options_TRACK_SUCCS)
+try:
+    si_det.is_useful_scc(0)
+    exit(2)
+except RuntimeError as e:
+    tc.assertIn('STOP_ON_ACC', str(e))

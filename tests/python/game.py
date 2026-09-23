@@ -509,3 +509,21 @@ tc.assertFalse(spot.solve_parity_game(empty))
 # A parity game with a dead end is outside the solver's precondition.
 # Keep this test as documentation of the currently unsupported input rather
 # than asserting a result whose finite-play semantics are not defined.
+
+# The strategy/winner getters and setters.
+strat = [0] * g.num_states()
+spot.set_strategy(g, strat)
+spot.set_state_winners(g, [True] * g.num_states())
+spot.set_state_winner(g, 0, True)
+tc.assertEqual(len(spot.get_strategy(g)), g.num_states())
+tc.assertTrue(spot.get_state_winner(g, 0))
+try:
+    spot.set_state_winner(g, 100, True)
+    exit(1)
+except RuntimeError as e:
+    tc.assertIn('invalid state number', str(e))
+try:
+    spot.set_strategy(g, [0] * (g.num_states() - 3))
+    exit(1)
+except RuntimeError as e:
+    tc.assertIn('same size as the automaton', str(e))

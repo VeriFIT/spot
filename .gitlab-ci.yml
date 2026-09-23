@@ -75,7 +75,7 @@ debian-unstable-gcc-coverage:
     - make check
     # --gcov-suspicious-hits-threshold 0 works around gcovr 8.3's refusal to
     # read counters ≥ 2^32 on hot inline lines (e.g. edge_iterator::operator* is called very often).
-    - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root $PWD -e 'bin/spot.cc' -e 'bin/spot-x.cc' -e 'spot/bricks/.*' -e 'spot/parse.*/scan.*.cc' -e 'spot/parse.*/parse.*.cc' -e 'utf8/.*' -e 'python/.*' -e 'buddy/.*' -e 'cadical/.*' -e 'doc/org/tmp/.*' --html-details coverage.html --html-tab-size 8 --fail-under-line 90.7 --gcov-suspicious-hits-threshold 0
+    - gcovr --xml-pretty --exclude-unreachable-branches --print-summary -o coverage.xml --root $PWD -e 'bin/spot.cc' -e 'bin/spot-x.cc' -e 'spot/bricks/.*' -e 'spot/priv/robin_hood.hh' -e 'spot/parse.*/scan.*.cc' -e 'spot/parse.*/parse.*.cc' -e 'utf8/.*' -e 'python/.*' -e 'buddy/.*' -e 'cadical/.*' -e 'doc/org/tmp/.*' --html-details coverage.html --html-tab-size 8 --fail-under-line 90.7 --gcov-suspicious-hits-threshold 0
   coverage: /^\s*lines:\s*\d+.\d+\%/
   artifacts:
     when: always

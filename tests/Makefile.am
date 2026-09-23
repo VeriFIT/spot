@@ -432,7 +432,9 @@ TESTS_python = \
   python/bdddict.py \
   python/bdditer.py \
   python/bddnqueen.py \
+  python/bddprint.py \
   python/bugdet.py \
+  python/cobuchi.py \
   python/complement_semidet.py \
   python/dbranch.py \
   python/declenv.py \
