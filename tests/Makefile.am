@@ -448,9 +448,11 @@ TESTS_python = \
   python/ecfalse.py \
   python/except.py \
   python/forq_contains.py \
+  python/formula2bdd.py \
   python/game.py \
   python/gen.py \
   python/genem.py \
+  python/hierarchy.py \
   python/implies.py \
   python/interdep.py \
   python/intrun.py \

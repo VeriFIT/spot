@@ -287,3 +287,48 @@ tc.assertEqual(qvars, {'u', 'v'})
 # The body (last child) should be the alive wrapper.
 inner_body = result[result.size() - 1]
 tc.assertTrue(inner_body.kind() == spot.op_And)
+
+# ----------------------------------------------------------------------------
+# Error paths and unsupported operators in from_ltlf(),
+# ltlf_one_step_sat_rewrite() and ltlf_one_step_unsat_rewrite(), and
+# the quantified-formula case of ltlf_simplifier::simplify().
+# ----------------------------------------------------------------------------
+
+# from_ltlf() only supports LTL formulas; PSL formulas must be rejected.
+tc.assertRaises(RuntimeError, spot.from_ltlf, spot.formula('{a;b}'))
+tc.assertRaises(RuntimeError, spot.from_ltlf,
+                spot.formula('{a[*]}'), 'alive', 0)
+tc.assertRaises(RuntimeError, spot.from_ltlf,
+                spot.formula('{a;b}'), 'alive', 1)
+
+# ltlf_one_step_sat_rewrite() does not know the PSL operators.
+for psl in ['{a;b}', '{a[*]}']:
+    tc.assertRaises(RuntimeError, spot.ltlf_one_step_sat_rewrite,
+                    spot.formula(psl))
+# ... nor the quantifiers.
+tc.assertRaises(RuntimeError, spot.ltlf_one_step_sat_rewrite,
+                spot.formula('\\exists x: F(x)'))
+tc.assertRaises(RuntimeError, spot.ltlf_one_step_sat_rewrite,
+                spot.formula('\\forall x: G(x)'))
+
+# Same for ltlf_one_step_unsat_rewrite(), including its two-argument
+# (negated) overload.
+for psl in ['{a;b}', '{a[*]}']:
+    tc.assertRaises(RuntimeError, spot.ltlf_one_step_unsat_rewrite,
+                    spot.formula(psl))
+    tc.assertRaises(RuntimeError, spot.ltlf_one_step_unsat_rewrite,
+                    spot.formula(psl), True)
+tc.assertRaises(RuntimeError, spot.ltlf_one_step_unsat_rewrite,
+                spot.formula('\\exists x: F(x)'))
+tc.assertEqual(spot.ltlf_one_step_unsat_rewrite(spot.formula('!Xa'), True),
+               spot.formula.tt())
+
+# ltlf_simplifier::simplify() handles quantified formulas by keeping
+# the quantifier and simplifying under it.
+ls2 = spot.ltlf_simplifier()
+tc.assertEqual(ls2.simplify(spot.formula('\\exists x: F(x)')),
+               spot.formula('\\exists x: Fx'))
+tc.assertEqual(ls2.simplify(spot.formula('\\forall x: G(x)')),
+               spot.formula('\\forall x: Gx'))
+tc.assertEqual(ls2.simplify(spot.formula('\\exists x: Fx')),
+               spot.formula('\\exists x: Fx'))
