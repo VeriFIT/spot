@@ -40,3 +40,32 @@ for opt in 0 1 2 3 7 8 9; do
         *)         ../reduc -f -h $opt formulas;;
     esac
 done
+
+# Cover the remaining option levels.
+for opt in 4 5 6 10 11 12 13 14 15; do
+  ../reduc $opt 'Ga|b'
+done
+
+# Missing arguments trigger the usage message.
+run 2 ../reduc
+run 2 ../reduc 0
+
+# Bad formulas.
+run 2 ../reduc 0 'G('
+run 2 ../reduc 0 'Ga' 'G('
+
+# Reading from a non-existing file.
+run 2 ../reduc -f 0 /does/not/exist
+
+# A second formula while reading from a file is disallowed.
+echo 'Ga' > f
+run 2 ../reduc -f 0 f 'b'
+
+# A file containing a bad formula.
+echo 'G(' > bad
+run 2 ../reduc -f 0 bad
+
+# Two-formula forms check that the reduction is correct.
+../reduc 0 'Ga' 'Ga'
+../reduc 0 'a|a' 'a'
+run 1 ../reduc 0 'a|a' 'b'

@@ -1046,3 +1046,9 @@ digraph "" {
 }
 EOF
 diff out.dot exp.dot
+
+# --included-in accepts an alternating automaton as reference knowledge
+# (this calls complement and remove_alternation on it).
+autfilt -q --included-in=alt.hoa alt.hoa
+
+:

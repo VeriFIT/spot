@@ -417,6 +417,20 @@ diff output expected
 SPOT_DOTDEFAULT=bra ltl2tgba --dot='Ae.f(Lato)' 'GFa & GFb' >output
 cat output
 
+# Diagnostics for broken --dot options.
+autfilt --dot='+' input 2>err && exit 1
+grep 'missing number after' err
+autfilt --dot='<' input 2>err && exit 1
+grep 'missing number after' err
+autfilt --dot='f(' input 2>err && exit 1
+grep 'invalid font' err
+autfilt --dot=C input 2>err && exit 1
+grep 'invalid node color' err
+
+# SPOT_DOTDEFAULT must not contain '.'.
+SPOT_DOTDEFAULT=. autfilt --dot=. input 2>err && exit 1
+grep 'SPOT_DOTDEFAULT should not contain' err
+
 zero='<font color="#1F78B4">⓿</font>'
 one='<font color="#FF4DA0">❶</font>'
 cat >expected <<EOF

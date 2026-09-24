@@ -84,7 +84,6 @@ syntax(char* prog)
     "  -XD   do not compute an automaton, read it from an ltl2dstar file\n"
     "  -XDB  like -XD, and convert it to TGBA\n"
     "  -XH   do not compute an automaton, read it from a HOA file\n"
-    "  -XL   do not compute an automaton, read it from an LBTT file\n"
     "  -XN   do not compute an automaton, read it from a neverclaim file\n"
     "  -Pfile  multiply the formula automaton with the TGBA read"
     " from `file'\n"
@@ -98,13 +97,10 @@ syntax(char* prog)
     "\n"
     "Options for Couvreur's FM algorithm (-f):\n"
     "  -fr   reduce formula at each step of FM\n"
-    "          as specified with the -r{1..7} options\n"
+    "          as specified with the -r4 or -r7 options\n"
     "  -fu   build unambiguous automata\n"
     "  -L    fair-loop approximation (implies -f)\n"
     "  -p    branching postponement (implies -f)\n"
-    "  -U[PROPS]  consider atomic properties of the formula as "
-    "exclusive events, and\n"
-    "        PROPS as unobservables events (implies -f)\n"
     "  -x    try to produce a more deterministic automaton "
     "(implies -f)\n"
     "  -y    do not merge states with same symbolic representation "
@@ -114,16 +110,9 @@ syntax(char* prog)
     "  -c    enable language containment checks (implies -taa)\n"
     "\n"
     "Formula simplification (before translation):\n"
-    "  -r1   reduce formula using basic rewriting\n"
-    "  -r2   reduce formula using class of eventuality and universality\n"
-    "  -r3   reduce formula using implication between sub-formulae\n"
-    "  -r4   reduce formula using all above rules\n"
-    "  -r5   reduce formula using tau03\n"
-    "  -r6   reduce formula using tau03+\n"
+    "  -r4   reduce formula using basic rewriting, eventuality,\n"
+    "        universality, and implication\n"
     "  -r7   reduce formula using tau03+ and -r4\n"
-    "  -rd   display the reduced formula\n"
-    "  -rD   dump statistics about the simplifier cache\n"
-    "  -rL   disable basic rewritings producing larger formulas\n"
     "  -ru   lift formulae that are eventual and universal\n"
     "\n"
     "Automaton degeneralization (after translation):\n"
@@ -145,7 +134,6 @@ syntax(char* prog)
     "  -Rm   attempt to WDBA-minimize the automaton\n"
     "  -RM   attempt to WDBA-minimize the automaton unless the "
     "result is bigger\n"
-    "  -RQ   determinize a TGBA (assuming it's legal!)\n"
     "\n"
     "Automaton conversion:\n"
     "  -M    convert into a det. minimal monitor (implies -R3 or R3b)\n"
@@ -158,8 +146,6 @@ syntax(char* prog)
     "  -E[ALGO]  run emptiness check, expect no accepting run\n"
     "  -C    compute an accepting run (Counterexample) if it exists\n"
     "  -CR   compute and replay an accepting run (implies -C)\n"
-    "  -G    graph the accepting run seen as an automaton (requires -e)\n"
-    "  -m    try to reduce accepting runs, in a second pass\n"
     "Where ALGO should be one of:\n"
     "  Cou99(OPTIONS) (the default)\n"
     "  CVWY90(OPTIONS)\n"
@@ -175,22 +161,16 @@ syntax(char* prog)
     "Output options (if no emptiness check):\n"
     "  -ks   display statistics on the automaton (size only)\n"
     "  -kt   display statistics on the automaton (size + subtransitions)\n"
-    "  -K    dump the graph of SCCs in dot format\n"
     "  -KC   list cycles in automaton\n"
     "  -KW   list weak SCCs\n"
     "  -N    output the never claim for Spin (implies -DS)\n"
-    "  -NN   output the never claim for Spin, with commented states"
-    " (implies -DS)\n"
     "  -O    tell if a formula represents a safety, guarantee, "
     "or obligation property\n"
     "  -t    output automaton in LBTT's format\n"
     "\n"
     "Miscellaneous options:\n"
-    "  -0    produce minimal output dedicated to the paper\n"
-    "  -8    output UTF-8 formulae\n"
     "  -d    turn on traces during parsing\n"
-    "  -T    time the different phases of the translation\n"
-    "  -v    display the BDD variables used by the automaton\n";
+    "  -T    time the different phases of the translation\n";
   exit(2);
 }
 
@@ -222,8 +202,6 @@ checked_main(int argc, char** argv)
   int exit_code = 0;
 
   bool debug_opt = false;
-  bool paper_opt = false;
-  bool utf8_opt = false;
   enum { NoDegen, DegenTBA, DegenSBA } degeneralize_opt = NoDegen;
   enum { TransFM, TransTAA, TransCompo } translation = TransFM;
   bool fm_red = false;
@@ -248,27 +226,18 @@ checked_main(int argc, char** argv)
   bool simpltl = false;
   spot::tl_simplifier_options redopt(false, false, false, false,
                                            false, false, false);
-  bool simpcache_stats = false;
   bool scc_filter_all = false;
-  bool display_reduced_form = false;
   bool post_branching = false;
   bool fair_loop_approx = false;
-  bool graph_run_tgba_opt = false;
-  bool opt_reduce = false;
   bool opt_minimize = false;
-  bool opt_determinize = false;
-  unsigned opt_determinize_threshold = 0;
   unsigned opt_o_threshold = 0;
   bool opt_dtwacomp = false;
   bool reject_bigger = false;
   bool opt_monitor = false;
   bool containment = false;
-  bool opt_closure = false;
-  bool opt_stutterize = false;
   const char* opt_never = nullptr;
   const char* hoa_opt = nullptr;
   auto& env = spot::default_environment::instance();
-  spot::atomic_prop_set* unobservables = nullptr;
   spot::twa_ptr system_aut = nullptr;
   auto dict = spot::make_bdd_dict();
   spot::timer_map tm;
@@ -281,9 +250,7 @@ checked_main(int argc, char** argv)
   bool cs_nosimul = true;
   bool cs_early_start = false;
   bool cs_oblig = false;
-  bool opt_complete = false;
   int opt_dtbasat = -1;
-  int opt_dtwasat = -1;
 
   for (;;)
     {
@@ -292,16 +259,7 @@ checked_main(int argc, char** argv)
 
       ++formula_index;
 
-      if (!strcmp(argv[formula_index], "-0"))
-        {
-          paper_opt = true;
-        }
-      else if (!strcmp(argv[formula_index], "-8"))
-        {
-          utf8_opt = true;
-          spot::enable_utf8();
-        }
-      else if (!strcmp(argv[formula_index], "-c"))
+      if (!strcmp(argv[formula_index], "-c"))
         {
           containment = true;
           translation = TransTAA;
@@ -414,11 +372,6 @@ checked_main(int argc, char** argv)
         {
           file_opt = true;
         }
-      else if (!strcmp(argv[formula_index], "-G"))
-        {
-          accepting_run = true;
-          graph_run_tgba_opt = true;
-        }
       else if (!strncmp(argv[formula_index], "-H", 2))
         {
           output = 17;
@@ -431,10 +384,6 @@ checked_main(int argc, char** argv)
       else if (!strcmp(argv[formula_index], "-kt"))
         {
           output = 13;
-        }
-      else if (!strcmp(argv[formula_index], "-K"))
-        {
-          output = 10;
         }
       else if (!strncmp(argv[formula_index], "-KP", 3))
         {
@@ -461,21 +410,11 @@ checked_main(int argc, char** argv)
           fair_loop_approx = true;
           translation = TransFM;
         }
-      else if (!strcmp(argv[formula_index], "-m"))
-        {
-          opt_reduce = true;
-        }
       else if (!strcmp(argv[formula_index], "-N"))
         {
           degeneralize_opt = DegenSBA;
           output = 8;
           opt_never = nullptr;
-        }
-      else if (!strcmp(argv[formula_index], "-NN"))
-        {
-          degeneralize_opt = DegenSBA;
-          output = 8;
-          opt_never = "c";
         }
       else if (!strncmp(argv[formula_index], "-O", 2))
         {
@@ -502,38 +441,12 @@ checked_main(int argc, char** argv)
           system_aut = daut->aut;
           tm.stop("reading -P's argument");
         }
-      else if (!strcmp(argv[formula_index], "-r1"))
-        {
-          simpltl = true;
-          redopt.reduce_basics = true;
-        }
-      else if (!strcmp(argv[formula_index], "-r2"))
-        {
-          simpltl = true;
-          redopt.event_univ = true;
-        }
-      else if (!strcmp(argv[formula_index], "-r3"))
-        {
-          simpltl = true;
-          redopt.synt_impl = true;
-        }
       else if (!strcmp(argv[formula_index], "-r4"))
         {
           simpltl = true;
           redopt.reduce_basics = true;
           redopt.event_univ = true;
           redopt.synt_impl = true;
-        }
-      else if (!strcmp(argv[formula_index], "-r5"))
-        {
-          simpltl = true;
-          redopt.containment_checks = true;
-        }
-      else if (!strcmp(argv[formula_index], "-r6"))
-        {
-          simpltl = true;
-          redopt.containment_checks = true;
-          redopt.containment_checks_stronger = true;
         }
       else if (!strcmp(argv[formula_index], "-r7"))
         {
@@ -545,12 +458,9 @@ checked_main(int argc, char** argv)
           redopt.containment_checks_stronger = true;
         }
       else if (!strcmp(argv[formula_index], "-R1q")
-               || !strcmp(argv[formula_index], "-R1t")
-               || !strcmp(argv[formula_index], "-R2q")
-               || !strcmp(argv[formula_index], "-R2t"))
+               || !strcmp(argv[formula_index], "-R1t"))
         {
-          // For backward compatibility, make all these options
-          // equal to -RDS.
+          // For backward compatibility, make these options equal to -RDS.
           reduction_dir_sim = true;
         }
       else if (!strcmp(argv[formula_index], "-RRS"))
@@ -566,18 +476,6 @@ checked_main(int argc, char** argv)
           scc_filter = true;
           scc_filter_all = true;
         }
-      else if (!strcmp(argv[formula_index], "-rd"))
-        {
-          display_reduced_form = true;
-        }
-      else if (!strcmp(argv[formula_index], "-rD"))
-        {
-          simpcache_stats = true;
-        }
-      else if (!strcmp(argv[formula_index], "-RC"))
-        {
-          opt_complete = true;
-        }
       else if (!strcmp(argv[formula_index], "-RDS"))
         {
           reduction_dir_sim = true;
@@ -585,20 +483,6 @@ checked_main(int argc, char** argv)
       else if (!strcmp(argv[formula_index], "-RIS"))
         {
           reduction_iterated_sim = true;
-        }
-      else if (!strcmp(argv[formula_index], "-rL"))
-        {
-          simpltl = true;
-          redopt.reduce_basics = true;
-          redopt.reduce_size_strictly = true;
-        }
-      else if (!strncmp(argv[formula_index], "-RG", 3))
-        {
-          if (argv[formula_index][3] != 0)
-            opt_dtwasat = to_int(argv[formula_index] + 3);
-          else
-            opt_dtwasat = 0;
-          //output = -1;
         }
       else if (!strcmp(argv[formula_index], "-Rm"))
         {
@@ -608,12 +492,6 @@ checked_main(int argc, char** argv)
         {
           opt_minimize = true;
           reject_bigger = true;
-        }
-      else if (!strncmp(argv[formula_index], "-RQ", 3))
-        {
-          opt_determinize = true;
-          if (argv[formula_index][3] != 0)
-            opt_determinize_threshold = to_int(argv[formula_index] + 3);
         }
       else if (!strncmp(argv[formula_index], "-RS", 3))
         {
@@ -637,14 +515,6 @@ checked_main(int argc, char** argv)
         {
           dupexp = true;
         }
-      else if (!strcmp(argv[formula_index], "-CL"))
-        {
-          opt_closure = true;
-        }
-      else if (!strcmp(argv[formula_index], "-ST"))
-        {
-          opt_stutterize = true;
-        }
       else if (!strcmp(argv[formula_index], "-t"))
         {
           output = 6;
@@ -656,18 +526,6 @@ checked_main(int argc, char** argv)
       else if (!strcmp(argv[formula_index], "-taa"))
         {
           translation = TransTAA;
-        }
-      else if (!strncmp(argv[formula_index], "-U", 2))
-        {
-          unobservables = new spot::atomic_prop_set;
-          translation = TransFM;
-          // Parse -U's argument.
-          const char* tok = strtok(argv[formula_index] + 2, ", \t;");
-          while (tok)
-            {
-              unobservables->insert(env.require(tok));
-              tok = strtok(nullptr, ", \t;");
-            }
         }
       else if (!strncmp(argv[formula_index], "-u", 2))
         {
@@ -713,10 +571,6 @@ checked_main(int argc, char** argv)
               ++c;
             }
         }
-      else if (!strcmp(argv[formula_index], "-v"))
-        {
-          output = 5;
-        }
       else if (!strcmp(argv[formula_index], "-x"))
         {
           translation = TransFM;
@@ -735,10 +589,6 @@ checked_main(int argc, char** argv)
         {
           from_file = true;
         }
-      else if (!strcmp(argv[formula_index], "-XL"))
-        {
-          from_file = true;
-        }
       else if (!strcmp(argv[formula_index], "-XN")) // now synonym for -XH
         {
           from_file = true;
@@ -752,13 +602,6 @@ checked_main(int argc, char** argv)
         {
           break;
         }
-    }
-
-  if ((graph_run_tgba_opt)
-      && (!echeck_inst || !expect_counter_example))
-    {
-      std::cerr << argv[0] << ": error: -G requires -e.\n";
-      exit(1);
     }
 
   std::string input;
@@ -844,13 +687,6 @@ checked_main(int argc, char** argv)
               spot::formula t = simp->simplify(f);
               tm.stop("reducing formula");
               f = t;
-              if (display_reduced_form)
-                {
-                  if (utf8_opt)
-                    print_utf8_psl(std::cout, f) << '\n';
-                  else
-                    print_psl(std::cout, f) << '\n';
-                }
               // This helps ltl_to_tgba_fm() to order BDD variables in
               // a more natural way.
               simp->clear_as_bdd_cache();
@@ -873,7 +709,7 @@ checked_main(int argc, char** argv)
                                        fm_symb_merge_opt,
                                        post_branching,
                                        fair_loop_approx,
-                                       unobservables,
+                                       nullptr,
                                        fm_red ? simp : nullptr,
                                        fm_unambiguous);
               break;
@@ -890,23 +726,6 @@ checked_main(int argc, char** argv)
             }
           tm.stop("translating formula");
 
-          if (simp && simpcache_stats)
-            {
-              simp->print_stats(std::cerr);
-              bddStat s;
-              bdd_stats(&s);
-              std::cerr << "BDD produced: " << s.produced
-                        << "\n    nodenum: " << s.nodenum
-                        << "\n    maxnodenum: " << s.maxnodenum
-                        << "\n    freenodes: " <<  s.freenodes
-                        << "\n    minfreenodes: " << s.minfreenodes
-                        << "\n    varnum: " <<  s.varnum
-                        << "\n    cachesize: " << s.cachesize
-                        << "\n    gbcnum: " << s.gbcnum
-                        << '\n';
-              bdd_fprintstat(stderr);
-              dict->dump(std::cerr);
-            }
           delete simp;
         }
 
@@ -1019,17 +838,6 @@ checked_main(int argc, char** argv)
             }
         }
 
-      if (opt_determinize && a->acc().num_sets() <= 1
-          && (!f || f.is_syntactic_recurrence()))
-        {
-          tm.start("determinization 2");
-          auto determinized = tba_determinize(ensure_digraph(a), 0,
-                                              opt_determinize_threshold);
-          tm.stop("determinization 2");
-          if (determinized)
-            a = determinized;
-        }
-
       if (opt_monitor)
         {
           tm.start("Monitor minimization");
@@ -1040,7 +848,7 @@ checked_main(int argc, char** argv)
                                 // pointless.
         }
 
-      if (degeneralize_opt != NoDegen || opt_determinize)
+      if (degeneralize_opt != NoDegen)
         {
           if (reduction_dir_sim && !reduction_iterated_sim)
             {
@@ -1067,29 +875,12 @@ checked_main(int argc, char** argv)
             }
         }
 
-      if (opt_complete)
-        {
-          tm.start("completion");
-          a = complete(a);
-          tm.stop("completion");
-        }
-
       if (opt_dtbasat >= 0)
         {
           tm.start("dtbasat");
           auto satminimized =
             dtba_sat_synthetize(ensure_digraph(a), opt_dtbasat);
           tm.stop("dtbasat");
-          if (satminimized)
-            a = satminimized;
-        }
-      else if (opt_dtwasat >= 0)
-        {
-          tm.start("dtwasat");
-          auto satminimized = dtwa_sat_minimize
-            (ensure_digraph(a), opt_dtwasat,
-             spot::acc_cond::acc_code::generalized_buchi(opt_dtwasat));
-          tm.stop("dtwasat");
           if (satminimized)
             a = satminimized;
         }
@@ -1101,8 +892,7 @@ checked_main(int argc, char** argv)
           tm.stop("DTωA complement");
         }
 
-      if (opt_determinize || opt_dtwacomp || opt_dtbasat >= 0
-          || opt_dtwasat >= 0)
+      if (opt_dtwacomp || opt_dtbasat >= 0)
         {
           if (scc_filter && (reduction_dir_sim || reduction_rev_sim))
             {
@@ -1113,16 +903,6 @@ checked_main(int argc, char** argv)
                                    false : scc_filter_all);
               tm.stop("SCC-filter post-sim");
             }
-        }
-
-      if (opt_closure)
-        {
-          a = closure(ensure_digraph(a));
-        }
-
-      if (opt_stutterize)
-        {
-          a = sl(ensure_digraph(a));
         }
 
       if (opt_monitor)
@@ -1175,18 +955,10 @@ checked_main(int argc, char** argv)
       if (echeck_inst
           && (a->acc().num_sets() < echeck_inst->min_sets()))
         {
-          if (!paper_opt)
-            {
-              std::cerr << echeck_algo << " requires at least "
-                        << echeck_inst->min_sets()
-                        << " acceptance sets.\n";
-              exit(1);
-            }
-          else
-            {
-              std::cout << std::endl;
-              exit(0);
-            }
+          std::cerr << echeck_algo << " requires at least "
+                    << echeck_inst->min_sets()
+                    << " acceptance sets.\n";
+          exit(1);
         }
 
       if (f)
@@ -1199,9 +971,6 @@ checked_main(int argc, char** argv)
             {
             case 0:
               spot::print_dot(std::cout, a);
-              break;
-            case 5:
-              a->get_dict()->dump(std::cout);
               break;
             case 6:
               spot::print_lbtt(std::cout, a);
@@ -1222,9 +991,6 @@ checked_main(int argc, char** argv)
                   }
                 break;
               }
-            case 10:
-              dump_scc_info_dot(std::cout, ensure_digraph(a));
-              break;
             case 12:
               stats_reachable(a).dump(std::cout);
               break;
@@ -1318,102 +1084,61 @@ checked_main(int argc, char** argv)
               auto res = ec->check();
               tm.stop("running emptiness check");
 
-              if (paper_opt)
-                {
-                  std::ios::fmtflags old = std::cout.flags();
-                  std::cout << std::left << std::setw(25)
-                            << echeck_algo << ", ";
-                  spot::twa_statistics a_size =
-                                        spot::stats_reachable(ec->automaton());
-                  std::cout << std::right << std::setw(10)
-                            << a_size.states << ", "
-                            << std::right << std::setw(10)
-                            << a_size.edges << ", ";
-                  std::cout << ec->automaton()->acc().num_sets()
-                            << ", ";
-                  auto ecs = ec->emptiness_check_statistics();
-                  if (ecs)
-                    std::cout << std::right << std::setw(10)
-                              << ecs->states() << ", "
-                              << std::right << std::setw(10)
-                              << ecs->transitions() << ", "
-                              << std::right << std::setw(10)
-                              << ecs->max_depth();
-                  else
-                    std::cout << "no stats, , ";
-                  if (res)
-                    std::cout << ", accepting run found";
-                  else
-                    std::cout << ", no accepting run found";
-                  std::cout << std::endl;
-                  std::cout << std::setiosflags(old);
-                }
-              else
-                {
-                  if (!graph_run_tgba_opt)
-                    ec->print_stats(std::cout);
-                  if (expect_counter_example != !!res &&
-                      (!expect_counter_example || ec->safe()))
-                    exit_code = 1;
+              {
+                ec->print_stats(std::cout);
+                if (expect_counter_example != !!res &&
+                    (!expect_counter_example || ec->safe()))
+                  exit_code = 1;
 
-                  if (!res)
-                    {
-                      std::cout << "no accepting run found";
-                      if (!ec->safe() && expect_counter_example)
-                        {
-                          std::cout << " even if expected\n";
-                          std::cout << "this may be due to the use of the bit"
-                                    << " state hashing technique\n";
-                          std::cout << "you can try to increase the heap size "
-                                    << "or use an explicit storage"
-                                    << std::endl;
-                        }
-                      std::cout << std::endl;
-                      break;
-                    }
-                  else if (accepting_run)
-                    {
+                if (!res)
+                  {
+                    std::cout << "no accepting run found";
+                    if (!ec->safe() && expect_counter_example)
+                      {
+                        std::cout << " even if expected\n";
+                        std::cout << "this may be due to the use of the bit"
+                                  << " state hashing technique\n";
+                        std::cout << "you can try to increase the heap size "
+                                  << "or use an explicit storage"
+                                  << std::endl;
+                      }
+                    std::cout << std::endl;
+                    break;
+                  }
+                else if (accepting_run)
+                  {
 
-                      tm.start("computing accepting run");
-                      auto run = res->accepting_run();
-                      tm.stop("computing accepting run");
+                    tm.start("computing accepting run");
+                    auto run = res->accepting_run();
+                    tm.stop("computing accepting run");
 
-                      if (!run)
-                        {
-                          std::cout << "an accepting run exists\n";
-                        }
-                      else
-                        {
-                          if (opt_reduce)
-                            {
-                              tm.start("reducing accepting run");
-                              run = run->reduce();
-                              tm.stop("reducing accepting run");
-                            }
-                          if (accepting_run_replay)
-                            {
-                              tm.start("replaying acc. run");
-                              if (!run->replay(std::cout, true))
-                                exit_code = 1;
-                              tm.stop("replaying acc. run");
-                            }
-                          else
-                            {
-                              tm.start("printing accepting run");
-                              if (graph_run_tgba_opt)
-                                spot::print_dot(std::cout, run->as_twa());
-                              else
-                                std::cout << *run;
-                              tm.stop("printing accepting run");
-                            }
-                        }
-                    }
-                  else
-                    {
-                      std::cout << "an accepting run exists "
-                                << "(use -C to print it)\n";
-                    }
-                }
+                    if (!run)
+                      {
+                        std::cout << "an accepting run exists\n";
+                      }
+                    else
+                      {
+                        if (accepting_run_replay)
+                          {
+                            tm.start("replaying acc. run");
+                            if (!run->replay(std::cout, true))
+                              exit_code = 1;
+                            tm.stop("replaying acc. run");
+                          }
+                        else
+                          {
+                            tm.start("printing accepting run");
+                            std::cout << *run;
+                            tm.stop("printing accepting run");
+                          }
+                      }
+                  }
+                else
+                  {
+                    std::cout << "an accepting run exists "
+                              << "(use -C to print it)\n";
+                  }
+              }
             }
           while (search_many);
         }
@@ -1426,7 +1151,6 @@ checked_main(int argc, char** argv)
   if (use_timer)
     tm.print(std::cout);
 
-  delete unobservables;
   return exit_code;
 }
 

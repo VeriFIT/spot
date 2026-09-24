@@ -1,0 +1,194 @@
+#! /bin/sh
+# -*- coding: utf-8 -*-
+# Copyright (C) by the Spot authors, see the AUTHORS file for details.
+#
+# This file is part of Spot, a model checking library.
+#
+# Spot is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# Spot is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+# License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. ./defs || exit 1
+
+set -e
+
+# Generate a test automaton with multiple SCCs
+ltl2tgba 'GFa & GFb' >aut.hoa
+ltl2tgba -D 'Ga U Fb' >aut2.hoa
+
+# --sccs: filter by number of SCCs
+autfilt --sccs=2 aut2.hoa >out.hoa
+grep 'HOA:' out.hoa
+autfilt --sccs=0 aut.hoa >out.hoa 2>/dev/null && exit 1
+test $? = 1
+test -z "`cat out.hoa`"
+
+# --acc-sccs: filter by number of accepting SCCs
+autfilt --acc-sccs=1.. aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --rej-sccs: filter by number of rejecting SCCs
+autfilt --rej-sccs=0.. aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --triv-sccs: filter by number of trivial SCCs (the deterministic
+# automaton for 'a' has some)
+ltl2tgba -D 'a' >aut3.hoa
+autfilt --triv-sccs=1.. aut3.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --inherently-weak-sccs: filter by inherently weak SCCs
+autfilt --inherently-weak-sccs=0.. aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --weak-sccs: filter by weak SCCs
+autfilt --weak-sccs=0.. aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --terminal-sccs: filter by terminal SCCs
+autfilt --terminal-sccs=0.. aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --given-automaton: simplify with reference automaton
+ltl2tgba 'Ga U Fb' >ref.hoa
+autfilt --given-automaton=ref.hoa --small aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --instut=1 (first algorithm)
+autfilt --instut=1 aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --instut=2 (second algorithm)
+autfilt --instut=2 aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --instut with bad argument
+autfilt --instut=foo aut.hoa 2>err && exit 1
+grep 'unknown argument for --instut' err
+
+# --instut without argument (defaults to 1)
+autfilt --instut aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --complement and --dualize cannot be used together
+autfilt --complement --dualize aut.hoa 2>err && exit 1
+grep 'either --complement or --dualize' err
+
+# --dualize and --complement cannot be used together (opposite order)
+autfilt --dualize --complement aut.hoa 2>err && exit 1
+grep 'either --complement or --dualize' err
+
+# --equivalent-to given twice (should error)
+autfilt --equivalent-to=ref.hoa --equivalent-to=ref.hoa aut.hoa 2>err && exit 1
+grep 'only one --equivalent-to' err
+
+# --mask-acc with negative number (should error)
+autfilt --mask-acc=-1 aut.hoa 2>err && exit 1
+grep 'non-negative' err
+
+# --mask-acc with an oversized set number (should error)
+autfilt --mask-acc=64000 aut.hoa 2>err && exit 1
+grep 'does not support that many' err
+
+# --nondet-states filter
+autfilt --nondet-states=0.. aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# Additional --dot option sanity checks.
+autfilt --dot='+' aut.hoa 2>err && exit 1
+grep 'missing number after' err
+autfilt --dot='<' aut.hoa 2>err && exit 1
+grep 'missing number after' err
+autfilt --dot='f(' aut.hoa 2>err && exit 1
+grep 'invalid font' err
+autfilt --dot=C aut.hoa 2>err && exit 1
+grep 'invalid node color' err
+
+# SPOT_DOTDEFAULT must not contain '.'.
+SPOT_DOTDEFAULT=. autfilt --dot=. aut.hoa 2>err && exit 1
+grep 'SPOT_DOTDEFAULT should not contain' err
+
+# --partial-degeneralize requires a non-negative value small enough.
+autfilt --partial-degeneralize=-1 aut.hoa 2>err && exit 1
+grep 'should be non-negative' err
+autfilt --partial-degeneralize=64000 aut.hoa 2>err && exit 1
+grep 'does not support that many' err
+
+# --acc-sets requires a valid range.
+autfilt --acc-sets=-2 aut.hoa 2>err && exit 1
+grep 'invalid range' err
+
+# --accept-word must parse an infinite word.
+autfilt --accept-word='a b' aut.hoa 2>err && exit 1
+grep 'failed to parse the argument of --accept-word' err
+
+# --cnf-acc puts the acceptance condition in conjunctive normal form.
+autfilt --cnf-acc aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# Universal branching is parsed from HOA input, ...
+cat >univ.hoa <<'EOF'
+HOA: v1
+States: 3
+Start: 0
+AP: 1 "a"
+acc-name: Buchi
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0
+[0] 1 {0}
+[!0] 1&2 {0}
+State: 1
+[0] 1 {0}
+State: 2
+[!0] 2 {0}
+--END--
+EOF
+autfilt --stats=%s univ.hoa >out
+test `cat out` = 3
+autfilt --dot=h univ.hoa >out.hoa
+# ... and can be used as a reference in --included-in, which calls
+# complement and remove_alternation on it.
+autfilt --included-in=univ.hoa univ.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --sum-or and --sum-and combine two automata.
+autfilt --sum-or=aut.hoa aut2.hoa >out.hoa
+grep 'HOA:' out.hoa
+autfilt --sum-and=aut.hoa aut2.hoa >out.hoa
+grep 'HOA:' out.hoa
+# ... and two consecutive --sum-or/--sum-and combine three inputs.
+autfilt --sum-or=aut.hoa --sum-or=aut2.hoa aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+autfilt --sum-and=aut.hoa --sum-and=aut2.hoa aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --are-isomorphic with --merge packages the reference automaton.
+autfilt --are-isomorphic=aut.hoa --merge aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# --given-formula combined with the auto-small and auto-si strategies.
+autfilt --given-formula='Ga' --given-strategy=auto-small aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+autfilt --given-formula='Ga' --given-strategy=auto-si aut.hoa >out.hoa
+grep 'HOA:' out.hoa
+# auto-si on a stutter-sensitive input exercises the stutter-aware
+# keep_best branch.
+ltl2tgba -D 'Xa U b' >stutt.hoa
+autfilt --given-formula='Ga' --given-strategy=auto-si stutt.hoa >out.hoa
+grep 'HOA:' out.hoa
+
+# Reading an empty stream is an error.
+autfilt </dev/null >out.hoa 2>/dev/null && exit 1
+test $? = 1
+
+:

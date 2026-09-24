@@ -317,3 +317,22 @@ diff experror output
 
 # X-free formulas should produce stutter-invariant automata
 ltl2tgba -BD -f 'Fa -> Fb' | grep stutter-invariant
+
+# PSL: SERE, closure, and EConcat/UConcat formulas are supported.
+for f in '{a;b}' '!{a;b}' '{a;b}<>->a' '{a;b}[]->a' \
+         '{a;b}<>=>a' '{a;b}[]=>a' '{a[*]}' '{a[+] && b[*]}' \
+         '{1[*0..2]}' 'X{IPv4}';
+do
+  ltl2tgba -q -f "$f" || exit 1
+done
+
+# Quantified formulas are eliminated by the translator.
+ltl2tgba -q -f '\forall x: F x'
+ltl2tgba -q -f '\exists x: F x'
+
+# --lbtt requires a proper argument.
+ltl2tgba --lbtt=zz -f a >/dev/null 2>err && exit 1
+grep 'unknown argument for --lbtt' err
+
+# Random PSL formulas can be translated (exercises the SERE translation).
+randltl --psl a b | ltl2tgba -F - -q

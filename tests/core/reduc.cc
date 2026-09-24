@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <string>
 #include <cstring>
+#include <memory>
 #include <spot/tl/parse.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/simplify.hh>
@@ -144,18 +145,18 @@ main(int argc, char** argv)
   int exit_code = 0;
 
   {
-    spot::tl_simplifier* simp = new spot::tl_simplifier(o);
+    std::unique_ptr<spot::tl_simplifier> simp(new spot::tl_simplifier(o));
     o.reduce_size_strictly = true;
-    spot::tl_simplifier* simp_size = new spot::tl_simplifier(o);
+    std::unique_ptr<spot::tl_simplifier> simp_size(new spot::tl_simplifier(o));
 
     spot::formula f1 = nullptr;
     spot::formula f2 = nullptr;
 
-    std::ifstream* fin = nullptr;
+    std::unique_ptr<std::ifstream> fin;
 
     if (readfile)
       {
-        fin = new std::ifstream(argv[2]);
+        fin = std::make_unique<std::ifstream>(argv[2]);
         if (!*fin)
           {
             std::cerr << "Cannot open " << argv[2] << '\n';
@@ -292,16 +293,12 @@ main(int argc, char** argv)
     }
   end:
 
-    delete simp_size;
-    delete simp;
-
     if (fin)
       {
         float before = sum_before;
         float after = sum_after;
         std::cout << "gain: "
                   << (1 - (after / before)) * 100 << '%' << std::endl;
-        delete fin;
       }
   }
 

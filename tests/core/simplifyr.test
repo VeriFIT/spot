@@ -61,6 +61,36 @@ check 'a & (a | b)' -r3,0 -f 'a & (a | b)'
 # -- 0 then named option: simplification enabled --
 check a -r0,unit-propagation -f 'a & (a | b)'
 
+# -- named option: basics --
+check 'a & (a | b)' -rbasics -f 'a & (a | b)'
+
+# -- named option: synt-impl --
+check a -rsynt-impl -f 'a & (a | b)'
+
+# -- named option: containment-checks --
+check a -rcontainment-checks -f 'a & (a | b)'
+
+# -- named option: containment-checks-stronger --
+check a -rcontainment-checks-stronger -f 'a & (a | b)'
+
+# -- named option: nenoform-stop-on-boolean --
+check 'a & (a | b)' -rnenoform-stop-on-boolean -f 'a & (a | b)'
+
+# -- named option: reduce-size-strictly --
+check 'a & (a | b)' -rreduce-size-strictly -f 'a & (a | b)'
+
+# -- named option: boolean-to-isop --
+check a -rboolean-to-isop -f 'a & (a | b)'
+
+# -- named option: favor-event-univ --
+check 'a & (a | b)' -rfavor-event-univ -f 'a & (a | b)'
+
+# -- named option: keep-top-xor --
+check 'a & (a | b)' -rkeep-top-xor -f 'a & (a | b)'
+
+# -- several named options, with spaces around the commas --
+check a -r' basics , synt-impl , keep-top-xor ' -f 'a & (a | b)'
+
 # =============================================================
 # Ordering tests: options are applied in user-specified order.
 # =============================================================
@@ -84,6 +114,10 @@ grep "cannot prefix '!' to digit" stderr
 # -- error: ! prefix on 0 --
 ltlfilt -r'!0' -f a 2>stderr && exit 1
 grep "cannot prefix '!' to digit" stderr
+
+# -- error: empty option name after '!' --
+ltlfilt -r'!' -f a 2>stderr && exit 1
+grep "empty option name after '!' in --simplify" stderr
 
 # -- error: unknown option --
 ltlfilt -rbadoption -f a 2>stderr && exit 1

@@ -124,3 +124,15 @@ do
 done < acceptances > output
 
 diff acceptances output
+
+# --partial-degeneralize requires a non-negative value small enough.
+autfilt in --partial-degeneralize=-1 2>err && exit 1
+grep 'should be non-negative' err
+autfilt in --partial-degeneralize=64000 2>err && exit 1
+grep 'does not support that many' err
+
+# --acc-sets requires a valid range.
+autfilt in --acc-sets=-2 2>err && exit 1
+grep 'invalid range' err
+
+:

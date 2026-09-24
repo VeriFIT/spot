@@ -278,4 +278,23 @@ grep 'Acceptance:' out.hoa > out.acc
 echo 'Acceptance: 3 Fin(1) & Inf(2) & Fin(0)' > out.exp
 diff out.acc out.exp
 
+# --acceptance-is: t, f, generalized-co-Buchi, Rabin-like, and the
+# four flavors of parity acceptance.
+randaut -n1 -A all 1 | autfilt -q --acceptance-is=t
+randaut -n1 -A none 1 | autfilt -q --acceptance-is=f
+randaut -n1 -A 'generalized-co-Buchi 2' 1 |
+    autfilt -q --acceptance-is=generalized-co-Buchi
+randaut -n1 -A 'Rabin-like 4' 1 | autfilt -q --acceptance-is=Rabin-like
+randaut -n1 -A 'parity min even 2' 1 |
+    autfilt -q --acceptance-is=parity-min-even
+randaut -n1 -A 'parity min even 2' 1 | autfilt -q --acceptance-is=parity-min
+randaut -n1 -A 'parity min even 2' 1 | autfilt -q --acceptance-is=parity-even
+randaut -n1 -A 'parity max odd 2' 1 | autfilt -q --acceptance-is=parity-max-odd
+randaut -n1 -A 'parity max odd 2' 1 | autfilt -q --acceptance-is=parity-max
+randaut -n1 -A 'parity max odd 2' 1 | autfilt -q --acceptance-is=parity-odd
+# A parity automaton is filtered out by a mismatching flavor.
+randaut -n1 -A 'parity max even 2' 1 |
+    autfilt -q --acceptance-is=parity-min-odd && exit 1
+true
+
 :
