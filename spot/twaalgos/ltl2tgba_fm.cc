@@ -465,26 +465,15 @@ namespace spot
       bdd
       boolean_to_bdd(formula f)
       {
-        bdd res = ls->as_bdd(f);
-        var_set &= bdd_support(res);
-
-        bdd all = var_set;
-        while (all != bddfalse)
+        bdd res = ls->as_bdd(f); // cached
+        bdd sup = bdd_support(res);
+        var_set &= sup;
+        while (sup != bddtrue)
           {
-            bdd one = bdd_satone(all);
-            all -= one;
-            while (one != bddtrue)
-              {
-                int v = bdd_var(one);
-                a_->register_ap(var_to_formula(v));
-                if (bdd_high(one) == bddfalse)
-                  one = bdd_low(one);
-                else
-                  one = bdd_high(one);
-              }
+            int v = bdd_var(sup);
+            a_->register_ap(var_to_formula(v));
+            sup = bdd_high(sup);
           }
-
-
         return res;
       }
 
