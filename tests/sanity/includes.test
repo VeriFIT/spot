@@ -50,7 +50,7 @@ for file in `find "$INCDIR" \( -name "${1-*}.hh" \
    echo "#include <spot/$file>" >incltest.cc
    if $CXX $CPPFLAGS -DSKIP_DEPRECATED_WARNING $CXXFLAGS \
            -I$top_builddir -I$top_srcdir -I$top_srcdir/buddy/src \
-           -c incltest.cc; then
+           -fsyntax-only incltest.cc; then
       echo "PASS: $file"
    else
       echo "FAIL: $file (not self-contained)"
@@ -58,7 +58,7 @@ for file in `find "$INCDIR" \( -name "${1-*}.hh" \
    fi
 done
 
-rm -f incltest.cc incltest.o
+rm -f incltest.cc
 
 if test -f failures.inc; then
    echo "Failed files:"
