@@ -719,6 +719,7 @@ static struct opt_t
   std::vector<spot::twa_graph_ptr> acc_words;
   std::vector<spot::twa_graph_ptr> rej_words;
   std::vector<std::pair<spot::twa_graph_ptr, unsigned>> hl_words;
+  spot::formula track_formula = nullptr;
 }* opt;
 
 static bool opt_mcs = false;
@@ -794,7 +795,6 @@ static int opt_highlight_nondet_states = -1;
 static int opt_highlight_nondet_edges = -1;
 static int opt_highlight_accepting_run = -1;
 static bool opt_highlight_languages = false;
-static spot::formula opt_track_formula = nullptr;
 static bool opt_streett_like = false;
 static bool opt_enlarge_acceptance_set = false;
 static bool opt_reduce_acceptance_set = false;
@@ -1368,7 +1368,7 @@ parse_opt(int key, char* arg, struct argp_state*)
       opt_to_finite = arg ? arg : "alive";
       break;
     case OPT_TRACK_FORMULA:
-      opt_track_formula = spot::parse_formula(arg);
+      opt->track_formula = spot::parse_formula(arg);
       break;
     case OPT_TRIV_SCCS:
       opt_triv_sccs = parse_range(arg, 0, std::numeric_limits<int>::max());
@@ -1912,8 +1912,8 @@ namespace
       else if (opt_separate_edges)
         aut = spot::separate_edges(aut);
 
-      if (opt_track_formula)
-        match_states_decorate(aut, opt_track_formula);
+      if (opt->track_formula)
+        match_states_decorate(aut, opt->track_formula);
 
       if (opt_to_finite)
         aut = spot::to_finite(aut, opt_to_finite);
