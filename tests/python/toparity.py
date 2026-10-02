@@ -569,3 +569,19 @@ State: 3 {0}
 --END--""")
 b = spot.parity_type_to_parity(a)
 tc.assertTrue(spot.are_equivalent(a, b))
+
+# to_parity() used to fail an assertion when no edge of the output
+# received a color although the input had edges, i.e., when all
+# cycles of the input are rejecting.  (Issue #4 on VeriFIT/spot.)
+for a in ["""HOA: v1 States: 1 Start: 0 AP: 1 "a" Acceptance: 1 f
+--BODY-- State: 0 [t] 0 --END--""",
+          """HOA: v1 States: 1 Start: 0 AP: 1 "a"
+Acceptance: 2 Inf(0) & Inf(1) --BODY-- State: 0 [t] 0 {0} --END--""",
+          """HOA: v1 States: 2 Start: 0 AP: 2 "p0" "p1"
+Acceptance: 4 (Fin(0) & Inf(1)) | (Fin(2) & Inf(3)) --BODY--
+State: 0 [!0&!1] 0 {0 1 2 3} [0&1] 1 {0 3}
+State: 1 [0&!1] 0 {0 2 3} --END--"""]:
+    a = spot.automaton(a)
+    b = spot.to_parity(a)
+    tc.assertTrue(b.is_empty())
+    tc.assertTrue(spot.are_equivalent(a, b))

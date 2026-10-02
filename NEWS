@@ -66,6 +66,12 @@ New in spot 2.16.0.dev  (not yet released)
     same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
     syfco is the one performing the lower-casing.  (Issue #654.)
 
+  - to_parity() failed an assertion when no edge of its output
+    received a color although its input had edges, which happens
+    when all cycles of the input are rejecting (e.g., with acceptance
+    "f").  Such automata are now converted into automata with
+    acceptance "f".
+
 New in spot 2.16  (2026-09-03)
 
   Build:

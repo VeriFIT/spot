@@ -2391,13 +2391,13 @@ namespace spot
       // state
       if (need_purge_)
         res_->purge_unreachable_states();
-      // A special case is an automaton without edge. It implies
-      // max_color_used_ has not value so we need to test it.
+      // A special case is when no edge received a color.  This
+      // happens when the automaton has no edge, but also when all
+      // its cycles are rejecting: the SCCs are then processed in
+      // the "max even" world, where uncolored edges are rejecting.
+      // In both cases, the output has no accepting cycle.
       if (max_color_used_ == 0)
-        {
-          assert(aut_->num_edges() == 0);
-          res_->set_acceptance(acc_cond(acc_cond::acc_code::f()));
-        }
+        res_->set_acceptance(acc_cond(acc_cond::acc_code::f()));
       else
         {
           res_->set_acceptance(acc_cond(acc_cond::acc_code::
