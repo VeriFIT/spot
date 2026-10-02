@@ -66,6 +66,11 @@ New in spot 2.16.0.dev  (not yet released)
     same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
     syfco is the one performing the lower-casing.  (Issue #654.)
 
+  - autfilt --track-formula could crash on exit when Spot was built
+    with static libraries, because the formula it kept in a global
+    variable was destroyed after the table of atomic propositions.
+    (Issue #656.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:
