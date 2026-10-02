@@ -720,3 +720,29 @@ State: 1 {0}
 EOF
 
 diff output expected
+
+# Checking inherent weakness, semi-determinism, or unambiguity may
+# temporarily override the acceptance condition of the automaton
+# (via scc_and_mark_filter).  Restoring it should not lower the
+# declared number of acceptance sets, even if the highest set (here
+# set 2) only appears on edges and not in the acceptance formula.
+cat >input <<EOF
+HOA: v1
+States: 2
+Start: 0
+AP: 0
+Acceptance: 3 Fin(0) & Inf(1)
+--BODY--
+State: 0
+[t] 0 {2}
+[t] 1 {0 2}
+State: 1
+[t] 0 {1 2}
+--END--
+EOF
+
+for opt in --is-inherently-weak --is-semi-deterministic --is-unambiguous; do
+  autfilt $opt input >output
+  grep 'Acceptance: 3 Fin(0) & Inf(1)' output
+  autfilt -q output
+done

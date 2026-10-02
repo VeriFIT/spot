@@ -11,6 +11,14 @@ New in spot 2.16.0.dev  (not yet released)
     properly read even if the tool hasn't yet closed it (because it
     might append to it later).
 
+  - Some algorithms that temporarily override the acceptance condition
+    of an automaton (via scc_and_mark_filter) could lower the number
+    of acceptance sets declared by that automaton when restoring its
+    acceptance condition, if the highest sets occurred only on edges.
+    For instance, autfilt --is-inherently-weak, --is-semi-deterministic,
+    or --is-unambiguous could output automata that use undeclared
+    acceptance sets, and that could not be parsed back. (Issue #655.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:
