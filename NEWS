@@ -66,6 +66,12 @@ New in spot 2.16.0.dev  (not yet released)
     same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
     syfco is the one performing the lower-casing.  (Issue #654.)
 
+  - When called with acc_clean and propagate_col disabled,
+    to_parity() could produce an automaton with a different language
+    if some edges of its input carried acceptance sets that are not
+    used by the acceptance condition.  It also read past the end of
+    an internal array in that case.
+
 New in spot 2.16  (2026-09-03)
 
   Build:

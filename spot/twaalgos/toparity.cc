@@ -1054,13 +1054,19 @@ namespace spot
       auto col_fun = [&](const twa_graph::edge_storage_t &edge)
       {
         acc_cond::mark_t res{};
+        // Sets that have no new color (in particular, sets that are
+        // not used by the acceptance condition, and may be past the
+        // end of new_colors) are ignored, so an edge that only has
+        // such sets is treated like an uncolored edge.
+        bool colored = false;
         for (auto c : edge.acc.sets())
-        {
-          auto new_col = new_colors[c + 1];
-          if (new_col != -1U)
-            assign_color(res, new_col);
-        }
-        if (!edge.acc && new_colors[0] != -1U)
+          if (c + 1 < new_colors.size())
+            if (auto new_col = new_colors[c + 1]; new_col != -1U)
+              {
+                assign_color(res, new_col);
+                colored = true;
+              }
+        if (!colored && !new_colors.empty() && new_colors[0] != -1U)
           assign_color(res, new_colors[0]);
         return res;
       };
