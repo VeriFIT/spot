@@ -244,6 +244,14 @@ autfilt --help | sed -n '/Filtering options.*:/,/^$/p' | sed '1d;$d'
                              acceptance mark per transition or state)
       --is-complete          keep complete automata
       --is-deterministic     keep deterministic automata
+      --is-elea              keep Emerson-Lei elevator automata (ELEA), i.e.,
+                             automata without universal branching whose SCCs
+                             are each deterministic, inherently weak, or
+                             generalized co-Büchi.  On automata with Büchi
+                             acceptance, this is the same as --is-elevator.
+      --is-elevator          keep elevator automata, i.e., automata without
+                             universal branching whose SCCs are each
+                             deterministic or inherently weak
       --is-empty             keep automata with an empty language
       --is-inherently-weak   keep only inherently weak automata
       --is-semi-deterministic   keep semi-deterministic automata

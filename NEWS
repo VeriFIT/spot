@@ -29,6 +29,15 @@ New in spot 2.16.0.dev  (not yet released)
     instance to cross-check the two conversions, or in case the
     built-in parser is incomplete.
 
+  - autfilt learned two options to keep elevator automata, i.e.,
+    automata without universal branching whose SCCs are each
+    deterministic or inherently weak (--is-elevator), and the more
+    general Emerson-Lei elevator automata (ELEA), whose SCCs may also
+    be generalized co-Büchi (--is-elea).  Neither option restricts
+    the type of acceptance condition; combine them with
+    --acceptance-is=Buchi to keep only Büchi automata.  Note that
+    --is-e is no longer an unambiguous abbreviation of --is-empty.
+
   Library:
 
   - acc_cond::acc_code::rabin_like() and
@@ -42,6 +51,13 @@ New in spot 2.16.0.dev  (not yet released)
 
   - The spot/parsetlsf/ contains a parser for TLSF specifications,
     removing Spot's dependency on syfco.
+
+  - is_elevator_automaton() and is_emerson_lei_elevator_automaton()
+    are two new functions that check whether an automaton is an
+    elevator automaton, or an Emerson-Lei elevator automaton as
+    defined by Alexaj et al. (CONCUR'26).  They rely on two new
+    functions that check a single SCC: is_deterministic_scc() and
+    is_generalized_co_buchi_scc().
 
   Bug fix:
 

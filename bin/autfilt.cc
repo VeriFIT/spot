@@ -130,6 +130,8 @@ enum {
   OPT_IS_COLORED,
   OPT_IS_COMPLETE,
   OPT_IS_DETERMINISTIC,
+  OPT_IS_ELEA,
+  OPT_IS_ELEVATOR,
   OPT_IS_EMPTY,
   OPT_IS_INHERENTLY_WEAK,
   OPT_IS_SEMI_DETERMINISTIC,
@@ -240,6 +242,14 @@ static const argp_option options[] =
       "keep only inherently weak automata", 0 },
     { "is-very-weak", OPT_IS_VERY_WEAK, nullptr, 0,
       "keep only very-weak automata", 0 },
+    { "is-elea", OPT_IS_ELEA, nullptr, 0,
+      "keep Emerson-Lei elevator automata (ELEA), i.e., automata without "
+      "universal branching whose SCCs are each deterministic, inherently "
+      "weak, or generalized co-Büchi.  On automata with Büchi "
+      "acceptance, this is the same as --is-elevator.", 0 },
+    { "is-elevator", OPT_IS_ELEVATOR, nullptr, 0,
+      "keep elevator automata, i.e., automata without universal "
+      "branching whose SCCs are each deterministic or inherently weak", 0 },
     { "is-alternating", OPT_IS_ALTERNATING, nullptr, 0,
       "keep only automata using universal branching", 0 },
     { "intersect", OPT_INTERSECT, "FILENAME", 0,
@@ -736,6 +746,8 @@ static bool opt_is_terminal = false;
 static bool opt_is_weak = false;
 static bool opt_is_inherently_weak = false;
 static bool opt_is_very_weak = false;
+static bool opt_is_elevator = false;
+static bool opt_is_elea = false;
 static bool opt_is_stutter_invariant = false;
 static int opt_given_strat = GIVEN_MINATO;
 static bool opt_given_fixpoint = false;
@@ -1135,6 +1147,12 @@ parse_opt(int key, char* arg, struct argp_state*)
       break;
     case OPT_IS_DETERMINISTIC:
       opt_is_deterministic = true;
+      break;
+    case OPT_IS_ELEVATOR:
+      opt_is_elevator = true;
+      break;
+    case OPT_IS_ELEA:
+      opt_is_elea = true;
       break;
     case OPT_IS_EMPTY:
       opt_is_empty = true;
@@ -1677,6 +1695,11 @@ namespace
         matched &= is_weak_automaton(aut);
       else if (opt_is_inherently_weak)
         matched &= is_inherently_weak_automaton(aut);
+      // Elevator automata are Emerson-Lei elevator automata.
+      if (matched && opt_is_elevator)
+        matched &= is_elevator_automaton(aut);
+      else if (matched && opt_is_elea)
+        matched &= is_emerson_lei_elevator_automaton(aut);
       if (opt->are_isomorphic)
         matched &= opt->isomorphism_checker->is_isomorphic(aut);
       if (opt_is_empty)

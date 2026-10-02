@@ -50,6 +50,31 @@ namespace spot
   SPOT_API bool
   is_weak_scc(scc_info& map, unsigned scc);
 
+  /// \brief Whether the SCC number \a scc in \a map has a
+  /// generalized co-Büchi acceptance condition.
+  ///
+  /// The acceptance condition of the automaton is first simplified
+  /// for \a scc: acceptance sets that do not occur in \a scc are
+  /// considered never visited (see acc_cond::restrict_to()), and
+  /// acceptance sets that occur on all edges of \a scc are
+  /// considered always visited (see acc_cond::remove()).  The
+  /// remaining sets are then renumbered, and the function returns
+  /// whether the resulting condition is generalized co-Büchi (see
+  /// acc_cond::is_generalized_co_buchi()).
+  ///
+  /// This test is syntactic: a condition that is equivalent to a
+  /// generalized co-Büchi condition without being written as one
+  /// (e.g., <code>Fin(0)&Fin(0)</code>) is not recognized.  A
+  /// simplified condition of <code>f</code> counts as generalized
+  /// co-Büchi (with no Fin term), while <code>t</code> does not.
+  ///
+  /// This is one of the three alternative conditions (along with
+  /// determinism and inherent weakness) under which an SCC is
+  /// considered an elevator component of an Emerson-Lei elevator
+  /// automaton; see is_emerson_lei_elevator_automaton().
+  SPOT_API bool
+  is_generalized_co_buchi_scc(scc_info& map, unsigned scc);
+
   /// \brief Whether the SCC number \a scc in \a map is complete.
   ///
   /// An SCC is complete iff for all states and all labels there exists

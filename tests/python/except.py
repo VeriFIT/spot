@@ -61,7 +61,8 @@ else:
 
 si = spot.scc_info(aut)
 for meth in ('scc_has_rejecting_cycle', 'is_inherently_weak_scc',
-             'is_weak_scc', 'is_complete_scc', 'is_terminal_scc'):
+             'is_weak_scc', 'is_complete_scc', 'is_terminal_scc',
+             'is_deterministic_scc', 'is_generalized_co_buchi_scc'):
     try:
         getattr(spot, meth)(si, 20)
     except ValueError as e:

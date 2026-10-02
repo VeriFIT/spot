@@ -110,6 +110,55 @@ namespace spot
                                scc_info* sm = nullptr);
 
   /// \ingroup twa_misc
+  /// \brief Check whether an automaton is an elevator automaton.
+  ///
+  /// An automaton is an elevator automaton if it has no universal
+  /// branching (see twa_graph::is_existential()) and each of its
+  /// SCCs is either deterministic (see is_deterministic_scc()) or
+  /// inherently weak (see is_inherently_weak_scc()).  This notion
+  /// was introduced for Büchi automata \cite havlena.22.tacas, but
+  /// this function does not check the type of the acceptance
+  /// condition.  See is_emerson_lei_elevator_automaton() for a more
+  /// general notion.
+  ///
+  /// \param aut the automaton to check
+  ///
+  /// \param sm an scc_info object for \a aut if available (it will
+  /// be built otherwise).  It must have been built with the
+  /// scc_info_options::TRACK_STATES option, and without
+  /// scc_info_options::STOP_ON_ACC.
+  SPOT_API bool
+  is_elevator_automaton(const const_twa_graph_ptr& aut, scc_info* sm = nullptr);
+
+  /// \ingroup twa_misc
+  /// \brief Check whether an automaton is an Emerson-Lei elevator
+  /// automaton (ELEA).
+  ///
+  /// An automaton is an Emerson-Lei elevator automaton
+  /// \cite alexaj.26.concur if it has no universal branching (see
+  /// twa_graph::is_existential()) and each of its SCCs is
+  /// deterministic (see is_deterministic_scc()), inherently weak
+  /// (see is_inherently_weak_scc()), or generalized co-Büchi (see
+  /// is_generalized_co_buchi_scc()).
+  ///
+  /// Every automaton accepted by is_elevator_automaton() is also
+  /// accepted by this function.  The converse holds for automata
+  /// with Büchi acceptance, but not in general: this function also
+  /// accepts, e.g., non-deterministic co-Büchi SCCs.  Like
+  /// is_elevator_automaton(), this function does not check the type
+  /// of the acceptance condition.
+  ///
+  /// \param aut the automaton to check
+  ///
+  /// \param sm an scc_info object for \a aut if available (it will
+  /// be built otherwise).  It must have been built with the
+  /// scc_info_options::TRACK_STATES option, and without
+  /// scc_info_options::STOP_ON_ACC.
+  SPOT_API bool
+  is_emerson_lei_elevator_automaton(const const_twa_graph_ptr& aut,
+                                    scc_info* sm = nullptr);
+
+  /// \ingroup twa_misc
   /// \brief Check whether an automaton is a safety automaton.
   ///
   /// An automaton is a safety automaton if its acceptance condition
