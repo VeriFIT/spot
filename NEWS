@@ -66,6 +66,11 @@ New in spot 2.16.0.dev  (not yet released)
     same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
     syfco is the one performing the lower-casing.  (Issue #654.)
 
+  - to_parity() failed an assertion in try_parity_prefix() when the
+    SCCs left after removing a parity prefix produced no colored
+    edge.  The code following that assertion was already correct in
+    that case, but only by relying on unsigned wrap-around.
+
 New in spot 2.16  (2026-09-03)
 
   Build:
