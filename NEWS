@@ -85,6 +85,12 @@ New in spot 2.16.0.dev  (not yet released)
     used by the acceptance condition.  It also read past the end of
     an internal array in that case.  (Issue #657.)
 
+  - to_parity() failed an assertion in try_parity_prefix() when the
+    SCCs left after removing a parity prefix produced no colored
+    edge.  The code following that assertion was already correct in
+    that case, but only by relying on unsigned wrap-around.
+    (Issue #658.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:

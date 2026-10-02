@@ -583,3 +583,11 @@ Acceptance: 3 Fin(0) & Inf(1) --BODY--
 State: 0 [0] 0 {1} [!0] 0 {2} --END--"""]:
     a = spot.automaton(a)
     tc.assertTrue(spot.are_equivalent(a, spot.to_parity(a, opt)))
+
+# to_parity() used to fail an assertion in try_parity_prefix() when
+# none of the edges produced by its recursive calls received a color.
+# (Issue #658.)
+a = spot.automaton("""HOA: v1 States: 2 Start: 0 AP: 1 "a"
+Acceptance: 3 Fin(1) & Inf(0) & Inf(2) --BODY--
+State: 0 [t] 0 {2} [t] 1 State: 1 [t] 1 {0} [t] 0 {1} --END--""")
+tc.assertTrue(spot.are_equivalent(a, spot.to_parity(a)))

@@ -1877,8 +1877,14 @@ namespace spot
       opt_.parity_prefix = true;
       opt_.parity_prefix_general = old_pp_gen;
 
-      assert(max_scc_color_rec > 0);
-      bool max_used_is_accepting = ((max_scc_color_rec - 1) % 2) == is_odd_;
+      // max_scc_color_rec is the maximal color produced by the
+      // recursive calls, plus one.  It is 0 when none of the edges
+      // they produced received a color (e.g., when all the
+      // remaining cycles are rejecting).  An uncolored edge behaves
+      // like color -1, which is odd.
+      bool max_used_is_odd =
+        max_scc_color_rec == 0 || ((max_scc_color_rec - 1) % 2);
+      bool max_used_is_accepting = max_used_is_odd == is_odd_;
       bool last_prefix_acc = (prefixes.size() % 2) != first_is_accepting;
 
       unsigned m = prefixes.size() + (max_used_is_accepting != last_prefix_acc)
