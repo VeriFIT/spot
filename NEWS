@@ -79,6 +79,12 @@ New in spot 2.16.0.dev  (not yet released)
     variable was destroyed after the table of atomic propositions.
     (Issue #656.)
 
+  - When called with acc_clean and propagate_col disabled,
+    to_parity() could produce an automaton with a different language
+    if some edges of its input carried acceptance sets that are not
+    used by the acceptance condition.  It also read past the end of
+    an internal array in that case.  (Issue #657.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:
