@@ -569,3 +569,17 @@ State: 3 {0}
 --END--""")
 b = spot.parity_type_to_parity(a)
 tc.assertTrue(spot.are_equivalent(a, b))
+
+# With acc_clean and propagate_col disabled, to_parity() used to
+# change the language when an edge carries an acceptance set that is
+# not used by the acceptance condition.  (Issue #657.)
+opt = spot.to_parity_options()
+opt.acc_clean = False
+opt.propagate_col = False
+for a in ["""HOA: v1 States: 1 Start: 0 AP: 1 "a" Acceptance: 2 Fin(0)
+--BODY-- State: 0 [t] 0 {1} --END--""",
+          """HOA: v1 States: 1 Start: 0 AP: 1 "a"
+Acceptance: 3 Fin(0) & Inf(1) --BODY--
+State: 0 [0] 0 {1} [!0] 0 {2} --END--"""]:
+    a = spot.automaton(a)
+    tc.assertTrue(spot.are_equivalent(a, spot.to_parity(a, opt)))
