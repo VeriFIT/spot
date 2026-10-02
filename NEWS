@@ -74,6 +74,11 @@ New in spot 2.16.0.dev  (not yet released)
     or --is-unambiguous could output automata that use undeclared
     acceptance sets, and that could not be parsed back. (Issue #655.)
 
+  - autfilt --track-formula could crash on exit when Spot was built
+    with static libraries, because the formula it kept in a global
+    variable was destroyed after the table of atomic propositions.
+    (Issue #656.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:
