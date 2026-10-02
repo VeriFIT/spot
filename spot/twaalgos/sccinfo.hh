@@ -866,7 +866,7 @@ namespace spot
                         unsigned lower_scc,
                         acc_cond::mark_t cut_sets)
       : lower_si_(&lower_si), lower_scc_(lower_scc), cut_sets_(cut_sets),
-        aut_(lower_si_->get_aut()), old_acc_(aut_->get_acceptance())
+        aut_(lower_si_->get_aut()), old_acc_(aut_->acc())
     {
       auto f = lower_si.get_filter();
       if (f == &filter_mark_
@@ -898,7 +898,7 @@ namespace spot
     scc_and_mark_filter(const const_twa_graph_ptr& aut,
                         acc_cond::mark_t cut_sets)
       : lower_si_(nullptr), cut_sets_(cut_sets), aut_(aut),
-        old_acc_(aut_->get_acceptance())
+        old_acc_(aut_->acc())
     {
     }
 
