@@ -48,33 +48,16 @@ namespace spot
       }
 
       // Return the iteration variable introduced by a quantifier bound,
-      // or an empty string when the bound introduces none.  TLSF v1.2
-      // requires an explicit variable, so the recognized shapes are the
-      // comparison chain `lo <= i < hi` (parsed as `(lo <= i) < hi`)
-      // and the membership `i in set`; variable-less bounds are
-      // diagnosed at translation, and this helper only feeds the
+      // or an empty string when the bound introduces none.  The two
+      // shapes tlsf_binder_variable recognizes are the whole of TLSF
+      // v1.2 SS4.7-4.8; the parser has already rejected everything else,
+      // so the empty string is a safety net for an AST built by hand
+      // rather than by the parser.  This helper only feeds the
       // shadowing used by substitution to keep such variables local.
       std::string quantifier_loop_var(const tlsf_expr& bound)
       {
-        if (bound.type == tlsf_expr_type::BinaryOp
-            && (bound.op == tlsf_op::Lt || bound.op == tlsf_op::Le)
-            && bound.children.size() >= 2
-            && bound.children[0]
-            && bound.children[0]->type == tlsf_expr_type::BinaryOp
-            && (bound.children[0]->op == tlsf_op::Lt
-                || bound.children[0]->op == tlsf_op::Le)
-            && bound.children[0]->children.size() >= 2
-            && bound.children[0]->children[1]
-            && bound.children[0]->children[1]->type
-               == tlsf_expr_type::Identifier)
-          return bound.children[0]->children[1]->name;
-        if (bound.type == tlsf_expr_type::BinaryOp
-            && bound.op == tlsf_op::In
-            && bound.children.size() >= 2
-            && bound.children[0]
-            && bound.children[0]->type == tlsf_expr_type::Identifier)
-          return bound.children[0]->name;
-        return "";
+        const std::string* var = tlsf_binder_variable(bound);
+        return var ? *var : std::string();
       }
 
       // Safety valve for guarded recursive expansion.  The
@@ -260,9 +243,10 @@ namespace spot
           && body->children.size() >= 2 && body->children[0])
         {
           // A quantified identifier is local to both its bound and
-          // body, so substitution must leave it intact.  Variable-less
-          // bounds are diagnosed at translation and introduce nothing
-          // to shadow.
+          // body, so substitution must leave it intact.  A bound with
+          // no iteration variable contributes nothing to shadow; the
+          // parser rejects those, so this only guards an AST that was
+          // not built by the parser.
           const std::string var = quantifier_loop_var(*body->children[0]);
           if (!var.empty())
             child_shadowed.insert(var);
@@ -743,8 +727,282 @@ namespace spot
             }
           return true;
         }
+      // `(+)[b] eSX` / `(*)[b] eSX` (also spelled `CUP[` / `CAP[`), and the
+      // Spot extension `(-)[b] eSX` (`SETMINUS[`): the union,
+      // intersection, and difference of eSX over every combination the
+      // binder list b ranges over.  The argument is the quantifier run
+      // the list desugars to, exactly as for the numeric big operators.
+      if (e.type == tlsf_expr_type::UnaryOp
+          && (e.op == tlsf_op::BigUnion || e.op == tlsf_op::BigInter
+              || e.op == tlsf_op::BigDiff)
+          && e.children.size() >= 1 && e.children[0])
+        return eval_set_binder_run(*e.children[0], e.op, out);
       diag(e, "expected an integer set");
       return false;
+    }
+
+    namespace
+    {
+      /// \brief Is \a e a binder of a binder run, i.e. one of the nodes
+      /// \ref spot::tlsf_make_binders nests?
+      ///
+      /// The run built by \ref spot::tlsf_make_binders and \ref
+      /// spot::tlsf_make_bigop is a chain of two-child Quantifier nodes
+      /// tagged \c And or \c Or.  The bounded temporal quantifiers
+      /// (`X[lo:hi]`, `F[lo:hi]`, `G[lo:hi]` and the strong variants)
+      /// are Quantifier nodes too, but they carry three children, so
+      /// they must never be mistaken for a binder to enumerate: a body
+      /// like `&&[0 <= i < N] X[i] e` would otherwise have `i` bound
+      /// twice and lose its own `lo`/`hi` children.
+      bool is_binder_run_node(const tlsf_expr& e)
+      {
+        return e.type == tlsf_expr_type::Quantifier
+          && (e.op == tlsf_op::And || e.op == tlsf_op::Or)
+          && e.children.size() == 2 && e.children[0] && e.children[1];
+      }
+    }
+
+    bool translator::push_binder(const tlsf_expr& q, std::string& var,
+                                 std::vector<long long>& values)
+    {
+      // Only the two-child nodes of tlsf_make_binders reach here, and
+      // only when they are well formed: translate_expr's Quantifier
+      // case checks the child count, and the big operators build their
+      // runs through tlsf_make_binders.
+      assert(is_binder_run_node(q));
+      assert(q.children.size() >= 2 && q.children[0]);
+      const auto& bound = *q.children[0];
+
+      if (!tlsf_binder_variable(bound))
+        {
+          // The parser rejects a bound that is neither a membership nor
+          // a comparison chain (see tlsf_binder_variable), so this only
+          // fires on an AST that did not come from the parser: a
+          // hand-built one, or a caller of the public tlsf_to_ltl()
+          // that ignored the parse diagnostics.
+          diag(q, "quantifier bound must introduce an iteration "
+                  "variable (e.g. `&&[0 <= i < N]` or "
+                  "`&&[i IN {0, 1}]`)");
+          return false;
+        }
+
+      if (bound.op == tlsf_op::In)
+        {
+          // Membership: the variable is the element expression on the
+          // left of `IN`; the iteration values come from evaluating
+          // the set on the right.
+          var = bound.children[0]->name;
+          return eval_set(*bound.children[1], values);
+        }
+
+      // Comparison chain: the variable sits on the RHS of the inner
+      // comparison, and the inclusivity of each end of the range is
+      // given by the `<=` vs `<` spelling of its own operator.
+      const auto& lower_cmp = *bound.children[0];
+      var = lower_cmp.children[1]->name;
+      const bool lower_inclusive = lower_cmp.op == tlsf_op::Le;
+      const bool upper_inclusive = bound.op == tlsf_op::Le;
+      long long lower;
+      long long upper;
+      if (!eval_int(*lower_cmp.children[0], lower)
+          || !eval_int(*bound.children[1], upper))
+        return false;
+      if (lower <= upper)
+        {
+          const auto span = integer_range_span(lower, upper);
+          if (span >= 1000000)
+            {
+              diag(q, "quantifier range is too large");
+              var.clear();
+              return false;
+            }
+          values.reserve(static_cast<size_t>(span + 1));
+          long long value = lower;
+          while (true)
+            {
+              if ((lower_inclusive || value != lower)
+                  && (upper_inclusive || value != upper))
+                values.push_back(value);
+              if (value == upper)
+                break;
+              ++value;
+            }
+        }
+      return true;
+    }
+
+    bool translator::for_each_instantiation(
+      const tlsf_expr& q,
+      const std::function<bool(const tlsf_expr&)>& emit)
+    {
+      std::string var;
+      std::vector<long long> values;
+      if (!push_binder(q, var, values))
+        return false;
+      assert(q.children.size() >= 2 && q.children[1]);
+      const tlsf_expr& rest = *q.children[1];
+
+      bool ok = true;
+      for (long long value : values)
+        {
+          auto previous = loop_vars_.find(var);
+          const bool had_previous = previous != loop_vars_.end();
+          const long long previous_value =
+            had_previous ? previous->second : 0;
+          loop_vars_[var] = value;
+          // A nested run continues the enumeration; its bindings stay
+          // in effect for the body it eventually reaches.
+          if (is_binder_run_node(rest))
+            ok = for_each_instantiation(rest, emit);
+          else
+            ok = emit(rest);
+          // Restore as we unwind, so no binding escapes its binder.
+          if (had_previous)
+            loop_vars_[var] = previous_value;
+          else
+            loop_vars_.erase(var);
+          if (!ok)
+            break;
+        }
+      return ok;
+    }
+
+    bool translator::translate_binder_run(const tlsf_expr& e, formula& out)
+    {
+      std::vector<formula> parts;
+      const bool ok = for_each_instantiation(
+        e, [&](const tlsf_expr& body)
+        {
+          parts.push_back(translate_expr(body));
+          return true;
+        });
+      if (!ok)
+        {
+          // A bad binder or bound was already reported; fall back to a
+          // constant of the right polarity so the caller has something
+          // to return.
+          out = e.op == tlsf_op::And ? formula::tt() : formula::ff();
+          return false;
+        }
+      // A fold over no value is the neutral element, and
+      // formula::And/Or of an empty vector already spell `true` and
+      // `false`.
+      out = e.op == tlsf_op::And
+        ? formula::And(parts) : formula::Or(parts);
+      return true;
+    }
+
+    bool translator::eval_int_binder_run(const tlsf_expr& e, tlsf_op op,
+                                         long long& out)
+    {
+      // A fold over no value is the operation's neutral element: 0 for
+      // a sum, 1 for a product.  (The Boolean folds over no value are
+      // `true` and `false`, which formula::And/Or of an empty vector
+      // already give.)  Any first value then replaces that element.
+      const bool is_prod = op == tlsf_op::BigProd;
+      long long acc = is_prod ? 1 : 0;
+      bool first = true;
+      const bool ok = for_each_instantiation(
+        e, [&](const tlsf_expr& body)
+        {
+          long long value;
+          if (!eval_int(body, value))
+            return false;
+          if (first)
+            {
+              acc = value;
+              first = false;
+              return true;
+            }
+          const bool fits = is_prod
+            ? checked_mul(acc, value, acc) : checked_add(acc, value, acc);
+          if (!fits)
+            {
+              diag(e, std::string("integer overflow in ")
+                   + tlsf_format_op(op) + " big operator");
+              return false;
+            }
+          return true;
+        });
+      if (!ok)
+        return false;
+      // `first` still set means the binder domain was empty, in which
+      // case `acc` still holds the neutral element computed above.
+      out = acc;
+      return true;
+    }
+
+    bool translator::eval_set_binder_run(const tlsf_expr& e, tlsf_op op,
+                                         std::vector<long long>& out)
+    {
+      const bool is_union = op == tlsf_op::BigUnion;
+      const bool is_inter = op == tlsf_op::BigInter;
+      assert(is_union || is_inter || op == tlsf_op::BigDiff);
+      bool any = false;
+      const bool ok = for_each_instantiation(
+        e, [&](const tlsf_expr& body)
+        {
+          std::vector<long long> values;
+          if (!eval_set(body, values))
+            return false;
+          if (!any)
+            {
+              // The first instantiation is the fold's initial value.
+              out = std::move(values);
+              any = true;
+              return true;
+            }
+          // Each further instantiation folds in from the left, so the
+          // accumulator is always kept in the order the binder
+          // enumerates it.
+          std::vector<long long> acc;
+          if (is_union)
+            {
+              acc = out;
+              for (long long v : values)
+                if (std::find(acc.begin(), acc.end(), v) == acc.end())
+                  acc.push_back(v);
+            }
+          else if (is_inter)
+            {
+              for (long long v : out)
+                if (std::find(values.begin(), values.end(), v)
+                    != values.end())
+                  acc.push_back(v);
+            }
+          else
+            {
+              // Left fold of difference, matching the right-to-left
+              // associativity TLSF gives the binary `(-)`: each
+              // instantiation removes from what the earlier ones
+              // accumulated.
+              for (long long v : out)
+                if (std::find(values.begin(), values.end(), v)
+                    == values.end())
+                  acc.push_back(v);
+            }
+          out = std::move(acc);
+          return true;
+        });
+      if (!ok)
+        return false;
+      if (!any)
+        {
+          // Only the union has a representable identity (the empty
+          // set): the intersection's is the universal set and the
+          // left fold's is the first operand, neither of which exists
+          // when there is no operand.
+          if (is_union)
+            {
+              out.clear();
+              return true;
+            }
+          diag(e, std::string(is_inter ? "intersection" : "difference")
+                 + " over an empty binder domain has no value; "
+                   "the domain must be nonempty");
+          return false;
+        }
+      return true;
     }
 
     bool translator::eval_int_quiet(const tlsf_expr& e, long long& out)
@@ -1133,6 +1391,44 @@ namespace spot
               out = v ? 0 : 1;
               return true;
             }
+          // `+[b] eN` / `*[b] eN` (also spelled `SUM[` / `PROD[`):
+          // the sum and the product of eN over every combination the
+          // binder list b ranges over.  The big operator's argument is
+          // the quantifier run that list desugars to, so the fold
+          // walks the same enumeration the Boolean quantifiers do.
+          if (e.op == tlsf_op::BigSum || e.op == tlsf_op::BigProd)
+            return eval_int_binder_run(*e.children[0], e.op, out);
+          // `|eSX|` (also spelled `SIZE eSX`): the number of elements of
+          // the set.  `MIN eSX` / `MAX eSX`: its smallest / largest
+          // element.  All three take a set in a set position, so they
+          // are evaluated here rather than by eval_set, which only
+          // ever yields integer sets.
+          if (e.op == tlsf_op::SetSize || e.op == tlsf_op::SetMin
+              || e.op == tlsf_op::SetMax)
+            {
+              std::vector<long long> values;
+              if (!eval_set(*e.children[0], values))
+                return false;
+              if (e.op == tlsf_op::SetSize)
+                {
+                  // size() cannot overflow: the set was built from at
+                  // most that many evaluated integers.
+                  out = static_cast<long long>(values.size());
+                  return true;
+                }
+              if (values.empty())
+                {
+                  diag(e, std::string(tlsf_format_op(e.op))
+                         + " of an empty set has no value");
+                  return false;
+                }
+              const long long m = *std::min_element(values.begin(),
+                                                    values.end());
+              const long long M = *std::max_element(values.begin(),
+                                                    values.end());
+              out = e.op == tlsf_op::SetMin ? m : M;
+              return true;
+            }
           diag(e, "unary op '" + tlsf_format_op(e.op)
                  + "' is not supported in integer position");
           return false;
@@ -1482,6 +1778,21 @@ namespace spot
           {
             // The parser always attaches exactly one operand.
             assert(e.children.size() == 1);
+            // The big operators and the integer-valued set operators
+            // have no LTL counterpart.  Report them before translating
+            // the operand, so the diagnostic names the operator that
+            // cannot appear in LTL position rather than something
+            // buried in its body -- and so a big operator's nested
+            // quantifiers are not expanded pointlessly first.
+            if (e.op == tlsf_op::SetSize || e.op == tlsf_op::SetMin
+                || e.op == tlsf_op::SetMax || e.op == tlsf_op::BigSum
+                || e.op == tlsf_op::BigProd || e.op == tlsf_op::BigUnion
+                || e.op == tlsf_op::BigInter || e.op == tlsf_op::BigDiff)
+              {
+                diag(e, "operator '" + tlsf_format_op(e.op)
+                       + "' is not supported in LTL position");
+                return formula::ff();
+              }
             formula c = translate_expr(*e.children[0]);
             switch (e.op)
               {
@@ -1744,119 +2055,25 @@ namespace spot
                 return formula::G(min, max, body);
               }
 
-            // TLSF requires every quantifier to introduce an
-            // explicit iteration variable.  The bound is kept verbatim
-            // in children[0], and its two valid shapes are recognized
-            // here, at translation time:
-            //   * comparison chain `lo <= i < hi` (parsed as
-            //     `(lo <= i) < hi`, with `<=`/`<` in any combination);
-            //   * membership `i in set`, where the set is a literal,
-            //     a range, or a CUP/CAP/SETMINUS combination.
-            // Variable-less bounds (`&&[N]`, `&&[{...}]`)
-            // are not valid TLSF and are diagnosed here.
-            if (e.children.size() < 2 || !e.children[0] || !e.children[1])
+            // The And/Or runs are translated by the shared binder
+            // machinery, which the big operators use too.  XStack,
+            // FBounded, GBounded and their strong flavours returned
+            // above.
+            if (!is_binder_run_node(e))
               {
+                // Parser recovery can leave a binder without its bound
+                // or its body; the run helpers assert on a well-formed
+                // node, so report it the way an operand-less
+                // quantifier always was.
                 diag(e, "quantifier with fewer than two operands");
-                return formula::ff();
-              }
-            const auto& bound = *e.children[0];
-            std::string variable;
-            std::vector<long long> values;
-
-            if (bound.type == tlsf_expr_type::BinaryOp
-                && (bound.op == tlsf_op::Lt || bound.op == tlsf_op::Le)
-                && bound.children.size() >= 2
-                && bound.children[0]
-                && bound.children[0]->type == tlsf_expr_type::BinaryOp
-                && (bound.children[0]->op == tlsf_op::Lt
-                    || bound.children[0]->op == tlsf_op::Le)
-                && bound.children[0]->children.size() >= 2
-                && bound.children[0]->children[1]
-                && bound.children[0]->children[1]->type
-                   == tlsf_expr_type::Identifier)
-              {
-                // Comparison chain: the variable sits on the RHS of the
-                // inner comparison, and the inclusivity of each bound
-                // is given by the `<=` vs `<` spellings.
-                const auto& lower_cmp = *bound.children[0];
-                variable = lower_cmp.children[1]->name;
-                const bool lower_inclusive =
-                  lower_cmp.op == tlsf_op::Le;
-                const bool upper_inclusive = bound.op == tlsf_op::Le;
-                long long lower;
-                long long upper;
-                if (!eval_int(*lower_cmp.children[0], lower)
-                    || !eval_int(*bound.children[1], upper))
-                  return e.op == tlsf_op::And
-                    ? formula::tt() : formula::ff();
-                if (lower <= upper)
-                  {
-                    const auto span = integer_range_span(lower, upper);
-                    if (span >= 1000000)
-                      {
-                        diag(e, "quantifier range is too large");
-                        return e.op == tlsf_op::And
-                          ? formula::tt() : formula::ff();
-                      }
-                    values.reserve(static_cast<size_t>(span + 1));
-                    long long value = lower;
-                    while (true)
-                      {
-                        if ((lower_inclusive || value != lower)
-                            && (upper_inclusive || value != upper))
-                          values.push_back(value);
-                        if (value == upper)
-                          break;
-                        ++value;
-                      }
-                  }
-              }
-            else if (bound.type == tlsf_expr_type::BinaryOp
-                     && bound.op == tlsf_op::In
-                     && bound.children.size() >= 2
-                     && bound.children[0]
-                     && bound.children[0]->type
-                        == tlsf_expr_type::Identifier)
-              {
-                // Membership: the variable is the element expression on
-                // the left of `IN`; the iteration values come from
-                // evaluating the set on the right.
-                variable = bound.children[0]->name;
-                if (!eval_set(*bound.children[1], values))
-                  return e.op == tlsf_op::And
-                    ? formula::tt() : formula::ff();
-              }
-            else
-              {
-                diag(e, "quantifier bound must introduce an iteration "
-                        "variable (e.g. `&&[0 <= i < N]` or "
-                        "`&&[i IN {0, 1}]`)");
                 return e.op == tlsf_op::And
                   ? formula::tt() : formula::ff();
               }
-
-            auto previous = loop_vars_.find(variable);
-            bool had_previous = previous != loop_vars_.end();
-            long long previous_value = had_previous ? previous->second : 0;
-            std::vector<formula> parts;
-            parts.reserve(values.size());
-            for (long long value : values)
-              {
-                loop_vars_[variable] = value;
-                parts.push_back(translate_expr(*e.children[1]));
-              }
-            if (had_previous)
-              loop_vars_[variable] = previous_value;
-            else
-              loop_vars_.erase(variable);
-
-            if (e.op == tlsf_op::And)
-              return formula::And(parts);
-            if (e.op == tlsf_op::Or)
-              return formula::Or(parts);
-            // XStack, FBounded, GBounded and their strong flavours
-            // returned above.
-            SPOT_UNREACHABLE();
+            formula result;
+            if (!translate_binder_run(e, result))
+              return e.op == tlsf_op::And
+                ? formula::tt() : formula::ff();
+            return result;
           }
         case tlsf_expr_type::SetExplicit:
           diag(e, "set literal in LTL position");

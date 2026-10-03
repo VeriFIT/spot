@@ -342,28 +342,61 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
 "EXISTS"/{TLSF_ENUM_SEP}\[  RET(token::KW_EXISTS);
 "FORALL"              ENUM_WORD(token::KW_FORALL);
 "EXISTS"              ENUM_WORD(token::KW_EXISTS);
+"CUP"/{TLSF_ENUM_SEP}\[  RET(token::SET_CUP);
+"CAP"/{TLSF_ENUM_SEP}\[  RET(token::SET_CAP);
+"SETMINUS"/{TLSF_ENUM_SEP}\[  RET(token::SET_MINUS);
 "CUP"                 ENUM_WORD_INFIX(token::SET_CUP);
 "CAP"                 ENUM_WORD_INFIX(token::SET_CAP);
 "SETMINUS"            ENUM_WORD_INFIX(token::SET_MINUS);
+  /* The set big operators `(+)[b] eSX` and `(*)[b] eSX` (TLSF v1.2
+   * Table 1, precedence 5) are parenthesised operator words followed by
+   * a binder list, so `[` is their whole trigger.  Without the trigger
+   * they would shadow the parenthesised infix forms `(+)` and `(*)`,
+   * which the surrounding parentheses already delimit; that is why the
+   * `(+) (CAP)` infix spelling is deliberately not matched here.
+   * `(-)[b] eSX` is not in TLSF v1.2 -- that table has `(-)`, `(\)`,
+   * and `SETMINUS` only as binary right-to-left difference -- but it
+   * fits the family and completes it, so it is accepted and documented
+   * as a Spot extension. */
+"(+)"/{TLSF_ENUM_SEP}\[  RET(token::BIG_SET_UNION);
+"(*)"/{TLSF_ENUM_SEP}\[  RET(token::BIG_SET_INTER);
+"(-)"/{TLSF_ENUM_SEP}\[  RET(token::BIG_SET_DIFF);
 "PLUS"                ENUM_WORD_INFIX(token::KW_PLUS);
 "MINUS"               ENUM_WORD_INFIX(token::KW_MINUS);
 "MUL"                 ENUM_WORD_INFIX(token::KW_MUL);
 "DIV"                 ENUM_WORD_INFIX(token::KW_DIV);
 "MOD"                 ENUM_WORD_INFIX(token::KW_MOD);
 
-  /* `MIN(..)`, `MAX(..)`, `SUM(..)` and `PROD(..)` need their
-   * parenthesis, so `(` is their whole trigger. */
-"MIN"/{TLSF_ENUM_SEP}\(  RET(token::FN_MIN);
-"MAX"/{TLSF_ENUM_SEP}\(  RET(token::FN_MAX);
+  /* `MIN(..)` and `MAX(..)` need their parenthesis, so `(` is their
+   * whole trigger and they get a token of their own: `MIN`/`MAX` on
+   * their own are the prefix operators `MIN eSX` / `MAX eSX`, and a
+   * single token cannot be both (otherwise `MIN(1)` would come back
+   * through the deparser as the prefix `MIN (1)`, and a print/parse
+   * round-trip would no longer be the identity).  `SUM`/`PROD` have no
+   * prefix reading, so `(` stays their whole trigger and they need no
+   * second token. */
+"MIN"/{TLSF_ENUM_SEP}\(  RET(token::FN_MIN_CALL);
+"MAX"/{TLSF_ENUM_SEP}\(  RET(token::FN_MAX_CALL);
 "SUM"/{TLSF_ENUM_SEP}\(  RET(token::FN_SUM);
 "PROD"/{TLSF_ENUM_SEP}\(  RET(token::FN_PROD);
+  /* The numeric big operators `+[b] eN` and `*[b] eN` (TLSF v1.2
+   * Table 1, precedence 1, the tightest tier) and their `SUM[`/`PROD[`
+   * spellings are prefix operators whose argument is a binder list, so
+   * `[` is their whole trigger.  `+` and `*` alone keep their infix
+   * readings: the `[` has to follow immediately, and an operand cannot
+   * start with `[` in TLSF, so `a + b` and `a * b` are unaffected. */
+"+"/{TLSF_ENUM_SEP}\[    RET(token::BIG_SUM);
+"*"/{TLSF_ENUM_SEP}\[    RET(token::BIG_PROD);
+"SUM"/{TLSF_ENUM_SEP}\[  RET(token::BIG_SUM_LONG);
+"PROD"/{TLSF_ENUM_SEP}\[ RET(token::BIG_PROD_LONG);
 "MIN"                 ENUM_WORD(token::FN_MIN);
 "MAX"                 ENUM_WORD(token::FN_MAX);
 "SUM"                 ENUM_WORD(token::FN_SUM);
 "PROD"                ENUM_WORD(token::FN_PROD);
   /* `SIZEOF` takes a bare expression, so like `NOT` it has no trigger
-   * and stays reserved. */
+   * and stays reserved.  `SIZE eSX` does too: syfco reserves both. */
 "SIZEOF"              RET(token::FN_SIZEOF);
+"SIZE"                RET(token::FN_SIZE);
 
 "&&"                  RET(token::AND);
 "||"                  RET(token::OR);
@@ -382,6 +415,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
 "/"                   RET(token::SLASH);
 "%"                   RET(token::PERCENT);
 "!"                   RET(token::BANG);
+"|"                   RET(token::BAR);
 "[!"                  RET(token::LBRACKET_BANG);
 "!]"                  RET_EXPR(token::BANG_RBRACKET);
 ".."                  RET(token::DOTDOT);

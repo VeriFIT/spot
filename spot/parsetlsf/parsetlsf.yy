@@ -188,6 +188,33 @@
 %code
 {
   #include "parsedecl.hh"
+
+  namespace
+  {
+    // Reject a binder list holding anything but the two shapes TLSF v1.2
+    // SS4.7-4.8 give a binder, `id IN set` and `lo <= id < hi`;
+    // tlsf_binder_variable (ast.hh) recognizes exactly those.
+    void check_binders(spot::tlsf_result& res,
+                       const std::vector<spot::tlsf_expr_ptr>& binders)
+    {
+      for (const spot::tlsf_expr_ptr& b : binders)
+        if (b && !::spot::tlsf_binder_variable(*b))
+          res.errors.emplace_back(
+            b->loc,
+            "invalid binder; a binder must have the form "
+            "`id IN set` or `lo <= id < hi`");
+    }
+
+    // Recovery from a binder list that does not parse, shared by the
+    // `error` production of every head that takes one.
+    spot::tlsf_expr_ptr
+    recover_binder(spot::tlsf_result& res, const spot::location& loc,
+                   spot::tlsf_expr_ptr body)
+    {
+      res.errors.emplace_back(loc, "malformed binder list");
+      return body;
+    }
+  }
 }
 
 %token <std::string> STRING "string"
@@ -291,6 +318,21 @@
 %token SET_CUP "CUP"
 %token SET_CAP "CAP"
 %token SET_MINUS "SETMINUS"
+// Big operators: a prefix head whose argument is a binder list, as in
+// `SUM[i IN {0, 1}] eN` or `CUP[i IN {0, 1}] eSX`.  TLSF v1.2 Table 1
+// gives the numeric four (`+[`, `*[`, and their `SUM[`/`PROD[`
+// spellings) precedence 1 and the set two (`(+)[`, `(*)[`, and their
+// `CUP[`/`CAP[` spellings) precedence 5.  `(-)[` and `SETMINUS[` are
+// Spot extensions: the table has `(-)`, `(\)`, and `SETMINUS` only as
+// binary right-to-left difference.  These heads declare no precedence of
+// their own; see the note above the `%precedence NUM_UNARY` line.
+%token BIG_SUM "+["
+%token BIG_PROD "*["
+%token BIG_SUM_LONG "SUM["
+%token BIG_PROD_LONG "PROD["
+%token BIG_SET_UNION "(+)["
+%token BIG_SET_INTER "(*)["
+%token BIG_SET_DIFF "(-)["
 %token KW_PLUS "PLUS"
 %token KW_MINUS "MINUS"
 %token KW_MUL "MUL"
@@ -298,10 +340,17 @@
 %token KW_MOD "MOD"
 
 // TLSF built-in functions (phase 4 will fold them; for now they're
-// just identifier-shaped apps).
+// just identifier-shaped apps).  FN_MIN and FN_MAX are the *prefix*
+// forms `MIN eSX` / `MAX eSX`; their parenthesised call spellings
+// `MIN(..)` / `MAX(..)` are separate tokens, because a single token
+// would let `MIN(1)` return from the deparser as the prefix `MIN (1)`
+// and break the print/parse round-trip.
 %token FN_MIN "MIN"
 %token FN_MAX "MAX"
+%token FN_MIN_CALL "MIN("
+%token FN_MAX_CALL "MAX("
 %token FN_SIZEOF "SIZEOF"
+%token FN_SIZE "SIZE"
 %token FN_SUM "SUM"
 %token FN_PROD "PROD"
 
@@ -323,6 +372,7 @@
 %token PERCENT "%"
 %token BANG "!"
 %token DOTDOT ".."
+%token BAR "|"
 
 // ---------- Precedence (lowest to highest) -----------------------------
 //
@@ -347,6 +397,12 @@
 %precedence QUANTIFIER
 %left IN KW_ELEM
 %left EQ KW_EQ NEQ KW_NEQ LT LE KW_LE GT GE KW_GE KW_LEQ KW_GEQ
+// Table 1 row 5, the unary-set tier: the set big operators `(+)[b] eSX`,
+// `(*)[b] eSX`, and the Spot extension `(-)[b] eSX`.  They bind tighter
+// than a comparison but looser than `+`/`-`, which the rows after this one
+// give.  This token is never returned by the scanner, exactly like
+// QUANTIFIER above: the productions name it with `%prec` only.
+%precedence BIG_SET
 %left SET_CUP
 %left SET_CAP
 %right SET_MINUS
@@ -354,6 +410,11 @@
 %right SLASH KW_DIV PERCENT KW_MOD
 %left STAR KW_MUL
 %precedence NUM_UNARY
+// The big-operator heads take no precedence of their own: each is only
+// ever the first token of a production, so no shift/reduce decision ever
+// turns on one, and their productions carry `%prec QUANTIFIER` (the
+// set ones) or `%prec NUM_UNARY` (the numeric ones) instead.  Bison
+// rejects a %precedence for a token it would never consult.
 
 %type <spot::tlsf_ap_decl> ap_decl_body
 %type <std::vector<spot::tlsf_expr_ptr>> body
@@ -375,6 +436,7 @@
 %type <spot::tlsf_expr_ptr> expr
 %type <std::vector<spot::tlsf_expr_ptr>> property_body
 %type <std::vector<spot::tlsf_expr_ptr>> arg_expr_list
+%type <std::vector<spot::tlsf_expr_ptr>> binder_list
 %type <std::vector<spot::tlsf_expr_ptr>> set_elements
 
 %start tlsf
@@ -995,11 +1057,11 @@ expr: NUMBER
       {
         $$ = ::spot::tlsf_make_busref(@1, std::move($1), $3);
       }
-    | FN_MIN LPAREN arg_expr_list RPAREN %prec NUM_UNARY
+    | FN_MIN_CALL LPAREN arg_expr_list RPAREN %prec NUM_UNARY
       {
         $$ = ::spot::tlsf_make_app(@1, "MIN", std::move($3));
       }
-    | FN_MAX LPAREN arg_expr_list RPAREN %prec NUM_UNARY
+    | FN_MAX_CALL LPAREN arg_expr_list RPAREN %prec NUM_UNARY
       {
         $$ = ::spot::tlsf_make_app(@1, "MAX", std::move($3));
       }
@@ -1011,20 +1073,82 @@ expr: NUMBER
       {
         $$ = ::spot::tlsf_make_app(@1, "PROD", std::move($3));
       }
-    | SET_CUP LBRACKET arg_expr_list RBRACKET
+    // Big operators: a head, a binder list, and a body, folded over
+    // the binder with the connective TLSF v1.2 gives the operator
+    // (see tlsf_bigop_fold).  `CUP[`/`CAP[`/`SETMINUS[` are the
+    // spelled-out forms of `(+)[`/`(*)[`/`(-)[`; they used to head an
+    // n-ary list of operands instead, which no longer has a reading.
+    | SET_CUP LBRACKET binder_list RBRACKET expr %prec BIG_SET
       {
-        $$ = ::spot::tlsf_make_nary_setop(
-          ::spot::tlsf_op::SetUnion, @1, std::move($3));
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigUnion,
+                                     ::spot::tlsf_bigop_fold::Or,
+                                     @1, $3, $5);
       }
-    | SET_CAP LBRACKET arg_expr_list RBRACKET
+    | BIG_SET_UNION LBRACKET binder_list RBRACKET expr %prec BIG_SET
       {
-        $$ = ::spot::tlsf_make_nary_setop(
-          ::spot::tlsf_op::SetIntersection, @1, std::move($3));
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigUnion,
+                                     ::spot::tlsf_bigop_fold::Or,
+                                     @1, $3, $5);
       }
-    | SET_MINUS LBRACKET arg_expr_list RBRACKET
+    | SET_CAP LBRACKET binder_list RBRACKET expr %prec BIG_SET
       {
-        $$ = ::spot::tlsf_make_nary_setop(
-          ::spot::tlsf_op::SetDifference, @1, std::move($3));
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigInter,
+                                     ::spot::tlsf_bigop_fold::Or,
+                                     @1, $3, $5);
+      }
+    | BIG_SET_INTER LBRACKET binder_list RBRACKET expr %prec BIG_SET
+      {
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigInter,
+                                     ::spot::tlsf_bigop_fold::Or,
+                                     @1, $3, $5);
+      }
+    | SET_MINUS LBRACKET binder_list RBRACKET expr %prec BIG_SET
+      {
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigDiff,
+                                     ::spot::tlsf_bigop_fold::Or,
+                                     @1, $3, $5);
+      }
+    | BIG_SET_DIFF LBRACKET binder_list RBRACKET expr %prec BIG_SET
+      {
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigDiff,
+                                     ::spot::tlsf_bigop_fold::Or,
+                                     @1, $3, $5);
+      }
+    // The numeric big operators share the set ones' shape but fold in
+    // integer position, with conjunction as their connective.
+    | BIG_SUM LBRACKET binder_list RBRACKET expr %prec NUM_UNARY
+      {
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigSum,
+                                     ::spot::tlsf_bigop_fold::And,
+                                     @1, $3, $5);
+      }
+    | BIG_SUM_LONG LBRACKET binder_list RBRACKET expr %prec NUM_UNARY
+      {
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigSum,
+                                     ::spot::tlsf_bigop_fold::And,
+                                     @1, $3, $5);
+      }
+    | BIG_PROD LBRACKET binder_list RBRACKET expr %prec NUM_UNARY
+      {
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigProd,
+                                     ::spot::tlsf_bigop_fold::And,
+                                     @1, $3, $5);
+      }
+    | BIG_PROD_LONG LBRACKET binder_list RBRACKET expr %prec NUM_UNARY
+      {
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_bigop(::spot::tlsf_op::BigProd,
+                                     ::spot::tlsf_bigop_fold::And,
+                                     @1, $3, $5);
       }
     // `SIZEOF <expr>` -- the canonical TLSF form when the argument is
     // a single token (chomp.tlsf's `(SIZEOF sel)`, for instance).
@@ -1038,6 +1162,26 @@ expr: NUMBER
         std::vector< ::spot::tlsf_expr_ptr> args;
         args.push_back(std::move($2));
         $$ = ::spot::tlsf_make_app(@1, "SIZEOF", std::move(args));
+      }
+    // `|eSX|`, the cardinality of the set expression `eSX`, and `SIZE
+    // eSX`, its word spelling.  Both are the same operator, so the AST
+    // carries one tag and the two spellings differ only in the first
+    // token; the deparser always emits the `|` form.
+    | BAR expr BAR %prec NUM_UNARY
+      {
+        $$ = ::spot::tlsf_make_unop(::spot::tlsf_op::SetSize, @1, $2);
+      }
+    | FN_SIZE expr %prec NUM_UNARY
+      {
+        $$ = ::spot::tlsf_make_unop(::spot::tlsf_op::SetSize, @1, $2);
+      }
+    | FN_MIN expr %prec NUM_UNARY
+      {
+        $$ = ::spot::tlsf_make_unop(::spot::tlsf_op::SetMin, @1, $2);
+      }
+    | FN_MAX expr %prec NUM_UNARY
+      {
+        $$ = ::spot::tlsf_make_unop(::spot::tlsf_op::SetMax, @1, $2);
       }
     | IDENTIFIER LPAREN arg_expr_list RPAREN
       {
@@ -1094,21 +1238,29 @@ expr: NUMBER
       {
         $$ = ::spot::tlsf_make_binop(::spot::tlsf_op::Guard, @2, $1, $3);
       }
-    | KW_AND LBRACKET expr RBRACKET expr  %prec QUANTIFIER
+    // The six quantifier heads below all accept a comma-separated binder
+    // list, which is shorthand for nested single-binder quantifiers: see
+    // tlsf_make_binders().  The fold matches syfco, where `&&[X] e` is
+    // literally `forall X. e` and `||[X] e` is `exists X. e`.
+    | KW_AND LBRACKET binder_list RBRACKET expr  %prec QUANTIFIER
       {
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::And, @1, $3, $5);
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_binders(::spot::tlsf_op::And, @1, $3, $5);
       }
-    | KW_OR LBRACKET expr RBRACKET expr  %prec QUANTIFIER
+    | KW_OR LBRACKET binder_list RBRACKET expr  %prec QUANTIFIER
       {
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::Or, @1, $3, $5);
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_binders(::spot::tlsf_op::Or, @1, $3, $5);
       }
-    | KW_FORALL LBRACKET expr RBRACKET expr  %prec QUANTIFIER
+    | KW_FORALL LBRACKET binder_list RBRACKET expr  %prec QUANTIFIER
       {
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::And, @1, $3, $5);
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_binders(::spot::tlsf_op::And, @1, $3, $5);
       }
-    | KW_EXISTS LBRACKET expr RBRACKET expr  %prec QUANTIFIER
+    | KW_EXISTS LBRACKET binder_list RBRACKET expr  %prec QUANTIFIER
       {
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::Or, @1, $3, $5);
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_binders(::spot::tlsf_op::Or, @1, $3, $5);
       }
     | expr LTL_U expr %prec LTL_U
     { $$ = ::spot::tlsf_make_binop(::spot::tlsf_op::U, @2, $1, $3); }
@@ -1191,30 +1343,53 @@ expr: NUMBER
         $$ = ::spot::tlsf_make_bounded(::spot::tlsf_op::StrongGBounded,
                @1, $3, $5, $7);
       }
-    | AND LBRACKET expr RBRACKET expr  %prec QUANTIFIER
+    | AND LBRACKET binder_list RBRACKET expr  %prec QUANTIFIER
       {
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::And, @1, $3, $5);
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_binders(::spot::tlsf_op::And, @1, $3, $5);
       }
-    | OR LBRACKET expr RBRACKET expr  %prec QUANTIFIER
+    | OR LBRACKET binder_list RBRACKET expr  %prec QUANTIFIER
       {
-        $$ = ::spot::tlsf_make_quantifier(::spot::tlsf_op::Or, @1, $3, $5);
+        check_binders(res, $3);
+        $$ = ::spot::tlsf_make_binders(::spot::tlsf_op::Or, @1, $3, $5);
       }
-    // Error recovery for a malformed quantifier bound: swallow the
-    // `[...]` region and resume parsing on the body.
+    // Error recovery for a malformed binder list: swallow the
+    // `[...]` region, drop the operator, and resume parsing on the
+    // body.  One rule per head, because the head token and its
+    // precedence differ; they all share recover_binder()'s message so
+    // that a change to it cannot leave one head behind.
     | AND LBRACKET error RBRACKET expr  %prec QUANTIFIER
-      {
-        res.errors.emplace_back(@1,
-          "invalid quantifier bound; supported forms are "
-          "`&&[0 <= i < N]` or `&&[i IN {0, 1}]`");
-        $$ = $5;
-      }
+      { $$ = recover_binder(res, @1, $5); }
     | OR LBRACKET error RBRACKET expr  %prec QUANTIFIER
-      {
-        res.errors.emplace_back(@1,
-          "invalid quantifier bound; supported forms are "
-          "`||[0 <= i < N]` or `||[i IN {0, 1}]`");
-        $$ = $5;
-      }
+      { $$ = recover_binder(res, @1, $5); }
+    | KW_AND LBRACKET error RBRACKET expr  %prec QUANTIFIER
+      { $$ = recover_binder(res, @1, $5); }
+    | KW_OR LBRACKET error RBRACKET expr  %prec QUANTIFIER
+      { $$ = recover_binder(res, @1, $5); }
+    | KW_FORALL LBRACKET error RBRACKET expr  %prec QUANTIFIER
+      { $$ = recover_binder(res, @1, $5); }
+    | KW_EXISTS LBRACKET error RBRACKET expr  %prec QUANTIFIER
+      { $$ = recover_binder(res, @1, $5); }
+    | SET_CUP LBRACKET error RBRACKET expr  %prec BIG_SET
+      { $$ = recover_binder(res, @1, $5); }
+    | BIG_SET_UNION LBRACKET error RBRACKET expr  %prec BIG_SET
+      { $$ = recover_binder(res, @1, $5); }
+    | SET_CAP LBRACKET error RBRACKET expr  %prec BIG_SET
+      { $$ = recover_binder(res, @1, $5); }
+    | BIG_SET_INTER LBRACKET error RBRACKET expr  %prec BIG_SET
+      { $$ = recover_binder(res, @1, $5); }
+    | SET_MINUS LBRACKET error RBRACKET expr  %prec BIG_SET
+      { $$ = recover_binder(res, @1, $5); }
+    | BIG_SET_DIFF LBRACKET error RBRACKET expr  %prec BIG_SET
+      { $$ = recover_binder(res, @1, $5); }
+    | BIG_SUM LBRACKET error RBRACKET expr  %prec NUM_UNARY
+      { $$ = recover_binder(res, @1, $5); }
+    | BIG_SUM_LONG LBRACKET error RBRACKET expr  %prec NUM_UNARY
+      { $$ = recover_binder(res, @1, $5); }
+    | BIG_PROD LBRACKET error RBRACKET expr  %prec NUM_UNARY
+      { $$ = recover_binder(res, @1, $5); }
+    | BIG_PROD_LONG LBRACKET error RBRACKET expr  %prec NUM_UNARY
+      { $$ = recover_binder(res, @1, $5); }
     | LBRACE set_elements RBRACE
       {
         $$ = ::spot::tlsf_make_set_explicit(@1, std::move($2));
@@ -1243,6 +1418,22 @@ set_elements: %empty {}
                 $$.push_back(std::move($1));
               }
             | set_elements COMMA expr
+              {
+                $1.push_back(std::move($3));
+                $$ = std::move($1);
+              }
+            ;
+
+// The comma-separated binder list of a big operator, e.g. the `i, j`
+// of `&&[i, j] phi`.  It is not an argument list: unlike `arg_expr_list`
+// it is never empty and never accepts a trailing comma.  Whether each
+// element really is a binder is checked by the head production, which
+// sees the list only once it is complete.
+binder_list: expr
+              {
+                $$.push_back(std::move($1));
+              }
+            | binder_list COMMA expr
               {
                 $1.push_back(std::move($3));
                 $$ = std::move($1);

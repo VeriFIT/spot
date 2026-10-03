@@ -2303,15 +2303,16 @@ diff -u boundsize.f.exp boundsize.f
 sed 's/F\[1:3\] a/F[a:b] a/' boundsize.tlsf > boundsize2.tlsf
 ( set +x
   run 2 ../parsetlsf qrange.tlsf boundsize2.tlsf > /dev/null 2>range.err )
-# qrange: the un-braced quantifier range is not valid TLSF.
+# qrange: the un-braced quantifier range is not valid TLSF.  The
+# expected-token list now mentions `","` because a big operator accepts a
+# comma-separated binder list.  The recovery is the head's own, so the
+# message names the binder list rather than the mistake.
 # boundsize2: a boolean expression in a bound is rejected.
 cat >range.err.exp <<'EOF'
-qrange.tlsf:11.5-10: syntax error, unexpected ..
-qrange.tlsf:11.5-6: invalid quantifier bound; supported forms are `&&[
-0 <= i < N]` or `&&[i IN {0, 1}]`
-qrange.tlsf:12.5-10: syntax error, unexpected ..
-qrange.tlsf:12.5-6: invalid quantifier bound; supported forms are `||[
-0 <= i < N]` or `||[i IN {0, 1}]`
+qrange.tlsf:11.5-10: syntax error, unexpected .., expecting ] or ","
+qrange.tlsf:11.5-6: malformed binder list
+qrange.tlsf:12.5-10: syntax error, unexpected .., expecting ] or ","
+qrange.tlsf:12.5-6: malformed binder list
 boundsize2.tlsf:16.5-7: expected an integer; identifier 'a' has no int
 eger binding
 conversion of boundsize2.tlsf failed
@@ -3122,7 +3123,9 @@ fold -w 70 intcmpbad.err | sed 's/ *$//' > intcmpbad.err.fold
 diff -u intcmpbad.err.exp intcmpbad.err.fold
 
 # Membership over set algebra: CUP / CAP / SETMINUS in the right-hand
-# side of a membership bound evaluate to an integer set.
+# side of a membership bound evaluate to an integer set.  These are the
+# infix spellings: the `CUP[`/`CAP[`/`SETMINUS[` bracket forms are big
+# operators taking a binder list (see the bigop tests below).
 cat >sets.tlsf <<'EOF'
 INFO {
   TITLE: "set algebra membership"
@@ -3135,19 +3138,353 @@ MAIN {
   INPUTS { a[5]; }
   OUTPUTS { z; }
   GUARANTEE {
-    &&[i IN CUP[{0}, {3}]] a[i];
-    &&[i IN CAP[{0, 2}, {2, 4}]] a[i];
-    &&[i IN SETMINUS[{0, 2, 4}, {2}]] a[i];
+    &&[i IN {0} CUP {3}] a[i];
+    &&[i IN {0, 2} CAP {2, 4}] a[i];
+    &&[i IN {0, 2, 4} SETMINUS {2}] a[i];
   }
 }
 EOF
 ../parsetlsf sets.tlsf > sets.f
-# CUP, CAP and SETMINUS in the bound of the first quantifier give
-# {0,3}, so the unfolded conjunction covers a_0..a_4.
+# The three bounds are {0,3}, {2}, and {0,4}, so the conjunction of the
+# unfolded quantifiers covers a_0, a_2, a_3, and a_4.
 cat >sets.f.exp <<'EOF'
 a_0 & a_2 & a_3 & a_4
 EOF
 diff -u sets.f.exp sets.f
+
+# Set cardinality `|eSX|` and its `SIZE eSX` spelling, plus the
+# prefix extrema `MIN eSX` / `MAX eSX`.  All four are integer-valued
+# and fold at translation time.
+cat >setsize.tlsf <<'EOF'
+INFO {
+  TITLE: "set cardinality and extrema"
+  DESCRIPTION: "|eSX|, SIZE eSX, MIN eSX and MAX eSX"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+MAIN {
+  INPUTS { a[5]; }
+  OUTPUTS { z; }
+  GUARANTEE {
+    |{1, 2, 3}| == 3;
+    SIZE {1, 2, 3} == 3;
+    |{1, 2, 3}| == SIZE {1, 2, 3};
+    |{}| == 0;
+    MIN {3, 1, 2} == 1;
+    MAX {3, 1, 2} == 3;
+    MIN {7} == 7;
+    MAX {7} == 7;
+    MIN {1, 2, 3} == MIN(1, 2, 3);
+    MAX {1, 2, 3} == MAX(1, 2, 3);
+  }
+}
+EOF
+../parsetlsf setsize.tlsf > setsize.f
+cat >setsize.f.exp <<'EOF'
+1
+EOF
+diff -u setsize.f.exp setsize.f
+
+# `SIZE` is a canonicalisation alias: both spellings fold to the same
+# operator, so the deparser emits the `|` form for either.  The
+# canonical print itself is checked through the Python binding, which
+# exposes the deparser; here we only pin that the file parses and
+# translates.
+cat >sizealias.tlsf <<'EOF'
+INFO {
+  TITLE: "SIZE is an alias for the bars"
+  DESCRIPTION: "SIZE eSX prints as |eSX|"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+MAIN {
+  INPUTS { a[5]; }
+  OUTPUTS { z; }
+  GUARANTEE { SIZE {1, 2, 3} == 3; }
+}
+EOF
+../parsetlsf sizealias.tlsf > sizealias.out
+cat >sizealias.out.exp <<'EOF'
+1
+EOF
+diff -u sizealias.out.exp sizealias.out
+
+# The extrema of an empty set have no value, and the cardinality of a
+# non-set has no meaning: both are diagnosed where they happen.
+cat >badsetop.tlsf <<'EOF'
+INFO {
+  TITLE: "ill-typed set operators"
+  DESCRIPTION: "MIN/MAX of an empty set, SIZE of an AP"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+MAIN {
+  INPUTS { a[5]; }
+  OUTPUTS { z; }
+  GUARANTEE {
+    MIN {} == 1;
+    MAX {} == 1;
+    SIZE a == 3;
+  }
+}
+EOF
+run 2 ../parsetlsf badsetop.tlsf > badsetop.err 2>&1
+grep -q "MIN of an empty set has no value" badsetop.err
+grep -q "MAX of an empty set has no value" badsetop.err
+grep -q "expected an integer set" badsetop.err
+# An integer-valued operator has no LTL counterpart, so using one as a
+# subterm is diagnosed too.  (A comparison whose two sides both fold,
+# like `|{1, 2}| == 2`, is not such a case: the comparison itself is a
+# constant and collapses before its operands are ever inspected.)
+cat >setsizeltl.tlsf <<'EOF'
+INFO {
+  TITLE: "set cardinality in LTL position"
+  DESCRIPTION: "|eSX| is not a Boolean operator"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+MAIN {
+  INPUTS { a; }
+  OUTPUTS { z; }
+  GUARANTEE { G |{1, 2}|; }
+}
+EOF
+run 2 ../parsetlsf setsizeltl.tlsf > setsizeltl.err 2>&1
+grep -q "operator '|' is not supported in LTL position" setsizeltl.err
+
+# The same for the prefix extrema.
+sed 's/G |{1, 2}|;/MIN {1, 2} \&\& a;/' setsizeltl.tlsf > setminltl.tlsf
+run 2 ../parsetlsf setminltl.tlsf > setminltl.err 2>&1
+grep -q "operator 'MIN' is not supported in LTL position" setminltl.err
+
+# A big operator accepts a comma-separated binder list, which is
+# shorthand for nested single-binder quantifiers: `&&[i, j] phi` means
+# `&&[i] &&[j] phi`, with the outermost binder listed first.  All six
+# heads take a list.  Each case gets its own file because the tool
+# conjoins the GUARANTEE section of a file into one formula.
+oneguards() {
+  cat > "$1" <<EOF
+INFO {
+  TITLE: "a minimal spec with one GUARANTEE"
+  DESCRIPTION: "used by the multiple-binder tests"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  PARAMETERS {
+    N = 1;
+    M = 1;
+  }
+}
+MAIN {
+  INPUTS { a[4]; b[2]; }
+  OUTPUTS { z; }
+  GUARANTEE { $2; }
+}
+EOF
+}
+oneguards mb1.tlsf  '&&[i IN {0, 1}, j IN {0, 1}] a[i + j]'
+oneguards mb2.tlsf  '&&[i IN {0, 1}] &&[j IN {0, 1}] a[i + j]'
+oneguards mb3.tlsf  '||[i IN {0, 1}, j IN {0, 1}] a[i + j]'
+oneguards mb4.tlsf  'OR[i IN {0, 1}, j IN {0, 1}] a[i + j]'
+oneguards mb5.tlsf  'EXISTS[i IN {0, 1}, j IN {0, 1}] a[i + j]'
+oneguards mb6.tlsf  'FORALL[i IN {0, 1}, j IN {0, 1}] a[i + j]'
+oneguards mb7.tlsf  '&&[0 <= i < 2, 0 <= j < 2] a[i + j]'
+oneguards mb8.tlsf  '&&[i IN {0, 1}, j IN {0, 1}] ||[k IN {0, 1}] a[i + j]'
+oneguards mb9.tlsf  '&&[i IN {0, 1}, j IN {0, 1}] a[i] && b[0]'
+oneguards mb10.tlsf 'AND[i IN {0, 1}, j IN {0, 1}, k IN {0, 1}] a[i + j + k]'
+# mb1 and mb2 are the same formula written two ways; the AND-folding
+# heads share one translation and the OR-folding heads share the dual.
+# mb7 mixes a range bound with a list, mb8 chains two heads.
+run 0 ../parsetlsf mb1.tlsf mb2.tlsf mb3.tlsf mb4.tlsf mb5.tlsf mb6.tlsf \
+            mb7.tlsf mb8.tlsf mb9.tlsf mb10.tlsf > multibind.out
+cat >multibind.out.exp <<'EOF'
+=== mb1.tlsf ===
+a_0 & a_1 & a_2
+=== mb2.tlsf ===
+a_0 & a_1 & a_2
+=== mb3.tlsf ===
+a_0 | a_1 | a_2
+=== mb4.tlsf ===
+a_0 | a_1 | a_2
+=== mb5.tlsf ===
+a_0 | a_1 | a_2
+=== mb6.tlsf ===
+a_0 & a_1 & a_2
+=== mb7.tlsf ===
+a_0 & a_1 & a_2
+=== mb8.tlsf ===
+a_0 & a_1 & a_2
+=== mb9.tlsf ===
+a_0 & a_1 & b_0
+=== mb10.tlsf ===
+a_0 & a_1 & a_2 & a_3
+EOF
+diff -u multibind.out.exp multibind.out
+
+# A binder list is not an argument list: it may not end with a comma.
+# `X[n] phi` is a next-stack length rather than a binder, so its
+# bracket takes no list either.
+oneguards mberr1.tlsf '&&[i IN {0, 1},] a[0]'
+oneguards mberr2.tlsf 'X[N, N] a[0]'
+oneguards mberr3.tlsf 'F[1:2, 3:4] a[0]'
+run 2 ../parsetlsf mberr1.tlsf mberr2.tlsf mberr3.tlsf > multibad.err 2>&1
+grep -q 'mberr1.tlsf:16.27-30: syntax error, unexpected \]' multibad.err
+grep -q 'mberr2.tlsf:16.15-18: syntax error, unexpected ","' multibad.err
+grep -q 'mberr3.tlsf:16.15-20: syntax error, unexpected ","' multibad.err
+
+# A bounded temporal operator in the body of a quantifier is not
+# another binder: `X[i]`, `F[i:j]` and `G[i:j]` are Quantifier nodes of
+# their own, carrying their two bounds and their body.  The binder run
+# stops at them, so the loop variable stays bound and remains readable
+# in the temporal bounds.
+oneguards bnd1.tlsf '&&[0 <= i < 2] X[i] a[0]'
+oneguards bnd2.tlsf '&&[0 <= i < 2] F[i:1] a[0]'
+oneguards bnd3.tlsf '||[i IN {0, 1}, j IN {0, 1}] X[i + j] a[0]'
+oneguards bnd4.tlsf '||[i IN {0, 1}] &&[j IN {0, 1}] G[j:1] a[0]'
+run 0 ../parsetlsf bnd1.tlsf bnd2.tlsf bnd3.tlsf bnd4.tlsf > boundbody.out
+cat >boundbody.out.exp <<'EOF'
+=== bnd1.tlsf ===
+a_0 & Xa_0
+=== bnd2.tlsf ===
+Xa_0 & (a_0 | Xa_0)
+=== bnd3.tlsf ===
+a_0 | Xa_0 | XXa_0
+=== bnd4.tlsf ===
+Xa_0 | (a_0 & Xa_0)
+EOF
+diff -u boundbody.out.exp boundbody.out
+
+# `X[n] X[m] phi` is a stack of two nexts, not one head with two
+# binders.  The tool reprints and reparses every spec it converts, so
+# converting this file already pins the two-head canonical spelling.
+oneguards xstack.tlsf 'X[N] X[M] a[0]'
+run 0 ../parsetlsf xstack.tlsf > xstack.out
+cat >xstack.out.exp <<'EOF'
+XXa_0
+EOF
+diff -u xstack.out.exp xstack.out
+
+# Big operators: a prefix head, a binder list, and a body folded over
+# every combination the list ranges over.  N is 3 and M is 2.
+bigop() {
+  cat > "$1" <<EOF
+INFO {
+  TITLE: "a minimal spec with one GUARANTEE"
+  DESCRIPTION: "used by the big-operator tests"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  PARAMETERS {
+    N = 3;
+    M = 2;
+  }
+}
+MAIN {
+  INPUTS { a[4]; }
+  OUTPUTS { z; }
+  GUARANTEE { $2; }
+}
+EOF
+}
+# The numeric heads, spelled both ways: `SUM[`/`PROD[` and the `+[`/
+# `*[` forms.  bo1 and bo3 are the same formula.
+bigop bo1.tlsf  'SUM[i IN {0..N-1}] i == 3'
+bigop bo2.tlsf  'PROD[i IN {0..N-1}] (i + 1) == 6'
+bigop bo3.tlsf  '+[i IN {0..N-1}] i == 3'
+bigop bo4.tlsf  '*[i IN {0..N-1}] (i + 1) == 6'
+# bo5 uses a comparison-chain bound rather than a membership one, and
+# bo6 nests two binders whose inner bound names the outer variable.
+bigop bo5.tlsf  'SUM[0 <= i < N] i == 3'
+bigop bo6.tlsf  'SUM[i IN {0, 1}, j IN {0..i}] j == 1'
+# The set heads, again under both spellings.  bo7 unions six distinct
+# values, bo8 intersects down to two, bo9 differs left to right down to
+# none.
+bigop bo7.tlsf  '|CUP[i IN {0..N-1}] {i, i + N}| == 6'
+bigop bo8.tlsf  '|CAP[i IN {0..N-1}] {0, 1, i}| == 2'
+bigop bo9.tlsf  '|SETMINUS[i IN {0..N-1}] {0, 1, i}| == 0'
+bigop bo10.tlsf '|(+)[i IN {0..N-1}] {i, i + N}| == 6'
+bigop bo11.tlsf '|(*)[i IN {0..N-1}] {0, 1, i}| == 2'
+bigop bo12.tlsf '|(-)[i IN {0..N-1}] {0, 1, i}| == 0'
+# An empty binder domain folds to the operation's identity: 0 for a
+# sum and a union, 1 for a product.
+bigop bo13.tlsf 'SUM[i IN {1..0}] i == 0'
+bigop bo14.tlsf 'PROD[i IN {1..0}] i == 1'
+bigop bo15.tlsf '|CUP[i IN {1..0}] {i}| == 0'
+# The big operators expand the same binder runs as the Boolean heads, so
+# they stop at a bounded temporal operator in the body as well.
+bigop bnd5.tlsf 'SUM[i IN {0, 1}] (i + 1) == 5'
+bigop bnd6.tlsf '|CUP[i IN {0, 1}, j IN {0, 1}] {i, j}| == 2'
+run 0 ../parsetlsf bnd5.tlsf bnd6.tlsf > boundbody2.out
+cat >boundbody2.out.exp <<'EOF'
+=== bnd5.tlsf ===
+0
+=== bnd6.tlsf ===
+1
+EOF
+diff -u boundbody2.out.exp boundbody2.out
+run 0 ../parsetlsf bo1.tlsf bo2.tlsf bo3.tlsf bo4.tlsf bo5.tlsf bo6.tlsf \
+            bo7.tlsf bo8.tlsf bo9.tlsf bo10.tlsf bo11.tlsf bo12.tlsf \
+            bo13.tlsf bo14.tlsf bo15.tlsf > bigop.out
+cat >bigop.out.exp <<'EOF'
+=== bo1.tlsf ===
+1
+=== bo2.tlsf ===
+1
+=== bo3.tlsf ===
+1
+=== bo4.tlsf ===
+1
+=== bo5.tlsf ===
+1
+=== bo6.tlsf ===
+1
+=== bo7.tlsf ===
+1
+=== bo8.tlsf ===
+1
+=== bo9.tlsf ===
+1
+=== bo10.tlsf ===
+1
+=== bo11.tlsf ===
+1
+=== bo12.tlsf ===
+1
+=== bo13.tlsf ===
+1
+=== bo14.tlsf ===
+1
+=== bo15.tlsf ===
+1
+EOF
+diff -u bigop.out.exp bigop.out
+
+# The intersection and the difference have no representable identity
+# element -- the first is the universal set, the second the first
+# operand -- so an empty binder domain is diagnosed for them, as is a
+# big operator in LTL position and a bound with no iteration variable.
+# Each of the first, second, and fourth guards is guarded by a
+# comparison so that it is evaluated rather than reported as sitting in
+# LTL position; each file's first diagnostic is the one pinned below.
+bigop boerr1.tlsf '|CAP[i IN {1..0}] {i}| == 0'
+bigop boerr2.tlsf '|SETMINUS[i IN {1..0}] {i}| == 0'
+bigop boerr3.tlsf 'SUM[i IN {0..N-1}] a[i]'
+bigop boerr4.tlsf 'SUM[N] i == 0'
+bigop boerr5.tlsf 'CUP[i IN {0, 1}] a[i]'
+run 2 ../parsetlsf boerr1.tlsf boerr2.tlsf boerr3.tlsf boerr4.tlsf \
+             boerr5.tlsf > bigopbad.err 2>&1
+grep -q "boerr1.tlsf:16.15-18: intersection over an empty binder domain" \
+     bigopbad.err
+grep -q "boerr2.tlsf:16.15-23: difference over an empty binder domain" \
+     bigopbad.err
+grep -q "boerr3.tlsf:16.15-17: operator 'SUM\[' is not supported in LTL" \
+     bigopbad.err
+grep -q "boerr4.tlsf:16.15-19: invalid binder; a binder must have the" \
+     bigopbad.err
+grep -q "boerr5.tlsf:16.15-17: operator 'CUP\[' is not supported in LTL" \
+     bigopbad.err
 
 # Unknown bus references and non-positive-sized buses are diagnosed.
 cat >busbad.tlsf <<'EOF'
@@ -3324,10 +3661,9 @@ MAIN {
   GUARANTEE { G z; }
 }
 EOF
-# A set-literal quantifier bound inside a definition body: the
-# substitution pass must not extract an iteration variable from it
-# (there is none), and the translation then diagnoses the
-# variable-less bound.
+# A set-literal quantifier bound introduces no iteration variable, which
+# TLSF v1.2 does not allow: the parser rejects it, so the file never
+# reaches the substitution pass or the translator.
 cat >varset.tlsf <<'EOF'
 INFO {
   TITLE: "set-literal quantifier bound"
@@ -3382,15 +3718,16 @@ EOF
   run 2 ../parsetlsf qint.tlsf varset.tlsf setltl.tlsf badsetelem.tlsf \
     > /dev/null 2>set.err )
 # qint: a quantifier is not an integer expression.
-# varset: a set-literal quantifier bound introduces no iteration variable.
+# varset: a set-literal quantifier bound has no iteration variable.  It is
+# a parse error, so it is reported on its own: the tool stops before
+# translating, and there is no "conversion failed" line for it.
 # setltl: a set operator in LTL position.
 # badsetelem: a set element that cannot be evaluated as an integer.
 cat >set.err.exp <<'EOF'
 qint.tlsf:9.12-13: quantifier is not an integer expression
 conversion of qint.tlsf failed
-varset.tlsf:9.15-16: quantifier bound must introduce an iteration vari
-able (e.g. `&&[0 <= i < N]` or `&&[i IN {0, 1}]`)
-conversion of varset.tlsf failed
+varset.tlsf:9.15-18: invalid binder; a binder must have the form `id I
+N set` or `lo <= id < hi`
 setltl.tlsf:10.15-16: unknown binary op
 conversion of setltl.tlsf failed
 badsetelem.tlsf:10.27-28: division by zero
@@ -3399,6 +3736,72 @@ conversion of badsetelem.tlsf failed
 EOF
 fold -w 70 set.err | sed 's/ *$//' > set.err.fold
 diff -u set.err.exp set.err.fold
+
+# TLSF v1.2 SS4.7-4.8 gives a binder one of two shapes: `id IN set` and
+# the range `lo <= id < hi`.  Every head rejects anything else while
+# parsing, so a variable-less bound, a count bound, and a chain spelled
+# with a relational operator outside `<`/`<=` are all syntax errors.  Each
+# head is listed so that a head added without the check, or without the
+# recovery rule, shows up here.
+for head in '&&' '||' 'AND' 'OR' 'FORALL' 'EXISTS' 'CUP' 'CAP' \
+            'SETMINUS' '(+)' '(*)' '(-)' 'SUM' '+' 'PROD' '*'; do
+  for bound in '{0, 2, 4}' '3' '{}' 'i > 0' 'i == 3' 'i >= 3'; do
+    cat >badbind.tlsf <<EOF
+INFO {
+  TITLE: "an invalid binder"
+  DESCRIPTION: "$head[$bound] has no iteration variable"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+MAIN {
+  INPUTS { a; }
+  OUTPUTS { z; }
+  GUARANTEE { $head[$bound] a; }
+}
+EOF
+    run 2 ../parsetlsf badbind.tlsf > /dev/null 2>badbind.err
+    grep -q 'invalid binder; a binder must have the form' badbind.err \
+      || { echo "no binder diagnostic for $head[$bound]"; exit 1; }
+  done
+  # A binder list that does not parse at all is reported by the head's
+  # recovery rule instead, one diagnostic per malformed list.
+  cat >badbind.tlsf <<EOF
+INFO {
+  TITLE: "a malformed binder list"
+  DESCRIPTION: "$head[0..2] does not parse"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+MAIN {
+  INPUTS { a; }
+  OUTPUTS { z; }
+  GUARANTEE { $head[0..2] a; }
+}
+EOF
+  run 2 ../parsetlsf badbind.tlsf > /dev/null 2>badbind.err
+  grep -q 'malformed binder list' badbind.err \
+    || { echo "no recovery diagnostic for $head[0..2]"; exit 1; }
+done
+
+# Only the shape is checked while parsing.  A well shaped bound whose ends
+# are not integers is a translation diagnostic, so a set literal in a
+# range still reaches eval_int.
+cat >badbind2.tlsf <<'EOF'
+INFO {
+  TITLE: "a range whose end is not an integer"
+  DESCRIPTION: "the binder shape is valid, its bounds are not"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+MAIN {
+  INPUTS { a; }
+  OUTPUTS { z; }
+  GUARANTEE { &&[{0} <= i < 3] a; }
+}
+EOF
+run 2 ../parsetlsf badbind2.tlsf > /dev/null 2>badbind2.err
+grep -q 'set is not an integer expression' badbind2.err
+grep -q 'conversion of badbind2.tlsf failed' badbind2.err
 
 # Non-Mealy semantics are parsed, printed (the printer uses
 # format_semantics to normalize them), and translated like any other.
@@ -3490,12 +3893,14 @@ cat >emptyset.out.exp <<'EOF'
 EOF
 diff -u emptyset.out.exp emptyset.out
 
-# An empty bracketed set-operator list (CUP[]) also denotes the empty
-# set, so a quantifier bound over it is satisfiable.
+# A big operator head takes a binder list, which cannot be empty: the
+# `CUP[]`-style empty list that the former n-ary set-operator forms
+# accepted is gone, so a bare head is a syntax error, reported by the
+# head's own recovery rule like any other malformed binder list.
 cat >cupset.tlsf <<'EOF'
 INFO {
-  TITLE: "empty set-operator list"
-  DESCRIPTION: "CUP[] as an empty set bound"
+  TITLE: "bare big-operator head"
+  DESCRIPTION: "CUP[] without a binder list"
   SEMANTICS: Mealy
   TARGET: Mealy
 }
@@ -3505,13 +3910,9 @@ MAIN {
   GUARANTEE { &&[i IN CUP[]] a; }
 }
 EOF
-../parsetlsf cupset.tlsf > cupset.out
-# An empty bracketed set-operator list is the empty set, so this is
-# satisfiable and the conjunction is tt as well.
-cat >cupset.out.exp <<'EOF'
-1
-EOF
-diff -u cupset.out.exp cupset.out
+run 2 ../parsetlsf cupset.tlsf > /dev/null 2>cupset.err
+grep -q 'syntax error, unexpected ]' cupset.err
+grep -q 'cupset.tlsf:10.23-25: malformed binder list' cupset.err
 
 # Parsing a nonexistent file reports "cannot open file" (optionally
 # raised as an exception) and leaves a null AST for tlsf_to_ltl.

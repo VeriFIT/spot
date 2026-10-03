@@ -435,7 +435,7 @@ try:
             "  OUTPUTS { b[2]; }\n"
             "  REQUIRE {\n"
             "    G((!a[0]) || (b[0] -> F a[1]));\n"
-            "    &&[N - 1] (b[i] || !b[i + 1]);\n"
+            "    &&[0 <= i < N - 1] (b[i] || !b[i + 1]);\n"
             "  }\n"
             "}\n")
 
@@ -449,7 +449,7 @@ try:
     tc.assertIn("a[0]", can2)
     tc.assertIn("b[0]", can2)
     tc.assertIn("F a[1]", can2)
-    tc.assertIn("&&[N - 1]", can2)
+    tc.assertIn("&&[0 <= i < N - 1]", can2)
     # Round-trip: re-parse the canonical and verify the second
     # deparse matches the first (idempotence).
     val2 = parse_tlsf(can2)
@@ -477,7 +477,7 @@ try:
             # Tighter RHS:
             "    a -> b && c;\n"
             # Quantifier body extends with ->:
-            "    &&[N - 1] p -> q;\n"
+            "    &&[0 <= i < N - 1] p -> q;\n"
             # Source parens preserved:
             "    (a -> b) -> c;\n"
             # Left-assoc parent, looser-precedence RHS:
@@ -511,7 +511,7 @@ try:
             "    a U b W c;\n"
             "    a R b U c;\n"
             "    a / b / c;\n"
-            "    &&[N - 1] p -> q;\n"
+            "    &&[0 <= i < N - 1] p -> q;\n"
             "    a -> b <-> c;\n"
             "    a || b && c;\n"
             "  }\n"
@@ -529,7 +529,7 @@ try:
     tc.assertIn("a U b W c;", can_prec)
     tc.assertIn("a R b U c;", can_prec)
     tc.assertIn("a / b / c;", can_prec)
-    tc.assertIn("&&[N - 1] p -> q;", can_prec)
+    tc.assertIn("&&[0 <= i < N - 1] p -> q;", can_prec)
     tc.assertIn("a -> b <-> c;", can_prec)
     tc.assertIn("a || b && c;", can_prec)
     precedence2 = parse_tlsf(can_prec)
@@ -1394,9 +1394,9 @@ try:
                    "(ASSERT + INVARIANTS)")
 
     # Negative test: an un-braced quantifier range `&&[lo..hi]` is NOT
-    # valid TLSF.  A parser recovery rule swallows the bad bound,
-    # resumes parsing on the body, and diagnoses with the two
-    # supported bound forms.
+    # valid TLSF.  A parser recovery rule swallows the bad bound, resumes
+    # parsing on the body, and diagnoses the binder list; every head has
+    # such a rule, and its message names no particular mistake.
     qrange = parse_tlsf(
             "INFO {\n"
             "  TITLE:       \"quant range\"\n"
@@ -1416,29 +1416,32 @@ try:
             "  }\n"
             "}\n")
 
-    # Each bad bound yields the recovery rule's diagnostic: 4 entries
-    # for 2 bounds.
+    # Each bad list yields Bison's own syntax error and the recovery
+    # rule's diagnostic: 4 entries for 2 lists.
     tc.assertEqual(len(list(qrange.errors)), 4,
                    f"un-braced quantifier ranges must yield exactly "
                    f"2 diagnostics; errors: "
                    f"{[(e.first, e.second) for e in qrange.errors]}")
     msgs = [e.second for e in qrange.errors]
-    tc.assertTrue(any('&&[0 <= i < N]' in m and '&&[i IN {0, 1}]' in m
-                      for m in msgs),
-                  f"the && diagnostic must show both supported forms; "
-                  f"errors: {msgs}")
-    tc.assertTrue(any('||[0 <= i < N]' in m and '||[i IN {0, 1}]' in m
-                      for m in msgs),
-                  f"the || diagnostic must show both supported forms; "
-                  f"errors: {msgs}")
-    # Positive cross-check: braced set bounds parse (variable-less
-    # bounds are a translation-time diagnostic).
+    tc.assertEqual(sum('malformed binder list' in m for m in msgs), 2,
+                   f"both bad lists must be recovered by the head's rule; "
+                   f"errors: {msgs}")
+
+    # Positive cross-check: a braced set literal and a braced range are
+    # valid set expressions, so they parse as such.  Using one as a
+    # *bound* is a separate matter, covered below: here they are named by
+    # set-valued parameters and consumed by membership bounds.
     set_explicit = parse_tlsf(
             "INFO {}\n"
-            "GLOBAL {}\n"
+            "GLOBAL {\n"
+            "  PARAMETERS {\n"
+            "    p = {1, 2, 3};\n"
+            "    q = {1..5};\n"
+            "  }\n"
+            "}\n"
             "MAIN {\n"
             "  INPUTS  { a; }\n"
-            "  GUARANTEE { && [{1, 2, 3}] a; && [{1..5}] a; }\n"
+            "  GUARANTEE { && [i IN p] a; && [j IN q] a; }\n"
             "}\n")
 
     tc.assertFalse(set_explicit.errors,
@@ -1446,61 +1449,78 @@ try:
                    f"clean; got: "
                    f"{[(e.first, e.second) for e in set_explicit.errors]}")
 
-    # Negative test: quantifier bounds must introduce an explicit
-    # iteration variable, either as a comparison chain
-    # (`&&[0 <= i < N]`) or membership (`&&[i IN {0, 2, 4}]`).
-    # Set-valued and count-valued bounds without a variable (set
-    # literals, ranges, CUP/CAP/SETMINUS, bare counts, empty sets)
-    # parse but are diagnosed at translation, instead of silently
-    # iterating over an implicit variable.
+    # Negative test: TLSF v1.2 SS4.7-4.8 gives a binder one of two
+    # shapes, `id IN set` and the range `lo <= i < N`, so a bound
+    # without an iteration variable is a syntax error rather than
+    # something diagnosed later: set literals, un-braced ranges, the
+    # infix set algebra, empty sets, and bare counts are all rejected
+    # while parsing.  The bracket spellings `CUP[`/`CAP[`/`SETMINUS[` are
+    # big operators taking a binder list, so the set algebra appears
+    # here in its infix form.
     set_cases = [
         "&&[{0, 2, 4}] a[i];",
         "&&[{1..3}] a[i];",
-        "&&[CUP[{0}, {2, 4}]] a[i];",
-        "&&[CAP[{0, 2}, {2, 4}]] a[i];",
-        "&&[SETMINUS[{0, 2, 4}, {2}]] a[i];",
+        "&&[{0} CUP {2, 4}] a[i];",
+        "&&[{0, 2} CAP {2, 4}] a[i];",
+        "&&[{0, 2, 4} SETMINUS {2}] a[i];",
+        "&&[3] a[i];",
+        "&&[i > 0] a[i];",
+        "&&[i == 0] a[i];",
     ]
-    set_operator_case = None
     for set_body in set_cases:
         set_case = parse_tlsf("INFO {}\n"
                     "GLOBAL {}\n"
                     "MAIN { INPUTS { a[5]; }\n"
                     "  GUARANTEE { " + set_body + " } }\n")
 
-        tc.assertFalse(set_case.errors,
-                       f"set domain must parse cleanly; got: "
-                       f"{[(e.first, e.second) for e in set_case.errors]}")
-        set_errors = spot.parse_aut_error_list()
-        set_result = spot.tlsf_to_ltl(
-            set_case, spot.tlsf_translator_options(), set_errors)
-        tc.assertFalse(bool(set_result.full_formula),
-                       f"variable-less set bound must be diagnosed: "
-                       f"{set_body}")
-        set_messages = [e.second for e in set_errors]
-        tc.assertTrue(any("iteration variable" in message
-                          for message in set_messages),
-                      f"missing iteration-variable diagnostic for "
-                      f"{set_body}; got: {set_messages}")
-        if set_body.startswith("&&[CUP["):
-            set_operator_case = set_case
+        messages = [e.second for e in set_case.errors]
+        tc.assertTrue(
+            any("invalid binder; a binder must have the form" in message
+                for message in messages),
+            f"missing binder diagnostic for {set_body}; got: {messages}")
 
-    # Empty sets are likewise variable-less; they still parse as a
-    # real SetExplicit node but must be diagnosed at translation.
+    # An empty set is no different: it parses as a real SetExplicit node
+    # but names no iteration variable, so the binder is rejected.
     empty_set = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN { INPUTS { a; }\n"
                 "  GUARANTEE { &&[{}] a; ||[{}] a; } }\n")
 
-    tc.assertFalse(empty_set.errors,
-                   f"empty set must parse cleanly; got: "
-                   f"{[(e.first, e.second) for e in empty_set.errors]}")
-    empty_set_errors = spot.parse_aut_error_list()
-    empty_set_result = spot.tlsf_to_ltl(
-        empty_set, spot.tlsf_translator_options(), empty_set_errors)
-    tc.assertFalse(bool(empty_set_result.full_formula),
-                   "variable-less empty-set quantifiers must be diagnosed")
-    tc.assertTrue(any("iteration variable" in e.second
-                      for e in empty_set_errors),
-                  f"missing iteration-variable diagnostic for empty sets; "
-                  f"got: {[e.second for e in empty_set_errors]}")
+    empty_set_messages = [e.second for e in empty_set.errors]
+    tc.assertTrue(
+        any("invalid binder; a binder must have the form" in message
+            for message in empty_set_messages),
+        f"missing binder diagnostic for empty sets; got: "
+        f"{empty_set_messages}")
+
+    # A binder list that does not parse is reported by the head's own
+    # recovery rule, one diagnostic per list, and names no particular
+    # mistake.  Every head has one, including the big operators.
+    for head in ("&&", "||", "AND", "OR", "FORALL", "EXISTS", "CUP", "CAP",
+                 "SETMINUS", "(+)", "(*)", "(-)", "SUM", "+", "PROD", "*"):
+        bad_list = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN { INPUTS { a; }\n"
+                    "  GUARANTEE { " + head + "[0..2] a; } }\n")
+        messages = [e.second for e in bad_list.errors]
+        tc.assertTrue(any("malformed binder list" in message
+                          for message in messages),
+                      f"missing recovery diagnostic for {head}[0..2]; "
+                      f"got: {messages}")
+
+    # Only the shape is checked while parsing.  A well shaped range whose
+    # ends are not integers is a translation diagnostic instead, so a set
+    # literal in a range still reaches eval_int.
+    bad_end = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN { INPUTS { a[5]; }\n"
+                         "  GUARANTEE { &&[{0} <= i < 3] a; } }\n")
+    tc.assertFalse(bad_end.errors,
+                   f"a range with a non-integer end must parse cleanly; got: "
+                   f"{[(e.first, e.second) for e in bad_end.errors]}")
+    bad_end_errors = spot.parse_aut_error_list()
+    bad_end_result = spot.tlsf_to_ltl(
+        bad_end, spot.tlsf_translator_options(), bad_end_errors)
+    tc.assertFalse(bool(bad_end_result.full_formula),
+                   "a range whose end is a set must be diagnosed")
+    tc.assertTrue(any("set is not an integer expression" in e.second
+                      for e in bad_end_errors),
+                  f"missing non-integer diagnostic; got: "
+                  f"{[e.second for e in bad_end_errors]}")
 
     # Membership bounds DO carry an explicit variable and must
     # translate.  The set on the right may be a literal, a range, or a
@@ -1511,7 +1531,7 @@ try:
                 "  GUARANTEE {\n"
                 "    &&[i IN {0, 2, 4}] a[i];\n"
                 "    ||[j IN {1..2}] b[j];\n"
-                "    &&[k IN CUP[{0}, {3}]] a[k];\n"
+                "    &&[k IN {0} CUP {3}] a[k];\n"
                 "  }\n}\n")
 
     tc.assertFalse(membership.errors,
@@ -1547,30 +1567,35 @@ try:
                    f"membership canonical form must reparse cleanly; got: "
                    f"{[(e.first, e.second) for e in membership_rt.errors]}")
 
-    # Count bounds (`&&[3]`) are also variable-less and must be
-    # diagnosed, even when the body mentions `i`.
-    membership = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN {\n"
+    # A count bound (`&&[3]`) is variable-less too, and is rejected even
+    # when the body mentions `i`: naming `i` in the body does not turn
+    # the bound into one.
+    count_bound = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN {\n"
                 "  GUARANTEE {\n"
                 "    &&[3] (i IN {0, 2});\n"
                 "    ||[3] (i IN {0, 2});\n"
                 "  }\n}\n")
 
-    tc.assertFalse(membership.errors,
-                   f"membership must parse cleanly; got: "
-                   f"{[(e.first, e.second) for e in membership.errors]}")
-    membership_errors = spot.parse_aut_error_list()
-    membership_result = spot.tlsf_to_ltl(
-        membership, spot.tlsf_translator_options(), membership_errors)
-    tc.assertFalse(bool(membership_result.full_formula),
-                   "count-bound quantifier must be diagnosed")
-    tc.assertTrue(any("iteration variable" in e.second
-                      for e in membership_errors),
-                  f"missing iteration-variable diagnostic; got: "
-                  f"{[e.second for e in membership_errors]}")
+    count_messages = [e.second for e in count_bound.errors]
+    tc.assertTrue(
+        any("invalid binder; a binder must have the form" in message
+            for message in count_messages),
+        f"missing binder diagnostic for count bounds; got: "
+        f"{count_messages}")
 
-    # Printer round-trip for the new prefix set-operator syntax.
-    # Prefix CUP[...] is normalized to the canonical binary spelling
-    # because the AST stores set algebra as BinaryOp nodes.
+    # Printer round-trip for the set algebra.  It is normalized to the
+    # canonical binary spelling because the AST stores set algebra as
+    # BinaryOp nodes.  The head takes a binder list, so the algebra
+    # appears on the right of an `IN` inside it.
+    set_operator_case = parse_tlsf("INFO {}\nGLOBAL {}\nMAIN {\n"
+                                   "  INPUTS { a[5]; }\n"
+                                   "  GUARANTEE {\n"
+                                   "    SUM[i IN {0} CUP {2, 4}] i == 6;\n"
+                                   "  }\n}\n")
+    tc.assertFalse(set_operator_case.errors,
+                   f"set algebra in a membership bound must parse cleanly; "
+                   f"got: "
+                   f"{[(e.first, e.second) for e in set_operator_case.errors]}")
     ostr = spot.ostringstream()
     spot.tlsf_print(ostr, set_operator_case)
     set_canonical = ostr.str()
@@ -3680,5 +3705,117 @@ try:
     tc.assertEqual(len(list(p.warnings)), 1,
                    "the ambiguity is reported even when the file also "
                    "has errors")
+
+    # A big operator takes a comma-separated binder list, which is
+    # shorthand for nested single-binder quantifiers.  A run of nested
+    # quantifiers sharing a tag prints back as one binder list, in
+    # nesting order.
+    def canon_guarantee(body):
+        """Canonical text of the single GUARANTEE formula `body`."""
+        spec = parse_tlsf('INFO {}\n'
+                          'GLOBAL { PARAMETERS { N = 2; M = 2; } }\n'
+                          'MAIN { INPUTS { a; }\n'
+                          f'  GUARANTEE {{ {body}; }} }}\n')
+        tc.assertFalse(spec.errors,
+                       f"{body!r} must parse cleanly; got "
+                       f"{diags(spec.errors)}")
+        ostr = spot.ostringstream()
+        spot.tlsf_print(ostr, spec)
+        formulas = formulas_in_section(ostr.str(), 'GUARANTEE')
+        tc.assertEqual(len(formulas), 1, f"expected one formula for {body!r}")
+        return formulas[0][:-1]  # drop the terminating ';'
+
+    for body, expected in [
+        ('&&[i IN {0, 1}, j IN {0, 1}] a', '&&[i IN {0, 1}, j IN {0, 1}] a'),
+        # Nested quantifiers print back as one binder list, outermost
+        # binder first, so the two spellings converge.
+        ('&&[i IN {0, 1}] &&[j IN {0, 1}] a',
+         '&&[i IN {0, 1}, j IN {0, 1}] a'),
+        ('&&[j IN {0, 1}] &&[i IN {0, 1}] a',
+         '&&[j IN {0, 1}, i IN {0, 1}] a'),
+        ('||[j IN {0, 1}] ||[i IN {0, 1}] a',
+         '||[j IN {0, 1}, i IN {0, 1}] a'),
+        ('&&[0 <= i < 2, 0 <= j < 2] a',
+         '&&[0 <= i < 2, 0 <= j < 2] a'),
+        # AND/FORALL share the And tag and OR/EXISTS share the Or tag,
+        # so each pair canonicalizes to the same spelling.
+        ('FORALL[i IN {0, 1}, j IN {0, 1}] a',
+         '&&[i IN {0, 1}, j IN {0, 1}] a'),
+        ('EXISTS[i IN {0, 1}, j IN {0, 1}] a',
+         '||[i IN {0, 1}, j IN {0, 1}] a'),
+        # A parenthesized head keeps its parentheses.
+        ('G (&&[i IN {0, 1}, j IN {0, 1}] a)',
+         'G (&&[i IN {0, 1}, j IN {0, 1}] a)'),
+        # `X[n] phi` is a next-stack length, not a binder, so a run of
+        # nexts keeps one head each.
+        ('X[N] X[M] a', 'X[N] X[M] a'),
+        ('X[N] X[M] X[N] a', 'X[N] X[M] X[N] a'),
+        # `X[!n] phi` keeps its marker inside the brackets.
+        ('X[!N] a', 'X[N!] a'),
+    ]:
+        got = canon_guarantee(body)
+        tc.assertEqual(got, expected,
+                       f"{body!r} must canonicalize to {expected!r}")
+
+    # A binder list may not be empty and may not end with a comma, and
+    # the brackets of `X[n]` and `F[lo:hi]` take no list at all.
+    for body, fragment in [
+        ('&&[i IN {0, 1},] a', 'unexpected ]'),
+        ('X[N, N] a', 'unexpected ","'),
+        ('F[1:2, 3:4] a', 'unexpected ","'),
+    ]:
+        spec = parse_tlsf('INFO {}\n'
+                          'GLOBAL { PARAMETERS { N = 2; } }\n'
+                          'MAIN { INPUTS { a; }\n'
+                          f'  GUARANTEE {{ {body}; }} }}\n')
+        tc.assertTrue(spec.errors,
+                      f"{body!r} must be rejected as a malformed "
+                      f"binder list")
+
+    # SIZE is an alias for the set cardinality `|eSX|` and prints back
+    # in that canonical form.  The prefix extrema print with the
+    # parentheses their operator word requires in comparison context.
+    tc.assertEqual(canon_guarantee('SIZE {1, 2, 3} == 3'), '|{1, 2, 3}| == 3')
+    tc.assertEqual(canon_guarantee('|{1, 2, 3}| == 3'), '|{1, 2, 3}| == 3')
+    tc.assertEqual(canon_guarantee('MIN {1, 2, 3} == 1'),
+                   '(MIN {1, 2, 3}) == 1')
+    tc.assertEqual(canon_guarantee('MAX {1, 2, 3} == 3'),
+                   '(MAX {1, 2, 3}) == 3')
+
+    # A big operator is a head, a binder list, and a body.  It prints
+    # back as one head carrying the whole list, with no parentheses
+    # around it: `SUM[` and `PROD[` are the tightest tier of Table 1,
+    # and `CUP[`, `CAP[`, and `SETMINUS[` the unary-set tier, which
+    # binds tighter than a comparison.  Each alias canonicalizes to the
+    # spelling the AST tag names.
+    for body, expected in [
+        ('SUM[i IN {0, 1}] i == 3', 'SUM[i IN {0, 1}] i == 3'),
+        ('+[i IN {0, 1}] i == 3', 'SUM[i IN {0, 1}] i == 3'),
+        ('PROD[i IN {0, 1}] (i + 1) == 2', 'PROD[i IN {0, 1}] (i + 1) == 2'),
+        ('*[i IN {0, 1}] (i + 1) == 2', 'PROD[i IN {0, 1}] (i + 1) == 2'),
+        ('|CUP[i IN {0, 1}] {i}| == 2', '|CUP[i IN {0, 1}] {i}| == 2'),
+        ('|(+)[i IN {0, 1}] {i}| == 2', '|CUP[i IN {0, 1}] {i}| == 2'),
+        ('|CAP[i IN {0, 1}] {i}| == 1', '|CAP[i IN {0, 1}] {i}| == 1'),
+        ('|(*)[i IN {0, 1}] {i}| == 1', '|CAP[i IN {0, 1}] {i}| == 1'),
+        ('|SETMINUS[i IN {0, 1}] {i}| == 1',
+         '|SETMINUS[i IN {0, 1}] {i}| == 1'),
+        ('|(-)[i IN {0, 1}] {i}| == 1',
+         '|SETMINUS[i IN {0, 1}] {i}| == 1'),
+        # The list survives the round-trip, outermost binder first, just
+        # as for the Boolean heads.
+        ('SUM[i IN {0, 1}, j IN {0, 1}] i == 4',
+         'SUM[i IN {0, 1}, j IN {0, 1}] i == 4'),
+        # A body that is itself a comparison stays unparenthesized,
+        # because the head binds tighter than `==`.
+        ('SUM[i IN {0, 1}] i * 2 == 4', 'SUM[i IN {0, 1}] i * 2 == 4'),
+    ]:
+        got = canon_guarantee(body)
+        tc.assertEqual(got, expected,
+                       f"{body!r} must canonicalize to {expected!r}")
+
+    # An explicitly parenthesized head keeps its parentheses, as the
+    # other unary operators do.
+    tc.assertEqual(canon_guarantee('G (SUM[i IN {0, 1}] i)'),
+                   'G (SUM[i IN {0, 1}] i)')
 finally:
     os.unlink(filename)

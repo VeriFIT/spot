@@ -129,6 +129,24 @@ namespace spot
     Mul,
     Div,
     Mod,
+
+    // Set folding.  These six tags carry a big operator with an
+    // already-desugared binder list: `tlsf_make_bigop` turns
+    // `OP[b0, b1] body` into nested tlsf_op::And / tlsf_op::Or
+    // quantifiers, one per binder, and the remaining tag only records
+    // which operation the head denoted.
+    BigSum,              //!< `+[` (alias `SUM[`)
+    BigProd,             //!< `*[` (alias `PROD[`)
+    BigUnion,            //!< `(+)[` (alias `CUP[`)
+    BigInter,            //!< `(*)[` (alias `CAP[`)
+    BigDiff,             //!< `(-)[` (alias `SETMINUS[`)
+
+    // Set cardinality `|eSX|` and its `SIZE` alias.
+    SetSize,
+    // Cardinality-folded extrema `MIN eSX` / `MAX eSX`, which build a
+    // cardinality guard `(v == |eSX|)` rather than a quantifier.
+    SetMin,
+    SetMax,
   };
 
   /// \brief A single TLSF expression node (tagged struct).
@@ -263,6 +281,22 @@ namespace spot
         return "/";
       case tlsf_op::Mod:
         return "%";
+      case tlsf_op::BigSum:
+        return "SUM[";
+      case tlsf_op::BigProd:
+        return "PROD[";
+      case tlsf_op::BigUnion:
+        return "CUP[";
+      case tlsf_op::BigInter:
+        return "CAP[";
+      case tlsf_op::BigDiff:
+        return "SETMINUS[";
+      case tlsf_op::SetSize:
+        return "|";
+      case tlsf_op::SetMin:
+        return "MIN";
+      case tlsf_op::SetMax:
+        return "MAX";
       case tlsf_op::None:
         return "";
       }
@@ -376,6 +410,114 @@ namespace spot
     return e;
   }
 
+  /// \brief Which connective a big operator expands into.
+  ///
+  /// Every TLSF big operator binds one identifier per binder and folds
+  /// the body with one of the two Boolean connectives: `AND[`, `&&[`,
+  /// `SUM[`, `PROD[`, `MIN[`, `MAX[` use \c And (conjunction), while
+  /// `OR[`, `||[`, `CUP[`, `CAP[`, `SETMINUS[` use \c Or (disjunction).
+  /// This is the same expansion syfco performs, where `&&[X] e` is
+  /// literally `forall X. e`.
+  enum class tlsf_bigop_fold
+  {
+    And,
+    Or,
+  };
+
+  /// \brief The connective a big operator expands into, as a tlsf_op.
+  inline tlsf_op tlsf_fold_op(tlsf_bigop_fold fold)
+  {
+    return fold == tlsf_bigop_fold::And ? tlsf_op::And : tlsf_op::Or;
+  }
+
+  /// \brief The iteration variable a quantifier bound introduces.
+  ///
+  /// TLSF v1.2 SS4.7 gives a binder exactly two shapes: the membership
+  /// `id IN eSX`, and the range `n .o.1 id .o.2 m` whose two relational
+  /// operators are both drawn from `<` and `<=` (SS4.8).  In the AST the
+  /// range arrives as the nested comparison `((n .o.1 id) .o.2 m)`, so
+  /// the identifier sits on the right of the inner comparison, and the
+  /// inclusivity of each end of the range is the spelling of its own
+  /// operator.
+  ///
+  /// Returns null when \a bound has neither shape.  That covers the
+  /// variable-less bounds Spot used to accept (`&&[{0, 1}]`, `&&[3]`)
+  /// as well as a range spelled with `>`, `>=`, `==`, or `!=`.
+  /// syfco rejects the same set in a pass of its own that runs before
+  /// type inference (Bindings.conditional, reported as a syntax
+  /// error), and the parser calls this on every binder so that such a
+  /// bound never reaches the translator.
+  inline const std::string* tlsf_binder_variable(const tlsf_expr& bound)
+  {
+    // The variable is never a position in the comparison: it is the LHS
+    // of `IN`, or the RHS of the inner comparison of a range.
+    auto is_identifier = [](const tlsf_expr_ptr& e)
+      {
+        return e && e->type == tlsf_expr_type::Identifier;
+      };
+    if (bound.type == tlsf_expr_type::BinaryOp
+        && bound.children.size() >= 2
+        && (bound.op == tlsf_op::Lt || bound.op == tlsf_op::Le)
+        && bound.children[0]
+        && bound.children[0]->type == tlsf_expr_type::BinaryOp
+        && (bound.children[0]->op == tlsf_op::Lt
+            || bound.children[0]->op == tlsf_op::Le)
+        && bound.children[0]->children.size() >= 2
+        && is_identifier(bound.children[0]->children[1]))
+      return &bound.children[0]->children[1]->name;
+    if (bound.type == tlsf_expr_type::BinaryOp
+        && bound.children.size() >= 2
+        && bound.op == tlsf_op::In
+        && is_identifier(bound.children[0]))
+      return &bound.children[0]->name;
+    return nullptr;
+  }
+
+  /// \brief Nest \a binders into quantifiers around \a body at \a loc.
+  ///
+  /// The binders are folded right-to-left, so `q[b0, b1, b2] body`
+  /// becomes `q[b0] q[b1] q[b2] body` with the first binder outermost;
+  /// this matches syfco, where `q[b0,b1] e` is accepted as a shorthand
+  /// for `q[b0] q[b1] e`.  \a qop is the quantifier tag the fold uses.
+  ///
+  /// A null bound is tolerated while the parser recovers from an error:
+  /// it simply contributes no quantifier at that position.
+  inline tlsf_expr_ptr tlsf_make_binders(tlsf_op qop, location loc,
+                                         const std::vector<tlsf_expr_ptr>&
+                                           binders,
+                                         tlsf_expr_ptr body)
+  {
+    tlsf_expr_ptr res = body;
+    for (auto it = binders.rbegin(); it != binders.rend(); ++it)
+      if (*it)
+        res = tlsf_make_quantifier(qop, loc, *it, res);
+    return res;
+  }
+
+  /// \brief Build the big operator `OP[\a binders] \a body` at \a loc.
+  ///
+  /// \a op selects the fold (see \ref tlsf_op::BigSum and friends) and \a
+  /// fold the quantifier it expands into.  The body is the nested run of
+  /// binders built by \ref tlsf_make_binders, kept as the single child
+  /// of a node tagged \a op so the deparser can tell which head
+  /// introduced it.
+  inline tlsf_expr_ptr tlsf_make_bigop(tlsf_op op, tlsf_bigop_fold fold,
+                                       location loc,
+                                       const std::vector<tlsf_expr_ptr>&
+                                         binders,
+                                       tlsf_expr_ptr body)
+  {
+    auto e = std::make_shared<tlsf_expr>();
+    e->loc = loc;
+    e->type = tlsf_expr_type::UnaryOp;
+    e->op = op;
+    tlsf_expr_ptr nested = tlsf_make_binders(tlsf_fold_op(fold), loc,
+                                             binders, std::move(body));
+    if (nested)
+      e->children.push_back(std::move(nested));
+    return e;
+  }
+
   /// \brief Build a bounded-temporal Quantifier node `op[lo:hi] body`.
   ///
   /// \a op is FBounded, GBounded, StrongFBounded or StrongGBounded --
@@ -427,23 +569,6 @@ namespace spot
     if (hi)
       e->children.push_back(std::move(hi));
     return e;
-  }
-
-  /// Build a left-associated set operation from a bracketed list such
-  /// as `CUP[{0}, {1, 2}]`.  The reference TLSF syntax permits one or
-  /// more operands for these operators; an empty list is represented by
-  /// the empty set so the algebra keeps its usual identity behavior.
-  inline tlsf_expr_ptr tlsf_make_nary_setop(
-      tlsf_op op, location loc,
-      std::vector<tlsf_expr_ptr> operands)
-  {
-    if (operands.empty())
-      return tlsf_make_set_explicit(loc, {});
-    auto result = std::move(operands.front());
-    for (size_t i = 1; i < operands.size(); ++i)
-      result = tlsf_make_binop(op, loc, std::move(result),
-                               std::move(operands[i]));
-    return result;
   }
 
   /// \brief A single value (Tag : patterns) entry of an enum decl.

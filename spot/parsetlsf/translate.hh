@@ -24,6 +24,7 @@
 #include <spot/parsetlsf/ast.hh>
 #include <spot/parsetlsf/public.hh>
 
+#include <functional>
 #include <map>
 #include <set>
 #include <vector>
@@ -135,6 +136,71 @@ namespace spot
 
       // \brief Evaluate an integer set, preserving source order.
       bool eval_set(const tlsf_expr& e, std::vector<long long>& out);
+
+      // \brief Resolve the values one quantifier binds.
+      //
+      // TLSF requires every quantifier to introduce an explicit
+      // iteration variable, and the bound is kept verbatim in
+      // children[0].  Its two valid shapes are enumerated by
+      // tlsf_binder_variable (ast.hh), which the parser applies to every
+      // binder, so they are already known to hold here:
+      //
+      //   * a comparison chain `lo <= i < hi` (parsed as
+      //     `(lo <= i) < hi`, with `<=`/`<` in any combination), whose
+      //     variable sits on the right of the inner comparison and
+      //     whose inclusivity each comparison spells out;
+      //   * a membership `i in set`, where `set` is a literal, a
+      //     range, or a CUP/CAP/SETMINUS combination.
+      //
+      // A bound of neither shape (`&&[N]`, `&&[{...}]`) is not valid
+      // TLSF and is diagnosed; the parser has already rejected it, so
+      // this only covers an AST that did not come from the parser.  The
+      // bounds of an inner quantifier may refer to the loop variables an
+      // outer one has bound, so \a var and \a values describe one level
+      // and the caller recurses.
+      //
+      // Returns false after emitting one diagnostic; \a var is then
+      // left empty and \a values empty.
+      bool push_binder(const tlsf_expr& q, std::string& var,
+                       std::vector<long long>& values);
+
+      // \brief Visit every combination the quantifier run at \a q binds.
+      //
+      // A big operator's binder list, and a nest of single-binder
+      // quantifiers, are the same run of nodes: `&&[i, j] p` and
+      // `&&[i] &&[j] p` both arrive as a Quantifier whose child is
+      // another Quantifier, down to the body.  This walks that run,
+      // outermost level first, calling \a emit on the innermost body
+      // once per combination with loop_vars_ bound accordingly.
+      // \a emit returns false to stop the walk (and to report failure),
+      // so a fold that overflows or hits an unevaluable operand does
+      // not keep enumerating.
+      //
+      // The walk restores each loop variable's previous binding as it
+      // unwinds, so a nested run cannot leak a binding outwards.
+      // Returns false once a diagnostic has been emitted or \a emit
+      // asked to stop.
+      bool for_each_instantiation(const tlsf_expr& q,
+                                  const std::function<bool(
+                                    const tlsf_expr&)>& emit);
+
+      // \brief Translate the run of quantifiers at \a e as a
+      // conjunction (tlsf_op::And) or disjunction (tlsf_op::Or).
+      bool translate_binder_run(const tlsf_expr& e, formula& out);
+
+      // \brief Evaluate the run of quantifiers at \a e in integer
+      // position.  \a op is BigSum or BigProd; a fold over no value is
+      // 0 for the sum and 1 for the product.
+      bool eval_int_binder_run(const tlsf_expr& e, tlsf_op op,
+                               long long& out);
+
+      // \brief Evaluate the run of quantifiers at \a e in set
+      // position.  \a op is BigUnion, BigInter, or BigDiff; a fold
+      // over no value is the empty set for the union, and is
+      // diagnosed for the other two, whose identity element (the
+      // universal set) is not representable.
+      bool eval_set_binder_run(const tlsf_expr& e, tlsf_op op,
+                               std::vector<long long>& out);
 
       void diag(const location& loc, const std::string& msg);
       void diag(const tlsf_expr& e, const std::string& msg);

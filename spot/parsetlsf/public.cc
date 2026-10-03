@@ -113,21 +113,35 @@ namespace spot
       case tlsf_op::Ge:
         return 9;
       case tlsf_op::SetUnion:
-        return 10;
-      case tlsf_op::SetIntersection:
         return 11;
-      case tlsf_op::SetDifference:
+      case tlsf_op::SetIntersection:
         return 12;
+      case tlsf_op::SetDifference:
+        return 13;
       case tlsf_op::Add:
-        return 13;
+        return 14;
       case tlsf_op::Sub:
-        return 13;
+        return 14;
       case tlsf_op::Div:
-        return 14;
-      case tlsf_op::Mod:
-        return 14;
-      case tlsf_op::Mul:
         return 15;
+      case tlsf_op::Mod:
+        return 15;
+      case tlsf_op::Mul:
+        return 16;
+      // The remaining tags name unary operators, which
+      // expr_precedence() answers for directly without consulting
+      // op_precedence(); list them so the switch stays exhaustive.
+      case tlsf_op::BigSum:
+      case tlsf_op::BigProd:
+        return 17;
+      case tlsf_op::BigUnion:
+      case tlsf_op::BigInter:
+      case tlsf_op::BigDiff:
+        return 10;
+      case tlsf_op::SetSize:
+      case tlsf_op::SetMin:
+      case tlsf_op::SetMax:
+        return 7;
       }
     return 0;
   }
@@ -137,12 +151,67 @@ namespace spot
   /// though a quantifier's operator tag is also used for its Boolean fold.
   static int expr_precedence(const tlsf_expr& e)
   {
+    // `|eSX|` is self-delimiting: the bars are both the operator and its
+    // delimiters, so it never needs parentheses around it and never
+    // needs one inside.  Treat it as atomic rather than as a unary
+    // operator, or every comparison would print as `(|{1, 2}|) == 3`.
+    if (e.op == tlsf_op::SetSize && e.type == tlsf_expr_type::UnaryOp)
+      return 100;
+    // The big operators are prefix heads too, but they are not in that
+    // tier: Table 1 puts the numeric two in the tightest row and the set
+    // three in the unary-set row, which binds tighter than a comparison
+    // yet looser than `+`/`-`.  Wrapping a head as if it were a `G` would
+    // print `(SUM[i] i) == 3` where the source said `SUM[i] i == 3`.
+    if (e.type == tlsf_expr_type::UnaryOp)
+      switch (e.op)
+        {
+        case tlsf_op::BigSum:
+        case tlsf_op::BigProd:
+        case tlsf_op::BigUnion:
+        case tlsf_op::BigInter:
+        case tlsf_op::BigDiff:
+          return op_precedence(e.op);
+        default:
+          break;
+        }
     if (e.type == tlsf_expr_type::Quantifier
         || e.type == tlsf_expr_type::UnaryOp)
       return 7;
     if (e.type == tlsf_expr_type::BinaryOp)
       return op_precedence(e.op);
     return 100;
+  }
+
+  static void tlsf_print_expr(std::ostream& os, const tlsf_expr& e);
+
+  /// \brief Print the binder list of the quantifier run starting at \a e.
+  ///
+  /// A big operator's argument is a comma-separated binder list, which
+  /// tlsf_make_binders() desugars into nested single-binder quantifiers:
+  /// `&&[i, j] p` becomes `&&[i] &&[j] p`.  The outermost binder is the
+  /// head's child and the innermost quantifier's child is the body, so
+  /// walking that run prints the list back out.  Returns the body, i.e.
+  /// the node that is not a quantifier of \a e's tag.
+  ///
+  /// \a e must be a quantifier whose tag is neither XStack nor
+  /// StrongXStack: those brackets hold a next-stack length rather than
+  /// binders, so they are never a list.
+  static const tlsf_expr*
+  print_binder_list(std::ostream& os, const tlsf_expr& e)
+  {
+    const tlsf_expr* q = &e;
+    bool first = true;
+    while (q->type == tlsf_expr_type::Quantifier && q->op == e.op
+           && q->children.size() >= 2 && q->children[0]
+           && q->children[1])
+      {
+        if (!first)
+          os << ", ";
+        first = false;
+        tlsf_print_expr(os, *q->children[0]);
+        q = q->children[1].get();
+      }
+    return q;
   }
 
   /// \brief Deparse \a e to canonical TLSF surface syntax on \a os.
@@ -182,6 +251,60 @@ namespace spot
         os << ')';
         return;
       case tlsf_expr_type::UnaryOp:
+        // Set cardinality `|eSX|` has no operator word: the bars are
+        // the operator and its two delimiters at once, so it does not
+        // fit the `OP e` shape the rest of this case prints.
+        if (e.op == tlsf_op::SetSize)
+          {
+            if (e.parenthesized)
+              os << '(';
+            os << '|';
+            if (!e.children.empty() && e.children[0])
+              tlsf_print_expr(os, *e.children[0]);
+            os << '|';
+            if (e.parenthesized)
+              os << ')';
+            return;
+          }
+        // A big operator is a head, a binder list, and a body: its
+        // child is the nested run of quantifiers the list desugars to.
+        // print_binder_list() writes the list and hands back the body,
+        // which goes after the closing bracket.  This is checked
+        // before the parenthesized shortcut below because the bracket
+        // is part of the head's spelling, not of a body the generic
+        // `OP e` shape can hold.
+        switch (e.op)
+          {
+          case tlsf_op::BigSum:
+          case tlsf_op::BigProd:
+          case tlsf_op::BigUnion:
+          case tlsf_op::BigInter:
+          case tlsf_op::BigDiff:
+            {
+              if (e.parenthesized)
+                os << '(';
+              os << tlsf_format_op(e.op);
+              if (e.children.empty() || !e.children[0])
+                {
+                  // A child lost to error recovery.
+                  os << "] ";
+                  if (e.parenthesized)
+                    os << ')';
+                  return;
+                }
+              {
+                const tlsf_expr* body =
+                  print_binder_list(os, *e.children[0]);
+                os << "] ";
+                tlsf_print_expr(os, *body);
+              }
+              if (e.parenthesized)
+                os << ')';
+              return;
+            }
+          default:
+            break;
+          }
         if (e.parenthesized)
           {
             os << '(' << tlsf_format_op(e.op);
@@ -329,10 +452,39 @@ namespace spot
             return;
           }
         os << tlsf_format_op(e.op) << '[';
-        if (e.children.size() >= 1 && e.children[0])
-          tlsf_print_expr(os, *e.children[0]);
         if (e.op == tlsf_op::StrongXStack)
-          os << '!';
+          {
+            // The strong next-stack carries its marker inside the
+            // brackets rather than after them.
+            if (e.children.size() >= 1 && e.children[0])
+              tlsf_print_expr(os, *e.children[0]);
+            os << '!';
+          }
+        else if (e.op != tlsf_op::XStack)
+          {
+            // A run of quantifiers sharing this node's tag is one head
+            // with several binders, so it prints back as a single
+            // comma-separated binder list, outermost binder first.
+            // `X[n] p` is deliberately left out: its bracket holds the
+            // length of a next-stack rather than a binder, so
+            // `X[n] X[m] p` must keep its two separate heads.  A node
+            // that lost a child to error recovery matches no binder at
+            // all and falls back to the single-binder shape below.
+            if (e.children.size() >= 2 && e.children[0]
+                && e.children[1])
+              {
+                const tlsf_expr* body = print_binder_list(os, e);
+                os << "] ";
+                tlsf_print_expr(os, *body);
+                if (e.parenthesized)
+                  os << ')';
+                return;
+              }
+            if (e.children.size() >= 1 && e.children[0])
+              tlsf_print_expr(os, *e.children[0]);
+          }
+        else if (e.children.size() >= 1 && e.children[0])
+          tlsf_print_expr(os, *e.children[0]);
         os << "] ";
         if (e.children.size() >= 2 && e.children[1])
           tlsf_print_expr(os, *e.children[1]);
