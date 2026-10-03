@@ -3209,6 +3209,158 @@ try:
     tc.assertEqual(lg_can2.str(), lg_canon,
                    "canonical deparse must be idempotent")
 
+    # Nested comments.
+    plain_src = """\
+INFO {
+  TITLE:       "nested /* not a comment */ comments"
+  DESCRIPTION: "one nested comment in every position the scanner has one"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+  TAGS: x, y
+}
+GLOBAL {
+  PARAMETERS {
+    N = 2;
+  }
+  DEFINITIONS {
+    enum Mode = U: 00*, 1*0;
+    m(x) = G(x);
+  }
+}
+MAIN {
+  INPUTS {
+    req[N];
+  }
+  OUTPUTS { ack; }
+  GUARANTEE {
+    G(req[0] -> F ack);
+  }
+}
+"""
+    nested_src = """\
+INFO /* a /* b */ c */ {
+  TITLE:       /* d /* e */ f */ "nested /* not a comment */ comments"
+  DESCRIPTION: "one nested comment in every position the scanner has one"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+  /* g /* h */ i */ TAGS: x, /* j /* k */ l */ y
+}
+GLOBAL {
+  PARAMETERS /* m /* n */ o */ {
+    /* p */ N /* q /* r */ s */ = /* t /* u */ v */ 2;
+  }
+  DEFINITIONS {
+    /* w */ enum /* x /* y */ z */ Mode = /* a /* b */ c */ U:
+       /* d /* e */ f */ 00*, // g
+       /* h /* i */ j */ 1*0;
+    m( /* k /* l */ m */ x) = G(/* n /* o */ p */ x);
+  }
+}
+MAIN {
+  INPUTS /* q /* r */ s */ {
+    /* t /* u */ v */ req[N];
+    /* w /* x /* y */ z */ a /* b /* c */ d /* e */ f */ g */
+  }
+  OUTPUTS { ack; /* e /* f */ g */ }
+  GUARANTEE {
+    /* h /* i */ j */ G(req[0] -> F ack); /* k /* l /* m */ n /* o */ p */ q */
+  }
+}
+"""
+    nested = parse_tlsf(nested_src)
+    tc.assertFalse(
+        list(nested.errors),
+        f"nested comments must parse cleanly; got: "
+        f"{[(e.first, e.second) for e in nested.errors]}")
+    nested_can = spot.ostringstream()
+    spot.tlsf_print(nested_can, nested)
+    plain = parse_tlsf(plain_src)
+    plain_can = spot.ostringstream()
+    spot.tlsf_print(plain_can, plain)
+    tc.assertEqual(nested_can.str(), plain_can.str(),
+                   "a nested comment must be as transparent as a flat one")
+    # Only the comment *inside* the TITLE string comes back: the string
+    # is inert, but it is data and the deparser keeps it.
+    tc.assertEqual(nested_can.str().count('/*'), 1,
+                   "only the comment inside the TITLE string may survive")
+    nested_rt = parse_tlsf(nested_can.str())
+    tc.assertFalse(
+        list(nested_rt.errors),
+        "the deparsed form of a nested-comment spec must re-parse")
+    # Neither half of a comment pair starts or ends the other one: a
+    # `//` inside a block comment is comment text, and a `/*` inside a
+    # `//` comment does not open anything.  Both fixtures below are
+    # kept in a named variable first: the errors of a document are
+    # only valid while that document is alive.
+    inert_slashes = parse_tlsf("MAIN {\n"
+                               "  INPUTS { x; }\n"
+                               "  OUTPUTS { o; }\n"
+                               "  GUARANTEE { /* a // b */\n"
+                               "              G(x -> o); }\n"
+                               "}\n")
+    tc.assertFalse(
+        list(inert_slashes.errors),
+        "a line-comment marker inside a block comment must be inert")
+    inert_stars = parse_tlsf("MAIN {\n"
+                             "  INPUTS { x; }\n"
+                             "  OUTPUTS { o; }\n"
+                             "  GUARANTEE { // /* a /* b\n"
+                             "              G(x -> o); }\n"
+                             "}\n")
+    tc.assertFalse(
+        list(inert_stars.errors),
+        "a block-comment opener inside a line comment must be inert")
+
+    # An unterminated nested comment is diagnosed where it opens, and
+    # the report spans the rest of the file -- including the line
+    # breaks, which is what tells it apart from a comment the scanner
+    # believes it has closed.
+    unclosed = parse_tlsf("INFO {\n"
+                          "  TITLE:       \"unclosed\"\n"
+                          "  DESCRIPTION: \"the outer comment never closes\"\n"
+                          "  SEMANTICS:   Mealy\n"
+                          "  TARGET:      Mealy\n"
+                          "}\n"
+                          "MAIN {\n"
+                          "  INPUTS { x; }\n"
+                          "  OUTPUTS { o; }\n"
+                          "  GUARANTEE { /* a /* b */ c\n"
+                          "G(x -> o); }\n"
+                          "}\n")
+    unclosed_diag = spot.ostringstream()
+    spot.format_tlsf_diagnostics(unclosed_diag, "u.tlsf", unclosed.errors)
+    tc.assertEqual(unclosed_diag.str(),
+                   "u.tlsf:10.15-13.1: unclosed comment\n"
+                   "u.tlsf:10.15-13.1: syntax error, unexpected end of "
+                   "file, expecting }\n",
+                   "an unterminated nested comment must be reported where "
+                   "it opens, spanning the rest of the file")
+
+    # A multi-line nested comment moves the line counter like any
+    # other multi-line comment does.  The syntax error below is on
+    # line 9 of `bad`, past a comment that spans lines 5 to 8; when
+    # the comment was matched by a single flat regular expression,
+    # every newline inside it counted as one column and the same error
+    # was reported on line 6.
+    bad = parse_tlsf("MAIN {\n"
+                     "  INPUTS { x; }\n"
+                     "  OUTPUTS { o; }\n"
+                     "  GUARANTEE {\n"
+                     "    /* line 5\n"
+                     "       line 6 /* nested\n"
+                     "       line 7 */\n"
+                     "       line 8 */\n"
+                     "    o @;\n"
+                     "  }\n"
+                     "}\n")
+    bad_diag = spot.ostringstream()
+    spot.format_tlsf_diagnostics(bad_diag, "bad.tlsf", bad.errors)
+    tc.assertEqual(bad_diag.str(),
+                   "bad.tlsf:9.7: syntax error, unexpected identifier, "
+                   "expecting }\n",
+                   "a multi-line nested comment must advance the line "
+                   "counter")
+
     # Enum coverage of wide buses.  The coverage constraint used to be
     # one disjunct per *uncovered* valuation, so a bus needed at least
     # 17 bits before the formula outgrew formula::nary's 65535

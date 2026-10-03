@@ -169,9 +169,49 @@ declared_word(const spot::tlsf_result* res, const char* s, size_t n)
     { yyextra->prev_ends_expr = false; yyextra->await_decl = false;  \
       BEGIN(state); return (tok); }
 
+ /* Enter a block comment from whichever start condition is current.
+  * The body of the comment is scanned by the in_COMMENT state below,
+  * which counts the nesting level (TLSF v1.2 SS4.9) and restores
+  * `orig_cond` once the outermost comment closes.
+  *
+  * Neither `await_decl` nor `prev_ends_expr` is touched here, and
+  * neither is touched by the rules that skip a comment's contents: a
+  * comment is transparent, so it neither separates a section keyword
+  * from its brace nor an operand from the operator that follows it.
+  * This is also why every rule that opens a comment just calls this
+  * macro: the flag that the keyword's trailing context could not set
+  * through a comment with nested comments in it is set by the bare
+  * keyword rule instead, see ENUM_WORD_AWAIT below.  */
+#define BEGIN_COMMENT()                          \
+  yyextra->orig_cond = YY_START;                 \
+  BEGIN(in_COMMENT);                             \
+  yyextra->comment_level = 1;
+
+ /* Same as ENUM_WORD, but the keyword also flags the brace that may
+  * follow it, with the kind RET_AWAIT and RET_AWAIT_SIG use.  Only the
+  * bare PARAMETERS, DEFINITIONS, INPUTS and OUTPUTS rules need this:
+  * they are the rules that fire when the keyword's trailing context
+  * did not match, and TLSF_ENUM_SEP being a regular expression, the
+  * one separator it cannot express is a comment that nests.  The flag
+  * is cleared again by the next token of any kind, exactly as ENUM_WORD
+  * clears it, so a keyword that a malformed file leaves unmatched by
+  * its brace still cannot latch onto a later one.  */
+#define ENUM_WORD_AWAIT(tok, kind)                                    \
+  if (declared_word(yyextra, yytext, yyleng))                         \
+    {                                                               \
+      yylval->emplace<std::string>(yytext, yyleng);                 \
+      yyextra->prev_ends_expr = true;                                \
+      yyextra->await_decl = false;                                   \
+      return token::IDENTIFIER;                                      \
+    }                                                               \
+  else                                                              \
+    { yyextra->prev_ends_expr = false; yyextra->await_decl = (kind);  \
+      return (tok); }
+
 %}
 
 %x str
+%x in_COMMENT
 %x enumname
 %x enumdecl
 %x taglist
@@ -184,7 +224,14 @@ declared_word(const spot::tlsf_result* res, const char* s, size_t n)
 
   /* What may separate an identifier inside an enum body from the
    * token that tells us whether the identifier belongs to the enum:
-   * whitespace and comments, as everywhere else in this scanner. */
+   * whitespace and comments, as everywhere else in this scanner.
+   *
+   * A regular expression cannot count nesting, so the block comment
+   * this accepts has to be flat: it is the separator of the section
+   * keywords' trailing contexts, and a comment that nests one is
+   * simply not part of the trailing context.  Such a keyword still
+   * comes back as the keyword, because its bare rule sets the same
+   * flag the trailing context rule does; see ENUM_WORD_AWAIT.  */
 TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
 
 %%
@@ -203,11 +250,8 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
 [\r\n]+               yylloc->lines(yyleng / 2); yylloc->step();
 
 "//"[^\n]*            yylloc->step();
-  /* C-style block comment.  The alternation admits `*` characters
-   * inside the comment body (real benchmarks such as
-   * full_arbiter_unreal1.tlsf use `*` for bullet-pointed comments),
-   * and the closing alternative consumes the first star-slash pair. */
-"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  /* A C-style block comment, but with proper nesting support.  */
+"/*"                  BEGIN_COMMENT();
 
   /* Section keywords.  A file may still call a signal, a tag, a
    * parameter or a definition by one of these names -- syfco resolves
@@ -263,14 +307,21 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   /* Away from the brace of its section a section keyword is the name
    * the file declares, and the keyword when it declares none: a bare
    * `GLOBAL` is still the keyword, so a malformed file is diagnosed
-   * where it was before. */
+   * where it was before.
+   *
+   * The four keywords whose brace opens a block of declarations flag
+   * that brace here as well as in the rule above, because this is the
+   * rule that fires when a comment with nested comments separated the
+   * keyword from its brace, which the trailing context above cannot
+   * match.  A comment leaves the flag alone, so it survives the
+   * comment; see ENUM_WORD_AWAIT. */
 "INFO"               ENUM_WORD(token::INFO);
 "MAIN"               ENUM_WORD(token::MAIN);
 "GLOBAL"             ENUM_WORD(token::GLOBAL);
-"PARAMETERS"         ENUM_WORD(token::PARAMETERS);
-"DEFINITIONS"        ENUM_WORD(token::DEFINITIONS);
-"INPUTS"             ENUM_WORD(token::INPUTS);
-"OUTPUTS"            ENUM_WORD(token::OUTPUTS);
+"PARAMETERS"         ENUM_WORD_AWAIT(token::PARAMETERS, 1);
+"DEFINITIONS"        ENUM_WORD_AWAIT(token::DEFINITIONS, 1);
+"INPUTS"             ENUM_WORD_AWAIT(token::INPUTS, 2);
+"OUTPUTS"            ENUM_WORD_AWAIT(token::OUTPUTS, 2);
 "INITIALLY"          ENUM_WORD(token::INITIALLY);
 "PRESET"             ENUM_WORD(token::PRESET);
 "REQUIRE"            ENUM_WORD(token::REQUIRE);
@@ -512,7 +563,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <enumname>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <enumname>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <enumname>"//"[^\n]*   yylloc->step();
-  <enumname>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <enumname>"/*"         BEGIN_COMMENT();
   <enumname>[a-zA-Z_@][a-zA-Z0-9_@']* {
                           yylval->emplace<std::string>(yytext, yyleng);
                           yyextra->declared_words.insert(yylval->as<std::string>());
@@ -545,7 +596,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <enumdecl>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <enumdecl>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <enumdecl>"//"[^\n]*   yylloc->step();
-  <enumdecl>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <enumdecl>"/*"         BEGIN_COMMENT();
   /* disallow "enum" as a tag, to catch two enum declaration not
      separated by ';' */
   <enumdecl>"enum"        { BEGIN(enumname); RET(token::ENUM); }
@@ -598,7 +649,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <taglist>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <taglist>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <taglist>"//"[^\n]*   yylloc->step();
-  <taglist>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <taglist>"/*"         BEGIN_COMMENT();
 
    /* The tags.  The identifier class is spelled out rather than shared
     * with the INITIAL-state rule above, for the reason given there: a
@@ -628,7 +679,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <semval>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <semval>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <semval>"//"[^\n]*   yylloc->step();
-  <semval>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <semval>"/*"         BEGIN_COMMENT();
   <semval>"Mealy"       { BEGIN(INITIAL); RET(token::MEALY); }
   <semval>"Moore"       { BEGIN(INITIAL); RET(token::MOORE); }
   <semval>"Strict"      { BEGIN(INITIAL); RET(token::STRICT); }
@@ -657,7 +708,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <declhead>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <declhead>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <declhead>"//"[^\n]*   yylloc->step();
-  <declhead>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <declhead>"/*"         BEGIN_COMMENT();
 
   <declhead>"enum"        { BEGIN(enumname); RET(token::ENUM); }
 
@@ -684,7 +735,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <declhead2>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <declhead2>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <declhead2>"//"[^\n]*   yylloc->step();
-  <declhead2>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <declhead2>"/*"         BEGIN_COMMENT();
 
   <declhead2>"="        { BEGIN(INITIAL); RET(token::EQUAL); }
   <declhead2>"("        { BEGIN(arglist); RET(token::LPAREN); }
@@ -701,7 +752,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <arglist>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <arglist>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <arglist>"//"[^\n]*   yylloc->step();
-  <arglist>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <arglist>"/*"         BEGIN_COMMENT();
 
   <arglist>[a-zA-Z_@][a-zA-Z0-9_@']* {
                           yylval->emplace<std::string>(yytext, yyleng);
@@ -757,7 +808,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <signalhead>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <signalhead>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <signalhead>"//"[^\n]*   yylloc->step();
-  <signalhead>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <signalhead>"/*"         BEGIN_COMMENT();
 
   <signalhead>"G"           RET(token::LTL_G);
   <signalhead>"F"           RET(token::LTL_F);
@@ -795,7 +846,7 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
   <signalafter>[\n]+        { yylloc->lines(yyleng); yylloc->step(); }
   <signalafter>[\r\n]+      { yylloc->lines(yyleng / 2); yylloc->step(); }
   <signalafter>"//"[^\n]*   yylloc->step();
-  <signalafter>"/*"([^*]|\*+[^*/])*\*+"/"  yylloc->step();
+  <signalafter>"/*"         BEGIN_COMMENT();
 
   <signalafter>"G"          RET(token::LTL_G);
   <signalafter>"F"          RET(token::LTL_F);
@@ -836,6 +887,32 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
                         }
 
   <signalafter>.        { BEGIN(INITIAL); yylloc->columns(-1); yyless(0); }
+
+   /* --- block comment (in_COMMENT start condition) ---
+   * This implements support for nested comments.  */
+  <in_COMMENT>{
+  "/*"                  ++yyextra->comment_level;
+  [^*/\n\r]*            continue;
+  "/"[^*\n\r]*          continue;
+  "*"                   continue;
+  [\n]+                 yylloc->lines(yyleng);
+  [\r\n]+               yylloc->lines(yyleng / 2);
+  "*/"                  {
+                          if (--yyextra->comment_level == 0)
+                            {
+                              yylloc->step();
+                              const unsigned oc = yyextra->orig_cond;
+                              BEGIN(oc);
+                            }
+                        }
+  <<EOF>>               {
+                          const unsigned oc = yyextra->orig_cond;
+                          BEGIN(oc);
+                          yyextra->errors.emplace_back(*yylloc,
+                                                       "unclosed comment");
+                          return 0;
+                        }
+  }
 
 .                     {
                         char buf[2] = { yytext[0], 0 };

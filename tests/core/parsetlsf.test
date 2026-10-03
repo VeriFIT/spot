@@ -1017,6 +1017,149 @@ if syfco --version >/dev/null 2>&1; then
   syfco -c shadowsec.tlsf > /dev/null
   syfco -c shadowseccmt.tlsf > /dev/null
 fi
+
+# TLSF v1.2 SS4.9: "Multi line comments can be nested".
+cat >nested.tlsf <<'EOF'
+INFO /* a /* b */ c */ {
+  TITLE:       "nested comments"
+  DESCRIPTION: "one nested comment in every position the scanner has one"
+  SEMANTICS:   /* d /* e */ f */ Mealy
+  TARGET:      Mealy
+  /* g /* h */ i */ TAGS: x, /* j /* k */ l */ y
+}
+GLOBAL {
+  PARAMETERS /* m /* n */ o */ {
+    /* p */ N /* q /* r */ s */ = /* t /* u */ v */ 2;
+  }
+  DEFINITIONS {
+    /* w */ enum /* x /* y */ z */ Mode = /* a /* b */ c */ U:
+       /* d /* e */ f */ 00*, // g
+       /* h /* i */ j */ 1*0;
+    m( /* k /* l */ m */ x) = G( /* n /* o */ p */ x);
+  }
+}
+MAIN {
+  INPUTS /* q /* r */ s */ {
+    /* t /* u */ v */ req[N];
+    /* w /* x /* y */ z */ a /* b /* c */ d /* e */ f */ g */
+  }
+  OUTPUTS { ack; /* e /* f */ g */ }
+  GUARANTEE {
+    /* h /* i */ j */ G(req[0] -> F ack); /* k /* l /* m */ n /* o */ p */ q */
+  }
+}
+EOF
+run 0 ../parsetlsf --print-input-signals --print-output-signals nested.tlsf \
+  > nested.f
+grep -q "req_0,req_1" nested.f
+grep -q "^ack$" nested.f
+# The comments are gone from the canonical form, so the file parses to
+# what the same specification without any comment parses to.
+cat >nestedplain.tlsf <<'EOF'
+INFO {
+  TITLE:       "nested comments"
+  DESCRIPTION: "one nested comment in every position the scanner has one"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+  TAGS: x, y
+}
+GLOBAL {
+  PARAMETERS {
+    N = 2;
+  }
+  DEFINITIONS {
+    enum Mode = U: 00*, 1*0;
+    m(x) = G(x);
+  }
+}
+MAIN {
+  INPUTS {
+    req[N];
+  }
+  OUTPUTS { ack; }
+  GUARANTEE {
+    G(req[0] -> F ack);
+  }
+}
+EOF
+( set +x
+  run 0 ../parsetlsf nested.tlsf nestedplain.tlsf > nested.all )
+cat >nested.exp <<'EOF'
+=== nested.tlsf ===
+G(req_0 -> Fack)
+=== nestedplain.tlsf ===
+G(req_0 -> Fack)
+EOF
+diff -u nested.exp nested.all
+if syfco --version >/dev/null 2>&1; then
+  syfco -c nested.tlsf > /dev/null
+  syfco -f ltlxba -m fully nested.tlsf > syfco-nested.f
+  ../parsetlsf -e "`cat syfco-nested.f`" nested.tlsf > /dev/null
+fi
+# A nested comment that spans several lines moves the line counter like
+# any other multi-line comment does, so the diagnostic below points at
+# line 15 -- before, when the comment was matched by a single flat
+# regular expression, every newline inside it counted as one column and
+# the same diagnostic named line 12.  syfco names line 15 as well.
+cat >nestedlines.tlsf <<'EOF'
+INFO {
+  TITLE:       "multi-line nested comment"
+  DESCRIPTION: "the line counter follows the comment"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { x; }
+  OUTPUTS { o; }
+  GUARANTEE {
+    /* line 11
+       line 12 /* nested
+       line 13 */
+       line 14 */
+    o @;
+  }
+}
+EOF
+# nestedlines: the syntax error of the fixture above.
+# nestedunclosed: the outer comment of the next one is never closed, so
+# the scanner reaches the end of the file inside it and says so.
+cat >nestedunclosed.tlsf <<'EOF'
+INFO {
+  TITLE:       "unclosed nested comment"
+  DESCRIPTION: "the outer comment is never closed"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { x; }
+  OUTPUTS { o; }
+  GUARANTEE { /* a /* b */ c
+G(x -> o); }
+}
+EOF
+if syfco --version >/dev/null 2>&1; then
+  # syfco counts the newlines of the comment too, and says so on the
+  # same line we do.
+  syfco -c nestedlines.tlsf 2>&1 | grep -q "(line 15, column 7)"
+fi
+( set +x
+  run 2 ../parsetlsf nestedlines.tlsf nestedunclosed.tlsf \
+    > /dev/null 2>nested.err )
+cat >nested.err.exp <<'EOF'
+nestedlines.tlsf:15.7: syntax error, unexpected identifier, expecting
+}
+nestedunclosed.tlsf:10.15-13.1: unclosed comment
+nestedunclosed.tlsf:10.15-13.1: syntax error, unexpected end of file,
+expecting }
+2 of 2 files failed
+EOF
+fold -w 70 nested.err | sed 's/ *$//' > nested.err.fold
+diff -u nested.err.exp nested.err.fold
+# syfco rejects the unterminated comment too, with its own wording.
+if syfco --version >/dev/null 2>&1; then
+  ! syfco -c nestedunclosed.tlsf
+fi
+
 # Two adjacent `;`-less definitions are read as one item, so the second
 # name gets no declaration context: `f = c U = c` cannot name the
 # definition U.  Writing the `;` makes it parse.

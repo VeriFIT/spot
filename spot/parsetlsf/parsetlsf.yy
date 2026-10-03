@@ -113,6 +113,13 @@
       /// file, and every other token rule clears the flag, so a
       /// keyword that a malformed file leaves unmatched by its brace
       /// cannot latch onto a later one.
+      ///
+      /// A comment does not clear the flag, at any nesting depth: the
+      /// scanner's comment rules only move the location along.  The
+      /// keyword's flex trailing context matches plain block comments,
+      /// so the flag is what makes a comment that nests one transparent
+      /// to the brace rule; see ENUM_WORD_AWAIT in
+      /// spot/parsetlsf/scantlsf.ll.
       unsigned char await_decl = 0;
 
       /// \brief The first identifier of an `INPUTS`/`OUTPUTS`
@@ -137,6 +144,26 @@
       /// operator, which is exactly where a declared word is an
       /// identifier.
       bool prev_ends_expr = false;
+
+      /// \brief How deep the block comment being scanned nests.
+      ///
+      /// TLSF v1.2 SS4.9 lets a block comment contain block comments
+      /// ("Multi line comments can be nested"), and so does syfco
+      /// (`nestedComments = True`, Reader/Parser/Data.hs:133), so an
+      /// opening pair inside a comment raises the count and only the
+      /// matching closing pair of the innermost comment lowers it
+      /// again.  Zero whenever the scanner is not inside a comment.
+      unsigned comment_level = 0;
+
+      /// \brief The start condition the current block comment started
+      /// in.
+      ///
+      /// A flex start condition is an integer (that is what YY_START
+      /// yields), so it can be stored and handed back to BEGIN() when
+      /// the comment closes; this is how a comment is invisible to the
+      /// rest of the state machine.  Meaningful only while
+      /// `comment_level` is nonzero.
+      unsigned orig_cond = 0;
 
       /// \brief Record that the INFO item \a bit was seen at \a loc.
       ///
