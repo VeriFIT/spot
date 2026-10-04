@@ -176,6 +176,16 @@ namespace spot
     /// sub-expression. Round-trip printing re-emits those parens.
     bool parenthesized;
 
+    /// True if this expression or any of its subexpressions is an App.
+    bool has_app = false;
+
+    /// True if this expression or any subexpression can name a
+    /// definition formal, i.e. is an Identifier, a BusRef, or a
+    /// Quantifier (whose loop variable can capture an outer formal).
+    /// LiteralInt subtrees carry no name, so `single(a + 1)` has
+    /// this false and the substitution pass hands it back untouched.
+    bool has_binding_target = false;
+
     /// Identifier name (Identifier / BusRef base / App callee).
     std::string name;
 
@@ -201,7 +211,9 @@ namespace spot
     tlsf_expr()
       : type(tlsf_expr_type::Identifier),
         op(tlsf_op::None),
-        parenthesized(false)
+        parenthesized(false),
+        has_app(false),
+        has_binding_target(false)
     {
     }
   };
@@ -305,6 +317,34 @@ namespace spot
 
   // --- constructor helpers used by parsetlsf.yy -----------------------
 
+  /// \brief Recompute the summary flags of \a e from its children.
+  ///
+  /// Both flags are monotone over the subtree, so a single pass over
+  /// the direct children is enough once the children already carry
+  /// their own flags.  Every tlsf_make_* helper calls this as its
+  /// last step; deriving the flags here rather than inline at each
+  /// call site keeps them correct even when a helper moves a child
+  /// pointer into `children` before reading it.
+  inline void tlsf_update_flags(const tlsf_expr_ptr& e)
+  {
+    if (!e)
+      return;
+    e->has_app = e->type == tlsf_expr_type::App;
+    e->has_binding_target =
+      e->type == tlsf_expr_type::Identifier
+      || e->type == tlsf_expr_type::BusRef
+      || e->type == tlsf_expr_type::Quantifier;
+    for (const auto& ch : e->children)
+      {
+        if (!ch)
+          continue;
+        if (ch->has_app)
+          e->has_app = true;
+        if (ch->has_binding_target)
+          e->has_binding_target = true;
+      }
+  }
+
   /// \brief Build a LiteralInt node for integer literal \a v at \a loc.
   inline tlsf_expr_ptr tlsf_make_int(location loc, long long v)
   {
@@ -312,6 +352,7 @@ namespace spot
     e->loc = loc;
     e->type = tlsf_expr_type::LiteralInt;
     e->val = v;
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -322,6 +363,7 @@ namespace spot
     e->loc = loc;
     e->type = tlsf_expr_type::Identifier;
     e->name = std::move(name);
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -337,6 +379,7 @@ namespace spot
     e->name = std::move(name);
     if (index)
       e->children.push_back(std::move(index));
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -353,6 +396,7 @@ namespace spot
     e->type = tlsf_expr_type::App;
     e->name = std::move(name);
     e->children = std::move(args);
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -369,6 +413,7 @@ namespace spot
     e->op = op;
     if (child)
       e->children.push_back(std::move(child));
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -388,6 +433,7 @@ namespace spot
       e->children.push_back(std::move(lhs));
     if (rhs)
       e->children.push_back(std::move(rhs));
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -407,6 +453,7 @@ namespace spot
       e->children.push_back(std::move(bound));
     if (body)
       e->children.push_back(std::move(body));
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -515,6 +562,7 @@ namespace spot
                                              binders, std::move(body));
     if (nested)
       e->children.push_back(std::move(nested));
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -541,6 +589,7 @@ namespace spot
       e->children.push_back(std::move(hi));
     if (body)
       e->children.push_back(std::move(body));
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -553,6 +602,7 @@ namespace spot
     e->loc = loc;
     e->type = tlsf_expr_type::SetExplicit;
     e->children = std::move(elements);
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -568,6 +618,7 @@ namespace spot
       e->children.push_back(std::move(lo));
     if (hi)
       e->children.push_back(std::move(hi));
+    tlsf_update_flags(e);
     return e;
   }
 
@@ -772,4 +823,35 @@ namespace spot
     /// Parsed formulas of MAIN { ASSUME / ASSUMPTIONS { ... } }.
     std::vector<tlsf_expr_ptr> assumptions_body;
   };
+
+  /// \brief Check if expression has any App node in subtree.
+  inline bool tlsf_subtree_has_app(const tlsf_expr& e)
+  {
+    // Deliberately recompute from the node kinds instead of trusting
+    // e.has_app: this is the independent check the translator's
+    // assert() uses to catch a flag that was never propagated.
+    if (e.type == tlsf_expr_type::App)
+      return true;
+    for (const auto& ch : e.children)
+      if (ch && tlsf_subtree_has_app(*ch))
+        return true;
+    return false;
+  }
+
+  /// \brief Independent recomputation of \c tlsf_expr::has_binding_target.
+  ///
+  /// Mirrors tlsf_subtree_has_app: walks the tree instead of reading
+  /// the cached flag, so an assert() on it can catch a missing
+  /// propagation in a clone.
+  inline bool tlsf_subtree_has_binding_target(const tlsf_expr& e)
+  {
+    if (e.type == tlsf_expr_type::Identifier
+        || e.type == tlsf_expr_type::BusRef
+        || e.type == tlsf_expr_type::Quantifier)
+      return true;
+    for (const auto& ch : e.children)
+      if (ch && tlsf_subtree_has_binding_target(*ch))
+        return true;
+    return false;
+  }
 }

@@ -4589,3 +4589,170 @@ EOF
 run 2 ltlf2dfa --tlsf=clidiag.tlsf > clidiag.hoa 2> clidiag.err
 grep -q "^clidiag\.tlsf:15\.15-17: enum 'E' has no value named 'NOPE'" \
   clidiag.err
+
+# --- argument substitution semantics -------------------------------------
+#
+# The substitution pass is single-pass with a lexical scope stack
+# (subst_expr in translate.cc).  These cases pin the behaviours that
+# the rewrite had to preserve, because each one is a way the old
+# per-formal `shadowed` set could have been miscompiled.
+
+# A formal used more than once in the body is replaced everywhere,
+# and the actual tree is spliced in without being re-substituted.
+cat >subst_multi.tlsf <<'EOF'
+INFO {
+  TITLE:       "formal used twice"
+  DESCRIPTION: "single actual, two occurrences of the formal"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    both(x) = x && x;
+  }
+}
+MAIN {
+  INPUTS  { a; b; }
+  OUTPUTS { z; }
+  GUARANTEE { both(a); }
+}
+EOF
+run 0 ../parsetlsf subst_multi.tlsf > subst_multi.f
+test "a" = "`cat subst_multi.f`"   # a && a simplifies to a
+
+# Two formals in one definition: each occurrence maps to its own
+# actual, and the order of the bindings does not matter.
+cat >subst_two.tlsf <<'EOF'
+INFO {
+  TITLE:       "two formals"
+  DESCRIPTION: "distinct actuals per formal"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    pair(x, y) = x -> y;
+  }
+}
+MAIN {
+  INPUTS  { a; b; }
+  OUTPUTS { z; }
+  GUARANTEE { pair(a, b); }
+}
+EOF
+run 0 ../parsetlsf subst_two.tlsf > subst_two.f
+test "a -> b" = "`cat subst_two.f`"
+
+# A formal bound inside an actual must NOT be substituted again by
+# the outer definition: the actual is spliced verbatim, so the inner
+# parameter keeps its own name and is bound by the inner call.
+cat >subst_nested.tlsf <<'EOF'
+INFO {
+  TITLE:       "nested definition call"
+  DESCRIPTION: "inner call passes its own formal through"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    inner(u) = u && u;
+    outer(v) = inner(v);
+  }
+}
+MAIN {
+  INPUTS  { a; }
+  OUTPUTS { z; }
+  GUARANTEE { outer(a); }
+}
+EOF
+run 0 ../parsetlsf subst_nested.tlsf > subst_nested.f
+test "a" = "`cat subst_nested.f`"
+
+# A quantifier inside the body binds its own loop variable: the loop
+# variable is local to the body and must not be captured by the
+# formal.  Here the body quantifies over `b`, which is also a formal
+# name, so the two would be indistinguishable without the scope.
+cat >subst_capture.tlsf <<'EOF'
+INFO {
+  TITLE:       "quantifier loop variable shadows a formal"
+  DESCRIPTION: "the loop variable is local to the body"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    wrap(b) = FORALL[b IN {0, 1}] b;
+  }
+}
+MAIN {
+  INPUTS  { a; b; }
+  OUTPUTS { z; }
+  GUARANTEE { wrap(a); }
+}
+EOF
+# The loop variable `b` stays local: the diagnostic must name `b`, not
+# the formal's actual, which pins the capture behaviour.
+run 2 ../parsetlsf subst_capture.tlsf > subst_capture.f 2> subst_capture.err
+grep -q "loop variable 'b' used in LTL position" subst_capture.err
+
+# A BusRef base that names a formal is renamed when the actual is a
+# plain identifier, and left alone otherwise (its index is resolved
+# later, in integer position).
+cat >subst_busref.tlsf <<'EOF'
+INFO {
+  TITLE:       "busref base rename"
+  DESCRIPTION: "a formal used as a bus base"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  PARAMETERS { n = 2; }
+  DEFINITIONS {
+    use(s) = s[0];
+  }
+}
+MAIN {
+  INPUTS  { a[n]; b[n]; }
+  OUTPUTS { z; }
+  GUARANTEE { use(a); }
+}
+EOF
+run 0 ../parsetlsf subst_busref.tlsf > subst_busref.f
+test "a_0" = "`cat subst_busref.f`"
+
+# Round-trip stability on the substitution cases above.
+for f in subst_multi subst_two subst_nested subst_busref; do
+  run 0 ../parsetlsf $f.tlsf > $f.f2
+  cmp $f.f $f.f2
+done
+
+# A specification pathological enough to blow past spot's formula
+# child limit must produce a diagnostic, not take the tool down: the
+# fnode layer throws std::runtime_error once a formula reaches
+# max_formula_children, and tlsf_to_ltl turns that into an error
+# entry.  A binder over 70000 values folds into a single conjunction
+# with one child per value, which is the cheapest way past the limit.
+cat >toomany.tlsf <<'EOF'
+INFO {
+  TITLE:       "too many children"
+  DESCRIPTION: "child-limit stress via a binder fold"
+  SEMANTICS:   Mealy,Finite
+  TARGET:      Mealy
+}
+GLOBAL {
+  PARAMETERS { n = 70000; }
+}
+MAIN {
+  INPUTS  { a[n]; }
+  OUTPUTS { g; }
+  GUARANTEE { &&[0 <= i < n] a[i]; }
+}
+EOF
+# Exercised through ltlf2dfa rather than ../parsetlsf: the test binary
+# ends with assert(fnode::instances_check()), which legitimately
+# reports the half-built formula nodes still alive while the exception
+# unwound out of tlsf_to_ltl.  A shipped tool carries no such assertion
+# and simply reports the error.
+run 2 ltlf2dfa --tlsf=toomany.tlsf > toomany.hoa 2> toomany.err
+grep -q "quantifier instantiation count exceeds" toomany.err
+test ! -s toomany.hoa

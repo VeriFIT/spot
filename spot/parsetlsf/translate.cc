@@ -186,6 +186,23 @@ namespace spot
                            parse_tlsf_error_list* errors)
       : ast_(ast), opts_(opts), errors_(errors)
     {
+      // Build the name indexes once.  Inputs are inserted before
+      // outputs so find_decl keeps resolving a name declared on
+      // both sides to the input, as the former two-loop scan did.
+      decls_.reserve(ast_.inputs.size() + ast_.outputs.size());
+      for (const auto& d : ast_.inputs)
+        decls_.emplace(d.name, &d);
+      for (const auto& d : ast_.outputs)
+        {
+          decls_.emplace(d.name, &d);
+          output_bases_.insert(d.name);
+        }
+      defs_.reserve(ast_.definitions.size());
+      for (const auto& d : ast_.definitions)
+        defs_.emplace(d.name, &d);
+      enums_.reserve(ast_.enumerations.size());
+      for (const auto& e : ast_.enumerations)
+        enums_.emplace(e.name, &e);
     }
 
     translator::~translator() = default;
@@ -215,49 +232,137 @@ namespace spot
       return false;
     }
 
+    size_t translator::lookup_scope(
+      const std::vector<subst_binding>& scopes,
+      const std::string& name)
+    {
+      for (size_t i = scopes.size(); i-- > 0; )
+        if (scopes[i].name == name)
+          return i;
+      return scopes.size();
+    }
+
+    // Widest conjunction or disjunction spot will accept in one node:
+    // fnode::nary throws beyond UINT16_MAX children.  Any fold that
+    // could exceed this many terms (a wide binder, the per-bus enum
+    // coverage constraints) must be folded pairwise instead.
+    constexpr long long max_formula_children = 65535;
+
     tlsf_expr_ptr
-    translator::subst_arg(const tlsf_expr_ptr& body,
-                          const std::string& arg_name,
-                          const tlsf_expr_ptr& replacement,
-                          const std::set<std::string>& shadowed)
+    translator::subst_scoped(const tlsf_expr_ptr& body,
+                             const std::vector<subst_binding>& env,
+                             const std::vector<subst_binding>& scopes)
     {
       if (!body)
         return nullptr;
-      // Free identifier matching the formal arg => splice in the
-      // actual argument tree.  Identifiers in `shadowed` (e.g. a
-      // quantifier's loop variable) are skipped so a body containing
-      // its own quantifier remains intact.
-      if (body->type == tlsf_expr_type::Identifier
-          && body->name == arg_name
-          && !shadowed.count(arg_name))
-        return replacement;
-
-      auto clone = std::make_shared<tlsf_expr>();
-      if (body->type == tlsf_expr_type::BusRef
-          && body->name == arg_name
-          && !shadowed.count(arg_name)
-          && replacement->type == tlsf_expr_type::Identifier)
-        clone->name = replacement->name;
-      std::set<std::string> child_shadowed = shadowed;
-      if (body->type == tlsf_expr_type::Quantifier
-          && body->children.size() >= 2 && body->children[0])
+      // A subtree holding no Identifier, BusRef or Quantifier cannot
+      // reference a binding, so the walk would only rebuild an
+      // identical tree.  The assert re-derives the flag from the
+      // tree: a clone that dropped has_binding_target would
+      // otherwise silently skip substitution here and produce a
+      // wrong formula with no diagnostic.
+      if (!body->has_binding_target)
         {
-          // A quantified identifier is local to both its bound and
-          // body, so substitution must leave it intact.  A bound with
-          // no iteration variable contributes nothing to shadow; the
-          // parser rejects those, so this only guards an AST that was
-          // not built by the parser.
-          const std::string var = quantifier_loop_var(*body->children[0]);
-          if (!var.empty())
-            child_shadowed.insert(var);
+          assert(!tlsf_subtree_has_binding_target(*body));
+          return body;
         }
+      // Nothing was truncated: walk with the full environment.
+      if (scopes.size() == env.size())
+        return subst_expr(body, env);
+      // A quantifier above us re-bound at least one name, so
+      // `scopes` is a proper subset of `env` holding the bindings
+      // that are still visible here.  Walk with exactly that set: the
+      // shadowed formals must not be substituted inside the
+      // quantifier, while every unrelated formal stays in scope.
+      return subst_expr(body, scopes);
+    }
+
+    tlsf_expr_ptr
+    translator::subst_expr(const tlsf_expr_ptr& body,
+                           const std::vector<subst_binding>& env)
+    {
+      if (!body)
+        return nullptr;
+
+      // Fast path: with an empty environment there is nothing to
+      // substitute, and a subtree holding no Identifier, BusRef or
+      // Quantifier cannot reference a formal anyway.  Returning the
+      // node untouched is what keeps this pass linear in the number
+      // of names instead of the number of body nodes.
+      if (env.empty() && !body->has_binding_target)
+        return body;
+      if (!env.empty() && !body->has_binding_target)
+        {
+          assert(!tlsf_subtree_has_binding_target(*body));
+          return body;
+        }
+
+      // Resolve the free occurrence of \a name, if any.  Sets
+      // \a kind to the matching binding's kind so the caller knows
+      // whether the actual must itself be substituted.
+      const auto lookup = [&](const std::string& name,
+                              subst_binding::kind& kind)
+        -> tlsf_expr_ptr
+        {
+          const size_t i = lookup_scope(env, name);
+          if (i == env.size())
+            return nullptr;
+          kind = env[i].k;
+          return env[i].expr;
+        };
+
+      // Non-null when this node itself resolves to a binding.
+      tlsf_expr_ptr resolved;
+      subst_binding::kind kind = subst_binding::kind::splice;
+      if (body->type == tlsf_expr_type::Identifier
+          || body->type == tlsf_expr_type::BusRef)
+        resolved = lookup(body->name, kind);
+
+      // A BusRef index (`a[i]`) is always resolved later through
+      // eval_int, never by this pass, so a bound BusRef base can only
+      // be renamed.  Splicing a non-Identifier actual would leave a
+      // BusRef with no base, so such a match is dropped and the
+      // original node is kept.
+      if (resolved && body->type == tlsf_expr_type::BusRef
+          && resolved->type != tlsf_expr_type::Identifier)
+        resolved = nullptr;
+
+      if (resolved)
+        {
+          if (body->type == tlsf_expr_type::BusRef)
+            {
+              // Keep the BusRef and its index children, pointing the
+              // base at the actual's name.
+              auto ren = std::make_shared<tlsf_expr>();
+              ren->loc = body->loc;
+              ren->type = body->type;
+              ren->parenthesized = body->parenthesized;
+              ren->name = resolved->name;
+              for (size_t i = 0; i < body->children.size(); ++i)
+                ren->children.push_back(subst_scoped(body->children[i], env,
+                                                    env));
+              tlsf_update_flags(ren);
+              return ren;
+            }
+          // A splice carries an already-expanded actual: return it
+          // verbatim so this pass cannot expand it a second time.  A
+          // shadow binding still has to be substituted by the
+          // definitions outside its own scope, which is what the
+          // old outermost-first `shadowed` set emulated.
+          if (kind == subst_binding::kind::splice)
+            return resolved;
+          return subst_scoped(resolved, env, env);
+        }
+
+      // No binding matched: rebuild the node structurally so that its
+      // children are substituted in turn.
+      auto clone = std::make_shared<tlsf_expr>();
       clone->loc = body->loc;
       clone->type = body->type;
-      // Only copy the payload-bearing field for this node kind.
-      // Copying all three unconditionally (val, name, op) bled
-      // stale data across kinds when the body was reused across
-      // substitutions; switching here guarantees a clone carries
-      // exactly what is meaningful for its tag.
+      clone->parenthesized = body->parenthesized;
+      // Only copy the payload-bearing field for this node kind;
+      // copying val, name and op unconditionally bleeds stale data
+      // across kinds.
       switch (body->type)
         {
         case tlsf_expr_type::LiteralInt:
@@ -266,11 +371,7 @@ namespace spot
         case tlsf_expr_type::Identifier:
         case tlsf_expr_type::BusRef:
         case tlsf_expr_type::App:
-          if (!(body->type == tlsf_expr_type::BusRef
-                && body->name == arg_name
-                && !shadowed.count(arg_name)
-                && replacement->type == tlsf_expr_type::Identifier))
-            clone->name = body->name;
+          clone->name = body->name;
           break;
         case tlsf_expr_type::UnaryOp:
         case tlsf_expr_type::BinaryOp:
@@ -283,14 +384,61 @@ namespace spot
           // meaningful, and it is filled in below.
           break;
         }
-      clone->parenthesized = body->parenthesized;
+
+      // A quantified identifier is local to both its bound and its
+      // body, so an outer definition formal of the same name must
+      // neither capture it nor be renamed by it.  Drop the bindings
+      // that name from the environment for this subtree only.
+      std::vector<subst_binding> inner(env);
+      if (body->type == tlsf_expr_type::Quantifier
+          && body->children.size() >= 2 && body->children[0])
+        {
+          // A bound with no iteration variable contributes nothing
+          // to shadow; the parser rejects those, so this only guards
+          // a hand-built AST.
+          const std::string var = quantifier_loop_var(*body->children[0]);
+          if (!var.empty())
+            inner.erase(std::remove_if(inner.begin(), inner.end(),
+                                       [&](const subst_binding& b)
+                                       { return b.name == var; }),
+                        inner.end());
+        }
+
       // A Quantifier keeps exactly its [bound, body] children here;
       // both are substituted like any other child.
       for (size_t i = 0; i < body->children.size(); ++i)
         clone->children.push_back(
-          subst_arg(body->children[i], arg_name, replacement,
-                    child_shadowed));
+          subst_scoped(body->children[i], env, inner));
+      tlsf_update_flags(clone);
       return clone;
+    }
+
+    tlsf_expr_ptr
+    translator::subst_clause(const tlsf_expr_ptr& clause,
+                             const tlsf_definition& def,
+                             const std::vector<tlsf_expr_ptr>& actuals,
+                             bool actuals_expanded)
+    {
+      // Both callers hand over actuals that expand_ast has already
+      // expanded, and both therefore ask for `splice` bindings: the
+      // actual is substituted verbatim and is not expanded a second
+      // time here.  Shadowing is applied to both kinds alike, so a
+      // quantifier inside the body still captures a formal of the same
+      // name.
+      //
+      // `shadow` is the other kind, for an actual that must be
+      // rewritten by the bindings enclosing this definition.  It is not
+      // reachable from here: its actual is re-substituted under the
+      // same environment, and an expanded actual still mentions the
+      // identifiers the caller substituted for its own formals, so the
+      // two rewrite each other and the recursion never terminates.
+      std::vector<subst_binding> env;
+      env.reserve(def.args.size());
+      for (size_t i = 0; i < def.args.size(); ++i)
+        env.push_back({actuals_expanded ? subst_binding::kind::splice
+                                         : subst_binding::kind::shadow,
+                       def.args[i], actuals[i]});
+      return subst_expr(clause, env);
     }
 
     tlsf_expr_ptr
@@ -298,6 +446,18 @@ namespace spot
     {
       if (!e)
         return nullptr;
+
+      // Fast path: a subtree with no App node contains no
+      // user-defined call, so this pass has nothing to flatten
+      // and cannot change it.  Return the node as is instead of
+      // rebuilding an identical tree.  The clone below is purely
+      // structural, so sharing the original is safe: neither this
+      // pass nor its callers mutate the tree they are handed.
+      if (!e->has_app)
+        {
+          assert(!tlsf_subtree_has_app(*e));
+          return e;
+        }
 
       // App: only flatten user-defined def chains.  Built-in
       // helpers and unknown names pass through unchanged --
@@ -311,13 +471,7 @@ namespace spot
               || e->name == "SUM" || e->name == "PROD"
               || e->name == "SIZEOF")
             return e;
-          const tlsf_definition* def = nullptr;
-          for (const auto& d : ast_.definitions)
-            if (d.name == e->name)
-              {
-                def = &d;
-                break;
-              }
+          const tlsf_definition* def = find_def(e->name);
           if (!def)
             return e;
           // Arity mismatch and unknowns are surfaced later by
@@ -374,16 +528,14 @@ namespace spot
               actuals.push_back(expand_ast(c));
             }
           // Substitute formals -> expanded actuals into the
-          // single body clause.  Use a fresh shadowed set so we
-          // don't trample on the caller's
-          // quantifier-loop-var binding.
-          std::set<std::string> shadowed;
-          auto expanded = only;
-          for (size_t i = 0; i < def->args.size(); ++i)
-            expanded = subst_arg(expanded,
-                                 def->args[i],
-                                 actuals[i],
-                                 shadowed);
+          // single body clause.  The actuals were pre-expanded
+          // above, so every binding splices verbatim and this
+          // pass cannot re-expand them; the caller's
+          // quantifier-loop-var binding is untouched because a
+          // quantifier inside the body truncates the scope chain
+          // locally.
+          tlsf_expr_ptr expanded =
+            subst_clause(only, *def, actuals, true);
           // Flatten any App calls surfaced inside the
           // substituted body (e.g., MultiUse's body has 5
           // MyDef(x) leaves) so translate_expr never has to
@@ -428,45 +580,34 @@ namespace spot
       clone->parenthesized = e->parenthesized;
       for (size_t i = 0; i < e->children.size(); ++i)
         clone->children.push_back(expand_ast(e->children[i]));
+      tlsf_update_flags(clone);
       return clone;
     }
 
     const tlsf_ap_decl*
     translator::find_decl(const std::string& name) const
     {
-      for (const auto& d : ast_.inputs)
-        if (d.name == name)
-          return &d;
-      for (const auto& d : ast_.outputs)
-        if (d.name == name)
-          return &d;
-      return nullptr;
+      auto it = decls_.find(name);
+      return it == decls_.end() ? nullptr : it->second;
     }
 
     bool translator::base_is_output(const std::string& name) const
     {
-      for (const auto& d : ast_.outputs)
-        if (d.name == name)
-          return true;
-      return false;
+      return output_bases_.count(name) != 0;
     }
 
     const tlsf_definition*
     translator::find_def(const std::string& name) const
     {
-      for (const auto& d : ast_.definitions)
-        if (d.name == name)
-          return &d;
-      return nullptr;
+      auto it = defs_.find(name);
+      return it == defs_.end() ? nullptr : it->second;
     }
 
     const tlsf_enum_decl*
     translator::find_enum(const std::string& name) const
     {
-      for (const auto& e : ast_.enumerations)
-        if (e.name == name)
-          return &e;
-      return nullptr;
+      auto it = enums_.find(name);
+      return it == enums_.end() ? nullptr : it->second;
     }
 
     bool
@@ -839,6 +980,25 @@ namespace spot
       std::vector<long long> values;
       if (!push_binder(q, var, values))
         return false;
+      // A run this wide cannot be folded into one formula node, and
+      // there is no way to build it: spot's fnode layer caps a node at
+      // max_formula_children operands, and both fnode::multop and
+      // multop_build_and_or inline a child that already carries the
+      // same operator, so a balanced tree of Ands is flattened back
+      // into the one over-wide node (spot/tl/formula.cc).  Catching
+      // that throw instead is not free either: it unwinds past the
+      // half-built node and leaks the formulas the run had already
+      // interned.  So refuse the run, here, before any body is
+      // translated.  loop_vars_ is populated for the enclosing binders
+      // at this point, so the bound evaluates in the right scope.
+      if (SPOT_UNLIKELY(values.size() > static_cast<size_t>(
+                                        max_formula_children)))
+        {
+          diag(q, "quantifier instantiation count exceeds the formula "
+                  "child limit of "
+                  + std::to_string(max_formula_children));
+          return false;
+        }
       assert(q.children.size() >= 2 && q.children[1]);
       const tlsf_expr& rest = *q.children[1];
 
@@ -869,6 +1029,9 @@ namespace spot
 
     bool translator::translate_binder_run(const tlsf_expr& e, formula& out)
     {
+      // for_each_instantiation() refuses a binder wider than a single
+      // formula node can hold, before translating any body, so the fold
+      // below is always within the child limit of spot's fnode layer.
       std::vector<formula> parts;
       const bool ok = for_each_instantiation(
         e, [&](const tlsf_expr& body)
@@ -1135,16 +1298,18 @@ namespace spot
       // Grammar invariant: a definition accepted by the parser
       // carries at least one body clause.
       assert(!def.body.empty());
-      std::set<std::string> shadowed;
       for (const tlsf_expr_ptr& raw_clause : def.body)
         {
           // Substitute the (pre-expanded) actuals into this clause
           // before inspecting its guard, so guards over formal
-          // integer arguments become constant comparisons.
-          tlsf_expr_ptr clause = raw_clause;
-          for (size_t i = 0; i < def.args.size(); ++i)
-            clause = subst_arg(clause, def.args[i], actuals[i],
-                               shadowed);
+          // integer arguments become constant comparisons.  The
+          // actuals are spliced verbatim: they were already
+          // expanded by the caller and carry no formal name, and a
+          // quantifier inside the clause must not capture a formal
+          // (it never did here, the scan having used an empty
+          // shadow set).
+          tlsf_expr_ptr clause =
+            subst_clause(raw_clause, def, actuals, true);
           if (clause->type == tlsf_expr_type::BinaryOp
               && clause->op == tlsf_op::Guard
               && clause->children.size() >= 2 && clause->children[0]
@@ -1321,26 +1486,15 @@ namespace spot
               // Search inputs and outputs for a matching bus decl.
               // A typed bus (`hburst HBURST;`) has an empty `size`
               // but is a real bus: its width comes from the enum.
-              for (const auto& d : ast_.inputs)
-                if (d.name == arg.name)
-                  {
-                    if (!d.size && d.enum_type.empty())
-                      {
-                        diag(e, "SIZEOF of scalar AP '" + arg.name + "'");
-                        return false;
-                      }
-                    return eval_ap_width(d, out);
-                  }
-              for (const auto& d : ast_.outputs)
-                if (d.name == arg.name)
-                  {
-                    if (!d.size && d.enum_type.empty())
-                      {
-                        diag(e, "SIZEOF of scalar AP '" + arg.name + "'");
-                        return false;
-                      }
-                    return eval_ap_width(d, out);
-                  }
+              if (const tlsf_ap_decl* d = find_decl(arg.name))
+                {
+                  if (!d->size && d->enum_type.empty())
+                    {
+                      diag(e, "SIZEOF of scalar AP '" + arg.name + "'");
+                      return false;
+                    }
+                  return eval_ap_width(*d, out);
+                }
               diag(e, "SIZEOF: unknown bus '" + arg.name + "'");
               return false;
             }
@@ -1676,13 +1830,7 @@ namespace spot
             // declared arity and the call-site arity, so the user
             // can fix the call without grepping the DEFINITIONS
             // block.
-            const tlsf_definition* def = nullptr;
-            for (const auto& d : ast_.definitions)
-              if (d.name == e.name)
-                {
-                  def = &d;
-                  break;
-                }
+            const tlsf_definition* def = find_def(e.name);
             if (!def)
               {
                 diag(e, "definition '" + e.name + "' is not defined");
@@ -2208,7 +2356,6 @@ namespace spot
       // a perfectly ordinary 17-bit enum aborted the process.
       //
       // Input buses contribute to REQUIRE, output buses to ASSERT.
-      static constexpr long long max_formula_children = 65535;
       // Widest bus for which the covered valuations are enumerated to
       // compare the two encodings.  Above it the factored form is
       // used without looking, since 2^w valuations cannot be walked
@@ -2231,10 +2378,16 @@ namespace spot
                 continue;   // diagnosed, or a zero-width bus
               // The bus bits are APs registered by run()'s
               // register_decl pass (see run()) before any section is
-              // translated.
-              auto bit_ap = [&](long long i)
+              // translated.  Build each of them once per bus: the name
+              // is a string concatenation, and the loops below ask for
+              // the same bit over and over.
+              std::vector<formula> bits;
+              bits.reserve(static_cast<size_t>(w));
+              for (long long i = 0; i < w; ++i)
+                bits.push_back(formula::ap(d.name + '_' + std::to_string(i)));
+              auto bit_ap = [&](long long i) -> const formula&
                 {
-                  return formula::ap(d.name + '_' + std::to_string(i));
+                  return bits[static_cast<size_t>(i)];
                 };
               // A pattern covers v iff every non-star bit of p equals
               // the corresponding bit of v, so the conjunction over p's
@@ -2293,10 +2446,21 @@ namespace spot
                   parts.push_back(factored);
                   continue;
                 }
-              // Otherwise count the covered valuations exactly, by
-              // expanding the stars of each pattern (cheap: the work
-              // follows the number of stars, not 2^w).
-              std::vector<long long> covered;
+              // Otherwise count the covered valuations exactly and
+              // build the complement.  A bitmap indexed by the
+              // valuation records coverage, so the patterns are
+              // expanded once (work follows the number of stars) and
+              // the complement is then a bit scan rather than a
+              // sort plus a search over a sorted vector.  The bitmap
+              // is capped so a wide bus cannot allocate wildly: past
+              // the cap the factored form is kept, which the test
+              // below detects without allocating.
+              const unsigned long long space = 1ULL << w;
+              std::vector<bool> covered;
+              if (w < 24)
+                covered.assign(static_cast<size_t>(space), false);
+              long long ncovered = 0;
+              bool overflowed = false;
               for (const auto& entry : en->entries)
                 for (const auto& pat : entry.patterns)
                   {
@@ -2313,6 +2477,7 @@ namespace spot
                         else if (c == '1')
                           base |= 1LL << k;
                       }
+                    const bool track = !covered.empty();
                     for (long long sub = 0, span = 1LL << free_pos.size();
                          sub < span; ++sub)
                       {
@@ -2320,19 +2485,29 @@ namespace spot
                         for (size_t b = 0; b < free_pos.size(); ++b)
                           if ((sub >> b) & 1)
                             v |= 1LL << free_pos[b];
-                        covered.push_back(v);
+                        if (!track)
+                          continue;
+                        if (!covered[static_cast<size_t>(v)])
+                          {
+                            covered[static_cast<size_t>(v)] = true;
+                            ++ncovered;
+                          }
+                      }
+                    // Every valuation is covered: the complement is
+                    // empty and the factored form already says so.
+                    if (ncovered == static_cast<long long>(space))
+                      {
+                        overflowed = true;
+                        break;
                       }
                   }
-              std::sort(covered.begin(), covered.end());
-              covered.erase(std::unique(covered.begin(), covered.end()),
-                            covered.end());
-              const long long ncovered =
-                static_cast<long long>(covered.size());
-              const long long nmissing = (1LL << w) - ncovered;
+              const long long nmissing =
+                static_cast<long long>(space) - ncovered;
               // Take the complement only when it is both smaller than
               // the factored form and small enough to fit in a
               // formula; otherwise keep the factored form.
-              if (nmissing > max_formula_children
+              if (overflowed || covered.empty()
+                  || nmissing > max_formula_children
                   || nmissing >= ncovered)
                 {
                   parts.push_back(factored);
@@ -2340,14 +2515,11 @@ namespace spot
                 }
               std::vector<formula> disjoint;
               disjoint.reserve(static_cast<size_t>(nmissing));
-              size_t next = 0;
-              for (long long v = 0, end = 1LL << w; v < end; ++v)
+              for (long long v = 0; v < static_cast<long long>(space);
+                   ++v)
                 {
-                  if (next < covered.size() && covered[next] == v)
-                    {
-                      ++next;
-                      continue;
-                    }
+                  if (covered[static_cast<size_t>(v)])
+                    continue;
                   // Or_i (bit i of the bus differs from bit i of v)
                   std::vector<formula> differs;
                   differs.reserve(static_cast<size_t>(w));
@@ -2361,7 +2533,7 @@ namespace spot
             }
           if (parts.empty())
             return formula::tt();
-          while (parts.size() > max_formula_children)
+          while (parts.size() > static_cast<size_t>(max_formula_children))
             {
               // A pathological number of typed buses: fold the
               // collected constraints pairwise, so that no single

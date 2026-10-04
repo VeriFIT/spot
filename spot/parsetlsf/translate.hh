@@ -27,6 +27,8 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace spot
@@ -176,6 +178,11 @@ namespace spot
       // so a fold that overflows or hits an unevaluable operand does
       // not keep enumerating.
       //
+      // A binder whose iteration count exceeds max_formula_children is
+      // refused with a diagnostic before any body is translated: the
+      // fold it feeds cannot be represented, and the fnode layer would
+      // throw halfway through building it.
+      //
       // The walk restores each loop variable's previous binding as it
       // unwinds, so a nested run cannot leak a binding outwards.
       // Returns false once a diagnostic has been emitted or \a emit
@@ -324,6 +331,24 @@ namespace spot
       std::set<std::string> seen_inputs_;
       std::set<std::string> seen_outputs_;
 
+      // Name -> declaration indexes, built once from \c ast_ by the
+      // constructor.  Every name lookup during translation (AP
+      // resolution, definition expansion, enum width) is a hash
+      // probe instead of a linear walk over the corresponding
+      // vector, which matters because a single expression can name
+      // the same symbol many times and specs routinely declare
+      // hundreds of definitions.
+      //
+      // TLSF's "one symbol = one definition" rule (enforced by the
+      // parser's duplicate diagnostics) makes these maps
+      // unambiguous.  \c decls_ lists inputs before outputs so a
+      // lookup resolves in the same order the former two-loop
+      // find_decl used.
+      std::unordered_map<std::string, const tlsf_ap_decl*> decls_;
+      std::unordered_set<std::string> output_bases_;
+      std::unordered_map<std::string, const tlsf_definition*> defs_;
+      std::unordered_map<std::string, const tlsf_enum_decl*> enums_;
+
       // Names currently being flattened by expand_ast.  expand_ast
       // is a purely structural pass (used on call actuals and on
       // single-clause unguarded bodies); a def whose body calls
@@ -385,14 +410,60 @@ namespace spot
       // clause.
       std::string expansion_root_name_;
 
-      // Return a deep clone of \a body with every free Identifier
-      // matching \a arg_name replaced by \a replacement.  Identifiers
-      // in \a shadowed are left untouched.  Used for argument
-      // substitution during definition expansion.
-      tlsf_expr_ptr subst_arg(const tlsf_expr_ptr& body,
-                              const std::string& arg_name,
-                              const tlsf_expr_ptr& replacement,
-                              const std::set<std::string>& shadowed);
+      // One formal->actual binding of the definition being expanded.
+      //
+      // `kind::splice` replaces every free occurrence of `name` by
+      // `expr` verbatim: `expr` is never itself substituted, so a
+      // caller that pre-expanded its actuals cannot cause them to be
+      // expanded a second time.
+      //
+      // `kind::shadow` binds `name` lexically, so a quantifier
+      // inside the body that re-binds `name` hides the binding
+      // instead of capturing it, and the spliced `expr` is itself
+      // substituted by the definitions outside that scope.
+      struct subst_binding
+      {
+        enum class kind
+        {
+          splice,
+          shadow
+        };
+        kind k;
+        std::string name;
+        tlsf_expr_ptr expr;
+      };
+
+      // Index of the innermost binding of \a name in the
+      // outermost-first scope chain \a scopes, or \a scopes.size()
+      // when unbound.
+      static size_t lookup_scope(
+        const std::vector<subst_binding>& scopes,
+        const std::string& name);
+
+      // Walk \a body with \a scopes as the live lexical scope chain
+      // (see lookup_scope in translate.cc).
+      tlsf_expr_ptr subst_scoped(const tlsf_expr_ptr& body,
+                                 const std::vector<subst_binding>& env,
+                                 const std::vector<subst_binding>& scopes);
+
+      // Single-pass substitution over \a body, applying every
+      // binding in \a env at once.  \a env is ordered
+      // outermost-first and holds the formal->actual bindings of the
+      // definition currently being expanded; each entry also records
+      // whether its actual was already expanded (so a shadowing
+      // outer binding must not splice in an unexpanded tree).  See
+      // subst_binding and subst_scoped in translate.cc.
+      tlsf_expr_ptr subst_expr(const tlsf_expr_ptr& body,
+                               const std::vector<subst_binding>& env);
+
+      // \brief Substitute a whole definition clause set.
+      //
+      // Convenience wrapper building the environment for \a def's
+      // formals from \a actuals and delegating to subst_expr.
+      tlsf_expr_ptr subst_clause(const tlsf_expr_ptr& clause,
+                                 const tlsf_definition& def,
+                                 const std::vector<tlsf_expr_ptr>& actuals,
+                                 bool actuals_expanded);
 
       // Recursively flatten user-defined-def App calls in \a
       // expr.  For each App(call) where `call` is a known

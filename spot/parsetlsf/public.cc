@@ -1174,7 +1174,29 @@ namespace spot
     for (const auto& kv : tlsf.overrides)
       if (!effective.overrides.count(kv.first))
         effective.overrides[kv.first] = kv.second;
-    tlsf::translator tr(*tlsf.ast, effective, errors_out);
-    return tr.run();
+    // Composing the output formula can trip an assertion-free limit
+    // deep inside spot's formula layer: fnode::nary refuses more
+    // children than the configured maximum and throws
+    // std::runtime_error (see spot/tl/formula.cc).  A specification
+    // pathological enough to hit that must not take a whole tool
+    // down, so turn the exception into a diagnostic.  With
+    // raise_errors the caller still gets the exception, re-thrown
+    // below so its usual contract is unchanged.
+    try
+      {
+        tlsf::translator tr(*tlsf.ast, effective, errors_out);
+        return tr.run();
+      }
+    catch (const std::runtime_error& e)
+      {
+        if (errors_out)
+          errors_out->emplace_back(location(),
+                                   std::string("tlsf_to_ltl: ")
+                                   + e.what());
+        if (effective.raise_errors)
+          throw;
+        tlsf_translation_result partial;
+        return partial;
+      }
   }
 }
