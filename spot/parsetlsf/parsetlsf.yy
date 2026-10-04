@@ -241,6 +241,46 @@
       res.errors.emplace_back(loc, "malformed binder list");
       return body;
     }
+
+    // Reject anything TLSF v1.2 SS4.6 does not give a pattern: a shape
+    // the connective set of tlsf_pattern_op_is_legal (ast.hh) does not
+    // cover -- an integer literal, an arithmetic or comparison
+    // subexpression, a bus reference, a set literal, an App, or a
+    // nested `~` -- and a metavariable the pattern binds twice.
+    //
+    // This runs at parse time, on every `~`, so a bad pattern is
+    // reported even in a definition that is never called, exactly as a
+    // malformed binder is.  It is deliberately the only place a pattern
+    // is checked: translator::match_pattern dispatches on the same
+    // tlsf_pattern_op_is_legal, so a pattern this accepts is one the
+    // matcher knows how to compare.
+    void check_pattern(spot::tlsf_result& res,
+                       const spot::tlsf_expr_ptr& pat)
+    {
+      if (!pat)
+        return;
+      if (const spot::tlsf_expr* bad =
+          ::spot::tlsf_pattern_invalid(*pat))
+        {
+          res.errors.emplace_back(
+            bad->loc,
+            "invalid pattern: " + ::spot::tlsf_pattern_invalid_reason(*bad));
+          return;
+        }
+      // SS4.6 binds each metavariable once, so a name that appears
+      // twice would match only the subexpressions of one shape and
+      // leave the other occurrences unrelated.  Report the second
+      // occurrence; tlsf_pattern_vars preserves source order and does
+      // not filter duplicates.
+      std::vector<const spot::tlsf_expr*> vars;
+      ::spot::tlsf_pattern_vars(*pat, vars);
+      std::unordered_set<std::string> seen;
+      for (const spot::tlsf_expr* v : vars)
+        if (!seen.insert(v->name).second)
+          res.errors.emplace_back(
+            v->loc,
+            "pattern variable '" + v->name + "' is bound more than once");
+    }
   }
 }
 
@@ -279,6 +319,14 @@
 %token COMMA ","
 // `:` separator inside `Tag:bits` enum entries.
 %token COLON ":"
+// `~`, the pattern-match operator of TLSF v1.2 SS4.6: the second form a
+// clause guard may take, alongside `:`.
+%token TILDE "~"
+// `_`, the pattern wildcard of TLSF v1.2 SS4.6.  The scanner returns it
+// only in expression position (see the `_` rule in scantlsf.ll), and the
+// grammar turns it into the identifier "_", which is how a wildcard is
+// stored in the AST.
+%token WILDCARD "_"
 
 %token TITLE "TITLE:"
 %token DESCRIPTION "DESCRIPTION:"
@@ -412,7 +460,15 @@
 // looser than R (row 17): in `eB : e` every operator of `eB` and `e`
 // binds first.  It is left-associative like every row of the table
 // that has no explicit direction.
+//
+// The pattern-match operator `~` (Table 1 row 18) sits one tier tighter
+// than `:`, and looser than R: in `eB ~ phi'` every operator of `eB`
+// and every operator of the pattern binds before the `~`.  Only the
+// left-associativity of the tier is observed -- a pattern cannot itself
+// contain a `~`, which check_pattern reports -- but declaring the tier is
+// what lets `eB` be a general expression without parentheses.
 %left COLON
+%left TILDE
 %left LTL_R
 %right LTL_U
 %right LTL_W
@@ -1076,6 +1132,20 @@ expr: NUMBER
       {
         $$ = ::spot::tlsf_make_ident(@1, "false");
       }
+    // The pattern wildcard.  Storing it as the ordinary identifier
+    // "_" keeps the AST free of a new tlsf_expr_type, which every
+    // exhaustive switch over that enum would otherwise have to learn
+    // about; the pattern predicates in ast.hh recognize it by name.
+    //
+    // Outside a pattern, `_` is just a name: it is a metavariable only
+    // on the right of a `~`, so elsewhere it refers to a signal or
+    // parameter spelled `_` if one is declared, and to an atomic
+    // proposition of that name otherwise -- exactly as any other
+    // undeclared identifier is treated.
+    | WILDCARD
+      {
+        $$ = ::spot::tlsf_make_ident(@1, ::spot::tlsf_pattern_wildcard);
+      }
     | IDENTIFIER
       {
         $$ = ::spot::tlsf_make_ident(@1, std::move($1));
@@ -1264,6 +1334,24 @@ expr: NUMBER
     | expr COLON expr %prec COLON
       {
         $$ = ::spot::tlsf_make_binop(::spot::tlsf_op::Guard, @2, $1, $3);
+      }
+    // Pattern-matching clause `eB ~ phi'` of a definition body
+    // (TLSF v1.2 SS4.6).  The operator is declared one tier tighter
+    // than COLON (see the precedence block), so the subject and the
+    // pattern both keep their natural grouping.
+    //
+    // The right-hand side is parsed as a general expression and then
+    // validated by check_pattern, exactly as a binder list is checked
+    // by check_binders: the parser has no notion of a pattern
+    // nonterminal, which keeps the `~` production free of the
+    // shift/reduce conflicts such a nonterminal would cost.  A `~`
+    // nested inside a pattern is therefore reported by check_pattern
+    // rather than by the grammar.
+    | expr TILDE expr %prec TILDE
+      {
+        check_pattern(res, $3);
+        $$ = ::spot::tlsf_make_binop(::spot::tlsf_op::PatternMatch, @2,
+                                     $1, $3);
       }
     // The six quantifier heads below all accept a comma-separated binder
     // list, which is shorthand for nested single-binder quantifiers: see

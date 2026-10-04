@@ -348,6 +348,13 @@ namespace spot
       std::unordered_set<std::string> output_bases_;
       std::unordered_map<std::string, const tlsf_definition*> defs_;
       std::unordered_map<std::string, const tlsf_enum_decl*> enums_;
+      // Every tag of every enum, built alongside enums_.  A pattern
+      // metavariable may not be spelled like a tag: syfco would bind
+      // it silently, but the substitution would then rewrite the
+      // tag into the bound subexpression everywhere the clause value
+      // used it, which is a scoping error rather than a match.  Kept
+      // as a set because only membership is ever asked of it.
+      std::unordered_set<std::string> enum_tags_;
 
       // Names currently being flattened by expand_ast.  expand_ast
       // is a purely structural pass (used on call actuals and on
@@ -432,6 +439,35 @@ namespace spot
         std::string name;
         tlsf_expr_ptr expr;
       };
+
+      // \brief Match \a pat against \a subject, binding metavariables.
+      //
+      // Returns true when the pattern matches; on success \a bindings
+      // holds one splice binding per metavariable, ready to be handed
+      // to subst_expr so that the clause value sees each metavariable
+      // as the subexpression it matched.  A wildcard binds nothing, and
+      // the Boolean literals match only themselves.
+      //
+      // \a pat must already have been accepted by check_pattern_vars,
+      // which rejects a metavariable that is not fresh; this function
+      // assumes every identifier of \a pat is bindable.  A pattern that
+      // fails to match is not an error: the clause is simply false and
+      // the scan moves on to the next one.
+      bool match_pattern(const tlsf_expr& subject,
+                         const tlsf_expr& pat,
+                         std::vector<subst_binding>& bindings);
+
+      // \brief Reject a pattern whose metavariables are not fresh.
+      //
+      // TLSF v1.2 SS4.6 introduces the metavariables of a pattern in
+      // the pattern itself, so a name already spoken for in the clause
+      // -- a formal of \a def, a declared parameter, a definition name,
+      // an input or output, an enum name or tag, or a loop variable
+      // bound by an enclosing quantifier -- cannot be bound by it.  Such
+      // a name is reported via diag(); the pattern is rejected.  Returns
+      // true when \a pat may be used.
+      bool check_pattern_vars(const tlsf_expr& pat,
+                              const tlsf_definition& def);
 
       // Index of the innermost binding of \a name in the
       // outermost-first scope chain \a scopes, or \a scopes.size()

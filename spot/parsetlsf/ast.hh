@@ -106,6 +106,15 @@ namespace spot
     // selected and its body expanded.
     Guard,
 
+    // Pattern match `subject ~ pattern`, the second form a clause
+    // guard may take (Table 1 row 18, one tier tighter than `:`).
+    // `children[0]` is the LTL expression the pattern is matched
+    // against and `children[1]` the pattern itself, whose
+    // identifiers are metavariables bound to the subexpressions
+    // they match (see tlsf_pattern_vars below and
+    // translator::match_pattern).
+    PatternMatch,
+
     // LTL binary
     U,
     R,
@@ -232,6 +241,8 @@ namespace spot
         return "!";
       case tlsf_op::Guard:
         return ":";
+      case tlsf_op::PatternMatch:
+        return "~";
       case tlsf_op::G:
         return "G";
       case tlsf_op::XStack:
@@ -518,6 +529,248 @@ namespace spot
         && is_identifier(bound.children[0]))
       return &bound.children[0]->name;
     return nullptr;
+  }
+
+  /// \brief The name the pattern wildcard `_` is stored under.
+  ///
+  /// The scanner returns `_` as a token of its own (it is a reserved
+  /// word, as it is in syfco), and the grammar builds it as an ordinary
+  /// Identifier, so a wildcard costs no new \c tlsf_expr_type and needs
+  /// no new arm in the many exhaustive switches over \c
+  /// tlsf_expr_type.  Every predicate that walks a pattern therefore has
+  /// to recognise this one name, which is why it is named here rather
+  /// than spelled out at each of them.
+  inline constexpr const char* tlsf_pattern_wildcard = "_";
+
+  /// \brief True iff \a e is the `_` wildcard.
+  inline bool tlsf_is_wildcard(const tlsf_expr& e)
+  {
+    return e.type == tlsf_expr_type::Identifier
+      && e.name == tlsf_pattern_wildcard;
+  }
+
+  /// \brief True iff \a e is one of the two Boolean literals.
+  ///
+  /// `true` and `false` are Identifiers in the AST (see the `BOOL_TRUE`
+  /// and `BOOL_FALSE` productions of spot/parsetlsf/parsetlsf.yy), so a
+  /// pattern that names one of them is a leaf rather than a
+  /// metavariable.
+  inline bool tlsf_is_bool_literal(const tlsf_expr& e)
+  {
+    return e.type == tlsf_expr_type::Identifier
+      && (e.name == "true" || e.name == "false");
+  }
+
+  /// \brief The children of \a e that a pattern may descend into.
+  ///
+  /// Every node of a legal pattern except a Quantifier contributes
+  /// all of its children.  A Quantifier is different: its trailing
+  /// child is the formula the operator scopes over, and that is the
+  /// only part that is a pattern.  The leading children are bounds
+  /// (`X[n]`'s stack length, `F[lo:hi]`'s two bounds, a binder run's)
+  /// and they are integer expressions (or a binder), not LTL, so
+  /// SS4.6 gives them no pattern reading and they are compared as
+  /// numbers by the matcher instead.
+  ///
+  /// syfco's getPatternIds (Abstraction.hs:441-473) makes exactly this
+  /// cut: it recurses into the body of `LtlRGlobally _ x` and into
+  /// both operands of `LtlUntil x y`, and never into a bound.
+  inline void
+  tlsf_pattern_children(const tlsf_expr& e,
+                        std::vector<const tlsf_expr*>& out)
+  {
+    if (e.type != tlsf_expr_type::Quantifier)
+      {
+        for (const auto& ch : e.children)
+          if (ch)
+            out.push_back(ch.get());
+        return;
+      }
+    if (!e.children.empty() && e.children.back())
+      out.push_back(e.children.back().get());
+  }
+
+  /// \brief True iff \a e is a metavariable of a pattern.
+  ///
+  /// TLSF v1.2 SS4.6: "every identifier expression that appears in
+  /// \c phi' is bound to the equivalent sub-expression in \c phi".  So
+  /// every identifier of a pattern is a metavariable, and only the two
+  /// exceptions are leaves: the wildcard and the Boolean literals.
+  inline bool tlsf_is_pattern_var(const tlsf_expr& e)
+  {
+    return e.type == tlsf_expr_type::Identifier
+      && e.name != tlsf_pattern_wildcard && e.name != "true"
+      && e.name != "false";
+  }
+
+  /// \brief True iff the operator of \a e may head a pattern.
+  ///
+  /// This is the single authority on which connectives a pattern may
+  /// use: the parser validates a pattern with \ref tlsf_pattern_valid
+  /// (which calls this), and translator::match_pattern dispatches on
+  /// exactly these tags.  Keeping the list here is what keeps the two
+  /// from drifting apart -- a connective this admits is one the
+  /// matcher can compare, and one it rejects never reaches it.
+  ///
+  /// The admitted set mirrors syfco's `getPatternIds`
+  /// (refs/syfco/src/lib/Reader/Abstraction.hs:441-473), which walks
+  /// the same Boolean and temporal constructors and reports anything
+  /// else through `errPattern`: the Boolean connectives, the unary and
+  /// binary temporal operators, the bounded and stacked spellings of
+  /// the latter, and the quantifier run a big operator desugars into.
+  /// Integer arithmetic, comparisons, membership, set expressions and
+  /// bus references are excluded, as they are in syfco.
+  inline bool tlsf_pattern_op_is_legal(tlsf_op op, tlsf_expr_type type)
+  {
+    switch (type)
+      {
+      case tlsf_expr_type::UnaryOp:
+        switch (op)
+          {
+          case tlsf_op::Not:
+          case tlsf_op::X:
+          case tlsf_op::StrongNext:
+          case tlsf_op::G:
+          case tlsf_op::F:
+            return true;
+          default:
+            return false;
+          }
+      case tlsf_expr_type::BinaryOp:
+        switch (op)
+          {
+          case tlsf_op::And:
+          case tlsf_op::Or:
+          case tlsf_op::Implies:
+          case tlsf_op::Equiv:
+          case tlsf_op::U:
+          case tlsf_op::W:
+          case tlsf_op::R:
+            return true;
+          default:
+            return false;
+          }
+      case tlsf_expr_type::Quantifier:
+        // A quantifier node carries either a binder run -- which is
+        // what `&&[b] e`, `||[b] e` and the four big-operator heads
+        // desugar into, and which the AST no longer distinguishes from
+        // a plain `And`/`Or` node -- or one of the bounded and stacked
+        // temporal spellings of SS4.8.
+        switch (op)
+          {
+          case tlsf_op::And:
+          case tlsf_op::Or:
+          case tlsf_op::XStack:
+          case tlsf_op::StrongXStack:
+          case tlsf_op::FBounded:
+          case tlsf_op::GBounded:
+          case tlsf_op::StrongFBounded:
+          case tlsf_op::StrongGBounded:
+            return true;
+          default:
+            return false;
+          }
+      default:
+        return false;
+      }
+  }
+
+  /// \brief The first subexpression of \a pat that may not appear in a
+  /// pattern, or null if \a pat is well-formed.
+  ///
+  /// Returning the offending node rather than a bool is what lets a
+  /// caller point the diagnostic at it and name what it is: a pattern
+  /// can be wrong deep inside, and the interesting part of the message
+  /// is which construct was rejected.
+  inline const tlsf_expr* tlsf_pattern_invalid(const tlsf_expr& pat)
+  {
+    if (tlsf_is_wildcard(pat) || tlsf_is_bool_literal(pat)
+        || tlsf_is_pattern_var(pat))
+      return nullptr;
+    if (!tlsf_pattern_op_is_legal(pat.op, pat.type))
+      return &pat;
+    std::vector<const tlsf_expr*> children;
+    tlsf_pattern_children(pat, children);
+    for (const tlsf_expr* ch : children)
+      if (const tlsf_expr* bad = tlsf_pattern_invalid(*ch))
+        return bad;
+    return nullptr;
+  }
+
+  /// \brief True iff \a pat is a well-formed pattern.
+  ///
+  /// A pattern is built by the grammar from a general expression, so
+  /// this is what rejects the shapes SS4.6 does not give one -- an
+  /// integer literal, an arithmetic or comparison subexpression, a bus
+  /// reference, a set literal, a nested pattern -- as well as a
+  /// connective \ref tlsf_pattern_op_is_legal excludes.  The parser
+  /// calls it on the right-hand side of every `~` (see check_pattern in
+  /// spot/parsetlsf/parsetlsf.yy), so a bad pattern is reported even
+  /// in a definition that is never called, exactly as a malformed
+  /// binder is.
+  inline bool tlsf_pattern_valid(const tlsf_expr& pat)
+  {
+    return tlsf_pattern_invalid(pat) == nullptr;
+  }
+
+  /// \brief Explain, in a fragment of a sentence, why \a e is not
+  /// allowed in a pattern.
+  ///
+  /// \a e is expected to be a node \ref tlsf_pattern_invalid returned;
+  /// the caller prefixes and suffixes it.
+  inline std::string tlsf_pattern_invalid_reason(const tlsf_expr& e)
+  {
+    switch (e.type)
+      {
+      case tlsf_expr_type::LiteralInt:
+        return "an integer literal cannot appear in a pattern";
+      case tlsf_expr_type::BinaryOp:
+        if (e.op == tlsf_op::PatternMatch)
+          return "a pattern cannot itself contain `~`";
+        return "`" + tlsf_format_op(e.op)
+          + "' cannot appear in a pattern";
+      case tlsf_expr_type::UnaryOp:
+        return "`" + tlsf_format_op(e.op)
+          + "' cannot appear in a pattern";
+      case tlsf_expr_type::Quantifier:
+        return "the `" + tlsf_format_op(e.op)
+          + "' quantifier cannot appear in a pattern";
+      case tlsf_expr_type::App:
+        return "a function call cannot appear in a pattern";
+      case tlsf_expr_type::BusRef:
+        return "a bus reference cannot appear in a pattern";
+      case tlsf_expr_type::SetExplicit:
+      case tlsf_expr_type::SetRange:
+        return "a set literal cannot appear in a pattern";
+      default:
+        return "this expression cannot appear in a pattern";
+      }
+  }
+
+  /// \brief Collect the metavariables of \a pat, outermost first.
+  ///
+  /// \a out receives the Identifier nodes of \a pat that \ref
+  /// tlsf_is_pattern_var admits, in source order, so a caller can
+  /// report the name and the location of every binding a pattern
+  /// introduces.  Duplicates are NOT filtered: binding the same name
+  /// twice is a diagnostic the caller reports, not something this
+  /// silently drops.
+  inline void tlsf_pattern_vars(const tlsf_expr& pat,
+                                std::vector<const tlsf_expr*>& out)
+  {
+    if (tlsf_is_pattern_var(pat))
+      {
+        out.push_back(&pat);
+        return;
+      }
+    if (tlsf_is_wildcard(pat) || tlsf_is_bool_literal(pat))
+      return;
+    if (!tlsf_pattern_op_is_legal(pat.op, pat.type))
+      return;
+    std::vector<const tlsf_expr*> children;
+    tlsf_pattern_children(pat, children);
+    for (const tlsf_expr* ch : children)
+      tlsf_pattern_vars(*ch, out);
   }
 
   /// \brief Nest \a binders into quantifiers around \a body at \a loc.

@@ -480,6 +480,7 @@ TESTS_python = \
   python/otfcrash.py \
   python/parsetgba.py \
   python/parsetlsf.py \
+  python/parsetlsf_pattern.py \
   python/_partitioned_relabel.ipynb \
   python/parity.py \
   python/pdegen.py \

@@ -66,82 +66,87 @@ namespace spot
         return 0;
       case tlsf_op::Guard:
         return 0;
-      case tlsf_op::R:
+      // `~` sits one tier tighter than `:`, which is what makes an
+      // `eB ~ phi' : e` clause print without parentheses around the
+      // match: the match binds tighter than the guard that owns it.
+      case tlsf_op::PatternMatch:
         return 1;
-      case tlsf_op::U:
+      case tlsf_op::R:
         return 2;
-      case tlsf_op::W:
+      case tlsf_op::U:
         return 3;
+      case tlsf_op::W:
+        return 4;
       case tlsf_op::Implies:
-        return 4;
-      case tlsf_op::Equiv:
-        return 4;
-      case tlsf_op::Or:
         return 5;
-      case tlsf_op::And:
+      case tlsf_op::Equiv:
+        return 5;
+      case tlsf_op::Or:
         return 6;
+      case tlsf_op::And:
+        return 7;
       case tlsf_op::Not:
-        return 7;
+        return 8;
       case tlsf_op::F:
-        return 7;
+        return 8;
       case tlsf_op::G:
-        return 7;
+        return 8;
       case tlsf_op::X:
-        return 7;
+        return 8;
       case tlsf_op::StrongNext:
-        return 7;
+        return 8;
       case tlsf_op::XStack:
       case tlsf_op::StrongXStack:
-        return 7;
+        return 8;
       case tlsf_op::FBounded:
       case tlsf_op::GBounded:
       case tlsf_op::StrongFBounded:
       case tlsf_op::StrongGBounded:
-        return 7;
-      case tlsf_op::In:
         return 8;
+      case tlsf_op::In:
+        return 9;
       case tlsf_op::Eq:
-        return 9;
+        return 10;
       case tlsf_op::Neq:
-        return 9;
+        return 10;
       case tlsf_op::Lt:
-        return 9;
+        return 10;
       case tlsf_op::Le:
-        return 9;
+        return 10;
       case tlsf_op::Gt:
-        return 9;
+        return 10;
       case tlsf_op::Ge:
-        return 9;
+        return 10;
       case tlsf_op::SetUnion:
-        return 11;
-      case tlsf_op::SetIntersection:
         return 12;
-      case tlsf_op::SetDifference:
+      case tlsf_op::SetIntersection:
         return 13;
+      case tlsf_op::SetDifference:
+        return 14;
       case tlsf_op::Add:
-        return 14;
+        return 15;
       case tlsf_op::Sub:
-        return 14;
+        return 15;
       case tlsf_op::Div:
-        return 15;
-      case tlsf_op::Mod:
-        return 15;
-      case tlsf_op::Mul:
         return 16;
+      case tlsf_op::Mod:
+        return 16;
+      case tlsf_op::Mul:
+        return 17;
       // The remaining tags name unary operators, which
       // expr_precedence() answers for directly without consulting
       // op_precedence(); list them so the switch stays exhaustive.
       case tlsf_op::BigSum:
       case tlsf_op::BigProd:
-        return 17;
+        return 18;
       case tlsf_op::BigUnion:
       case tlsf_op::BigInter:
       case tlsf_op::BigDiff:
-        return 10;
+        return 11;
       case tlsf_op::SetSize:
       case tlsf_op::SetMin:
       case tlsf_op::SetMax:
-        return 7;
+        return 8;
       }
     return 0;
   }
@@ -176,7 +181,7 @@ namespace spot
         }
     if (e.type == tlsf_expr_type::Quantifier
         || e.type == tlsf_expr_type::UnaryOp)
-      return 7;
+      return 8;
     if (e.type == tlsf_expr_type::BinaryOp)
       return op_precedence(e.op);
     return 100;

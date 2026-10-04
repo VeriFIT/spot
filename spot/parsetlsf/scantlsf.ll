@@ -453,6 +453,11 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
 "||"                  RET(token::OR);
 "->"                  RET(token::IMPLIES);
 "<->"                 RET(token::EQUIV);
+  /* `~` is the pattern-match operator (TLSF v1.2 SS4.6).  It is lexed
+   * here like any other binary operator, with no trailing context: a
+   * `~` is always the operator, and whether what follows it is a legal
+   * pattern is decided by the grammar (see check_pattern). */
+"~"                   RET(token::TILDE);
 "=="                  RET(token::EQ);
 "!="                  RET(token::NEQ);
 "<="                  RET(token::LE);
@@ -544,6 +549,24 @@ TLSF_ENUM_SEP  ([ \t\f\r\n]|"//"[^\n]*|"/*"([^*]|\*+[^*/])*\*+"/")*
                             yylval->emplace<std::string>(s);
                             RET_EXPR(token::STRING);
                           }
+
+  /* `_` is the pattern wildcard (TLSF v1.2 SS4.6).  It is a reserved
+     * word here, as it is in syfco, so the rule has to precede the
+     * identifier rule below: flex breaks a tie between two rules of
+     * equal length in favour of the earlier one, and `_` matches both of
+     * length one.  A name that merely STARTS with an underscore is not
+     * affected -- the identifier class matches it in more characters, and
+     * flex prefers the longer match -- so `x_1` and `_foo` are still
+     * identifiers.
+     *
+     * The rule is deliberately absent from every start condition that
+     * reads a NAME (declhead, declhead2, arglist, signalhead,
+     * signalafter, enumname, enumdecl, taglist), each of which spells out
+     * its own identifier class: there `_` is still a name, so a
+     * parameter, formal argument, signal or enum tag spelled `_` keeps
+     * working.  Only the expression position, where this rule is live,
+     * reserves the word. */
+"_"                   RET_EXPR(token::WILDCARD);
 
 [a-zA-Z_@][a-zA-Z0-9_@']* {
                         yylval->emplace<std::string>(yytext, yyleng);

@@ -2808,6 +2808,348 @@ EOF
 fold -w 70 defn.err | sed 's/ *$//' > defn.err.fold
 diff -u defn.err.exp defn.err.fold
 
+# Pattern matching (TLSF v1.2 SS4.6): a clause guard `eP = phi ~ phi'`
+# holds when the two expressions are structurally equivalent, and every
+# identifier of the pattern binds to the subexpression it matched,
+# visible only in the value on the right of the `:`.  The `_` wildcard
+# matches anything and stays unbound.
+#
+# Each arm gets a pair of its OWN output signals -- one for the match,
+# one for the fallthrough -- and the guarantee mentions all of them.
+# Were the results shared signals instead, the whole conjunction would
+# simplify to a couple of terms and a regression in any single arm
+# would go unnoticed.  The bound forms come in pairs too: `pbd`/`pbdno`
+# are the same pattern against a matching and a non-matching subject,
+# so the bound comparison is pinned in both directions.
+cat >pattern.tlsf <<'EOF'
+INFO {
+  TITLE: "pattern matching"
+  DESCRIPTION: "one clause per connective"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  PARAMETERS { n = 2; }
+  DEFINITIONS {
+    pwild(x) = x ~ _ : ow otherwise : ow2;
+    ptrue(x) = x ~ true : ot otherwise : ot2;
+    pfalse(x) = x ~ false : of otherwise : of2;
+    pnot(x) = x ~ !p : on otherwise : on2;
+    pnext(x) = x ~ X p : ox otherwise : ox2;
+    psnext(x) = x ~ X[!] p : os otherwise : os2;
+    pfin(x) = x ~ F p : ofi otherwise : ofi2;
+    pglob(x) = x ~ G p : og otherwise : og2;
+    puntil(x) = x ~ (p U q) : ou otherwise : ou2;
+    pweak(x) = x ~ (p W q) : ow2 otherwise : ow3;
+    prel(x) = x ~ (p R q) : or otherwise : or2;
+    pimpl(x) = x ~ (p -> q) : oi otherwise : oi2;
+    pequiv(x) = x ~ (p <-> q) : oe otherwise : oe2;
+    pport(x) = x ~ (p || q) : oo otherwise : oo2;
+    pand(x) = x ~ (p && q) : oa otherwise : oa2;
+    ptwo(x) = x ~ G (p && X q) : ot2 otherwise : ot3;
+    pnested(x) = x ~ G (p || F q) : on2 otherwise : on3;
+    pbnd(x) = x ~ F[1:2] p : ob otherwise : ob2;
+    pbndno(x) = x ~ F[1:2] p : ob3 otherwise : ob4;
+    pbnd2(x) = x ~ G[!1:2] p : obr otherwise : obr2;
+    pbndparam(x) = x ~ F[n:2] p : obp otherwise : obp2;
+    pstack(x) = x ~ X[2] p : ost otherwise : ost2;
+    pstack2(x) = x ~ X[!2] p : oss otherwise : oss2;
+    pquant(x) = x ~ &&[0 <= i < 2] p : oq otherwise : oq2;
+  }
+}
+MAIN {
+  INPUTS { a; b; }
+  OUTPUTS {
+    ow; ow2; ow3;
+    ot; ot2; ot3;
+    of; of2;
+    on; on2; on3;
+    ox; ox2;
+    os; os2;
+    ofi; ofi2;
+    og; og2;
+    ou; ou2;
+    or; or2;
+    oi; oi2;
+    oe; oe2;
+    oo; oo2;
+    oa; oa2;
+    ob; ob2; ob3; ob4;
+    obr; obr2;
+    obp; obp2;
+    ost; ost2;
+    oss; oss2;
+    oq; oq2;
+    z;
+  }
+  GUARANTEE {
+    G(pwild(a)
+      && ptrue(true) && pfalse(false)
+      && pnot(!a) && pnext(X a) && psnext(X[!] a) && pfin(F a)
+      && pglob(G a) && puntil(a U b) && pweak(a W b) && prel(a R b)
+      && pimpl(a -> b) && pequiv(a <-> b) && pport(a || b)
+      && pand(a && b) && ptwo(G(a && X b)) && pnested(G(a || F b))
+      && pbnd(F[1:2] a) && pbndno(F[2:2] a) && pbnd2(G[!1:2] a)
+      && pbndparam(F[n:2] a) && pstack(X[2] a) && pstack2(X[!2] a)
+      && pquant(&&[0 <= i < 2] a));
+  }
+}
+EOF
+# The `ob`/`ob4` pair is the bound comparison pinned in both
+# directions: pbnd matches F[1:2] against F[1:2] and yields ob, while
+# pbndno tests the very same pattern against F[2:2] and must fall
+# through to ob4.  Every other arm yields its FIRST signal.
+cat >pattern.f.exp <<'EOF'
+G(oa & ob & ob4 & obp & obr & oe & of & ofi & og & oi & on & on2 & oo & oq & or
+& os & oss & ost & ot & ot2 & ou & ow & ow2 & ox)
+EOF
+fold -w 80 pattern.f.exp | sed 's/ *$//' > pattern.f.fold
+../parsetlsf pattern.tlsf | fold -w 80 | sed 's/ *$//' > pattern.f
+diff -u pattern.f.fold pattern.f
+# The output signals are exactly the ones the file declares: no
+# metavariable leaked out of a pattern and registered a signal of its
+# own name, which is the visible symptom of a binding not being applied.
+cat >pattern.s.exp <<'EOF'
+ow,ow2,ow3,ot,ot2,ot3,of,of2,on,on2,on3,ox,ox2,os,os2,ofi,ofi2,og,og2,ou,ou2,or,
+or2,oi,oi2,oe,oe2,oo,oo2,oa,oa2,ob,ob2,ob3,ob4,obr,obr2,obp,obp2,ost,ost2,oss,os
+s2,oq,oq2,z
+EOF
+fold -w 80 pattern.s.exp | sed 's/ *$//' > pattern.s.fold
+../parsetlsf --print-output-signals pattern.tlsf \
+  | tr '\n' ' ' | fold -w 80 | sed 's/ *$//' > pattern.s.fold.raw
+echo >> pattern.s.fold.raw
+mv pattern.s.fold.raw pattern.s
+diff -u pattern.s.fold pattern.s
+
+# The shape of SS4.6's own example: `f ~ (a U _) : a` yields phi1 when f
+# is an until formula, and the `otherwise` clause yields X f when it is
+# not.  The pattern's operand is spelled m and the signals u, v here:
+# spelled as the specification does, with the operand sharing its name
+# with a declared signal, the pattern would be rejected for binding a
+# name that is already taken (see pap in patbad.tlsf).
+cat >patmatch.tlsf <<'EOF'
+INFO {
+  TITLE: "pattern match"
+  DESCRIPTION: "until-shaped subject and otherwise fallthrough"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    fun(f) = f ~ (q U _) : q
+             otherwise : X f;
+  }
+}
+MAIN {
+  INPUTS { u; v; }
+  OUTPUTS { y; }
+  GUARANTEE { G(y <-> (fun(u U v) && fun(G u))); }
+}
+EOF
+cat >patmatch.f.exp <<'EOF'
+G(y <-> (u & XGu))
+EOF
+../parsetlsf patmatch.tlsf > patmatch.f
+diff -u patmatch.f.exp patmatch.f
+
+# A pattern that fails to match falls through to the next clause, and
+# the first matching clause wins when two would match.
+cat >patorder.tlsf <<'EOF'
+INFO {
+  TITLE: "clause order"
+  DESCRIPTION: "first match wins, otherwise is the fallthrough"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    first(x) = x ~ m : o1
+                x ~ m : o2
+                otherwise : o3;
+    fallthru(x) = x ~ G p : o4
+                 otherwise : o5;
+  }
+}
+MAIN {
+  INPUTS { a; b; c; }
+  OUTPUTS { z; o1; o2; o3; o4; o5; }
+  GUARANTEE { G(first(a) && fallthru(F a) && fallthru(G a)); }
+}
+EOF
+cat >patorder.f.exp <<'EOF'
+G(o1 & o4 & o5)
+EOF
+../parsetlsf patorder.tlsf > patorder.f
+diff -u patorder.f.exp patorder.f
+
+# The subject of a pattern is the substituted, expanded expression: a
+# plain macro is flattened away before the match, while the call to a
+# guarded definition survives as an App node and therefore does not
+# match a formula-shaped pattern.
+cat >patsubj.tlsf <<'EOF'
+INFO {
+  TITLE: "pattern subject"
+  DESCRIPTION: "macro flattening versus a guarded call"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    Mac(x) = G x;
+    Guarded(x) = (x == 0) : a
+                 x == 1 : b;
+    P(x) = x ~ G p : p otherwise : c;
+  }
+}
+MAIN {
+  INPUTS { a; b; c; }
+  OUTPUTS { z; }
+  GUARANTEE { G(P(Mac(a)) && P(Guarded(0))); }
+}
+EOF
+cat >patsubj.f.exp <<'EOF'
+G(a & c)
+EOF
+../parsetlsf patsubj.tlsf > patsubj.f
+diff -u patsubj.f.exp patsubj.f
+
+# A pattern is rejected at parse time when its SHAPE is wrong, even in a
+# definition that is never called: a metavariable bound twice, a nested
+# `~`, and every connective SS4.6 does not list -- arithmetic,
+# comparison, membership, a bare integer literal, and a set literal.
+cat >patshape.tlsf <<'EOF'
+INFO {
+  TITLE: "bad pattern shapes"
+  DESCRIPTION: "connectives SS4.6 does not list in a pattern"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    pdbl(x) = x ~ (p && p) : p;
+    pnested(x) = x ~ (a ~ p) : p;
+    pcmp(x) = x ~ (p < 2) : p;
+    parith(x) = x ~ (p + 1) : p;
+    pint(x) = x ~ 3 : p;
+    pset(x) = x ~ {0, 1} : p;
+    pcall(x) = x ~ (p == 0) : p;
+    pbus(x) = x ~ (p[0]) : p;
+  }
+}
+MAIN {
+  INPUTS { a; b[2]; }
+  OUTPUTS { w; }
+  GUARANTEE { G(w <-> a); }
+}
+EOF
+# A metavariable that is already bound is rejected at translate time
+# instead: its freshness depends on what the definition body knows, so
+# the parser cannot see it.  This is a divergence from syfco, which
+# binds such a name silently; see SPEC.md SS4.6.
+cat >patstale.tlsf <<'EOF'
+INFO {
+  TITLE: "stale metavariables"
+  DESCRIPTION: "a pattern cannot bind a name that is taken"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  PARAMETERS { n = 2; }
+  DEFINITIONS {
+    enum E = T0:0 T1:1;
+    pformal(x) = x ~ G x : x;
+    pparam(x) = x ~ G n : n;
+    pdef(x) = x ~ G pdef : pdef;
+    pap(x) = x ~ G a : a;
+    penum(x) = x ~ G E : E;
+    ptag(x) = x ~ G T0 : T0;
+  }
+}
+MAIN {
+  INPUTS { a; b; E z; }
+  OUTPUTS { w; }
+  GUARANTEE { G(w <-> (pformal(a) && pparam(a) && pdef(a)
+                      && pap(b) && penum(a) && ptag(a))); }
+}
+EOF
+( set +x
+  run 2 ../parsetlsf patshape.tlsf patstale.tlsf > /dev/null 2>patbad.err )
+cat >patbad.err.exp <<'EOF'
+patshape.tlsf:9.25: pattern variable 'p' is bound more than once
+patshape.tlsf:10.22: invalid pattern: a pattern cannot itself contain
+`~`
+patshape.tlsf:11.19: invalid pattern: `<' cannot appear in a pattern
+patshape.tlsf:12.21: invalid pattern: `+' cannot appear in a pattern
+patshape.tlsf:13.19: invalid pattern: an integer literal cannot appear
+ in a pattern
+patshape.tlsf:14.19: invalid pattern: a set literal cannot appear in a
+ pattern
+patshape.tlsf:15.20: invalid pattern: `==' cannot appear in a pattern
+patshape.tlsf:16.19: invalid pattern: a bus reference cannot appear in
+ a pattern
+patstale.tlsf:11.24: pattern variable 'x' is already bound as a formal
+ argument of the definition
+patstale.tlsf:12.23: pattern variable 'n' is already bound as a parame
+ter
+patstale.tlsf:13.21-24: pattern variable 'pdef' is already bound as a
+definition
+patstale.tlsf:14.20: pattern variable 'a' is already bound as an input
+ or output
+patstale.tlsf:15.22: pattern variable 'E' is already bound as an enum
+patstale.tlsf:16.21-22: pattern variable 'T0' is already bound as an e
+num tag
+conversion of patstale.tlsf failed
+2 of 2 files failed
+EOF
+fold -w 70 patbad.err | sed 's/ *$//' > patbad.err.fold
+diff -u patbad.err.exp patbad.err.fold
+
+# syfco cannot be used to cross-check ANY pattern: its type inference
+# has no case for the pattern constructor, so it never processes one
+# successfully.  Depending on the file it either reports a type error
+# ("expecting: pattern expression", or "Formulas are not allowed on
+# the right hand side of a pattern match") or dies with
+# `Prelude.undefined`.  Every file below is therefore pinned as
+# REJECTED by syfco.  Were a future syfco to start accepting patterns,
+# these checks would fail and the cross-checks would have to be
+# revisited -- which is the intent.
+if $test_syfco; then
+  ! syfco -c pattern.tlsf
+  ! syfco -c patmatch.tlsf
+  ! syfco -c patorder.tlsf
+  ! syfco -c patsubj.tlsf
+  ! syfco -c patshape.tlsf
+  ! syfco -c patstale.tlsf
+fi
+
+# The wildcard does not shadow a declared name: the scanner reserves
+# `_` only in expression position, so a signal spelled `_` is still that
+# signal when it is used, and a name that merely begins with an
+# underscore is an ordinary identifier.
+cat >patname.tlsf <<'EOF'
+INFO {
+  TITLE: "underscore as a name"
+  DESCRIPTION: "the wildcard does not shadow a declared _"
+  SEMANTICS: Mealy
+  TARGET: Mealy
+}
+GLOBAL {
+  DEFINITIONS {
+    Wid(x) = x ~ _ : a;
+  }
+}
+MAIN {
+  INPUTS { _; a; _foo; x_1; }
+  OUTPUTS { w; }
+  GUARANTEE { G(w <-> (Wid(G a) && _ && _foo && x_1)); }
+}
+EOF
+cat >patname.f.exp <<'EOF'
+G(w <-> (_ & _foo & a & x_1))
+EOF
+../parsetlsf patname.tlsf > patname.f
+diff -u patname.f.exp patname.f
+
 # A zero-argument definition used as a bus size evaluates in integer
 # position: ALL of MIN/MAX/SUM/PROD, the logical-not of a literal, a
 # membership, and the comparison operators are usable as sizes.
@@ -3081,6 +3423,7 @@ MAIN {
     &&[i IN {0..2000000}] a[i];
     G({0, 1});
     G({0..5});
+    G(a ~ b);
   }
 }
 EOF
@@ -3151,6 +3494,8 @@ ltlerr.tlsf:30.13: expected an integer set
 ltlerr.tlsf:31.13: integer set range is too large
 ltlerr.tlsf:32.5-6: set literal in LTL position
 ltlerr.tlsf:33.5-6: set range in LTL position
+ltlerr.tlsf:34.5-6: pattern match '~' is only meaningful inside a defi
+nition body
 conversion of ltlerr.tlsf failed
 3 of 3 files failed
 EOF

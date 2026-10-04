@@ -202,7 +202,11 @@ namespace spot
         defs_.emplace(d.name, &d);
       enums_.reserve(ast_.enumerations.size());
       for (const auto& e : ast_.enumerations)
-        enums_.emplace(e.name, &e);
+        {
+          enums_.emplace(e.name, &e);
+          for (const auto& v : e.entries)
+            enum_tags_.insert(v.tag);
+        }
     }
 
     translator::~translator() = default;
@@ -480,11 +484,15 @@ namespace spot
           if (def->args.size() != e->children.size())
             return e;
           // This pass only flattens plain macro definitions: a
-          // single, unguarded clause.  A guarded or multi-clause
-          // body (and a recursive definition) needs the
+          // single, unguarded clause.  A guarded, pattern-matching, or
+          // multi-clause body (and a recursive definition) needs the
           // guard-selecting evaluation of the translate_expr App
           // case, which may legitimately re-enter the same symbol;
-          // leave the call in place for it.  translate_expr is
+          // leave the call in place for it.  A bare `~` clause is
+          // listed here so that a pattern match missing its `: value`
+          // reaches select_def_clause, which can name the mistake,
+          // instead of being flattened into an LTL-position `~`.
+          // translate_expr is
           // called on every definition use, so guarded defs are
           // still expanded there even when they appear nested
           // inside an actual.
@@ -492,7 +500,8 @@ namespace spot
             return e;
           const tlsf_expr_ptr& only = def->body[0];
           if (only && only->type == tlsf_expr_type::BinaryOp
-              && only->op == tlsf_op::Guard)
+              && (only->op == tlsf_op::Guard
+                  || only->op == tlsf_op::PatternMatch))
             return e;
           // Cycle detection: a def whose body calls itself
           // (directly or transitively) trips the active_defs_
@@ -1290,6 +1299,175 @@ namespace spot
         }
     }
 
+    bool translator::check_pattern_vars(const tlsf_expr& pat,
+                                        const tlsf_definition& def)
+    {
+      std::vector<const tlsf_expr*> vars;
+      tlsf_pattern_vars(pat, vars);
+      bool ok = true;
+      for (const tlsf_expr* v : vars)
+        {
+          const std::string& name = v->name;
+          // The parser already rejected a name bound twice within one
+          // pattern, so each name here is reported at most once.
+          const char* clash = nullptr;
+          if (std::find(def.args.begin(), def.args.end(), name)
+              != def.args.end())
+            clash = "a formal argument of the definition";
+          else if (params_.count(name))
+            clash = "a parameter";
+          else if (defs_.count(name))
+            clash = "a definition";
+          else if (decls_.count(name))
+            clash = "an input or output";
+          else if (enums_.count(name))
+            clash = "an enum";
+          else if (enum_tags_.count(name))
+            clash = "an enum tag";
+          else if (loop_vars_.count(name))
+            clash = "a loop variable";
+          if (clash)
+            {
+              diag(*v, "pattern variable '" + name + "' is already "
+                       "bound as " + clash);
+              ok = false;
+            }
+        }
+      return ok;
+    }
+
+    bool translator::match_pattern(const tlsf_expr& subject,
+                                   const tlsf_expr& pat,
+                                   std::vector<subst_binding>& bindings)
+    {
+      // Compare the BOUNDS of two quantifier nodes of the same tag.
+      // `X[n]` carries one bound, `F[lo:hi]` two, and a binder run one
+      // that is deliberately NOT compared (see below).  One lambda
+      // keeps the arity check out of the dispatch below.
+      auto bounds_match = [this](const tlsf_expr& subject,
+                                 const tlsf_expr& pat)
+      {
+        switch (pat.op)
+          {
+          case tlsf_op::XStack:
+          case tlsf_op::StrongXStack:
+            if (subject.children.size() < 2 || pat.children.size() < 2)
+              return false;
+            break;
+          case tlsf_op::FBounded:
+          case tlsf_op::GBounded:
+          case tlsf_op::StrongFBounded:
+          case tlsf_op::StrongGBounded:
+            if (subject.children.size() < 3 || pat.children.size() < 3)
+              return false;
+            break;
+          default:
+            // A binder run: the leading child is a binder, not a bound.
+            // It names a loop variable and is kept in the AST as the
+            // verbatim source tree, so comparing it would be comparing
+            // binder spellings rather than the formula the operator
+            // scopes over.  syfco's getPatternIds likewise recurses only
+            // into the body of a quantified head, so two runs over
+            // different ranges are as interchangeable here as they are
+            // there.
+            return true;
+          }
+        // Every leading child of both nodes is an integer expression.
+        for (size_t i = 0; i + 1 < pat.children.size(); ++i)
+          {
+            long long pv, sv;
+            if (!eval_int_quiet(*pat.children[i], pv)
+                || !eval_int_quiet(*subject.children[i], sv)
+                || pv != sv)
+              return false;
+          }
+        return true;
+      };
+      // The wildcard matches anything and binds nothing.
+      if (tlsf_is_wildcard(pat))
+        return true;
+      // A Boolean literal is a leaf, not a metavariable: `true` matches
+      // `true` and nothing else.  Reaching this arm with a bare
+      // LiteralInt would mean an illegal pattern slipped past the
+      // parser, so it cannot match.
+      if (tlsf_is_bool_literal(pat))
+        return subject.type == tlsf_expr_type::Identifier
+          && subject.name == pat.name;
+      // A metavariable matches any subexpression and binds it.
+      if (tlsf_is_pattern_var(pat))
+        {
+          bindings.push_back(
+            {subst_binding::kind::splice, pat.name,
+             std::make_shared<tlsf_expr>(subject)});
+          return true;
+        }
+
+      // A connective matches only when the subject has the same
+      // connective.  Anything else -- a different operator, a leaf, a
+      // shape the operator does not have -- fails without binding
+      // anything.
+      if (pat.type != subject.type || pat.op != subject.op)
+        return false;
+
+      switch (pat.type)
+        {
+        case tlsf_expr_type::UnaryOp:
+          if (subject.children.empty() || pat.children.empty())
+            return false;
+          return match_pattern(*subject.children[0], *pat.children[0],
+                               bindings);
+
+        case tlsf_expr_type::BinaryOp:
+          {
+            if (subject.children.size() < 2 || pat.children.size() < 2)
+              return false;
+            // Match the left operand first: a failure there must bind
+            // nothing, so bindings is only grown on a success that is
+            // actually kept.  Since every binding added before a
+            // failure would be left behind, and the caller discards
+            // the vector unless the whole match succeeds, this is
+            // correct -- but restoring it explicitly keeps the
+            // function usable on its own.
+            std::vector<subst_binding> lhs;
+            if (!match_pattern(*subject.children[0], *pat.children[0], lhs))
+              return false;
+            if (!match_pattern(*subject.children[1], *pat.children[1], lhs))
+              return false;
+            bindings.insert(bindings.end(), lhs.begin(), lhs.end());
+            return true;
+          }
+
+        case tlsf_expr_type::Quantifier:
+          {
+            // Only the BODY of a quantifier node is a pattern; its
+            // leading children are bounds.  A bound is an integer
+            // expression rather than LTL, so it is compared as a
+            // number and not matched structurally -- eval_int is the
+            // same evaluator the translator lowers bounds with, so a
+            // bound over the current parameter bindings compares
+            // equal exactly as it lowers equal.  A bound that does not
+            // evaluate cannot be shown equal to anything, so the match
+            // fails rather than silently succeeding.
+            //
+            // A binder (the shape a `&&[b] e` / `||[b] e` run and the
+            // big-operator heads desugar into) is not compared at all:
+            // it is an integer expression naming a loop variable, and
+            // the AST keeps the bound tree verbatim, so a subject
+            // spelled with a different iteration range would still
+            // match.  Only the body decides.
+            if (subject.children.empty() || pat.children.empty())
+              return false;
+            if (!bounds_match(subject, pat))
+              return false;
+            return match_pattern(*subject.children.back(),
+                                 *pat.children.back(), bindings);
+          }
+
+        default:
+          return false;
+        }
+    }
+
     tlsf_expr_ptr translator::select_def_clause(
       const tlsf_definition& def,
       const std::vector<tlsf_expr_ptr>& actuals,
@@ -1300,6 +1478,102 @@ namespace spot
       assert(!def.body.empty());
       for (const tlsf_expr_ptr& raw_clause : def.body)
         {
+          // A pattern clause `eB ~ phi' : e` is handled BEFORE the
+          // formal substitution below, and that ordering is what makes
+          // it correct.  Two things must not happen to the pattern: it
+          // must not have the definition's formals substituted into it
+          // (a metavariable is introduced by the pattern, and a
+          // formal of the same name is rejected by
+          // check_pattern_vars, so there is nothing to substitute --
+          // but a subject or value that mentions a formal still has
+          // to), and it must not be expanded by expand_ast (a `~` is
+          // never a user-defined call, and flattening the subject
+          // here would expand it a second time).  So the subject and
+          // the value are substituted and expanded on their own, and
+          // the pattern is matched against the resulting subject.
+          //
+          // `raw_clause` has shape `Guard(eB ~ phi', e)` here, because
+          // `~` binds tighter than `:` (Table 1 rows 18 and 19) and
+          // the parser builds exactly that.  An inner `:` guard inside
+          // the subject would already have been rejected by
+          // check_pattern.
+          // A clause head of either shape that the pattern machinery owns:
+          // `Guard(PatternMatch(subject, pat), value)` -- the well-formed
+          // `eP : e` clause, because `~` binds tighter than `:` (Table 1
+          // rows 18 and 19) and the parser builds exactly that -- or a
+          // bare `PatternMatch(subject, pat)`, which is a pattern clause
+          // written without its `: value`.  Return the subject and the
+          // pattern of the latter, or null for any other clause.
+          auto as_pattern_clause = [](const tlsf_expr_ptr& clause,
+                                      tlsf_expr_ptr& subject,
+                                      tlsf_expr_ptr& pat) -> bool
+          {
+            if (clause->type != tlsf_expr_type::BinaryOp
+                || clause->children.size() < 2
+                || !clause->children[0] || !clause->children[1])
+              return false;
+            if (clause->op == tlsf_op::Guard)
+              {
+                const tlsf_expr_ptr& inner = clause->children[0];
+                if (inner->type != tlsf_expr_type::BinaryOp
+                    || inner->op != tlsf_op::PatternMatch
+                    || inner->children.size() < 2
+                    || !inner->children[0] || !inner->children[1])
+                  return false;
+                subject = inner->children[0];
+                pat = inner->children[1];
+                return true;
+              }
+            if (clause->op == tlsf_op::PatternMatch)
+              {
+                subject = clause->children[0];
+                pat = clause->children[1];
+                return true;
+              }
+            return false;
+          };
+
+          tlsf_expr_ptr subject_src;
+          tlsf_expr_ptr pat_src;
+          if (raw_clause->type == tlsf_expr_type::BinaryOp
+              && as_pattern_clause(raw_clause, subject_src, pat_src))
+            {
+              // TLSF v1.2 SS4.6 gives `ec ::= e | eB : e | eP : e`, so a
+              // pattern clause always carries a value and the `:` is not
+              // optional the way an unguarded clause is.  Name the
+              // mistake here rather than letting the bare `~` reach
+              // translate_expr, which would blame the enclosing
+              // definition for a problem in this clause.
+              if (raw_clause->op != tlsf_op::Guard)
+                {
+                  diag(*raw_clause,
+                       "a pattern match clause needs a `: value' on its "
+                       "right; a bare `~' has no value to select");
+                  return nullptr;
+                }
+              const tlsf_expr& pat = *pat_src;
+              // The parser has already checked the SHAPE of the pattern
+              // (check_pattern).  What it cannot check is freshness of
+              // a metavariable against what the definition body knows,
+              // which is only known here.
+              if (!check_pattern_vars(pat, def))
+                return nullptr;
+              // The subject is substituted and expanded on its own, so
+              // that the pattern itself is never touched by either pass.
+              const tlsf_expr_ptr subject =
+                expand_ast(subst_clause(subject_src, def, actuals, true));
+              const tlsf_expr_ptr body =
+                subst_clause(raw_clause->children[1], def, actuals, true);
+              std::vector<subst_binding> bindings;
+              if (!match_pattern(*subject, pat, bindings))
+                continue;         // pattern false: next clause
+              // The metavariables are substituted into the value only.
+              // `splice` is right: a metavariable is bound to a
+              // subexpression of the already-expanded subject, which
+              // is inserted verbatim and must not be expanded again.
+              return subst_expr(body, bindings);
+            }
+
           // Substitute the (pre-expanded) actuals into this clause
           // before inspecting its guard, so guards over formal
           // integer arguments become constant comparisons.  The
@@ -2102,6 +2376,15 @@ namespace spot
                 // survivor here means the clause escaped expansion
                 // (e.g. written directly in a MAIN subsection).
                 diag(e, "guard clause ':' is only meaningful inside "
+                        "a definition body");
+                return formula::ff();
+              case tlsf_op::PatternMatch:
+                // Same shape as the guard above, and for the same
+                // reason: `eB ~ phi'` is meaningful only as a clause of
+                // a DEFINITION body, where select_def_clause
+                // matches it and substitutes the metavariables before
+                // translating the selected value.
+                diag(e, "pattern match '~' is only meaningful inside "
                         "a definition body");
                 return formula::ff();
               default:
