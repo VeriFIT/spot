@@ -18,9 +18,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Exercise the TLSF parser, printer, and translator through the
-# tests/core/parsetlsf program.  When syfco is installed, its
-# conversions are used to cross-check our signals, target, and
-# formula.
+# tests/core/parsetlsf program.  Some checks also cross-check our
+# signals, target, and formula against syfco, the reference
+# implementation; those are opt-in, see below.
 #
 # Specifications that are expected to translate alike, and
 # specifications that are expected to be rejected alike, are handed to
@@ -44,6 +44,21 @@
 . ./defs || exit 1
 
 set -e
+
+# syfco is the reference implementation of TLSF, and a number of checks
+# below compare our reading of a specification against its, either to
+# confirm that a file we accept is accepted there too or that a file we
+# reject is rejected there for the same reason.  Those comparisons are
+# opt-in: syfco is a third-party binary Spot does not ship and does not
+# control, so a newer release that changes its mind about a file, or
+# that has a bug of its own, must not be able to fail this test suite.
+# Set TEST_SYFCO in the environment to run them; they additionally need
+# syfco to be installed.
+if test -n "$TEST_SYFCO" && syfco --version >/dev/null 2>&1; then
+  test_syfco=true
+else
+  test_syfco=false
+fi
 
 # A small specification provides a positive end-to-end check.
 cat >small.tlsf <<'EOF'
@@ -698,7 +713,7 @@ EOF
   sed -e "s/= $w: 00;/= Z: 00;/" -e "s/== $w)/== Z)/" \
     enumkwone.$w.tlsf > enumkwoneref.$w.tlsf
   # syfco resolves the same specification, and to the same values.
-  if syfco --version >/dev/null 2>&1; then
+  if $test_syfco; then
     syfco -c enumkwone.$w.tlsf > /dev/null
   fi
 done
@@ -814,7 +829,7 @@ EOF
 sed -e 's/enum GLOBAL =/enum E =/' \
     -e 's/INPUTS  { GLOBAL b; }/INPUTS  { E b; }/' \
     enumkwsec.tlsf > enumkwsecref.tlsf
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   syfco -c enumkwsec.tlsf > /dev/null
   syfco -c enumkwsecref.tlsf > /dev/null
 fi
@@ -1013,12 +1028,22 @@ EOF
 # which is the whole trigger: both spellings give the same formula.
 sed -e 's/^GLOBAL {/GLOBAL \/* c *\/ {/' -e 's/^MAIN {/MAIN \/\/ c\n{/' \
   shadowsec.tlsf > shadowseccmt.tlsf
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   syfco -c shadowsec.tlsf > /dev/null
   syfco -c shadowseccmt.tlsf > /dev/null
 fi
 
-# TLSF v1.2 SS4.9: "Multi line comments can be nested".
+# TLSF v1.2 SS4.9: "Multi line comments can be nested", so a block
+# comment may contain block comments, and only the closing pair that
+# matches the innermost one closes it.  The fixture below puts a nested
+# comment in every position the scanner reads one, and is kept
+# spellable by syfco so that the opt-in cross-checks below mean
+# something.  Two positions are avoided deliberately: syfco rejects a
+# comment that follows the `(` of an expression with no space in
+# between -- it takes `G( /* c */ x)` but not `G(/* c */ x)`, whatever
+# the comment nests -- so every comment below follows either a space or
+# something else.  Spot accepts that spelling too; it is exercised in
+# tests/python/parsetlsf.py.
 cat >nested.tlsf <<'EOF'
 INFO /* a /* b */ c */ {
   TITLE:       "nested comments"
@@ -1091,7 +1116,7 @@ G(req_0 -> Fack)
 G(req_0 -> Fack)
 EOF
 diff -u nested.exp nested.all
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   syfco -c nested.tlsf > /dev/null
   syfco -f ltlxba -m fully nested.tlsf > syfco-nested.f
   ../parsetlsf -e "`cat syfco-nested.f`" nested.tlsf > /dev/null
@@ -1137,7 +1162,7 @@ MAIN {
 G(x -> o); }
 }
 EOF
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   # syfco counts the newlines of the comment too, and says so on the
   # same line we do.
   syfco -c nestedlines.tlsf 2>&1 | grep -q "(line 15, column 7)"
@@ -1156,7 +1181,7 @@ EOF
 fold -w 70 nested.err | sed 's/ *$//' > nested.err.fold
 diff -u nested.err.exp nested.err.fold
 # syfco rejects the unterminated comment too, with its own wording.
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   ! syfco -c nestedunclosed.tlsf
 fi
 
@@ -1409,7 +1434,7 @@ MAIN {
   }
 }
 EOF
-  if syfco --version >/dev/null 2>&1; then
+  if $test_syfco; then
     syfco -c sigsec.$w.tlsf > /dev/null
   fi
 done
@@ -1487,7 +1512,7 @@ MAIN {
   }
 }
 EOF
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   syfco -c sigsecshadow.tlsf > /dev/null
   syfco -c enumkwstate.tlsf > /dev/null
 fi
@@ -1550,7 +1575,7 @@ MAIN {
 }
 EOF
 done
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   for w in Mealy Moore Strict Finite; do
     syfco -c semval.$w.tlsf > /dev/null
   done
@@ -1587,7 +1612,7 @@ MAIN {
 EOF
 sed 's/  SEMANTICS:   MAIN/  SEMANTICS:   Main/' semvalbad.tlsf \
   > semvalbad2.tlsf
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   ! syfco -c semvalbad.tlsf
   ! syfco -c semvalbad2.tlsf
 fi
@@ -2503,8 +2528,8 @@ diff -u groupedsize.in.exp groupedsize.in
 # list above already pin the evaluation.
 ../parsetlsf -q groupedsize.tlsf
 
-# When syfco is installed, cross-check signals, target, and formula.
-if syfco --version >/dev/null 2>&1; then
+# With TEST_SYFCO set, cross-check signals, target, and formula.
+if $test_syfco; then
   syfco -f ltlxba -m fully small.tlsf > syfco-small.f
   ../parsetlsf -e "`cat syfco-small.f`" small.tlsf
   # Compare signal sets, not their order: syfco and spot are free to
@@ -4308,7 +4333,7 @@ MAIN {
 EOF
   ../parsetlsf tags.tlsf > tags.f
   grep -q "G(a -> b)" tags.f
-  if syfco --version >/dev/null 2>&1; then
+  if $test_syfco; then
     syfco -c tags.tlsf > /dev/null
   fi
 done
@@ -4333,7 +4358,7 @@ MAIN {
 EOF
 ../parsetlsf tagsmany.tlsf > tagsmany.f
 grep -q "G(a -> b)" tagsmany.f
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   syfco -c tagsmany.tlsf > /dev/null
 fi
 # The list may be empty -- syfco builds it with `commaSep`, which takes
@@ -4360,7 +4385,7 @@ grep -q "G(a -> b)" tagsnone.f
 sed 's/  TAGS:/  TAGS: nosuchdefinition/' tagsnone.tlsf > tagsundef.tlsf
 ../parsetlsf tagsundef.tlsf > tagsundef.f
 cmp tagsnone.f tagsundef.f
-if syfco --version >/dev/null 2>&1; then
+if $test_syfco; then
   syfco -c tagsnone.tlsf > /dev/null
   syfco -c tagsundef.tlsf > /dev/null
 fi
@@ -4416,7 +4441,7 @@ for bad in '5' '"arbiter"' 'a b' 'a,'; do
   sed "s/  TAGS: FOO: \"x\"/  TAGS: $bad/" tagscolon.tlsf > tagsbad.tlsf
   ( set +x
     ! ../parsetlsf tagsbad.tlsf > /dev/null 2>/dev/null )
-  if syfco --version >/dev/null 2>&1; then
+  if $test_syfco; then
     ! syfco -c tagsbad.tlsf > /dev/null 2>/dev/null
   fi
 done
