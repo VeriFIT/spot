@@ -3537,6 +3537,23 @@ MAIN {
     # Tags that together cover everything constrain nothing.
     tc.assertTrue(coverage([['0*'], ['1*']]).is_tt(),
                   "a total enumeration must not constrain the bus")
+    # ...and that holds for every way of covering the space, not just
+    # that one: a bus whose tags cover all 2^w valuations must
+    # contribute NO term at all, rather than a tautology the caller
+    # would have to simplify away.  Each case below reaches the
+    # exhaustive-coverage path, so each pins the same branch.  The
+    # partially-covering `['0*0'], ['1*1']` is listed last as the
+    # control: it covers half the space and must still constrain.
+    for entries in ([['0'], ['1']],
+                    [['00'], ['01'], ['10'], ['11']],
+                    [['*0'], ['*1']],
+                    [['0*', '1*']],
+                    [['*0*'], ['*1*']]):
+        tc.assertTrue(coverage(entries).is_tt(),
+                      f"the total enumeration {entries} must not "
+                      f"constrain the bus")
+    tc.assertFalse(coverage([['0*0'], ['1*1']]).is_tt(),
+                   "a half-covering enumeration must still constrain")
     # A 12-bit enum with a single tag: exhaustive over all 4096
     # valuations, and the factored form is used.
     mid = check_coverage([['1' * 11 + '0']], 12)
@@ -3969,5 +3986,119 @@ MAIN {
     # other unary operators do.
     tc.assertEqual(canon_guarantee('G (SUM[i IN {0, 1}] i)'),
                    'G (SUM[i IN {0, 1}] i)')
+
+    # ----------------------------------------------------------------
+    # tlsf_to_ltl refuses a specification whose parse reported errors.
+    #
+    # A file that opened but did not parse keeps a partial AST, and
+    # translating it can produce a formula that silently does not
+    # correspond to what was written -- an absent clause reads as an
+    # empty one.  The documented contract is that `full_formula` is null
+    # on failure (spot/parsetlsf/public.hh), so the guard belongs at the
+    # tlsf_to_ltl boundary rather than in every caller.  Both CLI
+    # front-ends already screen parse errors first (bin/common_tlsf.cc
+    # and tests/core/parsetlsf.cc), so this is defence in depth for API
+    # callers -- which is how the gap is reachable at all.
+    def translate_broken(src):
+        """(full_formula, [translate-time messages]) for `src`."""
+        broken = 'broken-tlsf.tlsf'
+        with open(broken, 'w') as f:
+            f.write(src)
+        try:
+            p = spot.parse_tlsf(broken)
+            tc.assertTrue(p.errors,
+                          f"fixture must fail to parse; got: "
+                          f"{[(e.first, e.second) for e in p.errors]}")
+            errs = spot.parse_aut_error_list()
+            r = spot.tlsf_to_ltl(p, spot.tlsf_translator_options(), errs)
+            return r.full_formula, [e.second for e in errs]
+        finally:
+            os.unlink(broken)
+
+    good_info = ('INFO {\n'
+                 '  TITLE:       "t"\n'
+                 '  DESCRIPTION: "t"\n'
+                 '  SEMANTICS:   Mealy\n'
+                 '  TARGET:      Mealy\n'
+                 '}\n')
+
+    # An unclosed parenthesised expression: the parser recovers and
+    # still builds an AST, so this is the case the guard is for.
+    # (Bison stops reporting after the first syntax error, so the count
+    # in the message is not a reliable way to count broken constructs;
+    # it just reports however many diagnostics the parse collected.)
+    full, errs = translate_broken(
+        good_info
+        + 'GLOBAL {}\n'
+        'MAIN {\n'
+        '  INPUTS  { a; }\n'
+        '  OUTPUTS { o; }\n'
+        '  GUARANTEE { (a; }\n'
+        '}\n')
+    tc.assertFalse(bool(full),
+                   f"a spec with parse errors must not translate; got "
+                   f"{full}")
+    tc.assertEqual(errs, ["tlsf_to_ltl: not translating a specification "
+                          "with 1 parse error(s)"],
+                   f"the refusal must say why; got {errs}")
+
+    # A non-syntax parse error is refused the same way.  Two tags of
+    # one enum claiming the same value is a cross-section validation
+    # (SS1.2), reported after parsing rather than during it, so this
+    # case reaches the guard with a perfectly well-formed AST.
+    full, errs = translate_broken(
+        good_info
+        + 'GLOBAL {\n'
+        '  DEFINITIONS {\n'
+        '    enum E = T0:00 T1:00;\n'
+        '  }\n'
+        '}\n'
+        'MAIN {\n'
+        '  INPUTS  { E b; }\n'
+        '  OUTPUTS { o; }\n'
+        '  GUARANTEE { (o <-> b); }\n'
+        '}\n')
+    tc.assertFalse(bool(full),
+                   f"a spec with parse errors must not translate; got "
+                   f"{full}")
+    tc.assertEqual(len(errs), 1,
+                   f"the refusal must be reported once; got {errs}")
+    tc.assertTrue(errs[0].startswith("tlsf_to_ltl: not translating a "
+                                     "specification with 1 parse error(s)"),
+                  f"the refusal must say why; got {errs}")
+
+    # The control: the same shape with balanced parentheses parses, so
+    # the guard must not fire.
+    clean = parse_tlsf(good_info
+                       + 'GLOBAL {}\n'
+                       'MAIN {\n'
+                       '  INPUTS  { a; b; c; }\n'
+                       '  OUTPUTS { o; }\n'
+                       '  GUARANTEE { ((a)); }\n'
+                       '}\n')
+    tc.assertFalse(clean.errors,
+                   f"the control must parse cleanly; got "
+                   f"{[(e.first, e.second) for e in clean.errors]}")
+    errs = spot.parse_aut_error_list()
+    res = spot.tlsf_to_ltl(clean, spot.tlsf_translator_options(), errs)
+    tc.assertFalse([e.second for e in errs],
+                   f"a clean spec must translate without diagnostics; got "
+                   f"{[e.second for e in errs]}")
+    tc.assertTrue(bool(res.full_formula),
+                  f"a clean spec must translate; got {res.full_formula}")
+
+    # A file that could not be OPENED has no AST at all, and keeps its
+    # own more specific diagnostic: tests/core/parsetlsf.test pins that
+    # wording via the --tl-empty option, so the guard must come after
+    # the empty-AST test rather than replacing it.
+    missing = spot.parse_tlsf('definitely-no-such-file.tlsf')
+    errs = spot.parse_aut_error_list()
+    res = spot.tlsf_to_ltl(missing, spot.tlsf_translator_options(), errs)
+    tc.assertFalse(bool(res.full_formula),
+                   f"an unopenable file must not translate; got "
+                   f"{res.full_formula}")
+    tc.assertEqual([e.second for e in errs], ["tlsf_to_ltl: empty AST"],
+                   f"an unopenable file must report the empty AST; got "
+                   f"{[e.second for e in errs]}")
 finally:
     os.unlink(filename)

@@ -1172,6 +1172,26 @@ namespace spot
                                    "tlsf_to_ltl: empty AST");
         return tlsf_translation_result{};
       }
+    // A file that opened but did not parse has a partial AST, and
+    // translating it can yield a formula that silently does not
+    // correspond to what was written -- an absent clause reads as an
+    // empty one.  Refuse, and leave the per-diagnostic list in
+    // tlsf.errors, which the caller already owns; repeating it here
+    // would just duplicate what format_errors() prints.
+    //
+    // The null-AST test above comes first on purpose: a file that could
+    // not be opened has parse errors too, and "empty AST" is the more
+    // specific answer for it.
+    if (!tlsf.errors.empty())
+      {
+        if (errors_out)
+          errors_out->emplace_back(location(),
+                                   "tlsf_to_ltl: not translating a "
+                                   "specification with "
+                                   + std::to_string(tlsf.errors.size())
+                                   + " parse error(s)");
+        return tlsf_translation_result{};
+      }
     // Parser-time overrides are the defaults for conversion.  A
     // translation-time override has higher precedence and therefore
     // replaces the corresponding parser-time value.

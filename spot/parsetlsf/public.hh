@@ -381,6 +381,15 @@ namespace spot
   /// appended to \a errors_out (when supplied). The AST is read but
   /// not mutated; the same AST may be re-converted with different
   /// options.
+  ///
+  /// A specification whose parse reported errors is not converted at
+  /// all, even when a partial AST is available: an absent clause reads
+  /// as an empty one, so translating such a tree can silently return a
+  /// formula that does not correspond to what was written. The
+  /// per-diagnostic list stays in `tlsf.errors`, which the caller
+  /// already owns; repeating it into \a errors_out would duplicate what
+  /// `parsed_tlsf::format_errors()` prints. A file that could not be
+  /// opened has no AST at all and is reported as such.
   SPOT_API tlsf_translation_result
   tlsf_to_ltl(const parsed_tlsf& tlsf,
               const tlsf_translator_options& opts = {},

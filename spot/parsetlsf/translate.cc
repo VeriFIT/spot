@@ -240,7 +240,7 @@ namespace spot
       const std::vector<subst_binding>& scopes,
       const std::string& name)
     {
-      for (size_t i = scopes.size(); i-- > 0; )
+      for (size_t i = scopes.size(); i-- > 0;)
         if (scopes[i].name == name)
           return i;
       return scopes.size();
@@ -2736,14 +2736,23 @@ namespace spot
               // the complement is then a bit scan rather than a
               // sort plus a search over a sorted vector.  The bitmap
               // is capped so a wide bus cannot allocate wildly: past
-              // the cap the factored form is kept, which the test
-              // below detects without allocating.
+              // the cap the patterns are still walked but coverage is
+              // not recorded, and the factored form is kept below.  In
+              // practice the cap never bites, because the span_bound
+              // shortcut above already diverted every bus wider than
+              // max_scan_width.
               const unsigned long long space = 1ULL << w;
               std::vector<bool> covered;
               if (w < 24)
                 covered.assign(static_cast<size_t>(space), false);
               long long ncovered = 0;
-              bool overflowed = false;
+              // `total` records that the tags cover every valuation:
+              // the constraint is then vacuous and the bus is skipped.
+              // This is distinct from the bitmap being unavailable, and
+              // from the complement simply losing the size contest --
+              // in those cases the factored form is a correct answer to
+              // emit, but here there is no constraint to emit at all.
+              bool total = false;
               for (const auto& entry : en->entries)
                 for (const auto& pat : entry.patterns)
                   {
@@ -2776,20 +2785,26 @@ namespace spot
                             ++ncovered;
                           }
                       }
-                    // Every valuation is covered: the complement is
-                    // empty and the factored form already says so.
+                    // Every valuation is covered: there is nothing left
+                    // for the constraint to say, so this bus is dropped
+                    // below instead of contributing the factored form.
                     if (ncovered == static_cast<long long>(space))
                       {
-                        overflowed = true;
+                        total = true;
                         break;
                       }
                   }
+              // A total enumeration constrains nothing: contribute no
+              // term at all, rather than a tautology the caller would
+              // have to simplify away.
+              if (total)
+                continue;
               const long long nmissing =
                 static_cast<long long>(space) - ncovered;
               // Take the complement only when it is both smaller than
               // the factored form and small enough to fit in a
               // formula; otherwise keep the factored form.
-              if (overflowed || covered.empty()
+              if (covered.empty()
                   || nmissing > max_formula_children
                   || nmissing >= ncovered)
                 {
