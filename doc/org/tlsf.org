@@ -273,7 +273,58 @@ propositions that start with =o= as outputs:
 #+RESULTS:
 : UNREALIZABLE
 
-* When =--tlsf= is not enough
+* Differences between Spot's TLSF support and Syfco's
+
+Like [[https://github.com/reactive-systems/syfco][=syfco=]], Spot's TLSF parser aims to support all the
+features of the formats.
+
+There are however a few cases where the two implementations differ.
+The most notable are the following.
+
+- Syfco's implementation of pattern matching appears to be unfinished.
+  For instance, at the time of writing, Syfco 1.2.1.2 cannot apply the
+  following example from the TLSF specification:
+#+BEGIN_SRC tlsf
+  fun(f) =
+    f ~ a U _: a
+    otherwise: X f
+#+END_SRC
+  Spot does apply it, but only if no signal share a name with the
+  pattern variable: a pattern variable has to be a fresh name, so
+  declaring a signal =a= in the example above would make the pattern
+  variable =a= of the specification illegal.  For the same reason
+  Spot's implementation of pattern matching cannot be validated
+  against another reference: Syfco accepts the pattern but not its
+  use, so there is no output to compare against.
+
+- Syfco has a few syntactic quirks that reject valid syntax ([[https://github.com/reactive-systems/syfco/issues/47][#47]]),
+  accept invalid syntax ([[https://github.com/reactive-systems/syfco/issues/38][#38]]), or attach the wrong semantic
+  to some operators ([[https://github.com/reactive-systems/syfco/issues/60][#60]]).
+
+- Spot and Syfco differ in their handling of definitions that overwrite
+  some keywords.  The TLSF specification suggests that there is a list
+  of keywords that are invalid identifiers.  Unfortunately, that list is
+  not fully specified, and Syfco supports some redefinitions of what
+  could be considered reserved keywords.  For instance Syfco will let
+  you declare ~U(a,b) = (a<->b)~ without complaining, but it cannot then
+  call that function: in =U(a,b)= it insists on reading =U= as the
+  temporal operator and fails on the remaining =a=.  Spot's parser makes
+  great efforts to support such overloaded definitions as well, and goes
+  a bit further: it both accepts the declaration and lets you call it,
+  while still reading =U= as the temporal operator when it appears
+  between two expressions.  So with =U= redefined, =U(a,b) U b=
+  parses as =((a<->b) U b)=.
+
+  There are some operators for which such overloading does not work
+  in either implementation: =G=, =F=, =X=, =NOT=, =SIZEOF=, =true= and
+  =false=.  These can actually be declared, but they cannot be called:
+  both parsers always assume these are operators or Boolean constants.
+
+- Both parser accept a specification whose =SEMANTICS= and =TARGET=
+  disagree, but Spot's translation to LTL does not support this.  In
+  that case Spot emits a warning and ignores the =TARGET=.
+
+* Converting TLSF to LTL by hand
 
 If you want to use TLSF with a tool that does not support the
 =--tlsf= option, you can still call [[https://github.com/reactive-systems/syfco][=syfco=]] explicitly and pass the
