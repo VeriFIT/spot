@@ -872,6 +872,124 @@ namespace spot
       return loc.begin.line ? loc : spec.loc;
     }
 
+    /// \brief Report identifiers a clause guard uses but nothing
+    /// declares.
+    ///
+    /// A clause guard is evaluated at translation time and has to be
+    /// statically decidable, so a name in one that resolves to nothing
+    /// can never hold.  The translator diagnoses exactly that, but only
+    /// for the clauses its scan actually reaches: a guard is checked
+    /// when the clauses before it have all failed.  A misspelt
+    /// `otherwise` is therefore invisible, because the intended
+    /// catch-all is by far the most often last clause of a body -- and
+    /// the specification still translates, to the value of whichever
+    /// earlier clause did match.  Checking here catches it the way
+    /// syfco does, while binding identifiers, before any clause is
+    /// selected and whether or not the definition is ever called.
+    ///
+    /// Three names are exempt.  `otherwise` is the catch-all keyword,
+    /// not a reference.  `true` and `false` are Boolean literals, which
+    /// the AST stores as identifiers.  And the pattern of a `~` clause
+    /// is skipped entirely: its identifiers are metavariables, which
+    /// the pattern introduces itself and which are required to be
+    /// fresh (see tlsf_pattern_vars and translator::check_pattern_vars).
+    static void
+    check_clause_guards(const tlsf_ast& spec,
+                        parse_tlsf_error_list& errors)
+    {
+      std::unordered_set<std::string> declared;
+      auto declare = [&declared](const std::string& name)
+        {
+          declared.insert(name);
+        };
+      for (const auto& p : spec.parameters)
+        declare(p.name);
+      for (const auto& d : spec.definitions)
+        declare(d.name);
+      for (const auto& e : spec.enumerations)
+        {
+          declare(e.name);
+          for (const auto& v : e.entries)
+            declare(v.tag);
+        }
+      for (const auto& d : spec.inputs)
+        declare(d.name);
+      for (const auto& d : spec.outputs)
+        declare(d.name);
+
+      // Names already bound at this point in the walk: the formals of
+      // the definition being checked, `otherwise`, and whatever a
+      // quantifier inside the guard binds.
+      using bindings = std::unordered_set<std::string>;
+
+      // A recursive lambda, written in the same `auto&& self` style as
+      // spot/tl/delta2.cc so that no std::function is needed.
+      auto walk = [&](const tlsf_expr& e, const bindings& bound,
+                     auto&& self) -> void
+      {
+        switch (e.type)
+          {
+          case tlsf_expr_type::Identifier:
+            if (!tlsf_is_bool_literal(e) && !tlsf_is_wildcard(e)
+                && !bound.count(e.name) && !declared.count(e.name))
+              errors.emplace_back(e.loc,
+                                  "'" + e.name + "' is not declared, so it "
+                                  "cannot be used as the guard of a "
+                                  "definition clause");
+            return;
+
+          case tlsf_expr_type::Quantifier:
+            // The iteration variable is local to the quantifier, over
+            // both its bound and its body.
+            {
+              bindings inner = bound;
+              if (!e.children.empty() && e.children[0])
+                if (const std::string* var =
+                      tlsf_binder_variable(*e.children[0]))
+                  inner.insert(*var);
+              for (const auto& ch : e.children)
+                if (ch)
+                  self(*ch, inner, self);
+              return;
+            }
+
+          case tlsf_expr_type::BinaryOp:
+            if (e.op == tlsf_op::PatternMatch)
+              {
+                // Only the subject is an ordinary expression; the
+                // pattern is the one whose identifiers are
+                // metavariables.
+                if (!e.children.empty() && e.children[0])
+                  self(*e.children[0], bound, self);
+                return;
+              }
+            break;
+
+          default:
+            break;
+          }
+        for (const auto& ch : e.children)
+          if (ch)
+            self(*ch, bound, self);
+      };
+
+      for (const auto& d : spec.definitions)
+        {
+          bindings bound(d.args.begin(), d.args.end());
+          bound.insert("otherwise");
+          for (const auto& clause : d.body)
+            {
+              if (!clause
+                  || clause->type != tlsf_expr_type::BinaryOp
+                  || clause->op != tlsf_op::Guard
+                  || clause->children.size() < 2
+                  || !clause->children[0])
+                continue;   // an unguarded clause has no guard to check
+              walk(*clause->children[0], bound, walk);
+            }
+        }
+    }
+
     /// Run the cross-section validations of TLSF v1.2 on \a spec.
     ///
     /// These are the checks that need the whole file, and therefore
@@ -1015,6 +1133,8 @@ namespace spot
               + "; the specification is ambiguous, the " + semantics
               + " composition is used");
         }
+
+      check_clause_guards(spec, errors);
 
       return errors.size() == before;
     }

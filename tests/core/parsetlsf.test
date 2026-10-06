@@ -2808,6 +2808,148 @@ EOF
 fold -w 70 defn.err | sed 's/ *$//' > defn.err.fold
 diff -u defn.err.exp defn.err.fold
 
+# An identifier in a clause guard must be declared.  A guard is
+# evaluated at translation time, so a name that resolves to nothing can
+# never hold; the translator says exactly that, but only for the
+# clauses its scan reaches.  A misspelt `otherwise` is therefore
+# invisible, because the intended catch-all is usually the last clause
+# of a body -- and the specification still translates, to the value of
+# whichever earlier clause did match.  syfco rejects the name while
+# binding identifiers, before any clause is selected.
+#
+# The first file below is the reported case: the first clause matches,
+# so the misspelt second clause is never evaluated, yet the name must
+# still be resolved.
+cat >badguard.tlsf <<'EOF'
+INFO
+{
+  TITLE:       "bad guard"
+  DESCRIPTION: "a misspelt otherwise"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL
+{
+  DEFINITIONS { fun(f) = f ~ a U _: a othrewise: X f }
+}
+MAIN
+{
+  INPUTS { x; }
+  OUTPUTS { y; }
+  GUARANTEES { fun(x U y); }
+}
+EOF
+# A definition that is never called is checked as well, since the
+# resolution does not depend on any call.
+cat >badguard2.tlsf <<'EOF'
+INFO
+{
+  TITLE:       "bad guard"
+  DESCRIPTION: "in a definition that is never called"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL
+{
+  DEFINITIONS { unused(x) = othrewise : a; }
+}
+MAIN
+{
+  INPUTS { x; }
+  OUTPUTS { y; }
+  GUARANTEES { G(x); }
+}
+EOF
+( set +x
+  run 2 ../parsetlsf badguard.tlsf badguard2.tlsf > /dev/null 2>badguard.err )
+# No "conversion ... failed" line: the name is resolved while parsing,
+# so neither file is ever handed to the translator.
+cat >badguard.err.exp <<'EOF'
+badguard.tlsf:10.39-47: 'othrewise' is not declared, so it cannot be u
+sed as the guard of a definition clause
+badguard2.tlsf:10.29-37: 'othrewise' is not declared, so it cannot be
+used as the guard of a definition clause
+2 of 2 files failed
+EOF
+fold -w 70 badguard.err | sed 's/ *$//' > badguard.err.fold
+diff -u badguard.err.exp badguard.err.fold
+if $test_syfco; then
+  ! syfco -c badguard.tlsf
+  ! syfco -c badguard2.tlsf
+fi
+
+# A variable a quantifier inside the guard binds is not an undeclared
+# name, so this file is diagnosed by the translator, for the unrelated
+# reason that it cannot evaluate such a guard statically -- and not by
+# the name resolution above.
+cat >quantguard.tlsf <<'EOF'
+INFO
+{
+  TITLE:       "quantifier guard"
+  DESCRIPTION: "a guard with a bound variable"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL
+{
+  DEFINITIONS { quant(x) = (&&[0 <= i < 2] i == 1) : a otherwise : b; }
+}
+MAIN
+{
+  INPUTS { x; }
+  OUTPUTS { o; }
+  GUARANTEE { G(o <-> quant(1)); }
+}
+EOF
+run 2 ../parsetlsf quantguard.tlsf > /dev/null 2>quantguard.err
+grep -q 'not statically decidable' quantguard.err
+! grep -q "'i' is not declared" quantguard.err
+
+# What a guard is allowed to name, on the other hand: `otherwise`, the
+# Boolean literals, the formals of the definition, a parameter, a
+# definition, a signal, an enumeration name or tag, and a variable
+# bound by a quantifier inside the guard.  A name in a clause VALUE is
+# not restricted, and keeps becoming a fresh atomic proposition.
+cat >goodguard.tlsf <<'EOF'
+INFO
+{
+  TITLE:       "good guards"
+  DESCRIPTION: "everything a guard may name"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  PARAMETERS { n = 2; }
+  DEFINITIONS {
+    enum E = T0:0 T1:1;
+    lit(x) = true : a otherwise : b;
+    fal(x) = false : a otherwise : b;
+    par(x) = n : a otherwise : b;
+    cmp(x) = (x == n) : a otherwise : b;
+    mem(x) = (x IN {0, 1}) : a otherwise : b;
+    two(x, y) = (x == y) : a otherwise : b;
+    // An undeclared name in a value is a fresh AP, as always.
+    fresh(x) = (x == 0) : nosuchvalue;
+  }
+}
+MAIN {
+  INPUTS { x; y; E s; }
+  OUTPUTS { o; }
+  GUARANTEE {
+    G(o <-> (lit(x) && fal(x) && par(x) && cmp(1) && mem(1)
+             && two(1, 1) && fresh(0)));
+  }
+}
+EOF
+../parsetlsf goodguard.tlsf > goodguard.f
+# Each guard selects its own branch: lit/par/mem/two hold and give a,
+# fal and cmp fail and fall through to otherwise's b, and fresh's value
+# is the fresh AP nosuchvalue.
+cat >goodguard.f.exp <<'EOF'
+G(o <-> (a & b & nosuchvalue))
+EOF
+diff -u goodguard.f.exp goodguard.f
+
 # Pattern matching (TLSF v1.2 SS4.6): a clause guard `eP = phi ~ phi'`
 # holds when the two expressions are structurally equivalent, and every
 # identifier of the pattern binds to the subexpression it matched,
