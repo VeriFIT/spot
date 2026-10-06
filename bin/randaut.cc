@@ -166,7 +166,6 @@ static bool opt_state_acc = false;
 static bool opt_colored = false;
 static bool ba_wanted = false;
 static bool generic_wanted = false;
-static bool gba_wanted = false;
 static std::unique_ptr<unique_aut_t> opt_uniq = nullptr;
 
 static void
@@ -210,7 +209,6 @@ parse_opt(int key, char* arg, struct argp_state* as)
             std::swap(opt_acc_sets.min, opt_acc_sets.max);
           if (opt_acc_sets.min < 0)
             error(2, 0, "number of acceptance sets should be positive");
-          gba_wanted = true;
         }
       else
         {
