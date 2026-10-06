@@ -100,7 +100,6 @@ enum {
   OPT_COMPLEMENT,
   OPT_COMPLEMENT_ACC,
   OPT_COUNT,
-  OPT_DCA,
   OPT_DECOMPOSE_SCC,
   OPT_DESTUT,
   OPT_DUALIZE,
@@ -796,7 +795,6 @@ static int opt_highlight_nondet_edges = -1;
 static int opt_highlight_accepting_run = -1;
 static bool opt_highlight_languages = false;
 static spot::formula opt_track_formula = nullptr;
-static bool opt_dca = false;
 static bool opt_streett_like = false;
 static bool opt_enlarge_acceptance_set = false;
 static bool opt_reduce_acceptance_set = false;
@@ -975,9 +973,6 @@ parse_opt(int key, char* arg, struct argp_state*)
       break;
     case OPT_COMPLEMENT_ACC:
       opt_complement_acc = true;
-      break;
-     case OPT_DCA:
-      opt_dca = true;
       break;
     case OPT_DECOMPOSE_SCC:
       opt_decompose_scc = arg;
