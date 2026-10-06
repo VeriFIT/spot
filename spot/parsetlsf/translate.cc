@@ -214,8 +214,12 @@ namespace spot
     void translator::diag(const location& loc,
                           const std::string& msg)
     {
+      // A suppressed probe is not a diagnostic: it must not count
+      // towards diag_count_, which a binder fold uses to decide whether
+      // the body it just translated was rejected.
       if (diags_quiet_)
         return;
+      ++diag_count_;
       failed_ = true;
       if (!errors_)
         return;
@@ -1045,7 +1049,16 @@ namespace spot
       const bool ok = for_each_instantiation(
         e, [&](const tlsf_expr& body)
         {
-          parts.push_back(translate_expr(body));
+          // One rejected instantiation rejects the whole run, so stop
+          // there the way the integer fold below does.  A body that is
+          // an error whichever value the binder takes -- a loop
+          // variable in LTL position, say -- would otherwise be
+          // translated, and so diagnosed, once per value of the domain.
+          const size_t before = diag_count_;
+          formula part = translate_expr(body);
+          if (diag_count_ != before)
+            return false;
+          parts.push_back(part);
           return true;
         });
       if (!ok)

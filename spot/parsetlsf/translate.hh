@@ -307,6 +307,14 @@ namespace spot
       parse_tlsf_error_list* errors_;
       bool failed_ = false;
 
+      // Number of real diagnostics diag() has emitted; a suppressed
+      // probe does not count.  A fold over a binder domain translates
+      // the same body once per value, so it needs to know whether the
+      // body it just translated reported something -- which failed_
+      // cannot say, because it may already have been set by an earlier
+      // error.
+      size_t diag_count_ = 0;
+
       // When true, diag() drops its message and does not mark the
       // translation as failed.  Used by eval_int_quiet /
       // eval_set_quiet while probing guard truth.

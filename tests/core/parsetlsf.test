@@ -1968,6 +1968,11 @@ cat >ltlerr.tlsf <<'EOF'
 // an argumentful def called bare, arithmetic/comparison, a guard
 // clause, unknown X[...] / bounds, oversized quantifier ranges, and
 // set literals.
+//
+// Each is reported once.  `&&[0 <= i < 2] G(i)` is the case that needs
+// saying: the loop variable is in LTL position whatever the binder is
+// bound to, and the fold stops at the first instantiation that reports
+// something rather than reporting it twice.
 GLOBAL {
   PARAMETERS { n = 2; }
   DEFINITIONS {
@@ -2691,6 +2696,11 @@ cat >subst_capture.tlsf <<'EOF'
 // variable is local to the body and must not be captured by the
 // formal.  Here the body quantifies over `b`, which is also a formal
 // name, so the two would be indistinguishable without the scope.
+//
+// The body puts `b` in LTL position, which is an error whichever value
+// the binder takes.  The fold stops at the first instantiation that
+// reports something, as the integer and set folds already do, so this
+// is diagnosed once rather than once per value of {0, 1}.
 GLOBAL {
   DEFINITIONS {
     wrap(b) = FORALL[b IN {0, 1}] b;
@@ -3311,33 +3321,32 @@ overflow.tlsf:15.5-10: could not evaluate parameter 'p_mul5'
 overflow.tlsf:16.18: integer overflow in modulo
 overflow.tlsf:16.5-9: could not evaluate parameter 'p_mod'
 conversion of overflow.tlsf failed
-ltlerr.tlsf:15.7: integer literal in LTL position
-ltlerr.tlsf:16.5-6: parameter 'n' used in LTL position
-ltlerr.tlsf:17.20-21: loop variable 'i' used in LTL position
-ltlerr.tlsf:17.20-21: loop variable 'i' used in LTL position
-ltlerr.tlsf:18.5-6: definition 'gen' expects 1 argument(s); called as
+ltlerr.tlsf:20.7: integer literal in LTL position
+ltlerr.tlsf:21.5-6: parameter 'n' used in LTL position
+ltlerr.tlsf:22.20-21: loop variable 'i' used in LTL position
+ltlerr.tlsf:23.5-6: definition 'gen' expects 1 argument(s); called as
 'gen()' to expand it
-ltlerr.tlsf:19.5-6: arithmetic/comparison op '==' is not supported in
+ltlerr.tlsf:24.5-6: arithmetic/comparison op '==' is not supported in
 LTL position
-ltlerr.tlsf:20.5-6: guard clause ':' is only meaningful inside a defin
+ltlerr.tlsf:25.5-6: guard clause ':' is only meaningful inside a defin
 ition body
-ltlerr.tlsf:21.5-7: expected an integer; identifier 'a' has no integer
+ltlerr.tlsf:26.5-7: expected an integer; identifier 'a' has no integer
  binding
-ltlerr.tlsf:22.5-10: expected an integer; identifier 'nope' has no int
+ltlerr.tlsf:27.5-10: expected an integer; identifier 'nope' has no int
 eger binding
-ltlerr.tlsf:23.5: X[...] requires a non-negative number of next steps
-ltlerr.tlsf:24.5: X[...] bound exceeds the maximum supported repetitio
+ltlerr.tlsf:28.5: X[...] requires a non-negative number of next steps
+ltlerr.tlsf:29.5: X[...] bound exceeds the maximum supported repetitio
 n
-ltlerr.tlsf:25.5: temporal bound exceeds the maximum supported repetit
+ltlerr.tlsf:30.5: temporal bound exceeds the maximum supported repetit
 ion
-ltlerr.tlsf:26.5-11: expected an integer; identifier 'nope' has no int
+ltlerr.tlsf:31.5-11: expected an integer; identifier 'nope' has no int
 eger binding
-ltlerr.tlsf:27.5-6: quantifier range is too large
-ltlerr.tlsf:28.13: expected an integer set
-ltlerr.tlsf:29.13: integer set range is too large
-ltlerr.tlsf:30.5-6: set literal in LTL position
-ltlerr.tlsf:31.5-6: set range in LTL position
-ltlerr.tlsf:32.5-6: pattern match '~' is only meaningful inside a defi
+ltlerr.tlsf:32.5-6: quantifier range is too large
+ltlerr.tlsf:33.13: expected an integer set
+ltlerr.tlsf:34.13: integer set range is too large
+ltlerr.tlsf:35.5-6: set literal in LTL position
+ltlerr.tlsf:36.5-6: set range in LTL position
+ltlerr.tlsf:37.5-6: pattern match '~' is only meaningful inside a defi
 nition body
 conversion of ltlerr.tlsf failed
 intcmpbad.tlsf:14.5-12: SIZEOF of scalar AP 's'
@@ -3409,8 +3418,7 @@ ion
 clash3.tlsf:7.5-18: 'e' is already declared as a definition
 dupinfo.tlsf:6.3-8: duplicate INFO item 'TITLE:'
 dupinfo.tlsf:8.3-7: duplicate INFO item 'TAGS:'
-subst_capture.tlsf:7.35: loop variable 'b' used in LTL position
-subst_capture.tlsf:7.35: loop variable 'b' used in LTL position
+subst_capture.tlsf:12.35: loop variable 'b' used in LTL position
 conversion of subst_capture.tlsf failed
 bad.tlsf:7.15-8.1: unclosed string
 bad.tlsf:7.15-8.1: syntax error, unexpected end of file
