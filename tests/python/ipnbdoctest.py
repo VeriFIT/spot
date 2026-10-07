@@ -344,7 +344,12 @@ def test_notebook(ipynb):
             continue
 
         failed = False
-        if not compare_outputs(cell.outputs, outs):
+        # Some outputs, such as SAT-generated automata, can be valid but
+        # differ between solver builds.  Such cells should check invariants
+        # in their source and carry this tag.
+        if ('output-is-nondeterministic' not in
+                cell.metadata.get('tags', []) and
+                not compare_outputs(cell.outputs, outs)):
             failed = True
         print("cell %d: " % i, end="")
         if failed:
