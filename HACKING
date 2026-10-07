@@ -157,6 +157,13 @@ This re-executes the notebook and overwrites it with the updated
 outputs.  Please check the resulting diffs carefully before committing
 the regenerated notebook.
 
+The notebook tester compares each code cell's output with its stored
+output.  For cells whose output can legitimately vary between runs or
+builds (for example, an automaton produced by a SAT solver), add the
+`output-is-nondeterministic` tag to that code cell's metadata.  The tester
+will still execute the cell, but will skip comparing its output, so the
+cell should check relevant properties of its result explicitly.
+
 Alternatively, if you use emacs, the .dir-locals.el configuration at
 the top of the project redefines the C-c C-c key for all shell and
 python scripts under the tests/ directory.  So if you are working on
