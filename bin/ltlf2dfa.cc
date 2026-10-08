@@ -26,7 +26,6 @@
 #include "common_aoutput.hh"
 #include "common_finput.hh"
 #include "common_setup.hh"
-#include "common_tlsf.hh"
 #include "common_trans.hh"
 #include <spot/tl/formula.hh>
 #include <spot/tl/print.hh>
@@ -41,7 +40,6 @@ enum
   OPT_MTDFA_DOT,
   OPT_MTDFA_STATS,
   OPT_SIMPLIFY_FORMULA,
-  OPT_TLSF,
   OPT_TRANS,
   OPT_MINIMIZE,
 };
@@ -51,12 +49,6 @@ static const argp_option options[] =
   {
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Input options:", 1 },
-    { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,
-      "Read a TLSF specification from FILENAME, and convert it into "
-      "LTLf using the parser embedded in Spot (unless the "
-      "SPOT_TLSF_PARSER environment variable selects the external "
-      "syfco tool).  Any parameter assignment specified after a slash"
-      " overrides that parameter." , 0 },
     { "negate", OPT_NEGATE, nullptr, 0, "negate each formula", 0 },
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Processing options:", 10 },
@@ -110,7 +102,7 @@ static const argp_option options[] =
 
 static const struct argp_child children[] =
   {
-    { &finput_argp_headless, 0, nullptr, 0 },
+    { &finput_argp_headless_ltlf, 0, nullptr, 0 },
     { &misc_argp, 0, nullptr, 0 },
     { nullptr, 0, nullptr, 0 }
   };
@@ -201,9 +193,6 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_KEEP_NAMES:
       opt_keep_names = true;
       break;
-    case OPT_TLSF:
-      jobs.emplace_back(arg, job_type::TLSF_FILENAME);
-      break;
     case OPT_TRANS:
       opt_trans = XARGMATCH("--translation", arg,
                             translation_args, translation_values);
@@ -265,6 +254,14 @@ namespace
     explicit trans_processor(spot::bdd_dict_ptr& dict)
       : dict(dict)
     {
+      // --tlsf: this tool only accepts LTLf formulas, so a
+      // specification that does not declare Finite semantics has to be
+      // rejected.  Only the formula is needed, so ask the syfco
+      // backend not to spend two more process invocations retrieving
+      // signals and target that would be discarded.
+      tlsf_read_flags = tlsf_flags::TLSF_EXPECT_FINITE
+                        | tlsf_flags::TLSF_IGNORE_SIGNALS
+                        | tlsf_flags::TLSF_IGNORE_TARGET;
     }
 
     int
@@ -370,23 +367,6 @@ namespace
                         nullptr, prefix, suffix);
         }
       return 0;
-    }
-
-    int
-    process_tlsf_file(const char* filename) override
-    {
-      tlsf_conversion_result conv;
-      // Only the formula is needed: expect a finite formula (like
-      // ltlfsynt), and pass the ignore flags so the syfco backend
-      // does not spend two more process invocations retrieving
-      // signals and target that would be discarded.
-      if (!read_tlsf_file(filename,
-                          tlsf_flags::TLSF_EXPECT_FINITE
-                          | tlsf_flags::TLSF_IGNORE_SIGNALS
-                          | tlsf_flags::TLSF_IGNORE_TARGET, conv))
-        // Parse errors must be reported with exit status 2.
-        return 2;
-      return process_formula(conv.formula, filename);
     }
 
   };

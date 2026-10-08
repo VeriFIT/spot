@@ -25,11 +25,31 @@ ltl2tgba --help | sed -n '/Input options:/,/^$/p' | sed '1d;$d'
 :       --lbt-input            read all formulas using LBT's prefix syntax
 :       --lenient              parenthesized blocks that cannot be parsed as
 :                              subformulas are considered as atomic properties
+:       --ltlf                 assume the input is an LTLf formula; the output
+:                              will have Büchi acceptance but should be
+:                              interpreted using finite automata semantics
+:       --negate               negate each formula
+:       --tlsf=FILENAME[/VAR=VAL[,VAR=VAL...]]
+:                              Read a TLSF specification from FILENAME, and
+:                              convert it into LTL using the parser embedded in
+:                              Spot (unless the SPOT_TLSF_PARSER environment
+:                              variable selects the external syfco tool).  Any
+:                              parameter assignment specified after a slash
+:                              overrides that parameter.
+:   -x, --extra-options=OPTS   fine-tuning options (see spot-x (7))
 
-=-f= is used to pass one formula on the command line, but this option can
+Note that not every tool advertises exactly the same options: some
+read LTLf formulas rather than LTL ones (and describe =--tlsf= as
+producing LTLf), some have no =--ltlf= option, and so on.  In
+particular, [[file:ltlf2dfa.org][=ltlf2dfa=]] and [[file:ltlfsynt.org][=ltlfsynt=]] only accept
+LTLf formulas, while [[file:ltlsynt.org][=ltlsynt=]], [[file:ltlcross.org][=ltlcross=]] and [[file:ltldo.org][=ltldo=]] only accept
+LTL ones.  Please refer to the manual page of the tool for the exact
+list of options it supports.
+
+-f= is used to pass one formula on the command line, but this option can
 be repeated to pass multiple formulas.
 
-=-F= is used to read formulas from a file (one formula per line).
+-F= is used to read formulas from a file (one formula per line).
 This option can also be repeated to pass multiple files.  If the
 filename specified is =-= (as in =-F-=), then formulas are read from
 standard input.  If a filename is suffixed with =/COL=, where =COL= is
@@ -38,6 +58,56 @@ formulas are read from its =COL=-th column.  Use =/-COL= to read from
 column =COL= and ignore the first line of the CSV file (which often
 contains column headers).  We have [[file:csv.org][examples of reading or writing CSV
 files on a separate page]].
+
+** TLSF specifications
+   :PROPERTIES:
+   :CUSTOM_ID: tlsf-input
+   :END:
+
+Option =--tlsf= reads a specification in the
+[[https://arxiv.org/abs/2303.03839][TLSF]] format, converts it to LTL (or
+LTLf if the specification declares =Finite= semantics) with the TLSF
+parser embedded in Spot, and processes the resulting formula as if it
+had been given with =-f= or =-F=.  See [[file:tlsf.org][a section about TLSF
+support]] for the details of the conversion.
+
+Like =-f= and =-F=, this option can be repeated, and can be mixed with
+the other formula sources.  The filename may be suffixed with
+=/VAR=VAL[,VAR=VAL...]= to override some of the parameters of the
+specification, as in =--tlsf spec.tlsf/n=3=.
+
+The =INPUTS= and =OUTPUTS= of the specification are also used as the
+partition of atomic propositions for the formula being processed, so
+that a tool like [[file:ltlfilt.org][=ltlfilt=]] can rename them by nature
+with =--relabel=io=, and a synthesis tool can use them without
+requiring =--ins= or =--outs=:
+
+#+BEGIN_SRC sh
+cat > grant.tlsf <<'EOF'
+INFO {
+  TITLE:       "arbitration"
+  DESCRIPTION: "grant one request at a time"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS  { request[2]; }
+  OUTPUTS { grant[2]; }
+  GUARANTEE {
+    (&&[0 <= i < 2] &&[0 <= j < 2] (request[i] <-> request[j])) ||
+      (grant[0] -> (grant[1] -> X(!grant[0])))
+  }
+}
+EOF
+ltlfilt --tlsf grant.tlsf --relabel=io
+#+END_SRC
+#+RESULTS:
+: (i0 <-> i1) | (o0 -> (o1 -> X!o0))
+
+This partition is only in effect while the formula read from the
+specification is processed: it does not affect the other formulas that
+the same command processes.  It is also ignored if the user requested a
+partition of their own with =--ins=, =--outs=, or =--part-file=.
 
 ** Default parser
    :PROPERTIES:

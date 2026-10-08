@@ -21,13 +21,39 @@ New in spot 2.16.0.dev  (not yet released)
     with the given PROBABILITY (0 by default), may be reused one or
     more additional times, in a randomly shuffled order.
 
-  - ltlsynt, ltlfsynt, and ltlf2dfa no longer call the external
-    "syfco" tool to convert their --tlsf FILENAME input into LTL/LTLf:
-    they now use a TLSF parser embedded in Spot.  The new
-    SPOT_TLSF_PARSER environment variable (documented in spot-x(7))
-    can be set to "syfco" to restore the previous behavior, for
-    instance to cross-check the two conversions, or in case the
-    built-in parser is incomplete.
+  - The --tlsf FILENAME option is no longer limited to ltlsynt,
+    ltlfsynt, and ltlf2dfa: every tool that reads LTL or LTLf formulas
+    as input now accepts it, namely: ltl2tgba, ltlfilt, ltlmix,
+    ltlcross, ltldo, and ltlgrind.  The specification is translated
+    just as for the three tools that already accepted it, and the
+    resulting formula is then processed as if it had been given with
+    -f.  As before, a specification that declares Finite semantics is
+    translated into LTLf, and one that does not into LTL; ltlcross and
+    ltldo, which only handle LTL, reject the former.
+
+    As an example, you can use
+
+        % ltlfilt --tlsf spec.tlsf --relabel=io
+
+    to convert spec.tlsf into an LTL (or LTLf) formula where atomic
+    propositions have been renamed according to their input/output
+    nature.  You can also easily convert a TLSF file into a
+    fully-parenthesized LTL formula and a file containing the
+    partition of input/output propositions, with the following
+    command:
+
+        % ltlfilt --tlsf spec.tlsf --save-part-file=spec.part -p \
+          -o spec.ltl
+
+  - TLSF parsing is now done by Spot, without using syfco.  For
+    synthesis, this is faster because we don't have to execute an
+    external tool three times (and therefore parse the TLSF
+    specification three times) to obtain all needed information.
+
+    The new SPOT_TLSF_PARSER environment variable can be set to
+    "syfco" to restore the previous behavior, for instance to
+    cross-check the two conversions, or in case the built-in parser is
+    found to be incomplete.
 
   Library:
 

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "common_sys.hh"
+#include "common_finput.hh"
 
 #include <iosfwd>
 #include <string>
@@ -27,51 +28,13 @@
 #include <spot/parsetlsf/public.hh>
 #include <spot/tl/formula.hh>
 
-// Helpers used by the tools that accept TLSF specifications
-// (ltlsynt, ltlfsynt, ltlf2dfa).  The conversion of a TLSF file to
-// LTL or LTLf can be done either by the parser embedded in Spot (the
-// default) or by the external syfco tool.  The SPOT_TLSF_PARSER
-// environment variable selects the backend: "spot" or "syfco".
-
-// What read_tlsf_file() should extract from the specification.
-// The TLSF_IGNORE_* flags only exist to spare the syfco backend
-// some process invocations: when set, the corresponding syfco call
-// is skipped and the matching field of tlsf_conversion_result is
-// left untouched.  They have no effect on the "spot" backend, which
-// always fills all fields from a single parse.
-enum class tlsf_flags
-  {
-    // Expect the specification to declare Finite semantics.
-    TLSF_EXPECT_FINITE = 1 << 0,
-    // Expect the specification to declare infinite semantics (i.e.,
-    // it must not declare Finite).
-    TLSF_EXPECT_INFINITE = 1 << 1,
-    // Do not retrieve the output signals (skips one syfco call).
-    TLSF_IGNORE_SIGNALS = 1 << 2,
-    // Do not retrieve the target (skips one syfco call).
-    TLSF_IGNORE_TARGET = 1 << 3,
-  };
-
-// Bitwise operators for tlsf_flags.
-inline tlsf_flags
-operator|(tlsf_flags a, tlsf_flags b)
-{
-  return static_cast<tlsf_flags>(static_cast<int>(a)
-                                 | static_cast<int>(b));
-}
-
-inline tlsf_flags&
-operator|=(tlsf_flags& a, tlsf_flags b)
-{
-  a = a | b;
-  return a;
-}
-
-inline bool
-operator&(tlsf_flags a, tlsf_flags b)
-{
-  return (static_cast<int>(a) & static_cast<int>(b)) != 0;
-}
+// Helpers used by the tools that accept TLSF specifications (i.e. all
+// the tools that accept LTL or LTLf formulas, through the --tlsf
+// option of the shared finput_argp group).  The conversion of a TLSF
+// file to LTL or LTLf can be done either by the parser embedded in
+// Spot (the default) or by the external syfco tool.  The
+// SPOT_TLSF_PARSER environment variable selects the backend: "spot" or
+// "syfco".
 
 // The result of converting a TLSF specification.
 struct tlsf_conversion_result
@@ -91,9 +54,65 @@ struct tlsf_conversion_result
   // Unchanged when TLSF_IGNORE_SIGNALS is set.
   std::vector<std::string> outputs;
 
+  // The flattened list of input signals, in declaration order.
+  //
+  // Only the "spot" backend fills this list, since it gets it for
+  // free from the single parse it already performs.  The "syfco"
+  // backend is never asked for the input signals, as that would cost
+  // one more process invocation, and the list is then left empty with
+  // inputs_known cleared.
+  std::vector<std::string> inputs;
+
+  // False when INPUTS must not be trusted, in which case the caller
+  // has to deduce the input signals.  See tlsf_signals below for how
+  // the tools do that.
+  bool inputs_known = false;
+
   // Mealy or Moore semantics.  Unchanged when TLSF_IGNORE_TARGET
   // is set.
   spot::tlsf_target target;
+};
+
+// Declare the signals of a TLSF specification in the --ins/--outs
+// machinery of common_ioap.hh, so that the tools that support
+// --relabel=io or --save-part-file can use the partition declared by
+// the specification.  If the user already classified some atomic
+// propositions from the command-line (with --ins, --outs, or
+// --part-file), nothing is declared: the partition the user asked for
+// wins.
+//
+// When CONV.inputs_known, both lists are declared, so that
+// find_ap_type() diagnoses any atomic proposition of the formula that
+// the specification does not declare.  Otherwise only the outputs are
+// declared, and find_ap_type() classifies every other atomic
+// proposition of the formula as an input: that is how the inputs are
+// deduced when only the syfco backend told us about the outputs.
+//
+// Pass USABLE=false for a tool that never looks at the partition, so
+// that nothing is declared at all.
+//
+// The previous state is restored when the object is destroyed, so that
+// a specification read by --tlsf does not affect the other formulas
+// that the tool processes.
+class tlsf_signals
+{
+public:
+  explicit tlsf_signals(const tlsf_conversion_result& conv,
+                        bool usable = true);
+  ~tlsf_signals();
+  tlsf_signals(const tlsf_signals&) = delete;
+  tlsf_signals& operator=(const tlsf_signals&) = delete;
+
+private:
+  // Which of the two lists did we fill?  We only fill them when both
+  // were empty, so they only have to be emptied again.
+  bool set_inputs_ = false;
+  bool set_outputs_ = false;
+  // The identifiers this object inserted into the ioap identifier_map,
+  // so that we can remove exactly those on destruction (leaving the
+  // ones the user provided alone).
+  std::vector<std::string> added_inputs_;
+  std::vector<std::string> added_outputs_;
 };
 
 // Convert the TLSF specification given by FILENAME to an LTL (or
@@ -116,7 +135,13 @@ struct tlsf_conversion_result
 // `target` fields of RES untouched: in the syfco backend this skips
 // the corresponding syfco invocations, in the "spot" backend it
 // changes nothing (all fields are always filled by the single
-// parse).
+// parse).  RES.outputs is filled by both backends, but RES.inputs
+// and RES.inputs_known are only filled by the "spot" backend: the
+// syfco backend is not asked for the input signals, so that
+// converting a specification still takes only one syfco invocation
+// for the formula, one for the output signals, and one for the
+// target.  Callers that need the input signals have to deduce them
+// (see tlsf_signals).
 //
 // Returns false, and prints diagnostics on standard error, when the
 // specification cannot be parsed or converted.  When the syfco

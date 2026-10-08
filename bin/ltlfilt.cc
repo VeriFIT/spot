@@ -699,6 +699,13 @@ namespace
     explicit ltl_processor(spot::tl_simplifier& simpl)
       : simpl(simpl)
     {
+      // --tlsf: ltlfilt never reads the TARGET of the specification,
+      // and reads the partition of the atomic propositions only for
+      // --relabel=io and --save-part-file.  Do not ask syfco for the
+      // signals when neither is in use.
+      tlsf_read_flags |= tlsf_flags::TLSF_IGNORE_TARGET;
+      if (relabeling != IOApRelabeling && !opt->output_part)
+        tlsf_read_flags |= tlsf_flags::TLSF_IGNORE_SIGNALS;
     }
 
     int

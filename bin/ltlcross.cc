@@ -933,6 +933,14 @@ namespace
     processor():
       runner(dict)
     {
+      // This tool only accepts infinite specifications: a TLSF
+      // specification that declares Finite semantics would produce an
+      // LTLf formula, which the cross-validation below does not
+      // support.  It also never looks at the partition of the atomic
+      // propositions, nor at the TARGET of the specification.
+      tlsf_read_flags = tlsf_flags::TLSF_EXPECT_INFINITE
+                        | tlsf_flags::TLSF_IGNORE_SIGNALS
+                        | tlsf_flags::TLSF_IGNORE_TARGET;
     }
 
     int

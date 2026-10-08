@@ -65,7 +65,6 @@ enum
   OPT_SEMANTICS,
   OPT_SIMPLIFY,
   OPT_SPLITTYPE,
-  OPT_TLSF,
   OPT_UNOBSERVABLE,
   OPT_VERBOSE,
   OPT_VERIFY
@@ -89,12 +88,6 @@ static const argp_option options[] =
     { "unobservable-inputs", 0, nullptr, OPTION_ALIAS, nullptr, 0 },
     { "part-file", OPT_PART_FILE, "FILENAME", 0,
       "read the I/O partition of atomic propositions from FILENAME", 0 },
-    { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,
-      "Read a TLSF specification from FILENAME, and convert it into "
-      "LTL using the parser embedded in Spot (unless the "
-      "SPOT_TLSF_PARSER environment variable selects the external "
-      "syfco tool).  Any parameter assignment specified after a slash"
-      " overrides that parameter." , 0 },
     { "from-pgame", OPT_FROM_PGAME, "FILENAME", 0,
       "Read a parity game in Extended HOA format instead of building it.",
       0 },
@@ -1110,29 +1103,24 @@ namespace
       // semantics from the command-line, there is no need to query
       // them from the TLSF file (this saves syfco calls in the
       // syfco backend).
-      tlsf_flags flags = tlsf_flags::TLSF_EXPECT_INFINITE;
+      tlsf_read_flags = tlsf_flags::TLSF_EXPECT_INFINITE;
       if (all_input_aps.has_value() || all_output_aps.has_value())
-        flags |= tlsf_flags::TLSF_IGNORE_SIGNALS;
+        tlsf_read_flags |= tlsf_flags::TLSF_IGNORE_SIGNALS;
       if (opt_semantics != semantics_default)
-        flags |= tlsf_flags::TLSF_IGNORE_TARGET;
+        tlsf_read_flags |= tlsf_flags::TLSF_IGNORE_TARGET;
 
       tlsf_conversion_result conv;
-      if (!read_tlsf_file(filename, flags, conv, gi->verbose_stream))
+      if (!read_tlsf_file(filename, tlsf_read_flags, conv, gi->verbose_stream))
         // An unreadable TLSF file is an error, not an unrealizable
         // specification: report it with exit status 2.
         return 2;
 
-      // The set of atomic propositions is temporarily set to those
-      // declared in the TLSF file, unless they were forced from the
-      // command-line.
-      bool reset_aps = false;
-      if (!all_input_aps.has_value() && !all_output_aps.has_value())
-        {
-          reset_aps = true;
-          all_output_aps.emplace(conv.outputs);
-          for (const std::string& a: conv.outputs)
-            identifier_map.emplace(a, ap_type::OutputAP);
-        }
+      // Declare the signals of the specification for the duration of
+      // the call below, unless they were forced from the
+      // command-line (in which case conv.outputs is empty anyway,
+      // thanks to TLSF_IGNORE_SIGNALS).
+      tlsf_signals sigs(conv);
+
       semantics_choice old_semantics = opt_semantics;
       if (old_semantics == semantics_default)
         {
@@ -1148,11 +1136,6 @@ namespace
         }
       int res = process_formula(conv.formula, filename);
       opt_semantics = old_semantics;
-      if (reset_aps)
-        {
-          all_output_aps.reset();
-          identifier_map.clear();
-        }
       return res;
     }
 
@@ -1417,9 +1400,6 @@ parse_opt(int key, char *arg, struct argp_state *)
     case OPT_SPLITTYPE:
       gi->sp = XARGMATCH("--splittype", arg,
                          splittype_args, splittype_values);
-      break;
-    case OPT_TLSF:
-      jobs.emplace_back(arg, job_type::TLSF_FILENAME);
       break;
     case OPT_UNOBSERVABLE:
       all_unobs_aps.emplace();

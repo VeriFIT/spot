@@ -283,9 +283,10 @@ heuristic is used to choose which implementation to use.
 
 .TP
 \fBSPOT_TLSF_PARSER\fR
-Selects how the \fB\-\-tlsf\fR option of \fBltlsynt\fR, \fBltlfsynt\fR,
-and \fBltlf2dfa\fR converts a TLSF specification to LTL or LTLf.  The
-default value, \fBspot\fR, uses the TLSF parser embedded in Spot.  Set
+Selects how the \fB\-\-tlsf\fR option of the tools that accept TLSF
+specifications (any tool that reads LTL or LTLf formulas) converts a
+TLSF specification to LTL or LTLf.  The default value, \fBspot\fR, uses
+the TLSF parser embedded in Spot.  Set
 this variable to \fBsyfco\fR to use the external \fBsyfco\fR tool
 instead; \fBsyfco\fR must then be installed somewhere on your
 \fBPATH\fR.  The \fBsyfco\fR backend is mainly useful to work around
@@ -294,7 +295,13 @@ its output.  Unlike the built-in parser, which reads the whole
 specification in one pass, the \fBsyfco\fR backend invokes
 \fBsyfco\fR once per requested item, so it is slower; the tools skip
 the invocations for information they do not need (for instance
-\fBltlf2dfa\fR only requests the formula).
+\fBltlf2dfa\fR only requests the formula).  In particular, the
+\fBsyfco\fR backend is never asked for the input signals, as that
+would cost one more invocation: with \fBSPOT_TLSF_PARSER=syfco\fR, the
+partition of the atomic propositions is completed by assuming that
+every atomic proposition that is not an output is an input, while the
+built-in parser declares the =INPUTS= and =OUTPUTS= of the
+specification.
 
 .TP
 \fBSPOT_TMPDIR\fR, \fBTMPDIR\fR

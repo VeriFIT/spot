@@ -149,9 +149,12 @@ read_tlsf_with_spot(const std::string& filename,
     }
 
   // Hand the formula to the caller directly: no need to print it
-  // and have the tool parse the printed form again.
+  // and have the tool parse the printed form again.  The input and
+  // output signals come from the same parse, at no extra cost.
   res.formula = conv.full_formula;
+  res.inputs = std::move(conv.inputs);
   res.outputs = std::move(conv.outputs);
+  res.inputs_known = true;
   res.target = parsed->target;
   return true;
 }
@@ -190,6 +193,13 @@ run_syfco(std::vector<char*>& command,
 // not declare Finite semantics, and "syfco -f ltlxba" fails on
 // those that do.  When no expectation is given, plain "ltlxba" is
 // used and both kinds are accepted.
+//
+// The input signals are deliberately not retrieved here: syfco would
+// need one more invocation for them, which would double the cost of
+// the signal lists, and a specification whose translation is correct
+// has no atomic proposition outside of the declared signals.  RES.inputs
+// is therefore left empty and RES.inputs_known is left false; it is up
+// to the caller to deduce the inputs (see tlsf_signals).
 static bool
 read_tlsf_with_syfco(const std::string& filename,
                      const std::vector<std::string>& assignments,
@@ -224,22 +234,15 @@ read_tlsf_with_syfco(const std::string& filename,
 
   // The formula itself is always needed.  Pass the parameter
   // assignments as -op VAR=VAL options, like the original code did.
-  for (const std::string& a: assignments)
-    {
-      static char argop[] = "-op";
-      command.push_back(argop);
-      command.push_back(const_cast<char*>(a.c_str()));
-    }
+  // run_syfco() resets the command, so that a probe above (if any)
+  // does not leak into this invocation.
   static char argf[] = "-f";
   static char argm[] = "-m";
   static char argfu[] = "fully";
-  command.push_back(argf);
-  command.push_back(const_cast<char*>(finite ? "ltlxba-fin" : "ltlxba"));
-  command.push_back(argm);
-  command.push_back(argfu);
-  command.push_back(const_cast<char*>(filename.c_str()));
-  command.push_back(nullptr);
-  std::string f = read_stdout_of_command(command, verbose);
+  std::string f =
+    run_syfco(command, assignments,
+              {argf, finite ? "ltlxba-fin" : "ltlxba", argm, argfu},
+              filename, verbose);
   // syfco outputs the formula as a string: parse it once here, so
   // that the callers get a spot::formula like with the "spot"
   // backend.
@@ -298,4 +301,75 @@ read_tlsf_file(const std::string& filename, tlsf_flags flags,
   else
     return read_tlsf_with_syfco(real_filename, assignments, flags,
                                 res, verbose);
+}
+
+tlsf_signals::tlsf_signals(const tlsf_conversion_result& conv, bool usable)
+{
+  if (!usable)
+    return;
+
+  // If the user already classified some atomic propositions from the
+  // command-line (--ins, --outs, --part-file), the partition they
+  // asked for wins and we declare nothing.  Declaring only one of the
+  // two lists would be wrong anyway: find_ap_type() then rejects every
+  // atomic proposition that matches neither of them.
+  if (all_input_aps.has_value() || all_output_aps.has_value())
+    return;
+
+  if (!conv.outputs.empty())
+    {
+      set_outputs_ = true;
+      all_output_aps.emplace(conv.outputs);
+      for (const std::string& a: conv.outputs)
+        // emplace() rather than insert_or_assign(): an identifier
+        // that the user already classified (with --unobservable-ins
+        // for instance) keeps its type.
+        if (identifier_map.emplace(a, ap_type::OutputAP).second)
+          added_outputs_.push_back(a);
+    }
+
+  // The inputs are only known when the built-in parser was used.  If
+  // they are not, we leave all_input_aps alone: find_ap_type() then
+  // assumes that any atomic proposition that is not an output is an
+  // input, which is the deduction we want.
+  if (conv.inputs_known && !conv.inputs.empty())
+    {
+      set_inputs_ = true;
+      all_input_aps.emplace(conv.inputs);
+      for (const std::string& a: conv.inputs)
+        if (identifier_map.emplace(a, ap_type::InputAP).second)
+          added_inputs_.push_back(a);
+    }
+}
+
+tlsf_signals::~tlsf_signals()
+{
+  // Remove exactly what we added, so that the state contributed by
+  // the command-line (--ins, --outs, --part-file,
+  // --unobservable-ins) is left intact.
+  for (const std::string& a: added_inputs_)
+    identifier_map.erase(a);
+  for (const std::string& a: added_outputs_)
+    identifier_map.erase(a);
+  if (set_inputs_)
+    all_input_aps.reset();
+  if (set_outputs_)
+    all_output_aps.reset();
+}
+
+int
+job_processor::process_tlsf_file(const char* filename)
+{
+  tlsf_conversion_result conv;
+  if (!read_tlsf_file(filename, tlsf_read_flags, conv))
+    // An unreadable TLSF file is an error: report it with exit
+    // status 2.
+    return 2;
+
+  // Tell the --ins/--outs machinery about the signals of the
+  // specification for the duration of the call below, unless the tool
+  // told us it will not use them.
+  tlsf_signals sigs(conv,
+                    !(tlsf_read_flags & tlsf_flags::TLSF_IGNORE_SIGNALS));
+  return process_formula(conv.formula, filename);
 }

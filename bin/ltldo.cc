@@ -322,6 +322,14 @@ namespace
       best_printer.declare('T', &cmdname); // backward compatibility <2.16
       best_printer.declare('#', &roundval);
       best_printer.declare('f', &inputf);
+      // This tool only accepts infinite specifications: a TLSF
+      // specification that declares Finite semantics would produce an
+      // LTLf formula, which the tools run here do not support.  It
+      // also never looks at the partition of the atomic propositions,
+      // nor at the TARGET of the specification.
+      tlsf_read_flags = tlsf_flags::TLSF_EXPECT_INFINITE
+                        | tlsf_flags::TLSF_IGNORE_SIGNALS
+                        | tlsf_flags::TLSF_IGNORE_TARGET;
     }
 
     ~processor() override = default;

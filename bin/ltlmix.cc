@@ -315,6 +315,14 @@ main(int argc, char* argv[])
         opt_io = true;
       if (opt_io)
         process_io_options();
+      else
+        // The partition of the atomic propositions is only consulted
+        // when the pattern draws inputs and outputs from separate sets
+        // (-A N,M or -P N,M), or when the user provided one with
+        // --ins/--outs/--part-file.  The TARGET is never used.
+        subreader.tlsf_read_flags = tlsf_flags::TLSF_EXPECT_ANY
+                                   | tlsf_flags::TLSF_IGNORE_SIGNALS
+                                   | tlsf_flags::TLSF_IGNORE_TARGET;
 
       if (subreader.run())
         return 2;

@@ -27,35 +27,61 @@
 enum {
   OPT_LBT = 1,
   OPT_LENIENT,
+  OPT_TLSF,
 };
 
 jobs_t jobs;
 bool lbt_input = false;
 static bool lenient = false;
 
-static const argp_option options[] =
+// The --tlsf entry is generated from this macro because the tools
+// that only accept LTLf formulas must advertise LTLf instead of LTL.
+#define FINPUT_OPTIONS(WHAT)                                          \
+  { nullptr, 0, nullptr, 0, "Input options:", 1 },                     \
+  { "formula", 'f', "STRING", 0, "process the formula STRING", 1 },   \
+  { "file", 'F', "FILENAME[/COL]", 0,                                 \
+    "process each line of FILENAME as a formula; if COL is a "        \
+    "positive integer, assume a CSV file and read column COL; use "   \
+    "a negative COL to drop the first line of the CSV file", 1 },     \
+  { "lbt-input", OPT_LBT, nullptr, 0,                                 \
+    "read all formulas using LBT's prefix syntax", 1 },               \
+  { "lenient", OPT_LENIENT, nullptr, 0,                               \
+    "parenthesized blocks that cannot be parsed as subformulas "      \
+    "are considered as atomic properties", 1 },                       \
+  { "tlsf", OPT_TLSF, "FILENAME[/VAR=VAL[,VAR=VAL...]]", 0,           \
+    "Read a TLSF specification from FILENAME, and convert it into "   \
+    WHAT " using the parser embedded in Spot (unless the "            \
+    "SPOT_TLSF_PARSER environment variable selects the external "     \
+    "syfco tool).  Any parameter assignment specified after a slash"   \
+    " overrides that parameter.", 1 },                                 \
+  { nullptr, 0, nullptr, 0, nullptr, 0 }
+
+static const argp_option options_ltl[] =
   {
-    { nullptr, 0, nullptr, 0, "Input options:", 1 },
-    { "formula", 'f', "STRING", 0, "process the formula STRING", 1 },
-    { "file", 'F', "FILENAME[/COL]", 0,
-      "process each line of FILENAME as a formula; if COL is a "
-      "positive integer, assume a CSV file and read column COL; use "
-      "a negative COL to drop the first line of the CSV file", 1 },
-    { "lbt-input", OPT_LBT, nullptr, 0,
-      "read all formulas using LBT's prefix syntax", 1 },
-    { "lenient", OPT_LENIENT, nullptr, 0,
-      "parenthesized blocks that cannot be parsed as subformulas "
-      "are considered as atomic properties", 1 },
-    { nullptr, 0, nullptr, 0, nullptr, 0 }
+    FINPUT_OPTIONS("LTL"),
   };
 
-const struct argp finput_argp = { options, parse_opt_finput,
+static const argp_option options_ltlf[] =
+  {
+    FINPUT_OPTIONS("LTLf"),
+  };
+
+const struct argp finput_argp = { options_ltl, parse_opt_finput,
                                   nullptr, nullptr, nullptr,
                                   nullptr, nullptr };
 
-const struct argp finput_argp_headless = { options + 1, parse_opt_finput,
+// The "headless" variants skip the "Input options:" header, for the
+// tools that provide their own.  They come in two flavours because the
+// --tlsf entry advertises the kind of formula the tool accepts.
+const struct argp finput_argp_headless = { options_ltl + 1,
+                                           parse_opt_finput,
                                            nullptr, nullptr, nullptr,
                                            nullptr, nullptr };
+
+const struct argp finput_argp_headless_ltlf = { options_ltlf + 1,
+                                                parse_opt_finput,
+                                                nullptr, nullptr, nullptr,
+                                                nullptr, nullptr };
 
 
 int
@@ -77,6 +103,9 @@ parse_opt_finput(int key, char* arg, struct argp_state*)
       break;
     case OPT_LENIENT:
       lenient = true;
+      break;
+    case OPT_TLSF:
+      jobs.emplace_back(arg, job_type::TLSF_FILENAME);
       break;
     default:
       return ARGP_ERR_UNKNOWN;
@@ -308,12 +337,6 @@ int
 job_processor::process_aut_file(const char*)
 {
   throw std::runtime_error("process_aut_file not defined for this tool");
-}
-
-int
-job_processor::process_tlsf_file(const char*)
-{
-  throw std::runtime_error("process_tlsf_file not defined for this tool");
 }
 
 int

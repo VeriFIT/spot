@@ -20,16 +20,20 @@
 . ./defs || exit 1
 set -e
 
-# Test that we can pass a TLSF specification to ltlsynt, ltlfsynt,
-# and ltlf2dfa.  This used to require the external syfco tool; it
-# now works with the TLSF parser embedded in Spot.  When syfco is
-# installed, the same checks are also run with the SPOT_TLSF_PARSER
-# environment variable set to syfco, to make sure that backend is
-# still functional.
+# Test that we can pass a TLSF specification to any tool that reads
+# LTL or LTLf formulas, via its --tlsf option.  This used to require
+# the external syfco tool; it now works with the TLSF parser embedded
+# in Spot.  When syfco is installed, the same checks are also run with
+# the SPOT_TLSF_PARSER environment variable set to syfco, to make sure
+# that backend is still functional.
 
 backends=spot
 if syfco --version >/dev/null 2>&1; then
   backends="spot syfco"
+  # Absolute path of the real syfco, resolved here, before the shim of
+  # the invocation-counting section below is created.  Resolving it
+  # later would find the shim instead, and the shim would exec itself.
+  syfco_real=`command -v syfco`
 fi
 
 for backend in $backends; do
@@ -138,6 +142,131 @@ test $s6 = 2
 ltlf2dfa --tlsf testf.tlsf/n=4 >out.hoa
 test "3,5" = `autfilt --stats=%s,%x out.hoa`
 
+# --tlsf is not limited to the synthesis tools: every tool that reads
+# LTL or LTLf formulas accepts it, and just processes the formula the
+# specification is translated to.
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = "`ltlfilt --tlsf test.tlsf`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = "`ltlfilt --tlsf testf.tlsf`"
+
+# The INPUTS and OUTPUTS of the specification are declared as the I/O
+# partition while its formula is processed, so --relabel=io renames
+# the inputs to i0, i1,... and the outputs to o0, o1,...
+test 'G(i0 <-> Xo0) & G(i0 <-> Xo1)' = \
+  "`ltlfilt --tlsf test.tlsf --relabel=io`"
+test 'G(i0 <-> Xo0) & G(i0 <-> Xo1)' = \
+  "`ltlfilt --tlsf testf.tlsf --relabel=io`"
+
+# ... and --save-part-file writes that same partition.
+ltlfilt --tlsf test.tlsf --save-part-file=out.part >/dev/null
+cat >expected <<\EOF
+.inputs in
+.outputs out_0 out_1
+EOF
+diff out.part expected
+
+# An explicit --ins/--outs takes precedence over the specification.
+test 'G(i0 <-> Xo0) & G(i0 <-> Xo1)' = "`ltlfilt --tlsf test.tlsf \
+  --relabel=io --ins=in --outs=out_0,out_1`"
+
+# The partition declared by the specification is only in effect while
+# its own formula is processed, and does not leak to the other inputs.
+ltlfilt --tlsf test.tlsf -f 'Gzz' --relabel=io >out 2>err && exit 1
+test 'G(i0 <-> Xo0) & G(i0 <-> Xo1)' = "`cat out`"
+grep "does not start with 'i' or 'o'" err
+
+# ltl2tgba accepts both kinds of specification; --ltlf is only needed
+# to translate the LTLf one with finite-trace semantics.
+ltl2tgba --tlsf test.tlsf >out.hoa
+test "3,3" = `autfilt --stats=%s,%x out.hoa`
+ltl2tgba --tlsf testf.tlsf >out.hoa
+test "3,3" = `autfilt --stats=%s,%x out.hoa`
+ltl2tgba --ltlf --tlsf testf.tlsf >out.hoa
+test "3,3" = `autfilt --stats=%s,%x out.hoa`
+
+# ltlgrind and ltlmix do not care whether they work on LTL or LTLf.
+test 'G(in <-> Xout_0)' = "`ltlgrind --tlsf test.tlsf | head -1`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlmix --tree-size=1 --tlsf test.tlsf`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlmix --tree-size=1 --tlsf testf.tlsf`"
+
+# ltlcross and ltldo only accept infinite specifications.
+ltlcross --tlsf test.tlsf 'ltl2tgba -f %f >%O' 2>&1 |
+  grep -q 'No problem detected.'
+ltldo --tlsf test.tlsf 'ltl2tgba -f %f >%O' > out.hoa
+grep -q 'AP: 3' out.hoa
+
+set +e
+ltlcross --tlsf testf.tlsf 'ltl2tgba -f %f >%O' 2>err
+s7=$?
+ltldo --tlsf testf.tlsf 'ltl2tgba -f %f >%O' 2>>err
+s8=$?
+ltlfilt --tlsf nonexistent.tlsf 2>>err
+s9=$?
+set -e
+test $s7 = 2
+test $s8 = 2
+test $s9 = 2
+# The spot backend diagnoses the semantics mismatch itself.  The syfco
+# backend asks syfco for an infinite formula, and syfco is the one
+# complaining.
+if test $backend = spot; then
+  test 2 = `grep -c 'declares Finite semantics' err`
+fi
+grep 'cannot open\|File does not exist' err
+
+# The syfco backend invokes the external tool once per requested item.
+# Check that each tool only asks syfco for what it actually uses, by
+# putting a syfco that logs its arguments first in $PATH.
+if test $backend = syfco; then
+  # A subshell, so that neither the shim nor the modified $PATH leaks
+  # into the rest of this iteration or the next one.
+  (
+    # Print how many times syfco was invoked by the given command.
+    count_syfco()
+    {
+      : > syfco.log
+      "$@" >/dev/null 2>&1 || true
+      wc -l < syfco.log
+    }
+
+    cat >syfco <<EOF
+#!/bin/sh
+echo "\$*" >> syfco.log
+exec $syfco_real "\$@"
+EOF
+    chmod +x syfco
+    PATH=".:$PATH"
+    export PATH
+
+    # ltlfilt asks for the I/O partition only for --relabel=io and
+    # --save-part-file, and never for the target: the semantics probe
+    # plus the formula, and one more call for the output signals.
+    test 2 = "`count_syfco ltlfilt --tlsf test.tlsf -p`"
+    test 3 = "`count_syfco ltlfilt --tlsf test.tlsf --relabel=io -p`"
+    test 3 = "`count_syfco ltlfilt --tlsf test.tlsf --save-part-file=- -p`"
+
+    # These three never look at the partition nor at the target.
+    test 2 = "`count_syfco ltl2tgba --tlsf test.tlsf`"
+    test 2 = "`count_syfco ltlgrind --tlsf test.tlsf`"
+    test 2 = "`count_syfco ltlmix --tlsf test.tlsf`"
+
+    # ltlcross and ltldo know the semantics is infinite, so they do not
+    # need the probe either, and they use neither the partition nor the
+    # target: the formula alone is enough.
+    test 1 = "`count_syfco ltlcross --tlsf test.tlsf 'ltl2tgba -f %f >%O'`"
+    test 1 = "`count_syfco ltldo --tlsf test.tlsf 'ltl2tgba -f %f >%O'`"
+
+    # The synthesis tools need the partition and the target.
+    test 3 = "`count_syfco ltlsynt --tlsf test.tlsf --realizability`"
+    test 3 = "`count_syfco ltlfsynt --tlsf testf.tlsf --real`"
+
+    # ltlf2dfa needs neither.
+    test 1 = "`count_syfco ltlf2dfa --tlsf testf.tlsf`"
+
+    rm -f syfco syfco.log
+  )
+fi
 
 cat >chomp.tlsf <<EOF
 INFO {

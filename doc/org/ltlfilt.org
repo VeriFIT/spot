@@ -445,6 +445,35 @@ cat out.part
 : .inputs i0 i1
 : .outputs o0 o1
 
+When the formula is read from a [[file:tlsf.org][TLSF]] specification
+with =--tlsf=, no =--ins= or =--outs= is required: the =INPUTS= and
+=OUTPUTS= of the specification are used as the partition.
+
+#+BEGIN_SRC sh
+cat > grant.tlsf <<'EOF'
+INFO {
+  TITLE:       "arbitration"
+  DESCRIPTION: "grant one request at a time"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS  { request[2]; }
+  OUTPUTS { grant[2]; }
+  GUARANTEE {
+    (&&[0 <= i < 2] &&[0 <= j < 2] (request[i] <-> request[j])) ||
+      (grant[0] -> (grant[1] -> X(!grant[0])))
+  }
+}
+EOF
+ltlfilt --tlsf grant.tlsf --relabel=io
+#+END_SRC
+#+RESULTS:
+: (i0 <-> i1) | (o0 -> (o1 -> X!o0))
+
+See [[file:ioltl.org::#tlsf-input][the description of the =--tlsf=
+option]] for the details.
+
 * Filtering
 
 =ltlfilt= supports many ways to filter formulas:

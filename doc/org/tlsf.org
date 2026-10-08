@@ -20,11 +20,13 @@ semantics.
 There is a tool, called [[https://github.com/reactive-systems/syfco][=syfco=]], which can translate a TLSF
 specification to an LTLf or LTL formula in various syntaxes.
 
-Some of Spot's command-line tools ([[file:ltlsynt.org][=ltlsynt=]], [[file:ltlfsynt.org][=ltlfsynt=]], [[file:ltlf2dfa.org][=ltlf2dfa=]])
-have support for the TLSF format.  By default they use the TLSF
-parser embedded in Spot to translate the specification to LTL or
-LTLf; set the =SPOT_TLSF_PARSER= environment variable to =syfco= to
-use the external [[https://github.com/reactive-systems/syfco][=syfco=]] tool instead.
+All of Spot's tools that read LTL or LTLf formulas ([[file:ltl2tgba.org][=ltl2tgba=]], [[file:ltlfilt.org][=ltlfilt=]], [[file:ltlmix.org][=ltlmix=]], [[file:ltlcross.org][=ltlcross=]], [[file:ltldo.org][=ltldo=]], [[file:ltlgrind.org][=ltlgrind=]], [[file:ltlsynt.org][=ltlsynt=]], [[file:ltlfsynt.org][=ltlfsynt=]], and [[file:ltlf2dfa.org][=ltlf2dfa=]])
+implement a =--tlsf= option.  By default they use the TLSF parser
+embedded in Spot to translate the specification to LTL or LTLf; set
+the =SPOT_TLSF_PARSER= environment variable to =syfco= to use the
+external [[https://github.com/reactive-systems/syfco][=syfco=]] tool
+instead.  See [[file:ioltl.org::#tlsf-input][the description of the
+=--tlsf= option]] for the details.
 
 * Example TLSF specification
 
@@ -173,8 +175,18 @@ three calls to [[https://github.com/reactive-systems/syfco][=syfco=]].
 The first command converts the TLSF specification into LTLf. =-f
 ltlxba-fin= requests a syntax of LTLf that is compatible with Spot,
 and =-m fully= requests fully parenthesized formulas to avoid
-ambiguities in operator priorities.  Running that first command on
-this example already produces a pretty large formula:
+ambiguities in operator priorities.  The second command retrieves the
+output signals, and the third one the target (Mealy or Moore).
+
+Notice that the input signals are never requested from =syfco=:
+retrieving them would cost one more process invocation, and they are
+deduced by assuming that every atomic proposition of the formula that
+is not an output is an input.  With the built-in parser (the default),
+both lists come from the single parse, so the partition of the atomic
+propositions is exact.
+
+Running that first command on this example already produces a pretty
+large formula:
 
 #+BEGIN_SRC sh
   syfco -f ltlxba-fin -m fully chomp.tlsf | fmt -80
@@ -260,10 +272,10 @@ syfco --print-target chomp.tlsf
 : Mealy
 
 
-Note that you can use =--semantics=, =--ins=, or =--outs= to override
-the partition of propositions or the semantics taken from the TLSF
-file.  For instance, forcing Moore semantics and classifying the
-propositions that start with =o= as outputs:
+Note that the partition of the propositions and the semantics are
+read from the TLSF file, so options such as =--ins= or =--outs= are
+only needed to override them.  For instance, forcing Moore semantics
+and classifying the propositions that start with =o= as outputs:
 
 #+BEGIN_SRC sh
   ltlfsynt --tlsf chomp.tlsf --semantics=Moore --outs='/^o/' --realizability \
@@ -326,9 +338,15 @@ The most notable are the following.
 
 * Converting TLSF to LTL by hand
 
-If you want to use TLSF with a tool that does not support the
-=--tlsf= option, you can still call [[https://github.com/reactive-systems/syfco][=syfco=]] explicitly and pass the
-LTL/LTLf formulas it produces directly to that tool.
+Every tool that reads LTL or LTLf formulas accepts a TLSF
+specification via =--tlsf=, so you rarely need to convert a
+specification yourself.  There are still a few reasons to do it: to
+feed the formula to a third-party tool, or to force the
+[[https://github.com/reactive-systems/syfco][=syfco=]] backend while
+inspecting its intermediate results.
+
+In that case, call [[https://github.com/reactive-systems/syfco][=syfco=]] explicitly and pass the
+LTL/LTLf formulas it produces directly to the tool of your choice.
 
 Beware that doing something like this only works up to a certain size
 of specifications:

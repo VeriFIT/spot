@@ -134,6 +134,11 @@ namespace
     explicit trans_processor(spot::translator& trans)
       : trans(trans)
     {
+      // --tlsf: this tool never looks at the partition of the atomic
+      // propositions, nor at the TARGET of the specification.
+      tlsf_read_flags = tlsf_flags::TLSF_EXPECT_ANY
+                        | tlsf_flags::TLSF_IGNORE_SIGNALS
+                        | tlsf_flags::TLSF_IGNORE_TARGET;
     }
 
     int

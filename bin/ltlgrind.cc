@@ -117,6 +117,15 @@ namespace
   class mutate_processor final: public job_processor
   {
   public:
+    mutate_processor()
+    {
+      // --tlsf: this tool never looks at the partition of the atomic
+      // propositions, nor at the TARGET of the specification.
+      tlsf_read_flags = tlsf_flags::TLSF_EXPECT_ANY
+                        | tlsf_flags::TLSF_IGNORE_SIGNALS
+                        | tlsf_flags::TLSF_IGNORE_TARGET;
+    }
+
     int
     process_formula(spot::formula f, const char* filename = nullptr,
                     int linenum = 0) override

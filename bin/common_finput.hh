@@ -29,6 +29,59 @@ enum class job_type : char { LTL_STRING,
                              AUT_FILENAME,
                              TLSF_FILENAME };
 
+// What the job_processor should extract from a TLSF specification
+// passed via --tlsf.  See read_tlsf_file() in common_tlsf.hh, which
+// documents how each of these flags is used.
+//
+// This enum lives here, rather than in common_tlsf.hh, because it
+// describes what a job_type::TLSF_FILENAME job may declare: keeping
+// it out of common_tlsf.hh spares spot/parsetlsf/public.hh (which
+// pulls spot/parseaut/public.hh) to the few tools that read TLSF.
+enum class tlsf_flags
+  {
+    // Accept both finite and infinite specifications.  This is the
+    // value that lets read_tlsf_file() pick the syntax matching the
+    // SEMANTICS declared by the specification.
+    TLSF_EXPECT_ANY = 0,
+    // Expect the specification to declare Finite semantics.
+    TLSF_EXPECT_FINITE = 1 << 0,
+    // Expect the specification to declare infinite semantics (i.e.,
+    // it must not declare Finite).
+    TLSF_EXPECT_INFINITE = 1 << 1,
+    // The caller will not use the partition of the atomic propositions,
+    // so do not retrieve the signals (this skips one syfco call).
+    // With the syfco backend this also means that the input signals
+    // cannot be deduced; the flag has no effect on the "spot" backend,
+    // which fills both lists from a single parse anyway, but
+    // job_processor::process_tlsf_file() then skips declaring them as
+    // well, so that both backends behave the same way.
+    TLSF_IGNORE_SIGNALS = 1 << 2,
+    // The caller will not use the TARGET of the specification, so do
+    // not retrieve it (this skips one syfco call).
+    TLSF_IGNORE_TARGET = 1 << 3,
+  };
+
+// Bitwise operators for tlsf_flags.
+inline tlsf_flags
+operator|(tlsf_flags a, tlsf_flags b)
+{
+  return static_cast<tlsf_flags>(static_cast<int>(a)
+                                 | static_cast<int>(b));
+}
+
+inline tlsf_flags&
+operator|=(tlsf_flags& a, tlsf_flags b)
+{
+  a = a | b;
+  return a;
+}
+
+inline bool
+operator&(tlsf_flags a, tlsf_flags b)
+{
+  return (static_cast<int>(a) & static_cast<int>(b)) != 0;
+}
+
 struct job
 {
   const char* str;
@@ -44,8 +97,15 @@ typedef std::vector<job> jobs_t;
 extern jobs_t jobs;
 extern bool lbt_input;
 
+// The common input options, with their own "Input options:" header.
 extern const struct argp finput_argp;
+// Same options without that header, for the tools that provide their
+// own.  The --tlsf entry advertises LTL, as this variant is for the
+// tools that work on LTL (or on both LTL and LTLf).
 extern const struct argp finput_argp_headless;
+// Same as finput_argp_headless, but with a --tlsf entry that mentions
+// LTLf instead of LTL, for tools that only accept LTLf formulas.
+extern const struct argp finput_argp_headless_ltlf;
 
 int parse_opt_finput(int key, char* arg, struct argp_state* state);
 
@@ -81,6 +141,11 @@ public:
   virtual int
   process_aut_file(const char* filename);
 
+  // Read a TLSF specification and pass the resulting LTL (or LTLf)
+  // formula to process_formula().  The default implementation is in
+  // common_tlsf.cc; tools that need extra work around it (e.g. to
+  // pick the synthesis semantics from the TARGET of the
+  // specification) override it and call it explicitly.
   virtual int
   process_tlsf_file(const char* filename);
 
@@ -91,6 +156,16 @@ public:
   long int col_to_read = 0;
   char* prefix = nullptr;
   char* suffix = nullptr;
+
+  // Flags for read_tlsf_file() when reading a file given via --tlsf.
+  // Defaults to accepting both finite and infinite specifications;
+  // tools that only support one kind of formula should set
+  // TLSF_EXPECT_FINITE or TLSF_EXPECT_INFINITE.  A tool that never
+  // looks at the partition of the atomic propositions, or never at
+  // the TARGET, should say so with TLSF_IGNORE_SIGNALS and
+  // TLSF_IGNORE_TARGET respectively, so that the syfco backend is not
+  // asked for information that would be discarded.
+  tlsf_flags tlsf_read_flags = tlsf_flags::TLSF_EXPECT_ANY;
 };
 
 // Report and error message or add a default job depending on whether
