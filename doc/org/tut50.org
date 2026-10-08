@@ -518,6 +518,7 @@ package spot {
   twa *--> acc_cond
 
   class twa_graph_state
+  class twa_graph_succ_iterator
 
   hide twa_graph members
   hide twa_graph_state members
