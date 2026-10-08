@@ -31,8 +31,8 @@
 
 namespace spot
 {
-  cspins_state_manager::cspins_state_manager(unsigned int state_size,
-                                             int compress)
+  inline cspins_state_manager::cspins_state_manager(unsigned int state_size,
+                                                    int compress)
     : p_((state_size+2)*sizeof(int)), compress_(compress),
       /* reserve one integer for the hash value and size */
       state_size_(state_size),
@@ -44,13 +44,13 @@ namespace spot
                      : int_array_array_decompress2)
   { }
 
-  int* cspins_state_manager::unbox_state(cspins_state s) const
+  inline int* cspins_state_manager::unbox_state(cspins_state s) const
   {
     return s+2;
   }
 
   // cmp is the area we can use to compute the compressed rep of dst.
-  cspins_state
+  inline cspins_state
   cspins_state_manager::alloc_setup(int *dst, int* cmp, size_t cmpsize)
   {
     cspins_state out = nullptr;
@@ -75,13 +75,14 @@ namespace spot
     return out;
   }
 
-  void cspins_state_manager::decompress(cspins_state s, int* uncompressed,
-                                        unsigned size) const
+  inline void
+  cspins_state_manager::decompress(cspins_state s, int* uncompressed,
+                                   unsigned size) const
   {
     fn_decompress_(s+2, s[1], uncompressed, size);
   }
 
-  void cspins_state_manager::dealloc(cspins_state s)
+  inline void cspins_state_manager::dealloc(cspins_state s)
   {
     if (compress_)
       msp_.deallocate(s, (s[1]+2)*sizeof(int));
@@ -89,12 +90,12 @@ namespace spot
       p_.deallocate(s);
   }
 
-  unsigned int cspins_state_manager::size() const
+  inline unsigned int cspins_state_manager::size() const
   {
     return state_size_;
   }
 
-  cspins_iterator::cspins_iterator(cspins_iterator_param& p)
+  inline cspins_iterator::cspins_iterator(cspins_iterator_param& p)
     :  current_(0), cond_(p.cond), tid_(p.tid)
   {
     successors_.reserve(10);
@@ -102,7 +103,7 @@ namespace spot
                    p.selfloopize, p.cubeset, p.dead_idx);
   }
 
-  void cspins_iterator::recycle(cspins_iterator_param& p)
+  inline void cspins_iterator::recycle(cspins_iterator_param& p)
   {
     tid_ = p.tid;
     cond_ = p.cond;
@@ -113,15 +114,15 @@ namespace spot
                    p.selfloopize, p.cubeset, p.dead_idx);
   }
 
-  void cspins_iterator::setup_iterator(cspins_state s,
-                                       const spot::spins_interface* d,
-                                       cspins_state_manager& manager,
-                                       inner_callback_parameters& inner,
-                                       cube& cond,
-                                       bool compress,
-                                       bool selfloopize,
-                                       cubeset& cubeset,
-                                       int dead_idx)
+  inline void cspins_iterator::setup_iterator(cspins_state s,
+                                              const spot::spins_interface* d,
+                                              cspins_state_manager& manager,
+                                              inner_callback_parameters& inner,
+                                              cube& cond,
+                                              bool compress,
+                                              bool selfloopize,
+                                              cubeset& cubeset,
+                                              int dead_idx)
   {
     inner.manager = &manager;
     inner.succ = &successors_;
@@ -153,30 +154,30 @@ namespace spot
 
   }
 
-  cspins_iterator::~cspins_iterator()
+  inline cspins_iterator::~cspins_iterator()
   {
     // Do not release successors states, the manager
     // will do it on time.
   }
 
-  void cspins_iterator::next()
+  inline void cspins_iterator::next()
   {
     ++current_;
   }
 
-  bool cspins_iterator::done() const
+  inline bool cspins_iterator::done() const
   {
     return current_ >= successors_.size();
   }
 
-  cspins_state cspins_iterator::state() const
+  inline cspins_state cspins_iterator::state() const
   {
     if (SPOT_UNLIKELY(!tid_))
       return successors_[current_];
     return   successors_[compute_index()];
   }
 
-  unsigned cspins_iterator::compute_index() const
+  inline unsigned cspins_iterator::compute_index() const
   {
     unsigned long long c = current_ + 1;
     unsigned long long p = primes[tid_];
@@ -184,13 +185,13 @@ namespace spot
     return (unsigned)  ((c*p) % s);
   }
 
-  cube cspins_iterator::condition() const
+  inline cube cspins_iterator::condition() const
   {
     return cond_;
   }
 
 
-  kripkecube<cspins_state, cspins_iterator>
+  inline kripkecube<cspins_state, cspins_iterator>
   ::kripkecube (spins_interface_ptr sip,
                 bool compress,
                 std::vector<std::string> visible_aps,
@@ -218,7 +219,7 @@ namespace spot
 
   }
 
-  kripkecube<cspins_state, cspins_iterator>::~kripkecube()
+  inline kripkecube<cspins_state, cspins_iterator>::~kripkecube()
   {
     for (auto& i: recycle_)
       {
@@ -239,7 +240,8 @@ namespace spot
     delete[] inner_;
   }
 
-  cspins_state kripkecube<cspins_state, cspins_iterator>::initial(unsigned tid)
+  inline cspins_state
+  kripkecube<cspins_state, cspins_iterator>::initial(unsigned tid)
   {
     d_->get_initial_state(inner_[tid].uncompressed);
     return manager_[tid].alloc_setup(inner_[tid].uncompressed,
@@ -247,7 +249,7 @@ namespace spot
                                      manager_[tid].size() * 2);
   }
 
-  std::string
+  inline std::string
   kripkecube<cspins_state, cspins_iterator>::to_string(const cspins_state s,
                                                        unsigned tid) const
   {
@@ -267,7 +269,7 @@ namespace spot
     return res;
   }
 
-  cspins_iterator*
+  inline cspins_iterator*
   kripkecube<cspins_state, cspins_iterator>::succ(const cspins_state s,
                                                   unsigned tid)
   {
@@ -293,25 +295,25 @@ namespace spot
     return new cspins_iterator(p);
   }
 
-  void
+  inline void
   kripkecube<cspins_state, cspins_iterator>::recycle(cspins_iterator* it,
                                                      unsigned tid)
   {
     recycle_[tid].push_back(it);
   }
 
-  const std::vector<std::string>
+  inline const std::vector<std::string>
   kripkecube<cspins_state, cspins_iterator>::ap()
   {
     return aps_;
   }
 
-  unsigned kripkecube<cspins_state, cspins_iterator>::get_threads()
+  inline unsigned kripkecube<cspins_state, cspins_iterator>::get_threads()
   {
     return nb_threads_;
   }
 
-  void
+  inline void
   kripkecube<cspins_state, cspins_iterator>::compute_condition
   (cube c, cspins_state s, unsigned tid)
   {
@@ -403,7 +405,7 @@ namespace spot
   // variables P_0.var1 and P_0.var2 but the property automaton only
   // mentions P_0.var2, we do not need to capture (in the resulting
   // cube) any atomic proposition for P_0.var1
-  void
+  inline void
   kripkecube<cspins_state,
              cspins_iterator>::match_aps(std::vector<std::string>& aps,
                                          std::string dead_prop)
