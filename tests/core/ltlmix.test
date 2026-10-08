@@ -189,4 +189,130 @@ grep 'Use --ltl-priorities' out
 ltlmix -B -fGa --dump-priorities >out
 grep 'Use --boolean-priorities' out
 
+# Reading a TLSF specification with --tlsf.  The signals of the
+# specification below start with neither 'i' nor 'o', so they can only
+# be classified thanks to the partition of the specification.
+cat >up.tlsf <<EOF
+INFO {
+  TITLE:       "Upper"
+  DESCRIPTION: "a game whose signals start with neither i nor o"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { AIn; }
+  OUTPUTS { BOut; }
+  GUARANTEES { G(AIn <-> X BOut) }
+}
+EOF
+cat >up.part <<EOF
+.inputs AIn
+.outputs BOut
+EOF
+
+# Two specifications with conflicting partitions: 'a' and 'b' swap
+# roles between them.
+cat >a.tlsf <<EOF
+INFO {
+  TITLE:       "A"
+  DESCRIPTION: "a is an input, b is an output"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { a; }
+  OUTPUTS { b; }
+  GUARANTEES { G(a <-> X b) }
+}
+EOF
+cat >c.tlsf <<EOF
+INFO {
+  TITLE:       "C"
+  DESCRIPTION: "b is an input, a is an output"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS { b; }
+  OUTPUTS { a; }
+  GUARANTEES { F(b); G(a) }
+}
+EOF
+
+# Run the checks with both TLSF backends.
+backends=spot
+if syfco --version >/dev/null 2>&1; then
+  backends="spot syfco"
+fi
+
+for backend in $backends; do
+  export SPOT_TLSF_PARSER=$backend
+
+  # The formula that the specification is converted to, and the same
+  # formula with its propositions renamed after the partition.
+  ltlfilt --tlsf up.tlsf -p >conv.ltl
+  ltlfilt --tlsf up.tlsf --relabel=io -p >conv-io.ltl
+  # The syfco backend lower-cases the propositions, the built-in
+  # parser preserves them; the renamed formula is the same either way.
+  case $backend in
+  spot) grep 'AIn' conv.ltl ;;
+  syfco) grep 'ain' conv.ltl ;;
+  esac
+  grep 'i0' conv-io.ltl
+
+  # Without the two-argument form of -A, all propositions are drawn from
+  # a single pool, so the partition of the specification is not needed
+  # and is not used.
+  ltlmix -A 3 --tlsf up.tlsf -n1 -o out.ltl
+  grep 'p[0-9]' out.ltl
+
+  # With -A N,M, the propositions of the specification are renamed
+  # after its partition, which makes the result indistinguishable from
+  # mixing the already relabeled formula.
+  ltlmix -A 1,1 --tlsf up.tlsf -n1 -o out.ltl
+  ltlmix -A 3,3 --tlsf up.tlsf -n1 --seed 1 -o out.ltl
+  ! grep 'p[0-9]' out.ltl
+  grep 'i[0-9]' out.ltl
+  grep 'o[0-9]' out.ltl
+  ltlmix -A 3,3 -f "`cat conv-io.ltl`" -n1 --seed 1 -o ref.ltl
+  diff out.ltl ref.ltl
+
+  # A partition passed on the command-line wins over the one of the
+  # specification, which is then ignored.  Check this with the built-in
+  # parser only: the syfco backend lower-cases the propositions of the
+  # formula it produces, so a partition mentioning 'AIn' would not
+  # match 'ain'.
+  if test $backend = spot; then
+    ltlmix -A 1,1 --tlsf up.tlsf --ins AIn -n1 -o out.ltl
+    ltlmix -A 1,1 --tlsf up.tlsf --outs BOut -n1 -o out.ltl
+    ltlmix -A 1,1 --tlsf up.tlsf --part-file=up.part -n1 -o out.ltl
+  fi
+
+  # Two specifications whose partitions conflict: 'a' is an input in
+  # the first one and an output in the second, and 'b' is an output in
+  # the first one and an input in the second.  Each specification is
+  # renamed after its own partition, so mixing them gives the same
+  # result as mixing the two renamed formulas.  Had the partition of
+  # the first specification still been in effect while the second one
+  # was read, both propositions of the latter would have been taken
+  # for inputs, giving (Fi0) & (Gi0) instead of (Fi0) & (Go0).
+  ltlfilt --tlsf a.tlsf --relabel=io -p >a-io.ltl
+  ltlfilt --tlsf c.tlsf --relabel=io -p >c-io.ltl
+  grep 'G((i0) <-> (X(o0)))' a-io.ltl
+  grep '(F(i0)) & (G(o0))' c-io.ltl
+  # The two renamed formulas are distinct, so the command below really
+  # mixes two different subformulas.
+  diff a-io.ltl c-io.ltl && exit 1
+  ltlmix -A 3,3 --tlsf a.tlsf --tlsf c.tlsf -n1 --seed 1 -o out.ltl
+  ltlmix -A 3,3 -f "`cat a-io.ltl`" -f "`cat c-io.ltl`" -n1 --seed 1 \
+         -o ref.ltl
+  diff out.ltl ref.ltl
+done
+unset SPOT_TLSF_PARSER
+
+# A partition is required as soon as -A N,M is used, since there is
+# then no default convention to fall back on.
+ltlmix -A 1,1 -f 'G(zz)' 2>err && exit 1
+grep "does not start with 'i' or 'o'" err
+
 :

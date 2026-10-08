@@ -25,6 +25,7 @@
 #include "common_finput.hh"
 #include "common_output.hh"
 #include "common_ioap.hh"
+#include "common_tlsf.hh"
 #include "common_conv.hh"
 #include "common_cout.hh"
 #include "common_range.hh"
@@ -185,6 +186,32 @@ namespace
       opt->sub.insert(f);
       return 0;
     }
+
+    int
+    process_tlsf_file(const char* filename) override
+    {
+      tlsf_conversion_result conv;
+      if (!read_tlsf_file(filename, tlsf_read_flags, conv))
+        // An unreadable TLSF file is an error: report it with exit
+        // status 2.
+        return 2;
+
+      spot::formula f = conv.formula;
+      if (!(tlsf_read_flags & tlsf_flags::TLSF_IGNORE_SIGNALS))
+        {
+          // randltlgenerator tells inputs from outputs by looking at
+          // the first letter of each proposition (see the output_p
+          // callback in main), so rename the propositions of this
+          // formula after the partition declared by the
+          // specification.  That partition is only needed here: it is
+          // forgotten as soon as the tlsf_signals object goes out of
+          // scope, and the default convention takes over from then on.
+          tlsf_signals sigs(conv);
+          spot::relabeling_map relmap;  // the inverse map is unused here
+          f = relabel_io(f, relmap, filename, 0);
+        }
+      return process_formula(f, filename);
+    }
   };
 }
 
@@ -315,14 +342,21 @@ main(int argc, char* argv[])
         opt_io = true;
       if (opt_io)
         process_io_options();
-      else
-        // The partition of the atomic propositions is only consulted
-        // when the pattern draws inputs and outputs from separate sets
-        // (-A N,M or -P N,M), or when the user provided one with
-        // --ins/--outs/--part-file.  The TARGET is never used.
-        subreader.tlsf_read_flags = tlsf_flags::TLSF_EXPECT_ANY
-                                   | tlsf_flags::TLSF_IGNORE_SIGNALS
-                                   | tlsf_flags::TLSF_IGNORE_TARGET;
+
+      // The TARGET of a TLSF specification (i.e. Mealy or Moore) is
+      // never used; the SEMANTICS, on the other hand, is what tells
+      // the syfco backend whether to ask for ltlxba or ltlxba-fin,
+      // which is why TLSF_EXPECT_ANY is kept below.  The partition is
+      // only consulted when the pattern draws inputs and outputs from
+      // separate sets (-A N,M or -P N,M), and the user did not provide
+      // a partition of their own with --ins, --outs, or --part-file
+      // (where omitting one of the two lists means "everything
+      // else").
+      subreader.tlsf_read_flags = tlsf_flags::TLSF_EXPECT_ANY
+                                  | tlsf_flags::TLSF_IGNORE_TARGET;
+      if (!opt_out_ap_count
+          || all_input_aps.has_value() || all_output_aps.has_value())
+        subreader.tlsf_read_flags |= tlsf_flags::TLSF_IGNORE_SIGNALS;
 
       if (subreader.run())
         return 2;

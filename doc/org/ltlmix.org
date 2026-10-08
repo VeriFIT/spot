@@ -215,6 +215,25 @@ propositions.
 Option =-P N= is similar to =-A N=, except that the selected atomic
 propositions can possibly be negated.
 
+When the two-argument form =-A N,M= (or =-P N,M=) is used, two separate
+sets of propositions are drawn from, one for the inputs and one for the
+outputs, so that =ltlmix= produces formulas suitable for LTL synthesis.
+It then needs to know which propositions of the input formulas are
+inputs and which are outputs: by default, a proposition whose name
+starts with =i= or =o= is taken to be an input or an output,
+respectively.  Use =-A N,M= together with options =--ins=, =--outs=, or
+=--part-file= (see [[file:ltlsynt.org::#input-options][=ltlsynt='s input options]]) to classify the propositions
+by hand.
+
+When an input formula comes from a TLSF specification given with
+=--tlsf=, the input and output signals that the specification declares
+are used to tell its inputs from its outputs, so there is nothing else
+to specify.  A partition that you pass explicitly with =--ins=,
+=--outs=, or =--part-file= overrides the one of the specification, which
+is then ignored; in that case the propositions of the specification have
+to appear in your own lists.  When neither =-A N,M= nor =-P N,M= is used,
+all propositions are drawn from a single set, so no partition is needed
+and the one of the TLSF specification is not used at all.
 
 These options solve two problems:
 

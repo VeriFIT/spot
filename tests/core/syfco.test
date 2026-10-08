@@ -240,24 +240,34 @@ EOF
     export PATH
 
     # ltlfilt asks for the I/O partition only for --relabel=io and
-    # --save-part-file, and never for the target: the semantics probe
-    # plus the formula, and one more call for the output signals.
+    # --save-part-file, and never for the TARGET of the specification:
+    # the semantics probe plus the formula, and one more call for the
+    # output signals.
     test 2 = "`count_syfco ltlfilt --tlsf test.tlsf -p`"
     test 3 = "`count_syfco ltlfilt --tlsf test.tlsf --relabel=io -p`"
     test 3 = "`count_syfco ltlfilt --tlsf test.tlsf --save-part-file=- -p`"
 
-    # These three never look at the partition nor at the target.
+    # These two need neither the partition nor the TARGET.
     test 2 = "`count_syfco ltl2tgba --tlsf test.tlsf`"
     test 2 = "`count_syfco ltlgrind --tlsf test.tlsf`"
+
+    # ltlmix needs neither the partition nor the TARGET either, and it
+    # only asks for the partition when '-A N,M' is used without a
+    # partition of our own.  It still probes the SEMANTICS, because it
+    # accepts both finite and infinite specifications and so has to
+    # choose between ltlxba and ltlxba-fin.
     test 2 = "`count_syfco ltlmix --tlsf test.tlsf`"
+    test 3 = "`count_syfco ltlmix -A 1,1 --tlsf test.tlsf`"
+    test 2 = "`count_syfco ltlmix -A 1,1 --tlsf test.tlsf --ins in`"
 
     # ltlcross and ltldo know the semantics is infinite, so they do not
     # need the probe either, and they use neither the partition nor the
-    # target: the formula alone is enough.
+    # TARGET: the formula alone is enough.
     test 1 = "`count_syfco ltlcross --tlsf test.tlsf 'ltl2tgba -f %f >%O'`"
     test 1 = "`count_syfco ltldo --tlsf test.tlsf 'ltl2tgba -f %f >%O'`"
 
-    # The synthesis tools need the partition and the target.
+    # The synthesis tools need the partition, the semantics and the
+    # TARGET.
     test 3 = "`count_syfco ltlsynt --tlsf test.tlsf --realizability`"
     test 3 = "`count_syfco ltlfsynt --tlsf testf.tlsf --real`"
 
