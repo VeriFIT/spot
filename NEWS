@@ -67,6 +67,14 @@ New in spot 2.16.0.dev  (not yet released)
     or by redirecting it), which is expected to hold a single
     specification.  The /VAR=VAL parameter assignments still work.
 
+  - ltlsynt now accepts positional arguments, like ltlfsynt.  They are
+    LTL formulas, each synthesized individually (as with repeated -f),
+    and may be mixed with -f and -F.  Together with --tlsf-input, this
+    makes it possible to synthesize a whole directory of
+    specifications at once:
+
+        % ltlsynt --tlsf-input *.tlsf
+
   Library:
 
   - acc_cond::acc_code::rabin_like() and

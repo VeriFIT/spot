@@ -114,6 +114,20 @@ The specification formula can be passed with =-f/--formula= or
 =-F/--file=.  If multiple specifications formulas are passed, they
 will all be solved individually.
 
+A formula can also be passed as a positional argument, so
+=ltlsynt 'G(i1 -> o1)'= is a synonym for
+=ltlsynt -f 'G(i1 -> o1)'=, and positional arguments may be mixed with
+=-f= and =-F=.  Like the other tools, =ltlsynt= takes =-= as the
+standard input.  When several positional arguments are given, each of
+them is a separate specification, solved individually; they are not
+conjoined.  With [[file:ioltl.org::#tlsf-input][=--tlsf-input=]] they
+are TLSF specification files instead of formulas (see [[#tlsf]]), which
+makes it possible to synthesize a whole directory of them at once:
+
+#+BEGIN_SRC sh :export code
+ltlsynt --tlsf-input *.tlsf
+#+END_SRC
+
 The input/output partition can be given in several ways.  If it is
 not specified, =ltlsynt= assumes that input variables should start
 with =i=, and output variables should start with =o=.
@@ -165,6 +179,9 @@ controller can copy the input) but unrealizable under Moore semantics
 previous input to set the output) but unrealizable under Mealy.
 
 * TLSF input
+   :PROPERTIES:
+   :CUSTOM_ID: tlsf
+   :END:
 
 =ltlsynt= was made with the [[http://syntcomp.org/][SYNTCOMP]] competition in mind, and more
 specifically the TLSF track of this competition.  TLSF is a high-level
@@ -199,6 +216,19 @@ ltlsynt --tlsf arbiter.tlsf/n=3
 #+END_SRC
 
 Again, please read [[file:tlsf.org][the TLSF page]] for more details.
+
+To synthesize several specifications at once, declare that all the
+inputs are specifications with the =--tlsf-input= option, instead of
+repeating =--tlsf=:
+
+#+BEGIN_SRC sh :export code
+ltlsynt --tlsf-input *.tlsf
+#+END_SRC
+
+Each positional argument, each =-F= argument, and the standard input
+is then a specification file, and every one of them is synthesized
+individually.  See [[file:ioltl.org::#tlsf-input][the section about
+=--tlsf-input=]] for the details.
 
 * Unobservable inputs
    :PROPERTIES:

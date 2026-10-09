@@ -21,6 +21,22 @@
 
 set -e
 
+# Positional arguments are LTL formulas, and "-" is the standard
+# input.  Like repeated -f, each of them is an independent formula.
+# (With --tlsf-input they are TLSF specifications instead; see
+# core/syfco.test.)
+test REALIZABLE = "$(ltlsynt 'G(i0 -> X o0)' --realizability)"
+test UNREALIZABLE = "$(ltlsynt 'Gi & Fo' --realizability)"
+test REALIZABLE = "$(echo 'G(i0 -> X o0)' | ltlsynt - --realizability)"
+# Several formulas can be passed at once, and each one is processed.
+test REALIZABLE = "$(ltlsynt 'G(i0 -> X o0)' 'Gi & Fo' \
+                          --realizability | head -1)"
+test UNREALIZABLE = "$(ltlsynt 'G(i0 -> X o0)' 'Gi & Fo' \
+                            --realizability | tail -1)"
+# Same as the same formulas passed with -f.
+test "$(ltlsynt 'G(i0 -> X o0)' 'Gi & Fo' --realizability)" = \
+     "$(ltlsynt -f 'G(i0 -> X o0)' -f 'Gi & Fo' --realizability)"
+
 cat >exp <<EOF
 parity 18;
 0 2 0 7,8;
@@ -1852,10 +1868,10 @@ diff out expected
 #Test override of aiger output
 ltlsynt -f "G(i0 <-> X(o0)) && FG(i1 <-> X[2](o1)) && G(i2<->o2)" \
         --ins "i0,i1,i2" --outs "o0,o1,o2" --print-each-mealy \
-        --aiger ite > out
+        --aiger=ite > out
 diff out expected
 ltlsynt -f "G(i0 <-> X(o0)) && FG(i1 <-> X[2](o1)) && G(i2<->o2)" \
-        --ins "i0,i1,i2" --outs "o0,o1,o2" --aiger ite \
+        --ins "i0,i1,i2" --outs "o0,o1,o2" --aiger=ite \
         --print-each-mealy > out
 diff out expected
 

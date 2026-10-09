@@ -1420,6 +1420,9 @@ parse_opt(int key, char *arg, struct argp_state *)
           error(2, 0, "failed to parse --options near '%s'", opt);
       }
       break;
+    case ARGP_KEY_ARG:
+      jobs.emplace_back(arg, positional_job(arg));
+      break;
     }
   END_EXCEPTION_PROTECT;
   return 0;
@@ -1437,7 +1440,7 @@ main(int argc, char **argv)
     //gi_.opt.set("dpa-simul", 1); // ... after determinization
     gi_.opt.set("tls-impl", 1);  // no automata-based implication check
     gi_.opt.set("wdba-minimize", 2); // minimize only syntactic oblig
-    const argp ap = { options, parse_opt, nullptr,
+    const argp ap = { options, parse_opt, "[FORMULA...]",
                       argp_program_doc, children, nullptr, nullptr };
     if (int err = argp_parse(&ap, argc, argv, ARGP_NO_HELP, nullptr, nullptr))
       exit(err);

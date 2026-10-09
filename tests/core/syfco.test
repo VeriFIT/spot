@@ -274,6 +274,14 @@ test '"G(in <-> Xout_0) & G(in <-> Xout_1) & G(in <-> Xout_2)"' = \
 # does not change how a specification is processed.
 test REALIZABLE = "`ltlsynt --tlsf-input -F test.tlsf --realizability`"
 test REALIZABLE = "`ltlsynt --tlsf-input < test.tlsf --realizability`"
+# ltlsynt takes positional arguments as well, so several
+# specifications can be processed without repeating --tlsf-input.
+test REALIZABLE = "`ltlsynt --tlsf-input test.tlsf --realizability`"
+test REALIZABLE = "`ltlsynt --tlsf-input test.tlsf test.tlsf \
+                    --realizability | head -1`"
+test 2 = "`ltlsynt --tlsf-input test.tlsf test.tlsf --realizability | \
+           wc -l`"
+test 2 = "`ltlsynt --tlsf-input tlsfs/*.tlsf --realizability | wc -l`"
 test UNREALIZABLE = "`ltlfsynt --tlsf-input -F testf.tlsf/n=3 --real`"
 test 'G(in <-> Xout_0)' = "`ltlgrind --tlsf-input test.tlsf | head -1`"
 test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
