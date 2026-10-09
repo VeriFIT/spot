@@ -67,6 +67,22 @@ namespace spot
   }
 
   bool
+  is_generalized_co_buchi_scc(scc_info& map, unsigned scc)
+  {
+    if (SPOT_UNLIKELY(scc >= map.scc_count()))
+      invalid_scc_number("is_generalized_co_buchi_scc");
+    acc_cond::mark_t sets = map.acc_sets_of(scc);
+    acc_cond acc = map.get_aut()->acc().restrict_to(sets);
+    acc = acc.remove(map.common_sets_of(scc), false);
+    // Neither restrict_to() nor remove() lowers num_sets(), but
+    // is_generalized_co_buchi() expects Fin over all sets: drop
+    // the unused ones and renumber the rest.
+    acc = acc.strip(acc.all_sets() - acc.get_acceptance().used_sets(),
+                    false);
+    return acc.is_generalized_co_buchi();
+  }
+
+  bool
   is_complete_scc(scc_info& map, unsigned scc)
   {
     if (SPOT_UNLIKELY(scc >= map.scc_count()))

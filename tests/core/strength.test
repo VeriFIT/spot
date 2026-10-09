@@ -721,6 +721,191 @@ EOF
 
 diff output expected
 
+
+# --is-elevator: keep only automata whose SCCs are each either
+# deterministic or inherently weak.
+cat >input <<EOF
+/* Deterministic SCC {0} feeding an inherently-weak accepting SCC
+   {1}: this is an elevator automaton. */
+HOA: v1
+States: 2
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0
+[0] 1
+[!0] 0
+State: 1
+[t] 1 {0}
+--END--
+/* A single SCC that is both non-deterministic (state 0 has two
+   edges labelled "t") and not inherently weak (it has both an
+   accepting cycle through state 1 and a rejecting cycle through
+   state 0): not an elevator automaton. */
+HOA: v1
+States: 2
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0
+[t] 0
+[t] 1 {0}
+State: 1
+[t] 0
+[t] 1 {0}
+--END--
+EOF
+
+test `autfilt -c --is-elevator input` = 1
+test `autfilt -c --invert-match --is-elevator input` = 1
+
+# Alternating automata (universal branching) are never elevator
+# automata, and this should not error out.
+cat >input <<EOF
+HOA: v1
+States: 2
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Inf(0)
+properties: trans-labels explicit-labels univ-branch
+--BODY--
+State: 0
+[t] 0&1 {0}
+State: 1
+[t] 1 {0}
+--END--
+EOF
+
+test `autfilt -c --is-elevator input` = 0
+test `autfilt -c --is-elea input` = 0
+
+# --is-elea: the strictly more general notion of Emerson-Lei
+# elevator automaton (ELEA).  This SCC is neither
+# deterministic (state 0 has two "t" edges) nor inherently weak (the
+# self-loop at 0 never sees color 0 and is accepting under Fin(0),
+# while the 0->1->0 cycle sees color 0 infinitely often and is
+# rejecting), but its acceptance condition Fin(0) is (trivially)
+# generalized co-Büchi.  So it is an elevator SCC for ELEA, but not
+# for --is-elevator: the two options disagree on this automaton.
+cat >input <<EOF
+HOA: v1
+States: 2
+Start: 0
+AP: 0
+Acceptance: 1 Fin(0)
+--BODY--
+State: 0
+[t] 0
+[t] 1 {0}
+State: 1
+[t] 0
+--END--
+EOF
+
+test `autfilt -c --is-deterministic input` = 0
+test `autfilt -c --is-inherently-weak input` = 0
+test `autfilt -c --is-elevator input` = 0
+test `autfilt -c --is-elea input` = 1
+
+# Same automaton, but declaring an extra set and using set 1 instead
+# of set 0.  The SCC never sees set 0, so restricted to that SCC the
+# acceptance condition is Fin(1): still generalized co-Büchi, even
+# though the SCC does not use every set the automaton declares.
+cat >input <<EOF
+HOA: v1
+States: 2
+Start: 0
+AP: 0
+Acceptance: 2 Inf(0) | Fin(1)
+--BODY--
+State: 0
+[t] 0
+[t] 1 {1}
+State: 1
+[t] 0
+--END--
+EOF
+
+test `autfilt -c --is-elevator input` = 0
+test `autfilt -c --is-elea input` = 1
+
+# A Büchi automaton with a non-deterministic but inherently weak SCC
+# {0,1} (all its cycles are accepting), leading to a deterministic
+# SCC {2} that is not inherently weak.  It is an elevator automaton,
+# without being deterministic or inherently weak.  On Büchi automata,
+# both notions agree.
+cat >input <<EOF
+HOA: v1
+States: 3
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0
+[t] 0 {0}
+[t] 1 {0}
+State: 1
+[t] 0 {0}
+[!0] 2
+State: 2
+[0] 2 {0}
+[!0] 2
+--END--
+EOF
+
+test `autfilt -c --is-deterministic input` = 0
+test `autfilt -c --is-inherently-weak input` = 0
+test `autfilt -c --is-elevator input` = 1
+test `autfilt -c --is-elea input` = 1
+test `autfilt -c --acceptance-is=Buchi --is-elevator input` = 1
+test `autfilt -c --acceptance-is=Buchi --is-elea input` = 1
+
+# Determinism is checked on the edges that stay inside each SCC: the
+# edge from 0 to 2 overlaps with the edge from 0 to 1, but leaves the
+# SCC {0,1}, which is deterministic (and not inherently weak).
+cat >input <<EOF
+HOA: v1
+States: 3
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Inf(0)
+--BODY--
+State: 0
+[0] 1 {0}
+[!0] 0
+[0] 2
+State: 1
+[t] 0
+State: 2
+[t] 2 {0}
+--END--
+EOF
+
+test `autfilt -c --is-deterministic input` = 0
+test `autfilt -c --is-elevator input` = 1
+
+# All cycles of this non-deterministic SCC are rejecting, so it is
+# inherently weak, but this is not visible without an emptiness
+# check: its acceptance mixes Fin and Inf.
+cat >input <<EOF
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "a"
+Acceptance: 2 Fin(0) & Inf(1)
+--BODY--
+State: 0
+[t] 0 {0 1}
+[t] 0
+--END--
+EOF
+
+test `autfilt -c --is-deterministic input` = 0
+test `autfilt -c --is-elevator input` = 1
+test `autfilt -c --is-elea input` = 1
+
 # Checking inherent weakness, semi-determinism, or unambiguity may
 # temporarily override the acceptance condition of the automaton
 # (via scc_and_mark_filter).  Restoring it should not lower the

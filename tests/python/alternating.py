@@ -222,3 +222,39 @@ except RuntimeError as e:
     tc.assertIn('remove_univ_otf: Büchi acceptance is expected', str(e))
 else:
     report_missing_exception()
+
+# is_deterministic_scc() should not consider an SCC with universal
+# branching to be deterministic.
+aut = spot.automaton("""HOA: v1 States: 2 Start: 0 AP: 0
+Acceptance: 1 Inf(0) --BODY-- State: 0 [t] 0&1 {0} State: 1 [t] 1 {0}
+--END--""")
+si = spot.scc_info(aut)
+tc.assertFalse(spot.is_deterministic_scc(si, si.scc_of(0)))
+tc.assertTrue(spot.is_deterministic_scc(si, si.scc_of(1)))
+tc.assertFalse(spot.is_elevator_automaton(aut))
+tc.assertFalse(spot.is_emerson_lei_elevator_automaton(aut))
+
+# A user-supplied scc_info must be built for the same automaton, with
+# TRACK_STATES, and without STOP_ON_ACC.
+aut = spot.automaton("""HOA: v1 States: 2 Start: 0 AP: 1 "a"
+Acceptance: 1 Inf(0) --BODY-- State: 0 [0] 1 [!0] 0 State: 1 [t] 1 {0}
+--END--""")
+tc.assertTrue(spot.is_elevator_automaton(aut, spot.scc_info(aut)))
+tc.assertTrue(spot.is_emerson_lei_elevator_automaton(aut, spot.scc_info(aut)))
+other = spot.automaton("""HOA: v1 States: 1 Start: 0 AP: 0
+Acceptance: 1 Inf(0) --BODY-- State: 0 [t] 0 {0} --END--""")
+for f in (spot.is_elevator_automaton, spot.is_emerson_lei_elevator_automaton):
+    for si, msg in ((spot.scc_info(other), "another automaton"),
+                    (spot.scc_info_with_options(
+                        aut, spot.scc_info_options_STOP_ON_ACC
+                        | spot.scc_info_options_TRACK_STATES),
+                     "STOP_ON_ACC"),
+                    (spot.scc_info_with_options(aut,
+                                                spot.scc_info_options_NONE),
+                     "TRACK_STATES")):
+        try:
+            f(aut, si)
+        except ValueError as e:
+            tc.assertIn(msg, str(e))
+        else:
+            report_missing_exception()

@@ -117,6 +117,85 @@ namespace spot
         return is_inweak;
       return is_weak && is_term;
     }
+
+    // Which notion of elevator automaton to check: the classical one
+    // only accepts SCCs that are deterministic or inherently weak;
+    // the Emerson-Lei one (ELEA) additionally accepts SCCs that are
+    // generalized co-Büchi.
+    enum class elevator_kind { Classic, EmersonLei };
+
+    // Whether SCC s of si is inherently weak.  Unlike
+    // is_inherently_weak_scc(), this does not assume that the
+    // acceptance of s has been determined beforehand: if s is
+    // neither known to be accepting nor rejecting, its emptiness is
+    // checked first, but only for this SCC.
+    static bool
+    is_inherently_weak_scc_lazy(scc_info& si, unsigned s)
+    {
+      if (si.is_rejecting_scc(s))
+        return true;
+      if (!si.is_accepting_scc(s) && si.check_scc_emptiness(s))
+        return true;            // all cycles are rejecting
+      return is_inherently_weak_scc(si, s);
+    }
+
+    // Shared implementation of is_elevator_automaton() and
+    // is_emerson_lei_elevator_automaton().
+    static bool
+    is_elevator_automaton_aux(const const_twa_graph_ptr& aut, scc_info* si,
+                              elevator_kind kind, const char* fname)
+    {
+      // Check a user-supplied scc_info before any shortcut, so that
+      // misuses are always reported.
+      if (si)
+        {
+          if (SPOT_UNLIKELY(si->get_aut() != aut))
+            throw std::invalid_argument(fname + ": scc_info was built "
+                                        "for another automaton"s);
+          scc_info_options opt = si->get_options();
+          if (SPOT_UNLIKELY(!!(opt & scc_info_options::STOP_ON_ACC)))
+            throw std::invalid_argument(fname + ": scc_info should not "
+                                        "be built with STOP_ON_ACC"s);
+          if (SPOT_UNLIKELY(!(opt & scc_info_options::TRACK_STATES)))
+            throw std::invalid_argument(fname + ": scc_info should be "
+                                        "built with TRACK_STATES"s);
+        }
+
+      // Universal branching is not accounted for by
+      // is_deterministic_scc(), so alternating automata are never
+      // considered elevator automata (same convention as
+      // is_deterministic()).
+      if (!aut->is_existential())
+        return false;
+      // Deterministic and inherently weak automata are elevator
+      // automata.
+      if (aut->prop_universal().is_true()
+          || aut->prop_inherently_weak().is_true())
+        return true;
+
+      std::unique_ptr<scc_info> own_si;
+      if (!si)
+        {
+          own_si = std::make_unique<scc_info>(aut,
+                                              scc_info_options::TRACK_STATES);
+          si = own_si.get();
+        }
+
+      // Try the cheaper conditions first, and resolve the acceptance
+      // of an SCC only when its inherent weakness has to be checked.
+      unsigned n = si->scc_count();
+      for (unsigned s = 0; s < n; ++s)
+        {
+          if (is_deterministic_scc(*si, s))
+            continue;
+          if (kind == elevator_kind::EmersonLei
+              && is_generalized_co_buchi_scc(*si, s))
+            continue;
+          if (!is_inherently_weak_scc_lazy(*si, s))
+            return false;
+        }
+      return true;
+    }
   }
 
   bool
@@ -170,6 +249,21 @@ namespace spot
       (std::const_pointer_cast<twa_graph>(aut), si);
     std::const_pointer_cast<twa_graph>(aut)->prop_inherently_weak(res);
     return res;
+  }
+
+  bool
+  is_elevator_automaton(const const_twa_graph_ptr& aut, scc_info* si)
+  {
+    return is_elevator_automaton_aux(aut, si, elevator_kind::Classic,
+                                     "is_elevator_automaton()");
+  }
+
+  bool
+  is_emerson_lei_elevator_automaton(const const_twa_graph_ptr& aut,
+                                    scc_info* si)
+  {
+    return is_elevator_automaton_aux(aut, si, elevator_kind::EmersonLei,
+                                     "is_emerson_lei_elevator_automaton()");
   }
 
   void check_strength(const twa_graph_ptr& aut, scc_info* si)

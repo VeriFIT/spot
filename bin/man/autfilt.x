@@ -111,6 +111,21 @@ Proceedings of PetriNet'25.  LNCS 15714.
 
 Discusses the techniques behind the \fB\-\-given\-formula\fR,
 \fB\-\-given\-automaton\fR, and \fB\-\-given\-strategy\fR options.
+.TP
+\(bu
+Vojtěch Havlena, Ondřej Lengál, and Barbora Šmahlíková:
+Sky is not the limit: tighter rank bounds for elevator automata in
+Büchi automata complementation.  Proceedings of TACAS'22.  LNCS 13244.
+
+Defines the elevator automata kept by \fB\-\-is\-elevator\fR.
+.TP
+\(bu
+Ondrej Alexaj, Vojtěch Havlena, Ondřej Lengál, Yong Li, and Nicolas
+Mazzocchi: Complementing Emerson-Lei elevator automata.  Proceedings
+of CONCUR'26.
+
+Defines the Emerson-Lei elevator automata kept by
+\fB\-\-is\-elea\fR.
 [SEE ALSO]
 .BR spot-x (7),
 .BR dstar2tgba (1)

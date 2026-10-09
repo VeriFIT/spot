@@ -304,6 +304,35 @@ namespace spot
     return check_semi_determism(aut, false);
   }
 
+  bool
+  is_deterministic_scc(scc_info& si, unsigned scc)
+  {
+    if (SPOT_UNLIKELY(scc >= si.scc_count()))
+      throw std::invalid_argument("is_deterministic_scc(): "
+                                  "invalid SCC number");
+    // inner_edges_of() lists the edges of each state of the SCC
+    // consecutively, so we only need to track the labels not yet
+    // used by the current source state.
+    unsigned src = -1U;
+    bdd available = bddtrue;
+    for (auto& t: si.inner_edges_of(scc))
+      {
+        // An edge with universal branching makes the SCC
+        // non-deterministic, as in is_deterministic().
+        if (twa_graph::is_univ_dest(t))
+          return false;
+        if (t.src != src)
+          {
+            src = t.src;
+            available = bddtrue;
+          }
+        if (!bdd_implies(t.cond, available))
+          return false;
+        available -= t.cond;
+      }
+    return true;
+  }
+
   void check_determinism(twa_graph_ptr aut)
   {
     check_semi_determism(aut, true);

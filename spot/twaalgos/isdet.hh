@@ -110,6 +110,18 @@ namespace spot
   semidet_sccs(scc_info& si);
 
   /// \ingroup twa_misc
+  /// \brief Whether the SCC number \a scc in \a si is deterministic.
+  ///
+  /// An SCC is deterministic if, restricted to the edges that stay
+  /// inside the SCC (i.e., ignoring edges that leave the SCC), no
+  /// state has two edges with compatible labels, and no edge has
+  /// universal branching.  (An edge with universal branching is
+  /// considered to stay inside the SCC if one of its destinations
+  /// does.)
+  SPOT_API bool
+  is_deterministic_scc(scc_info& si, unsigned scc);
+
+  /// \ingroup twa_misc
   /// \brief Set the deterministic and semi-deterministic properties
   /// appropriately.
   SPOT_API void check_determinism(twa_graph_ptr aut);
