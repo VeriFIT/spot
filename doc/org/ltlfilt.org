@@ -689,12 +689,12 @@ ltlfilt --help | sed -n '/ sequences:/,/^$/p' | sed '1d;$d'
                              time, (p) parent process, or (c) children
                              processes.
   %s                         the length (or size) of the formula
-  %x, %[LETTERS]X, %[LETTERS]x   number of atomic propositions used in the
-                             formula;  add LETTERS to list atomic propositions
-                             with (n) no quoting, (s) occasional double-quotes
-                             with C-style escape, (d) double-quotes with
-                             C-style escape, (c) double-quotes with CSV-style
-                             escape, (p) between parentheses, any extra
+  %x, %[LETTERS]x            number of atomic propositions used in the formula;
+                              add LETTERS to list atomic propositions with (n)
+                             no quoting, (s) occasional double-quotes with
+                             C-style escape, (d) double-quotes with C-style
+                             escape, (c) double-quotes with CSV-style escape,
+                             (p) between parentheses, any extra
                              non-alphanumeric character will be used to
                              separate propositions
 #+end_example
