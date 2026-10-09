@@ -64,7 +64,7 @@ extern bool output_ratexp;
         "to fuse several operators during depth evaluation.  Add '~' "  \
         "to rewrite the formula in negative normal form before "        \
         "counting.", 0 },                                               \
-    { "%x, %[LETTERS]X, %[LETTERS]x", 0, nullptr,                       \
+    { "%x, %[LETTERS]x", 0, nullptr,                                   \
         OPTION_DOC | OPTION_NO_USAGE,                                   \
         COMMON_X_OUTPUT_SPECS(used in the formula), 0 }
 
