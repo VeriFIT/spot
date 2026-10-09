@@ -295,6 +295,24 @@ grep -q 'AP: 3' out.hoa
 ltlfilt --tlsf-input nonexistent.tlsf 2>>err && exit 1
 grep 'cannot open\|File does not exist' err
 
+# The FILENAME/COL syntax of -F does not apply: a TLSF file holds one
+# specification, not one formula per line.  Diagnose it instead of
+# failing to open a file called "FILE/2".
+ltlfilt --tlsf-input -F nonexistent.csv/2 2>>err && exit 1
+grep 'would select a column of a CSV file' err
+# The same goes for a positional argument, and for --tlsf.
+ltlfilt --tlsf-input nonexistent.csv/2 2>>err && exit 1
+grep 'would select a column of a CSV file' err
+ltlfilt --tlsf=nonexistent.csv/2 2>>err && exit 1
+grep 'would select a column of a CSV file' err
+# A file whose name legitimately ends with a number is not mistaken for
+# a column, however.
+cp test.tlsf tlsfs/2
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt --tlsf-input tlsfs/2`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt --tlsf=tlsfs/2`"
+
 # -f and --lbt-input cannot be combined with --tlsf-input, in either
 # order.
 set +e

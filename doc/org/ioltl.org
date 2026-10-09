@@ -167,7 +167,10 @@ appended to a positional file name too).
 Note that =-f= cannot be used with =--tlsf-input=, because a formula
 string is not a specification, and that neither can =--lbt-input=,
 which selects another input syntax.  The =FILENAME/COL= syntax of =-F=
-(used to read one column of a CSV file) is meaningless here as well.
+(used to read one column of a CSV file) does not apply either, since a
+TLSF file holds one specification rather than one formula per line; a
+name like =spec.tlsf/2= is rejected with a diagnostic suggesting
+=spec.tlsf=.
 
 ** Default parser
    :PROPERTIES:

@@ -84,6 +84,38 @@ split_tlsf_argument(const std::string& arg,
       }
 }
 
+// The "FILENAME/COL" syntax of -F, used to read one column of a CSV
+// file, does not apply to TLSF specifications: one file holds one
+// specification, not one formula per line.  Diagnose that shape
+// explicitly instead of letting the parser complain that it cannot
+// open a file called "FILE/2".
+//
+// A file whose name legitimately ends with a number is left alone, so
+// only complain if there is no such file.  As in process_ltl_file(),
+// COL must be a non-zero integer covering the whole suffix, so that
+// "specs/1.tlsf" is not mistaken for a column number.
+static bool
+check_no_csv_column(const std::string& filename)
+{
+  const char* name = filename.c_str();
+  const char* slash = strrchr(name, '/');
+  if (!slash)
+    return true;
+  errno = 0;
+  char* end;
+  long int col = strtol(slash + 1, &end, 10);
+  if (errno != 0 || end == slash + 1 || *end || col == 0)
+    return true;
+  struct stat buf;
+  if (stat(name, &buf) == 0)
+    return true;
+  std::cerr << filename << ": the " << slash << " suffix would select a"
+            << " column of a CSV file, but a TLSF file holds one"
+            << " specification.  Did you mean '"
+            << std::string(name, slash - name) << "'?\n";
+  return false;
+}
+
 // Convert a TLSF file to LTL using the parser embedded in Spot.
 // Note that the TLSF_IGNORE_* flags of FLAGS are irrelevant here:
 // the single parse fills all fields of RES anyway.
@@ -321,6 +353,8 @@ read_tlsf_file(const std::string& filename, tlsf_flags flags,
   std::string real_filename;
   std::vector<std::string> assignments;
   split_tlsf_argument(filename, real_filename, assignments);
+  if (!check_no_csv_column(real_filename))
+    return false;
   if (use_builtin_parser())
     return read_tlsf_with_spot(real_filename, assignments, flags, res);
   else

@@ -396,3 +396,9 @@ ltlfsynt --tlsf chomp.tlsf/N=1,M=1 --realizability
 
 #+RESULTS:
 : UNREALIZABLE
+
+The same =/PARAM1=VAL1...= suffix is accepted with =--tlsf-input=,
+where it can be appended to a positional file name.  Note that a
+numeric suffix is rejected there: it is not taken for a column of a
+CSV file, since a TLSF file holds one specification rather than one
+formula per line.
