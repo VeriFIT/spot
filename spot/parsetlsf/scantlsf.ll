@@ -958,14 +958,25 @@ namespace spot
     yyscan_t yyscanner = *scanner;
     struct yyguts_t* yyg = (struct yyguts_t*)yyscanner;
     BEGIN(INITIAL);
-    yyin = fopen(name.c_str(), "r");
-    if (!yyin)
+    if (name == "-")
       {
-        yylex_destroy(yyscanner);
-        *scanner = nullptr;
-        return 1;
+        // As in hoayyopen(), a name of "-" denotes the standard input.
+        // Do not set close_yyin, so that tlsfyyclose() does not close
+        // the standard input.
+        yyin = stdin;
+        res.close_yyin = false;
       }
-    res.close_yyin = true;
+    else
+      {
+        yyin = fopen(name.c_str(), "r");
+        if (!yyin)
+          {
+            yylex_destroy(yyscanner);
+            *scanner = nullptr;
+            return 1;
+          }
+        res.close_yyin = true;
+      }
     return 0;
   }
 

@@ -28,14 +28,17 @@ enum {
   OPT_LBT = 1,
   OPT_LENIENT,
   OPT_TLSF,
+  OPT_TLSF_INPUT,
 };
 
 jobs_t jobs;
 bool lbt_input = false;
+bool tlsf_input = false;
 static bool lenient = false;
 
-// The --tlsf entry is generated from this macro because the tools
-// that only accept LTLf formulas must advertise LTLf instead of LTL.
+// The --tlsf and --tlsf-input entries are generated from this macro
+// because the tools that only accept LTLf formulas must advertise LTLf
+// instead of LTL.
 #define FINPUT_OPTIONS(WHAT)                                          \
   { nullptr, 0, nullptr, 0, "Input options:", 1 },                     \
   { "formula", 'f', "STRING", 0, "process the formula STRING", 1 },   \
@@ -54,6 +57,11 @@ static bool lenient = false;
     "SPOT_TLSF_PARSER environment variable selects the external "     \
     "syfco tool).  Any parameter assignment specified after a slash"   \
     " overrides that parameter.", 1 },                                 \
+  { "tlsf-input", OPT_TLSF_INPUT, nullptr, 0,                         \
+    "assume that every formula is read as a TLSF specification "       \
+    "file, as if it had been given to --tlsf (this applies to "       \
+    "-F, to the positional arguments, and to the standard input; "    \
+    "-f is not accepted)", 1 },                                       \
   { nullptr, 0, nullptr, 0, nullptr, 0 }
 
 static const argp_option options_ltl[] =
@@ -84,6 +92,37 @@ const struct argp finput_argp_headless_ltlf = { options_ltlf + 1,
                                                 nullptr, nullptr };
 
 
+// --tlsf-input was given.  argp calls us in the order in which the
+// options appear on the command line, so the formula sources that were
+// already queued have to be reclassified here.  Positional arguments
+// are not affected: getopt permutes them to the end of argv, so they
+// are always seen after every option, and they are classified by
+// positional_job() and positional_filename_job() as they arrive.
+static void
+switch_jobs_to_tlsf()
+{
+  for (job& j: jobs)
+    switch (j.type)
+      {
+      case job_type::LTL_FILENAME:
+        j.type = job_type::TLSF_FILENAME;
+        break;
+      case job_type::LTL_STRING:
+        // Only -f queues a job of this type (once positional_job() has
+        // been taken into account), and a formula string is not a TLSF
+        // specification.  Do not blame -f explicitly, because the same
+        // diagnostic must stay correct if a positional argument were
+        // ever passed before an option.
+        error(2, 0, "a formula string is not a TLSF specification: with "
+              "--tlsf-input, every input must name a file (use -F "
+              "FILENAME, or pass FILENAME as an argument)");
+        break;
+      case job_type::AUT_FILENAME:
+      case job_type::TLSF_FILENAME:
+        break;
+      }
+}
+
 int
 parse_opt_finput(int key, char* arg, struct argp_state*)
 {
@@ -93,12 +132,20 @@ parse_opt_finput(int key, char* arg, struct argp_state*)
   switch (key)
     {
     case 'f':
+      if (tlsf_input)
+        error(2, 0, "-f cannot be used with --tlsf-input, because a "
+              "formula string is not a TLSF specification (use -F "
+              "FILENAME, or pass FILENAME as an argument)");
       jobs.emplace_back(arg, job_type::LTL_STRING);
       break;
     case 'F':
-      jobs.emplace_back(arg, job_type::LTL_FILENAME);
+      jobs.emplace_back(arg, tlsf_input
+                        ? job_type::TLSF_FILENAME : job_type::LTL_FILENAME);
       break;
     case OPT_LBT:
+      if (tlsf_input)
+        error(2, 0, "--lbt-input and --tlsf-input are mutually "
+              "exclusive, as they select two different input syntaxes");
       lbt_input = true;
       break;
     case OPT_LENIENT:
@@ -106,6 +153,15 @@ parse_opt_finput(int key, char* arg, struct argp_state*)
       break;
     case OPT_TLSF:
       jobs.emplace_back(arg, job_type::TLSF_FILENAME);
+      break;
+    case OPT_TLSF_INPUT:
+      if (lbt_input)
+        error(2, 0, "--lbt-input and --tlsf-input are mutually "
+              "exclusive, as they select two different input syntaxes");
+      // Set the flag before reclassifying, so that the sources that
+      // follow also see it.
+      tlsf_input = true;
+      switch_jobs_to_tlsf();
       break;
     default:
       return ARGP_ERR_UNKNOWN;
@@ -428,7 +484,7 @@ void check_no_formula(const char* action)
     error(2, 0, "No formula to %s?  Run '%s --help' for help.\n"
           "Use '%s -' to force reading formulas from the standard "
           "input.", action, program_name, program_name);
-  jobs.emplace_back("-", job_type::LTL_FILENAME);
+  jobs.emplace_back("-", positional_filename_job("-"));
 }
 
 void check_no_automaton()

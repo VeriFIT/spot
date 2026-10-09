@@ -154,8 +154,7 @@ parse_opt(int key, char* arg, struct argp_state*)
       max_output = to_int(arg, "-n/--max-count");
       break;
     case ARGP_KEY_ARG:
-      // FIXME: use stat() to distinguish filename from string?
-      jobs.emplace_back(arg, job_type::LTL_FILENAME);
+      jobs.emplace_back(arg, positional_filename_job(arg));
       break;
     case OPT_AP2CONST:
       opt_all = 0;

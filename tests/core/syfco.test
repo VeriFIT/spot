@@ -215,6 +215,97 @@ if test $backend = spot; then
 fi
 grep 'cannot open\|File does not exist' err
 
+# --tlsf-input declares that every input is a TLSF specification, so
+# that a whole set of them can be processed at once (as in
+# "ltlfilt --tlsf-input *.tlsf") without repeating --tlsf.  Every
+# formula source is accepted, and all of them produce the same formula
+# as --tlsf.
+mkdir -p tlsfs
+cp test.tlsf tlsfs/a.tlsf
+cp test.tlsf tlsfs/b.tlsf
+
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt --tlsf-input -F test.tlsf`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt --tlsf-input test.tlsf`"
+
+# The flag may be given after the inputs that it applies to.
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt -F test.tlsf --tlsf-input`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt test.tlsf --tlsf-input`"
+
+# Several specifications at once, which is the point of the option.
+# Both the tools whose positional arguments are file names and the
+# ones that also accept formula strings accept a glob here.
+ltlfilt --tlsf-input tlsfs/a.tlsf tlsfs/b.tlsf > out
+cat >expected <<\EOF
+G(in <-> Xout_0) & G(in <-> Xout_1)
+G(in <-> Xout_0) & G(in <-> Xout_1)
+EOF
+diff out expected
+test 2 = "`ltlfilt --tlsf-input tlsfs/*.tlsf | wc -l`"
+test 2 = "`ltl2tgba --tlsf-input tlsfs/*.tlsf | grep -c '^HOA:'`"
+
+# The standard input holds a single specification, whether it is named
+# explicitly or read by default because no other input was given.
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt --tlsf-input - < test.tlsf`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlfilt --tlsf-input < test.tlsf`"
+test 1 = "`ltl2tgba --tlsf-input < test.tlsf | grep -c '^HOA:'`"
+
+# The partition declared by the specification is honored as usual.
+test 'G(i0 <-> Xo0) & G(i0 <-> Xo1)' = \
+  "`ltlfilt --tlsf-input -F test.tlsf --relabel=io`"
+
+# Parameter assignments still work, on a file as well as on the
+# standard input.
+ltlfilt --tlsf-input test.tlsf/n=4 > out
+cat >expected <<\EOF
+G(in <-> Xout_0) & G(in <-> Xout_1) & G(in <-> Xout_2) & G(in <-> Xout_3)
+EOF
+diff out expected
+ltlf2dfa --tlsf-input testf.tlsf/n=3 > out.hoa
+test '"G(in <-> Xout_0) & G(in <-> Xout_1) & G(in <-> Xout_2)"' = \
+  "`sed -n 's/^name: //p' out.hoa`"
+
+# --tlsf-input is accepted by every tool that accepts --tlsf, and it
+# does not change how a specification is processed.
+test REALIZABLE = "`ltlsynt --tlsf-input -F test.tlsf --realizability`"
+test REALIZABLE = "`ltlsynt --tlsf-input < test.tlsf --realizability`"
+test UNREALIZABLE = "`ltlfsynt --tlsf-input -F testf.tlsf/n=3 --real`"
+test 'G(in <-> Xout_0)' = "`ltlgrind --tlsf-input test.tlsf | head -1`"
+test 'G(in <-> Xout_0) & G(in <-> Xout_1)' = \
+  "`ltlmix --tree-size=1 --tlsf-input test.tlsf`"
+ltlcross --tlsf-input -F test.tlsf 'ltl2tgba -f %f >%O' 2>&1 |
+  grep -q 'No problem detected.'
+ltldo --tlsf-input -F test.tlsf 'ltl2tgba -f %f >%O' > out.hoa
+grep -q 'AP: 3' out.hoa
+
+# An unreadable specification is an error, as with --tlsf.
+ltlfilt --tlsf-input nonexistent.tlsf 2>>err && exit 1
+grep 'cannot open\|File does not exist' err
+
+# -f and --lbt-input cannot be combined with --tlsf-input, in either
+# order.
+set +e
+ltlfilt --tlsf-input -f 'G p' 2>err
+s10=$?
+ltlfilt -f 'G p' --tlsf-input 2>>err
+s11=$?
+ltlfilt --tlsf-input --lbt-input -F test.tlsf 2>>err
+s12=$?
+ltlfilt --lbt-input --tlsf-input -F test.tlsf 2>>err
+s13=$?
+set -e
+test $s10 = 2
+test $s11 = 2
+test $s12 = 2
+test $s13 = 2
+test 2 = `grep -c 'formula string is not a TLSF specification' err`
+test 2 = `grep -c 'mutually exclusive' err`
+
 # The syfco backend invokes the external tool once per requested item.
 # Check that each tool only asks syfco for what it actually uses, by
 # putting a syfco that logs its arguments first in $PATH.
@@ -273,6 +364,12 @@ EOF
 
     # ltlf2dfa needs neither.
     test 1 = "`count_syfco ltlf2dfa --tlsf testf.tlsf`"
+
+    # --tlsf-input costs no extra invocation, whether it is used to
+    # read a file, a glob, or the standard input.
+    test 2 = "`count_syfco ltlfilt --tlsf-input -p test.tlsf`"
+    test 3 = "`count_syfco ltlfilt --tlsf-input -p test.tlsf --relabel=io`"
+    test 2 = "`count_syfco ltlfilt --tlsf-input -p - < test.tlsf`"
 
     rm -f syfco syfco.log
   )

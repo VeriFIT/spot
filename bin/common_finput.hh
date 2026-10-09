@@ -96,6 +96,10 @@ struct job
 typedef std::vector<job> jobs_t;
 extern jobs_t jobs;
 extern bool lbt_input;
+// Set by --tlsf-input: every formula source is a TLSF specification
+// file rather than a formula (or a list of formulas).  See
+// switch_jobs_to_tlsf() in common_finput.cc.
+extern bool tlsf_input;
 
 // The common input options, with their own "Input options:" header.
 extern const struct argp finput_argp;
@@ -112,6 +116,32 @@ int parse_opt_finput(int key, char* arg, struct argp_state* state);
 spot::parsed_formula parse_formula(const std::string& s);
 
 spot::formula parse_formula_arg(const std::string& input);
+
+// The job type to use for a positional argument of the tools whose
+// positional arguments are all file names.  With --tlsf-input, the
+// argument names a TLSF specification.
+inline job_type
+positional_filename_job(const char*)
+{
+  return tlsf_input ? job_type::TLSF_FILENAME : job_type::LTL_FILENAME;
+}
+
+// The job type to use for a positional argument of the tools that
+// accept both formula strings and file names, "-" standing for the
+// standard input.  With --tlsf-input, ARG always names a TLSF
+// specification.
+//
+// The argp option handlers are called once all the options have been
+// parsed (getopt permutes the non-option arguments to the end of
+// argv), so tlsf_input is always known when this is called.
+inline job_type
+positional_job(const char* arg)
+{
+  if (tlsf_input)
+    return job_type::TLSF_FILENAME;
+  return (*arg == '-' && !arg[1])
+         ? job_type::LTL_FILENAME : job_type::LTL_STRING;
+}
 
 
 class job_processor

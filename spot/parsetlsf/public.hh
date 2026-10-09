@@ -351,6 +351,10 @@ namespace spot
   /// warning, and is listed in \c warnings.
   ///
   /// The parser does not throw unless opts.raise_errors is true.
+  ///
+  /// A \a filename of "-" denotes the standard input, which is read
+  /// as a single specification and left open (as in the HOA parser's
+  /// hoayyopen()).
   SPOT_API parsed_tlsf_ptr
   parse_tlsf(const std::string& filename,
              const tlsf_parser_options& opts = {});

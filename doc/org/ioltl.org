@@ -36,6 +36,11 @@ ltl2tgba --help | sed -n '/Input options:/,/^$/p' | sed '1d;$d'
 :                              variable selects the external syfco tool).  Any
 :                              parameter assignment specified after a slash
 :                              overrides that parameter.
+:       --tlsf-input           assume that every formula is read as a TLSF
+:                              specification file, as if it had been given to
+:                              --tlsf (this applies to -F, to the positional
+:                              arguments, and to the standard input; -f is not
+:                              accepted)
 :   -x, --extra-options=OPTS   fine-tuning options (see spot-x (7))
 
 Note that not every tool advertises exactly the same options: some
@@ -108,6 +113,61 @@ This partition is only in effect while the formula read from the
 specification is processed: it does not affect the other formulas that
 the same command processes.  It is also ignored if the user requested a
 partition of their own with =--ins=, =--outs=, or =--part-file=.
+
+Since =--tlsf= takes one file name, it has to be repeated for each
+specification to process.  The =--tlsf-input= option declares that
+*every* formula is a TLSF specification, so that a whole directory of
+them can be processed at once:
+
+#+BEGIN_SRC sh
+cat > grant-1.tlsf <<'EOF'
+INFO {
+  TITLE:       "arbitration"
+  DESCRIPTION: "grant one request at a time"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS  { request[2]; }
+  OUTPUTS { grant[2]; }
+  GUARANTEE {
+    (&&[0 <= i < 2] &&[0 <= j < 2] (request[i] <-> request[j])) ||
+      (grant[0] -> (grant[1] -> X(!grant[0])))
+  }
+}
+EOF
+cat > grant-2.tlsf <<'EOF'
+INFO {
+  TITLE:       "one grant"
+  DESCRIPTION: "grant as long as a request is pending"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+MAIN {
+  INPUTS  { request; }
+  OUTPUTS { grant; }
+  GUARANTEE { G(request -> X(grant <-> !request)) }
+}
+EOF
+ltlfilt --tlsf-input grant-*.tlsf --relabel=io
+rm -f grant-1.tlsf grant-2.tlsf
+#+END_SRC
+#+RESULTS:
+: (i0 <-> i1) | (o0 -> (o1 -> X!o0))
+: G(i0 -> X(!i0 <-> o0))
+
+With =--tlsf-input=, each file passed with =-F= or as a positional
+argument names a specification, and so does the standard input (given
+either as =-= or by redirecting it), which is then expected to hold a
+single specification.  The option may be given anywhere on the command
+line, and may be combined with =--tlsf=, which remains useful for the
+specifications that need =/VAR=VAL= assignments (as those can be
+appended to a positional file name too).
+
+Note that =-f= cannot be used with =--tlsf-input=, because a formula
+string is not a specification, and that neither can =--lbt-input=,
+which selects another input syntax.  The =FILENAME/COL= syntax of =-F=
+(used to read one column of a CSV file) is meaningless here as well.
 
 ** Default parser
    :PROPERTIES:

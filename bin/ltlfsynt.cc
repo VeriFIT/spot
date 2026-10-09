@@ -451,10 +451,7 @@ parse_opt(int key, char *arg, struct argp_state *)
       opt_show_status = false;
       break;
     case ARGP_KEY_ARG:
-      // FIXME: use stat() to distinguish filename from string?
-      jobs.emplace_back(arg, ((*arg == '-' && !arg[1])
-                              ? job_type::LTL_FILENAME
-                              : job_type::LTL_STRING));
+      jobs.emplace_back(arg, positional_job(arg));
       break;
 
     default:

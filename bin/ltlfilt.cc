@@ -451,8 +451,7 @@ parse_opt(int key, char* arg, struct argp_state*)
       invert = true;
       break;
     case ARGP_KEY_ARG:
-      // FIXME: use stat() to distinguish filename from string?
-      jobs.emplace_back(arg, job_type::LTL_FILENAME);
+      jobs.emplace_back(arg, positional_filename_job(arg));
       break;
     case OPT_ACCEPT_WORD:
       try
@@ -1068,7 +1067,7 @@ main(int argc, char** argv)
         exit(err);
 
       if (jobs.empty())
-        jobs.emplace_back("-", job_type::LTL_FILENAME);
+        jobs.emplace_back("-", positional_filename_job("-"));
 
       if (relabeling == IOApRelabeling || opt->output_part)
         process_io_options();

@@ -449,7 +449,7 @@ parse_opt(int key, char* arg, struct argp_state*)
       break;
     case ARGP_KEY_ARG:
       if (arg[0] == '-' && !arg[1])
-        jobs.emplace_back(arg, job_type::LTL_FILENAME);
+        jobs.emplace_back(arg, positional_filename_job(arg));
       else
         tools_push_trans(arg);
       break;

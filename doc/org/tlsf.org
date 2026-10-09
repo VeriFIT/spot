@@ -25,8 +25,10 @@ implement a =--tlsf= option.  By default they use the TLSF parser
 embedded in Spot to translate the specification to LTL or LTLf; set
 the =SPOT_TLSF_PARSER= environment variable to =syfco= to use the
 external [[https://github.com/reactive-systems/syfco][=syfco=]] tool
-instead.  See [[file:ioltl.org::#tlsf-input][the description of the
-=--tlsf= option]] for the details.
+instead.  When several specifications have to be processed, the
+=--tlsf-input= option declares that all of them are specifications.
+See [[file:ioltl.org::#tlsf-input][the description of the =--tlsf=
+and =--tlsf-input= options]] for the details.
 
 * Example TLSF specification
 

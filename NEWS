@@ -55,6 +55,18 @@ New in spot 2.16.0.dev  (not yet released)
     cross-check the two conversions, or in case the built-in parser is
     found to be incomplete.
 
+  - All tools that read TLSF specifications gained a --tlsf-input
+    option.  While --tlsf FILENAME marks a single specification,
+    --tlsf-input declares that *every* input is a specification, so
+    that a whole set of them can be processed at once:
+
+        % ltlfilt --tlsf-input *.tlsf
+
+    Every file passed with -F or as a positional argument then names a
+    specification, and so does the standard input (given either as -
+    or by redirecting it), which is expected to hold a single
+    specification.  The /VAR=VAL parameter assignments still work.
+
   Library:
 
   - acc_cond::acc_code::rabin_like() and

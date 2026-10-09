@@ -29,9 +29,12 @@
 #include <cstring>
 #include <initializer_list>
 #include <iostream>
+#include <memory>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <utility>
 
+#include <spot/misc/tmpfile.hh>
 #include <spot/parsetlsf/public.hh>
 #include <spot/tl/parse.hh>
 
@@ -211,6 +214,28 @@ read_tlsf_with_syfco(const std::string& filename,
   static char arg0[] = "syfco";
   command.push_back(arg0);
 
+  // syfco is given the name of a file to read, so a specification that
+  // the tools pass as "-" (the standard input; see the --tlsf-input
+  // option) has to be spilled to disk first.  TEMP keeps that file
+  // alive until the end of this function, i.e. until syfco is done
+  // with it.
+  std::unique_ptr<spot::temporary_file> temp;
+  std::string tmpname;
+  const std::string* file = &filename;
+  if (filename == "-")
+    {
+      std::string contents;
+      std::getline(std::cin, contents, '\0');
+      spot::open_temporary_file* tmpfile = spot::create_open_tmpfile("tlsf");
+      temp.reset(tmpfile);
+      tmpname = tmpfile->name();
+      ssize_t s = contents.size();
+      if (write(tmpfile->fd(), contents.data(), s) != s)
+        error(2, errno, "failed to write into %s", tmpname.c_str());
+      tmpfile->close();
+      file = &tmpname;
+    }
+
   // syfco has to be told which kind of formula to output.  When the
   // caller expresses no expectation (neither TLSF_EXPECT_FINITE nor
   // TLSF_EXPECT_INFINITE), probe the semantics of the specification
@@ -225,7 +250,7 @@ read_tlsf_with_syfco(const std::string& filename,
   else
     {
       std::string sem = run_syfco(command, {}, {"--print-semantics"},
-                                  filename, verbose);
+                                  *file, verbose);
       auto not_space = [](unsigned char c){ return !std::isspace(c); };
       sem.erase(std::find_if(sem.rbegin(), sem.rend(),
                              not_space).base(), sem.end());
@@ -242,7 +267,7 @@ read_tlsf_with_syfco(const std::string& filename,
   std::string f =
     run_syfco(command, assignments,
               {argf, finite ? "ltlxba-fin" : "ltlxba", argm, argfu},
-              filename, verbose);
+              *file, verbose);
   // syfco outputs the formula as a string: parse it once here, so
   // that the callers get a spot::formula like with the "spot"
   // backend.
@@ -267,14 +292,14 @@ read_tlsf_with_syfco(const std::string& filename,
         run_syfco(command, assignments,
                   {"-f", finite ? "ltlxba-fin" : "ltlxba",
                    "--print-output-signals"},
-                  filename, verbose);
+                  *file, verbose);
       split_aps(signals, res.outputs);
     }
 
   if (!(flags & tlsf_flags::TLSF_IGNORE_TARGET))
     {
       std::string target = run_syfco(command, {}, {"--print-target"},
-                                     filename, verbose);
+                                     *file, verbose);
       auto not_space = [](unsigned char c){ return !std::isspace(c); };
       target.erase(std::find_if(target.rbegin(), target.rend(),
                                 not_space).base(), target.end());

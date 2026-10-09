@@ -304,7 +304,7 @@ parse_opt(int key, char* arg, struct argp_state*)
         std::swap(opt_tree_size.min, opt_tree_size.max);
       break;
     case ARGP_KEY_ARG:
-      jobs.emplace_back(arg, job_type::LTL_FILENAME);
+      jobs.emplace_back(arg, positional_filename_job(arg));
       break;
     default:
       return ARGP_ERR_UNKNOWN;
