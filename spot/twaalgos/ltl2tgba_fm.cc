@@ -1392,11 +1392,6 @@ namespace spot
               //trace_ltl_bdd(dict_, res_);
               return res;
             }
-          case op::Star:
-          case op::FStar:
-          case op::first_match:
-            SPOT_UNREACHABLE();         // Not an LTL operator
-            // r(f1 logical-op f2) = r(f1) logical-op r(f2)
           case op::Xor:
           case op::Implies:
           case op::Equiv:
@@ -1683,6 +1678,9 @@ namespace spot
           case op::OrRat:
           case op::exists:
           case op::forall:
+          case op::Star:
+          case op::FStar:
+          case op::first_match:
             SPOT_UNREACHABLE(); // Not an LTL operator
           }
         SPOT_UNREACHABLE();
@@ -2242,7 +2240,7 @@ namespace spot
         do
           {
             transition t = *in;
-            while (++in != dests.end()
+            while (++in != dests.end() // NOLINT
                    && t.cond == in->cond && t.prom == in->prom)
               t.dest = formula::Or(t.dest, in->dest);
             *out++ = t;
@@ -2288,7 +2286,7 @@ namespace spot
       do
         {
           transition t = *in;
-          while (++in != dests.end()
+          while (++in != dests.end() // NOLINT
                  && t.prom == in->prom && t.dest == in->dest)
             t.cond |= in->cond;
           if (t.cond != bddfalse)
