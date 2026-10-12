@@ -137,7 +137,7 @@ namespace spot
   inline twa_product_ptr otf_product(const const_twa_ptr& left,
                                       const const_twa_ptr& right)
   {
-    return SPOT_make_shared_enabled__(twa_product, left, right);
+    return SPOT_make_shared_enabled_(twa_product, left, right);
   }
 
   /// \brief on-the-fly TGBA product with forced initial states
@@ -146,7 +146,7 @@ namespace spot
                                         const state* left_init,
                                         const state* right_init)
   {
-    return SPOT_make_shared_enabled__(twa_product_init,
+    return SPOT_make_shared_enabled_(twa_product_init,
                                       left, right, left_init, right_init);
   }
 }

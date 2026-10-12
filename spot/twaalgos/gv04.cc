@@ -410,6 +410,6 @@ namespace spot
   emptiness_check_ptr
   explicit_gv04_check(const const_twa_ptr& a, option_map o)
   {
-    return SPOT_make_shared_enabled__(gv04, a, o);
+    return SPOT_make_shared_enabled_(gv04, a, o);
   }
 }

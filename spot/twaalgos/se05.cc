@@ -680,7 +680,7 @@ namespace spot
   explicit_se05_search(const const_twa_ptr& a, option_map o)
   {
     return
-       SPOT_make_shared_enabled__(se05_search<explicit_se05_search_heap>,
+       SPOT_make_shared_enabled_(se05_search<explicit_se05_search_heap>,
                                  a, 0, o);
   }
 
@@ -689,7 +689,7 @@ namespace spot
                                 size_t size, option_map o)
   {
     return
-      SPOT_make_shared_enabled__(se05_search<bsh_se05_search_heap>,
+      SPOT_make_shared_enabled_(se05_search<bsh_se05_search_heap>,
                                  a, size, o);
   }
 

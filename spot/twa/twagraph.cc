@@ -1801,7 +1801,7 @@ namespace spot
   {
     if (max_states == -1U && !preserve_names)
       if (auto a = std::dynamic_pointer_cast<const twa_graph>(aut))
-        return SPOT_make_shared_enabled__(twa_graph, a, p);
+        return SPOT_make_shared_enabled_(twa_graph, a, p);
     return copy(aut, p, preserve_names, max_states);
   }
 }

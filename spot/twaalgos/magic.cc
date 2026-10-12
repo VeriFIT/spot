@@ -588,7 +588,7 @@ namespace spot
   explicit_magic_search(const const_twa_ptr& a, option_map o)
   {
     return
-      SPOT_make_shared_enabled__(magic_search_<explicit_magic_search_heap>,
+      SPOT_make_shared_enabled_(magic_search_<explicit_magic_search_heap>,
                                  a, 0, o);
   }
 
@@ -597,7 +597,7 @@ namespace spot
                                  size_t size, option_map o)
   {
     return
-      SPOT_make_shared_enabled__(magic_search_<bsh_magic_search_heap>,
+      SPOT_make_shared_enabled_(magic_search_<bsh_magic_search_heap>,
                                  a, size, o);
   }
 

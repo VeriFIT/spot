@@ -379,7 +379,7 @@ namespace spot
   explicit_tau03_search(const const_twa_ptr& a, option_map o)
   {
     return
-      SPOT_make_shared_enabled__(tau03_search<explicit_tau03_search_heap>,
+      SPOT_make_shared_enabled_(tau03_search<explicit_tau03_search_heap>,
                                  a, 0, o);
   }
 

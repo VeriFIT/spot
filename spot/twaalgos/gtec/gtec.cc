@@ -626,8 +626,8 @@ namespace spot
   couvreur99(const const_twa_ptr& a, option_map o)
   {
     if (o.get("shy"))
-      return SPOT_make_shared_enabled__(couvreur99_check_shy, a, o);
-    return SPOT_make_shared_enabled__(couvreur99_check, a, o);
+      return SPOT_make_shared_enabled_(couvreur99_check_shy, a, o);
+    return SPOT_make_shared_enabled_(couvreur99_check, a, o);
   }
 
 }
