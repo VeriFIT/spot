@@ -561,7 +561,7 @@ namespace spot
   emptiness_check_ptr
   explicit_tau03_opt_search(const const_twa_ptr& a, option_map o)
   {
-    return SPOT_make_shared_enabled__
+    return SPOT_make_shared_enabled_
       (tau03_opt_search<explicit_tau03_opt_search_heap>, a, 0, o);
   }
 

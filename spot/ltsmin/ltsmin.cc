@@ -958,7 +958,7 @@ namespace spot
         dict->unregister_all_my_variables(iface.get());
         throw;
       }
-    auto res = SPOT_make_shared_enabled__(spins_kripke,
+    auto res = SPOT_make_shared_enabled_(spins_kripke,
                                           iface, dict, ps, dead, compress);
     // All atomic propositions have been registered to the bdd_dict
     // for iface, but we also need to add them to the automaton so

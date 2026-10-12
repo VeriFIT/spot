@@ -187,9 +187,9 @@ namespace spot
 // that we only need this macro for classes that inherit from
 // enable_shared_from_this.
 #if __GNUC__ == 8 && __GNUC_MINOR__ == 2
-#  define SPOT_make_shared_enabled__(TYPE, ...) \
+#  define SPOT_make_shared_enabled_(TYPE, ...) \
    std::shared_ptr<TYPE>(new TYPE(__VA_ARGS__))
 #else
-#  define SPOT_make_shared_enabled__(TYPE, ...)  \
+#  define SPOT_make_shared_enabled_(TYPE, ...)  \
    std::make_shared<TYPE>(__VA_ARGS__)
 #endif

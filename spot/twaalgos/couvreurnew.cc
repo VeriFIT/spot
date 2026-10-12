@@ -856,9 +856,9 @@ namespace spot
   get_couvreur99_new_abstract(const const_twa_ptr& a, option_map o)
   {
     if (a->prop_weak())
-      return SPOT_make_shared_enabled__(cna<false>, a, o);
+      return SPOT_make_shared_enabled_(cna<false>, a, o);
     else
-      return SPOT_make_shared_enabled__(cna<true>, a, o);
+      return SPOT_make_shared_enabled_(cna<true>, a, o);
   }
 
   emptiness_check_ptr
@@ -868,9 +868,9 @@ namespace spot
     if (ag) // the automaton is explicit
       {
         if (a->prop_weak())
-          return SPOT_make_shared_enabled__(cne<false>, ag, o);
+          return SPOT_make_shared_enabled_(cne<false>, ag, o);
         else
-          return SPOT_make_shared_enabled__(cne<true>, ag, o);
+          return SPOT_make_shared_enabled_(cne<true>, ag, o);
       }
     else // the automaton is abstract
       {

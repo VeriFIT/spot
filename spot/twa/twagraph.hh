@@ -864,7 +864,7 @@ namespace spot
   /// \brief Build an explicit automaton from all states of \a aut,
   inline twa_graph_ptr make_twa_graph(const bdd_dict_ptr& dict)
   {
-    return SPOT_make_shared_enabled__(twa_graph, dict);
+    return SPOT_make_shared_enabled_(twa_graph, dict);
   }
 
   /// \ingroup twa_representation
@@ -872,7 +872,7 @@ namespace spot
   inline twa_graph_ptr make_twa_graph(const twa_graph_ptr& aut,
                                       twa::prop_set p)
   {
-    return SPOT_make_shared_enabled__(twa_graph, aut, p);
+    return SPOT_make_shared_enabled_(twa_graph, aut, p);
   }
 
   /// \ingroup twa_representation
@@ -885,7 +885,7 @@ namespace spot
                                       twa::prop_set p,
                                       bool preserve_name_properties = false)
   {
-    twa_graph_ptr res = SPOT_make_shared_enabled__(twa_graph, aut, p);
+    twa_graph_ptr res = SPOT_make_shared_enabled_(twa_graph, aut, p);
     if (preserve_name_properties)
       res->copy_named_properties_of(aut);
     return res;

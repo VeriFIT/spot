@@ -350,7 +350,7 @@ namespace spot
   /// \brief Construct a taa_tgba_string automaton.
   inline taa_tgba_string_ptr make_taa_tgba_string(const bdd_dict_ptr& dict)
   {
-    return SPOT_make_shared_enabled__(taa_tgba_string, dict);
+    return SPOT_make_shared_enabled_(taa_tgba_string, dict);
   }
 
   /// \ingroup twa_representation
@@ -384,6 +384,6 @@ namespace spot
   /// \brief Construct a taa_tgba_formula automaton.
   inline taa_tgba_formula_ptr make_taa_tgba_formula(const bdd_dict_ptr& dict)
   {
-    return SPOT_make_shared_enabled__(taa_tgba_formula, dict);
+    return SPOT_make_shared_enabled_(taa_tgba_formula, dict);
   }
 }
