@@ -2295,6 +2295,59 @@ namespace spot
     return edges;
   }
 
+  std::vector<fm_edge>
+  ltl_to_tgba_fm_otf::succ_as_raw_edges(formula s)
+  {
+    bdd res = succ_as_bdd(s);
+
+    if (res == bddfalse)
+      return {};
+
+    dest_map dests;
+    minato_isop isop(res);
+    bdd cube;
+    while ((cube = isop.next()) != bddfalse)
+      {
+        auto [cond, dest, acc] =
+          impl_->d->split_cube_as_cond_dest_and_acc(cube);
+
+        // Simplify the formula, if requested.
+        if (impl_->dest_simplifier)
+          {
+            dest = impl_->dest_simplifier->simplify(dest);
+            if (dest.is_ff())
+              continue;
+          }
+
+        // Canonicalize if symb_merge is enabled.
+        if (impl_->opts.symb_merge)
+          dest = impl_->fc->canonicalize(dest);
+
+        dests.emplace_back(transition(dest, cond, acc));
+      }
+
+    std::sort(dests.begin(), dests.end());
+
+    // Merge transitions with the same dest and promise set.
+    std::vector<fm_edge> edges;
+    dest_map::const_iterator in = dests.begin();
+    while (in != dests.end())
+      {
+        transition t = *in;
+        while (++in != dests.end() // NOLINT
+               && t.prom == in->prom && t.dest == in->dest)
+          t.cond |= in->cond;
+        if (t.cond != bddfalse)
+          {
+            if (impl_->unobs && t.dest.is_tt() && s.is_tt())
+              t.cond = impl_->all_events;
+            edges.push_back({t.cond, t.dest, t.prom});
+          }
+      }
+
+    return edges;
+  }
+
   std::vector<fm_simple_edge>
   ltl_to_tgba_fm_otf::succ_as_acc_and_dest(formula s)
   {
@@ -2379,6 +2432,184 @@ namespace spot
   ltl_to_tgba_fm_otf::get_dict() const
   {
     return impl_->d->dict;
+  }
+
+
+  // ---- ltl_to_ba_otf implementation ---------------------------------------
+
+  struct ltl_to_ba_otf::impl
+  {
+    std::unique_ptr<ltl_to_tgba_fm_otf> inner;
+    bdd_dict_ptr dict;
+
+    // Conjunction of all registered next-state variables.
+    bdd next_set = bddtrue;
+    // BDD variable -> (formula, m).
+    std::vector<ba_state> state_of_var;
+    // (formula, m) -> BDD variable.
+    robin_hood::unordered_node_map<ba_state, int, ba_state_hash> var_map;
+
+    // Caches keyed by source state.
+    robin_hood::unordered_node_map<ba_state, std::vector<ba_edge>,
+                                   ba_state_hash> raw_cache;
+    robin_hood::unordered_node_map<ba_state, std::vector<ba_edge>,
+                                   ba_state_hash> opt_cache;
+    robin_hood::unordered_node_map<ba_state, bdd, ba_state_hash> bdd_cache;
+
+    int register_state(ba_state s);
+    int new_m(int m_before, acc_cond::mark_t M);
+    const std::vector<ba_edge>& raw_ba_edges(const ba_state& s);
+
+    ~impl()
+    {
+      if (dict)
+        dict->unregister_all_my_variables(this);
+    }
+  };
+
+  int
+  ltl_to_ba_otf::impl::register_state(ba_state s)
+  {
+    auto p = var_map.emplace(s, 0);
+    if (!p.second)
+      return p.first->second;
+    int num = dict->register_anonymous_variables(1, this);
+    p.first->second = num;
+    if (static_cast<unsigned>(num) >= state_of_var.size())
+      state_of_var.resize(bdd_varnum());
+    state_of_var[num] = s;
+    next_set &= bdd_ithvar(num);
+    return num;
+  }
+
+  // Advance the minimum-unfulfilled-promise counter.
+  //
+  // \a M is the set of promises that are still pending on an outgoing
+  // edge of a state currently tracked by \a m_before.  This is the
+  // classical degeneralization of the generalized-Büchi condition
+  // Inf(!0)&Inf(!1)&..., using the usual "jump" optimization: if the
+  // promise \a m_before is discharged (not in \a M), the counter
+  // advances to the smallest promise still pending above it, or to -1
+  // when none is pending (a round is then complete and the state is
+  // accepting).
+  //
+  // No global bookkeeping of the promise indices is required: the
+  // successors of a formula-state only reference the promises that its
+  // own subformulas allocate, and any promise absent from \a M is
+  // discharged on this very edge.  Promises below \a m_before are
+  // assumed already discharged in the current round and will be
+  // checked again on the next round.
+  int
+  ltl_to_ba_otf::impl::new_m(int m_before, acc_cond::mark_t M)
+  {
+    // A round that has just been completed restarts from 0.
+    if (m_before < 0)
+      m_before = 0;
+    if (M.has(m_before))
+      return m_before;
+    for (unsigned i : M.sets())
+      if (static_cast<int>(i) > m_before)
+        return static_cast<int>(i);
+    return -1;
+  }
+
+  const std::vector<ltl_to_ba_otf::ba_edge>&
+  ltl_to_ba_otf::impl::raw_ba_edges(const ba_state& s)
+  {
+    auto it = raw_cache.find(s);
+    if (it != raw_cache.end())
+      return it->second;
+    std::vector<ba_edge> res;
+    for (auto& e : inner->succ_as_raw_edges(s.f))
+      res.push_back({e.cond, {e.dst, new_m(s.m, e.acc)}});
+    return raw_cache.emplace(s, std::move(res)).first->second;
+  }
+
+  ltl_to_ba_otf::ltl_to_ba_otf(formula f, twa_graph_ptr aut,
+                               options opts, tl_simplifier* simplifier,
+                               const atomic_prop_set* unobs)
+    : impl_(new impl)
+  {
+    impl_->inner = std::make_unique<ltl_to_tgba_fm_otf>(f, aut, opts,
+                                                        simplifier, unobs);
+    impl_->dict = impl_->inner->get_dict();
+  }
+
+  ltl_to_ba_otf::~ltl_to_ba_otf() = default;
+
+  ltl_to_ba_otf::ba_state
+  ltl_to_ba_otf::init_state() const
+  {
+    return {impl_->inner->init_state(), 0};
+  }
+
+  formula
+  ltl_to_ba_otf::orig_formula() const
+  {
+    return impl_->inner->orig_formula();
+  }
+
+  std::vector<ltl_to_ba_otf::ba_edge>
+  ltl_to_ba_otf::succ_as_ba_edges(ba_state s)
+  {
+    auto it = impl_->opt_cache.find(s);
+    if (it != impl_->opt_cache.end())
+      return it->second;
+    std::vector<ba_edge> res;
+    for (auto& e : impl_->inner->succ_as_edges(s.f))
+      res.push_back({e.cond, {e.dst, impl_->new_m(s.m, e.acc)}});
+    impl_->opt_cache.emplace(s, res);
+    return res;
+  }
+
+  bdd
+  ltl_to_ba_otf::succ_as_bdd(ba_state s)
+  {
+    auto it = impl_->bdd_cache.find(s);
+    if (it != impl_->bdd_cache.end())
+      return it->second;
+    bdd out = bddfalse;
+    for (auto& e : impl_->raw_ba_edges(s))
+      out |= e.cond & bdd_ithvar(impl_->register_state(e.dst));
+    impl_->bdd_cache.emplace(s, out);
+    return out;
+  }
+
+  const bdd&
+  ltl_to_ba_otf::var_set() const
+  {
+    return impl_->inner->var_set();
+  }
+
+  const bdd&
+  ltl_to_ba_otf::next_set() const
+  {
+    return impl_->next_set;
+  }
+
+  ltl_to_ba_otf::ba_state
+  ltl_to_ba_otf::state_from_var(int v) const
+  {
+    assert(v >= 0 && static_cast<unsigned>(v) < impl_->state_of_var.size());
+    return impl_->state_of_var[v];
+  }
+
+  bool
+  ltl_to_ba_otf::is_accepting(ba_state s) const
+  {
+    return s.m == -1;
+  }
+
+  int
+  ltl_to_ba_otf::register_next_state(ba_state s)
+  {
+    return impl_->register_state(s);
+  }
+
+  const bdd_dict_ptr&
+  ltl_to_ba_otf::get_dict() const
+  {
+    return impl_->dict;
   }
 
 

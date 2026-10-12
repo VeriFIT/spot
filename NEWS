@@ -120,6 +120,10 @@ New in spot 2.16.1.dev  (not yet released)
     destination, and condition, when they agree on every set that
     appears in a Fin term.
 
+  - spot::ltl_to_ba_otf is a new class that degeneralizes the
+    on-the-fly LTL-to-TGBA explorer ltl_to_tgba_fm_otf into an
+    on-the-fly LTL-to-NBA explorer with state-based Büchi acceptance.
+
   Bug fixes:
 
   - The --ins, --outs, and --unobservable-ins options of ltlfilt,

@@ -461,6 +461,7 @@ TESTS_python = \
   python/langmap.py \
   python/lasso.py \
   python/ltl2tgba.test \
+  python/ltlbaotf.py \
   python/ltlf.py \
   python/ltlf2dfa.py \
   python/ltlparse.py \

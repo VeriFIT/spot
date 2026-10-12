@@ -247,6 +247,22 @@ namespace spot
     /// Results are NOT cached.
     std::vector<fm_edge> succ_as_edges(formula s);
 
+    /// \brief Decompose the raw symbolic successors of \a s into edges.
+    ///
+    /// Internally calls succ_as_bdd(), then extracts edges via
+    /// minato_isop.  Applies simplification and canonicalization
+    /// (symb_merge), but, contrary to succ_as_edges(), it does not
+    /// apply the \c exprop option (conditions are the prime implicants
+    /// of the symbolic BDD) nor branching postponement.  The result
+    /// therefore matches succ_as_bdd() transition by transition.
+    ///
+    /// The acceptance marks returned in fm_edge::acc use negated
+    /// Inf semantics; see the class-level documentation for how to
+    /// convert them to proper generalized-Büchi marks.
+    ///
+    /// Results are NOT cached.
+    std::vector<fm_edge> succ_as_raw_edges(formula s);
+
     /// \brief Decompose the successors of \a s into edges without conditions.
     ///
     /// This is a lighter variant of succ_as_edges() that omits the BDD
@@ -296,5 +312,157 @@ namespace spot
     struct impl;
     std::unique_ptr<impl> impl_;
   };
+// ---------------------------------------------------------------------------
+// class ltl_to_ba_otf — on-the-fly LTL→Büchi automaton explorer
+// ---------------------------------------------------------------------------
+/// \ingroup twa_ltl
+/// \brief On-the-fly LTL→Büchi automaton explorer.
+///
+/// Degeneralizes the on-the-fly LTL→TGBA explorer ltl_to_tgba_fm_otf
+/// into an NBA with *state-based* Büchi acceptance, using
+/// minimum-unfulfilled-promise tracking.
+///
+/// A state is a pair (formula, m), where m is the smallest promise not
+/// yet discharged in the current round, or -1 once the round has been
+/// completed.  States with m == -1 are the accepting states.
+///
+/// Two successor views are provided:
+///   - succ_as_ba_edges(): an explicit edge list;
+///   - succ_as_bdd(): a symbolic BDD over atomic propositions and
+///     anonymous next-state variables (one per pair (f, m)); this BDD
+///     contains no promise variable.
+///
+/// To build a state-based Büchi automaton from the result, expand the
+/// (formula, m) pairs as states, and after exploration mark every state
+/// with m == -1 as accepting (i.e., tag all its outgoing transitions
+/// with acceptance set 0), then call set_buchi() and prop_state_acc(true)
+/// on the output automaton.
+class SPOT_API ltl_to_ba_otf final
+{
+public:
+  /// \brief Bundle the boolean options for translation.
+  ///
+  /// The options are those of ltl_to_tgba_fm_otf.  Note that \c exprop
+  /// and \c branching_postponement only affect succ_as_ba_edges();
+  /// succ_as_bdd() ignores them.
+  using options = ltl_to_tgba_fm_otf::options;
 
+  /// \brief Constructor.
+  ltl_to_ba_otf(formula f, twa_graph_ptr aut,
+                options opts = options(),
+                tl_simplifier* simplifier = nullptr,
+                const atomic_prop_set* unobs = nullptr);
+
+  ~ltl_to_ba_otf();
+
+  // Non-copyable, non-movable.
+  ltl_to_ba_otf(const ltl_to_ba_otf&) = delete;
+  ltl_to_ba_otf& operator=(const ltl_to_ba_otf&) = delete;
+
+  // ---- State interface ----
+
+  /// \brief Büchi automaton state: formula-state plus tracker.
+  struct ba_state
+  {
+    formula f;            ///< formula-state
+    int m;                ///< minimum unfulfilled promise, -1 = accepting
+
+    /// \brief Equality of states: same formula-state and same tracker.
+    bool operator==(const ba_state& other) const noexcept
+    {
+      return f == other.f && m == other.m;
+    }
+  };
+
+  /// \brief Hash function for \ref ba_state.
+  struct ba_state_hash
+  {
+    /// \brief Hash a state from its formula's identifier and tracker.
+    size_t operator()(const ba_state& s) const noexcept
+    {
+      return s.f.id() ^ static_cast<size_t>(s.m + 1);
+    }
+  };
+
+  /// \brief An explicit transition of the Büchi automaton.
+  struct ba_edge
+  {
+    bdd cond;      ///< condition on atomic propositions
+    ba_state dst;  ///< destination state; accepting iff dst.m == -1
+  };
+
+  /// The initial formula-state paired with the minimum unfulfilled
+  /// promise 0.
+  ba_state init_state() const;
+
+  /// The original formula after normalization and quantifier extraction,
+  /// but before canonicalization.  Useful for property checks on the
+  /// resulting automaton.
+  formula orig_formula() const;
+
+  // ---- Explicit successor view ----
+
+  /// \brief Decompose the successors of \a s into explicit edges.
+  ///
+  /// Applies the option-dependent machinery of
+  /// ltl_to_tgba_fm_otf::succ_as_edges() (exprop, branching
+  /// postponement, simplification, canonicalization) and pairs each
+  /// transition with its new minimum unfulfilled promise.
+  ///
+  /// Results are cached.
+  std::vector<ba_edge> succ_as_ba_edges(ba_state s);
+
+  // ---- Symbolic successor view ----
+
+  /// \brief Translate \a s into a single BDD representing its successors.
+  ///
+  /// The BDD uses two variable families:
+  ///
+  ///   - var_set():  atomic propositions (edge conditions), shared with
+  ///     ltl_to_tgba_fm_otf;
+  ///   - next_set(): anonymous variables, one per destination (f, m).
+  ///
+  /// Contrary to ltl_to_tgba_fm_otf::succ_as_bdd(), the \c exprop and
+  /// \c branching_postponement options are ignored.  There is no promise
+  /// variable: a transition is accepting iff the m component of its
+  /// destination is -1.
+  ///
+  /// Each cube of the result contains exactly one next_set() variable.
+  /// Because next_set() is the conjunction of *all* registered
+  /// next-state variables, extract it with
+  /// \code
+  ///   int v = bdd_var(bdd_exist(cube, var_set()));
+  ///   ba_state dst = state_from_var(v);
+  /// \endcode
+  /// (do not use <code>cube &amp; next_set()</code>, as this would
+  /// reintroduce the other next-state variables).
+  ///
+  /// Results are cached.
+  bdd succ_as_bdd(ba_state s);
+
+  // ---- Accessors for interpreting succ_as_bdd() results ----
+
+  /// Variable set: atomic propositions (same as in ltl_to_tgba_fm_otf).
+  const bdd& var_set() const;
+
+  /// Variable set: anonymous next-state variables.
+  const bdd& next_set() const;
+
+  /// \brief Decode a next-state variable of next_set() into a state.
+  ba_state state_from_var(int v) const;
+
+  /// \brief Whether \a s is accepting (m == -1).
+  bool is_accepting(ba_state s) const;
+
+  /// \brief Return the next-state variable associated to \a s,
+  /// registering it if needed.
+  int register_next_state(ba_state s);
+
+  /// The BDD dictionary.
+  const bdd_dict_ptr& get_dict() const;
+
+private:
+  struct impl;
+  std::unique_ptr<impl> impl_;
+};
 }
