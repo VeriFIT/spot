@@ -50,6 +50,27 @@ namespace spot
   SPOT_API atomic_prop_set*
   atomic_prop_collect(formula f, atomic_prop_set* s = nullptr);
 
+  /// \brief Return the number of distinct atomic propositions occurring
+  /// in \a f.
+  ///
+  /// Atomic propositions that occur several times are counted only once.
+  /// This is similar to atomic_prop_collect(f)->size(), but faster: it
+  /// uses an array of formula::apid_count() markers indexed by APIDs to
+  /// detect repeated propositions, and runs in time linear in the size of
+  /// the syntax tree of \a f.
+  SPOT_API unsigned
+  ap_count(formula f);
+
+  /// \brief Return true if the number of distinct atomic propositions
+  /// occurring in \a f is greater than \a limit.
+  ///
+  /// This may be faster than comparing ap_count(f) with \a limit: the
+  /// traversal can stop as soon as \a limit is exceeded, and the formula
+  /// is not even inspected when it cannot possibly use more than \a limit
+  /// atomic propositions.
+  SPOT_API bool
+  ap_count_exceeds(formula f, unsigned limit);
+
   /// \brief Return the set of atomic propositions occurring in a
   /// formula, as a BDD.
   ///

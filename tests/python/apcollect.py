@@ -104,3 +104,31 @@ leaf = [p for p in spot.list_formula_props(spot.formula('a'))]
 tc.assertIn('without Boolean sugar', leaf)
 tc.assertIn('LTL formula', leaf)
 tc.assertIn('syntactic stutter invariant', leaf)
+
+# Test ap_count()
+for f, n in [(spot.formula('1'), 0),
+             (spot.formula('a'), 1),
+             (spot.formula('a & b | !a'), 2),
+             (spot.formula('(a & Xa) | (b U Ga)'), 2),
+             (spot.formula('F(a & G(b & X(a | c)))'), 3),
+             (spot.formula('X(a | !a)'), 1)]:
+    tc.assertEqual(spot.ap_count(f), n)
+
+# Quantified atomic propositions are counted, like atomic_prop_collect()
+# does.
+f = spot.formula('\\exists x: G(y)')
+tc.assertEqual(spot.ap_count(f), 2)
+tc.assertEqual(len(spot.atomic_prop_collect(f)), 2)
+
+# Test ap_count_exceeds(): the limit can be exceeded, or not, and it can
+# be larger than the number of APIDs that exist (in which case the
+# formula cannot use that many propositions and is not even inspected).
+f = spot.formula('a & b & c')
+for lim, res in [(0, True), (2, True), (3, False), (4, False),
+                 (100, False)]:
+    tc.assertEqual(spot.ap_count_exceeds(f, lim), res)
+
+# ap_count() agrees with atomic_prop_collect() on a larger formula.
+f = spot.formula('G(p0 -> q0) & F(p1 & X(p2 | q1))')
+tc.assertEqual(spot.ap_count(f), len(spot.atomic_prop_collect(f)))
+tc.assertEqual(spot.ap_count(f), 5)

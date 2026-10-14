@@ -54,6 +54,60 @@ namespace spot
     return s;
   }
 
+  unsigned
+  ap_count(formula f)
+  {
+    // APIDs are small dense integers assigned by formula::ap(), so a
+    // plain array indexed by APID is enough to remember which
+    // propositions have already been seen.  No set, no hashing.
+    std::vector<char> seen(formula::apid_count(), 0);
+    unsigned n = 0;
+    f.traverse([&](const formula& g)
+               {
+                 if (g.is(op::ap))
+                   {
+                     unsigned id = g.apid();
+                     if (!seen[id])
+                       {
+                         seen[id] = 1;
+                         ++n;
+                       }
+                   }
+                 return false;
+               });
+    return n;
+  }
+
+  bool
+  ap_count_exceeds(formula f, unsigned limit)
+  {
+    // Fast path: a formula cannot use more atomic propositions than the
+    // number of APIDs that exist, so there is nothing to check.
+    if (formula::apid_count() <= limit)
+      return false;
+
+    std::vector<char> seen(formula::apid_count(), 0);
+    unsigned n = 0;
+    bool too_many = false;
+    f.traverse([&](const formula& g)
+               {
+                 if (SPOT_UNLIKELY(too_many))
+                   return true;        // prune the rest of the traversal
+                 if (g.is(op::ap))
+                   {
+                     unsigned id = g.apid();
+                     if (!seen[id])
+                       {
+                         seen[id] = 1;
+                         if (++n > limit)
+                           too_many = true;
+                       }
+                   }
+                 return false;
+               });
+    return too_many;
+  }
+
   bdd
   atomic_prop_collect_as_bdd(formula f, const twa_ptr& a)
   {

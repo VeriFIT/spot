@@ -87,6 +87,10 @@ New in spot 2.16.0.dev  (not yet released)
     randomized Rabin-like and Streett-like acceptance conditions from
     a number of acceptance sets and an optional reuse probability.
 
+  - New functions spot::ap_count() and spot::ap_count_exceeds()
+    to count the number of distinct atomic propositions used by a
+    formula.
+
   - As a consequence of the move from PicoSAT to CaDiCaL,
     minimize_mealy() lost its "satlogdimacs" option to print the
     intermediate DIMACS files during incremental SAT solving.
