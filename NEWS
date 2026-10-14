@@ -42,6 +42,8 @@ New in spot 2.16.0.dev  (not yet released)
     "f").  Such automata are now converted into automata with
     acceptance "f".  (Issue #659.)
 
+  - Improve speed of syntactic implication checks.  (Issue #660.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:

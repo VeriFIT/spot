@@ -23,6 +23,6 @@ set -e
 # Exercise bdd_dict::assert_emptiness()
 ../bdddict 2>stderr && exit 1
 grep 'some maps are not empty' stderr
-grep 'Var\[p0\] x2' stderr
-grep 'Var\[p1\] x2' stderr
-grep 'Var\[p2\] x2' stderr
+grep 'Var\[p0\] x1' stderr
+grep 'Var\[p1\] x1' stderr
+grep 'Var\[p2\] x1' stderr

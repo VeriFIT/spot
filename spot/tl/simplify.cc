@@ -18,7 +18,7 @@
 
 #include "config.h"
 #include <iostream>
-//#define TRACE
+// #define TRACE
 #ifdef TRACE
 #define trace std::cerr
 #else
@@ -3852,247 +3852,223 @@ namespace spot
   {
     // We first process all lines from the table except the
     // first two, and then we process the first two as a fallback.
-    //
-    // However for Boolean formulas we skip the bottom lines
-    // (keeping only the first one) to prevent them from being
-    // further split.
-    if (!f.is_boolean())
-      // Deal with all lines of the table except the first two.
-      switch (f.kind())
+    switch (f.kind())
+      {
+      case op::X:
+      case op::strong_X:
+        if (g.is_eventual() && syntactic_implication(f[0], g))
+          return true;
+        if (g.is(op::X, op::strong_X) && syntactic_implication(f[0], g[0]))
+          return true;
+        break;
+
+      case op::F:
+        if (g.is_eventual() && syntactic_implication(f[0], g))
+          return true;
+        break;
+
+      case op::G:
+        if (g.is(op::U, op::R) && syntactic_implication(f[0], g[1]))
+          return true;
+        if (g.is(op::W) && (syntactic_implication(f[0], g[0])
+                            || syntactic_implication(f[0], g[1])))
+          return true;
+        if (g.is(op::M) && (syntactic_implication(f[0], g[0])
+                            && syntactic_implication(f[0], g[1])))
+          return true;
+        // First column.
+        if (syntactic_implication(f[0], g))
+          return true;
+        break;
+
+      case op::U:
         {
-        case op::X:
-        case op::strong_X:
-          if (g.is_eventual() && syntactic_implication(f[0], g))
+          formula f1 = f[0];
+          formula f2 = f[1];
+          if (g.is(op::U, op::W)
+              && syntactic_implication(f1, g[0])
+              && syntactic_implication(f2, g[1]))
             return true;
-          if (g.is(op::X, op::strong_X) && syntactic_implication(f[0], g[0]))
+          if (g.is(op::M, op::R)
+              && syntactic_implication(f1, g[1])
+              && syntactic_implication(f2, g[0])
+              && syntactic_implication(f2, g[1]))
             return true;
-          break;
-
-        case op::F:
-          if (g.is_eventual() && syntactic_implication(f[0], g))
-            return true;
-          break;
-
-        case op::G:
-          if (g.is(op::U, op::R) && syntactic_implication(f[0], g[1]))
-            return true;
-          if (g.is(op::W) && (syntactic_implication(f[0], g[0])
-                              || syntactic_implication(f[0], g[1])))
-            return true;
-          if (g.is(op::M) && (syntactic_implication(f[0], g[0])
-                              && syntactic_implication(f[0], g[1])))
+          if (g.is(op::F) && syntactic_implication(f2, g[0]))
             return true;
           // First column.
-          if (syntactic_implication(f[0], g))
+          if (syntactic_implication(f1, g) && syntactic_implication(f2, g))
             return true;
           break;
-
-        case op::U:
-          {
-            formula f1 = f[0];
-            formula f2 = f[1];
-            if (g.is(op::U, op::W)
-                && syntactic_implication(f1, g[0])
-                && syntactic_implication(f2, g[1]))
-              return true;
-            if (g.is(op::M, op::R)
-                && syntactic_implication(f1, g[1])
-                && syntactic_implication(f2, g[0])
-                && syntactic_implication(f2, g[1]))
-              return true;
-            if (g.is(op::F) && syntactic_implication(f2, g[0]))
-              return true;
-            // First column.
-            if (syntactic_implication(f1, g) && syntactic_implication(f2, g))
-              return true;
-            break;
-          }
-        case op::W:
-          {
-            formula f1 = f[0];
-            formula f2 = f[1];
-            if (g.is(op::U) && (syntactic_implication(f1, g[1])
-                                && syntactic_implication(f2, g[1])))
-              return true;
-            if (g.is(op::W) && (syntactic_implication(f1, g[0])
-                                && syntactic_implication(f2, g[1])))
-              return true;
-            if (g.is(op::R) && (syntactic_implication(f1, g[1])
-                                && syntactic_implication(f2, g[0])
-                                && syntactic_implication(f2, g[1])))
-              return true;
-            if (g.is(op::F) && (syntactic_implication(f1, g[0])
-                                && syntactic_implication(f2, g[0])))
-              return true;
-            // First column.
-            if (syntactic_implication(f1, g) && syntactic_implication(f2, g))
-              return true;
-            break;
-          }
-        case op::R:
-          {
-            formula f1 = f[0];
-            formula f2 = f[1];
-            if (g.is(op::W) && (syntactic_implication(f1, g[1])
-                                && syntactic_implication(f2, g[0])))
-              return true;
-            if (g.is(op::R) && (syntactic_implication(f1, g[0])
-                                && syntactic_implication(f2, g[1])))
-              return true;
-            if (g.is(op::M) && (syntactic_implication(f2, g[0])
-                                && syntactic_implication(f2, g[1])))
-              return true;
-            if (g.is(op::F) && syntactic_implication(f2, g[0]))
-              return true;
-            // First column.
-            if (syntactic_implication(f2, g))
-              return true;
-            break;
-          }
-        case op::M:
-          {
-            formula f1 = f[0];
-            formula f2 = f[1];
-            if (g.is(op::U, op::W) && (syntactic_implication(f1, g[1])
-                                       && syntactic_implication(f2,
-                                                                g[0])))
-              return true;
-            if (g.is(op::R, op::M) && (syntactic_implication(f1, g[0])
-                                       && syntactic_implication(f2,
-                                                                g[1])))
-              return true;
-            if (g.is(op::F) && (syntactic_implication(f1, g[0])
-                                || syntactic_implication(f2, g[0])))
-              return true;
-            // First column.
-            if (syntactic_implication(f2, g))
-              return true;
-            break;
-          }
-        case op::Or:
-          {
-            // If we are checking something like
-            //   (a | b | Xc) => g,
-            // split it into
-            //   (a | b) => g
-            //   Xc      => g
-            unsigned i = 0;
-            if (formula bops = f.boolean_operands(&i))
-              if (!syntactic_implication(bops, g))
-                break;
-            bool b = true;
-            unsigned fs = f.size();
-            for (; i < fs; ++i)
-              if (!syntactic_implication(f[i], g))
-                {
-                  b = false;
-                  break;
-                }
-            if (b)
-              return true;
-            break;
-          }
-        case op::And:
-          {
-            // If we are checking something like
-            //   (a & b & Xc) => g,
-            // split it into
-            //   (a & b) => g
-            //   Xc      => g
-            unsigned i = 0;
-            if (formula bops = f.boolean_operands(&i))
-              if (syntactic_implication(bops, g))
-                return true;
-            unsigned fs = f.size();
-            for (; i < fs; ++i)
-              if (syntactic_implication(f[i], g))
-                return true;
-            break;
-          }
-        default:
+        }
+      case op::W:
+        {
+          formula f1 = f[0];
+          formula f2 = f[1];
+          if (g.is(op::U) && (syntactic_implication(f1, g[1])
+                              && syntactic_implication(f2, g[1])))
+            return true;
+          if (g.is(op::W) && (syntactic_implication(f1, g[0])
+                              && syntactic_implication(f2, g[1])))
+            return true;
+          if (g.is(op::R) && (syntactic_implication(f1, g[1])
+                              && syntactic_implication(f2, g[0])
+                              && syntactic_implication(f2, g[1])))
+            return true;
+          if (g.is(op::F) && (syntactic_implication(f1, g[0])
+                              && syntactic_implication(f2, g[0])))
+            return true;
+          // First column.
+          if (syntactic_implication(f1, g) && syntactic_implication(f2, g))
+            return true;
           break;
         }
+      case op::R:
+        {
+          formula f1 = f[0];
+          formula f2 = f[1];
+          if (g.is(op::W) && (syntactic_implication(f1, g[1])
+                              && syntactic_implication(f2, g[0])))
+            return true;
+          if (g.is(op::R) && (syntactic_implication(f1, g[0])
+                              && syntactic_implication(f2, g[1])))
+            return true;
+          if (g.is(op::M) && (syntactic_implication(f2, g[0])
+                              && syntactic_implication(f2, g[1])))
+            return true;
+          if (g.is(op::F) && syntactic_implication(f2, g[0]))
+            return true;
+          // First column.
+          if (syntactic_implication(f2, g))
+            return true;
+          break;
+        }
+      case op::M:
+        {
+          formula f1 = f[0];
+          formula f2 = f[1];
+          if (g.is(op::U, op::W) && (syntactic_implication(f1, g[1])
+                                     && syntactic_implication(f2,
+                                                              g[0])))
+            return true;
+          if (g.is(op::R, op::M) && (syntactic_implication(f1, g[0])
+                                     && syntactic_implication(f2,
+                                                              g[1])))
+            return true;
+          if (g.is(op::F) && (syntactic_implication(f1, g[0])
+                              || syntactic_implication(f2, g[0])))
+            return true;
+          // First column.
+          if (syntactic_implication(f2, g))
+            return true;
+          break;
+        }
+      case op::Or:
+        {
+          // If we are checking something like
+          //   (a | b | Xc) => g,
+          // split it into
+          //   a  => g,  and
+          //   b  => g,  and
+          //   Xc => g
+          bool b = true;
+          for (auto fi: f)
+            if (!syntactic_implication(fi, g))
+              {
+                b = false;
+                break;
+              }
+          if (b)
+            return true;
+          break;
+        }
+      case op::And:
+        {
+          // If we are checking something like
+          //   (a & b & Xc) => g,
+          // split it into
+          //   a   => g, or
+          //   b   => g, or
+          //   Xc  => g
+          for (auto fi: f)
+            if (syntactic_implication(fi, g))
+              return true;
+          break;
+        }
+      default:
+        break;
+      }
     // First two lines of the table.
     // (Don't check equality, it has already been done.)
-    if (!g.is_boolean())
-      switch (g.kind())
+    switch (g.kind())
+      {
+      case op::F:
+        if (syntactic_implication(f, g[0]))
+          return true;
+        break;
+
+      case op::G:
+      case op::X:
+      case op::strong_X:
+        if (f.is_universal() && syntactic_implication(f, g[0]))
+          return true;
+        break;
+
+      case op::U:
+      case op::W:
+        if (syntactic_implication(f, g[1]))
+          return true;
+        break;
+
+      case op::M:
+      case op::R:
+        if (syntactic_implication(f, g[0])
+            && syntactic_implication(f, g[1]))
+          return true;
+        break;
+
+      case op::And:
         {
-        case op::F:
-          if (syntactic_implication(f, g[0]))
-            return true;
-          break;
-
-        case op::G:
-        case op::X:
-        case op::strong_X:
-          if (f.is_universal() && syntactic_implication(f, g[0]))
-            return true;
-          break;
-
-        case op::U:
-        case op::W:
-          if (syntactic_implication(f, g[1]))
-            return true;
-          break;
-
-        case op::M:
-        case op::R:
-          if (syntactic_implication(f, g[0])
-              && syntactic_implication(f, g[1]))
-            return true;
-          break;
-
-        case op::And:
-          {
-            // If we are checking something like
-            //   f => (a & b & Xc),
-            // split it into
-            //   f => (a & b)
-            //   f => Xc
-            unsigned i = 0;
-            if (formula bops = g.boolean_operands(&i))
-              if (!syntactic_implication(f, bops))
+          // If we are checking something like
+          //   f => (a & b & Xc),
+          // split it into
+          //   f => a, and
+          //   f => b, and
+          //   f => Xc
+          bool b = true;
+          for (auto gi: g)
+            if (!syntactic_implication(f, gi))
+              {
+                b = false;
                 break;
-            bool b = true;
-            unsigned gs = g.size();
-            for (; i < gs; ++i)
-              if (!syntactic_implication(f, g[i]))
-                {
-                  b = false;
-                  break;
-                }
-            if (b)
-              return true;
-            break;
-          }
-
-        case op::Or:
-          {
-            // If we are checking something like
-            //   f => (a | b | Xc),
-            // split it into
-            //   f => (a | b)
-            //   f => Xc
-            unsigned i = 0;
-            if (formula bops = g.boolean_operands(&i))
-              if (syntactic_implication(f, bops))
-                return true;
-            unsigned gs = g.size();
-            for (; i < gs; ++i)
-              if (syntactic_implication(f, g[i]))
-                return true;
-            break;
-          }
-        default:
+              }
+          if (b)
+            return true;
           break;
         }
+
+      case op::Or:
+        {
+          // If we are checking something like
+          //   f => (a | b | Xc),
+          // split it into
+          //   f => a, or
+          //   f => b, or
+          //   f => Xc
+          for (auto gi: g)
+            if (syntactic_implication(f, gi))
+              return true;
+          break;
+        }
+      default:
+        break;
+      }
     return false;
   }
 
   // Return true if f => g syntactically
   bool
-  tl_simplifier_cache::syntactic_implication(formula f,
-                                              formula g)
+  tl_simplifier_cache::syntactic_implication(formula f, formula g)
   {
     // We cannot run syntactic_implication on SERE formulas,
     // except on Boolean formulas.
@@ -4125,7 +4101,9 @@ namespace spot
 
     bool result;
 
-    if (f.is_boolean() && g.is_boolean())
+    if (f.is_boolean() && g.is_boolean()
+        && !f.is(op::Or, op::And)
+        && !g.is(op::Or, op::And))
       {
         bdd l = as_bdd(f);
         result = bdd_implies(l, as_bdd(g));
