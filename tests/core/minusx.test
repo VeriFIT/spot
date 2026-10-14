@@ -28,6 +28,10 @@ grep -v 'ba-simul' error
 grep -- "- 'foo'" error
 grep -- "- 'bar'" error
 
+# ltlfilt's -x only knows the temporal-logic simplification options.
+ltlfilt -f a -x foo 2>error && exit 1
+grep "ltlfilt: option 'foo' was not used" error
+
 # Likewise for --sat-minimise
 
 ltl2tgba -f FGa | autfilt -D |

@@ -999,6 +999,16 @@ test a = `ltlfilt -r2 -f a`
 ltlfilt -r4 -f a 2>err && exit 1
 grep "invalid argument '4' for '--simplify'" err
 
+# -x options of spot-x(7) can tune the simplifier (issue #661).
+test 'Fa & Fb' = "`ltlfilt -r2 -f 'F(a & b) | (Fa & Fb)'`"
+ltlfilt -r2 -x tls-max-ops=1 -f 'F(a & b) | (Fa & Fb)' > out
+cat > exp <<EOF
+F(a & b) | (Fa & Fb)
+EOF
+diff exp out
+ltlfilt -f a -x tls-impl=4 2>err && exit 1
+grep 'tls-impl should take a value between 0 and 3' err
+
 ltlfilt --ignore-errors -f 'F' > out 2> out && exit 1
 test $? = 1
 cat >exp <<EOF

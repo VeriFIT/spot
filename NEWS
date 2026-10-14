@@ -75,6 +75,11 @@ New in spot 2.16.0.dev  (not yet released)
 
         % ltlsynt --tlsf-input *.tlsf
 
+  - ltlfilt larned the -x option already supported by several tools
+    for fine-tuning.  It currently recognizes only the temporal-logic
+    simplification options tls-impl, tls-max-states, and tls-max-ops
+    all described in the spot-x(7) man page. (Issue #661.)
+
   Library:
 
   - acc_cond::acc_code::rabin_like() and

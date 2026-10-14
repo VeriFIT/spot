@@ -33,6 +33,7 @@
 #include "common_r.hh"
 #include "common_range.hh"
 
+#include <spot/misc/optionmap.hh>
 #include <spot/misc/timer.hh>
 #include <spot/tl/simplify.hh>
 #include <spot/tl/sonf.hh>
@@ -323,6 +324,8 @@ static const argp_option options[] =
     COMMON_LTL_OUTPUT_SPECS,
     /**************************************************/
     { nullptr, 0, nullptr, 0, "Miscellaneous options:", -1 },
+    { "extra-options", 'x', "OPTS", 0,
+      "fine-tuning options (see spot-x (7))", 0 },
     { nullptr, 0, nullptr, 0, nullptr, 0 }
   };
 
@@ -385,6 +388,7 @@ static const char* sonf = nullptr;
 static bool opt_distribute_x = false;
 static bool to_delta2 = false;
 static bool satisfiable = false;
+static spot::option_map extra_options;
 
 // We want all these variables to be destroyed when we exit main, to
 // make sure it happens before all other global variables (like the
@@ -449,6 +453,13 @@ parse_opt(int key, char* arg, struct argp_state*)
       break;
     case 'v':
       invert = true;
+      break;
+    case 'x':
+      {
+        const char* opt = extra_options.parse_options(arg);
+        if (opt)
+          error(2, 0, "failed to parse --options near '%s'", opt);
+      }
       break;
     case ARGP_KEY_ARG:
       jobs.emplace_back(arg, positional_filename_job(arg));
@@ -1051,6 +1062,27 @@ namespace
   };
 }
 
+static void
+apply_extra_options()
+{
+  int v = extra_options.get("tls-impl", -1);
+  if (v >= 0)
+    {
+      if (v > 3)
+        throw std::runtime_error
+          ("tls-impl should take a value between 0 and 3");
+      simplification_opts.synt_impl = v > 0;
+      simplification_opts.containment_checks = v > 1;
+      simplification_opts.containment_checks_stronger = v > 2;
+    }
+  v = extra_options.get("tls-max-states", -1);
+  if (v >= 0)
+    simplification_opts.containment_max_states = v;
+  v = extra_options.get("tls-max-ops", -1);
+  if (v >= 0)
+    simplification_opts.containment_max_ops = v;
+}
+
 int
 main(int argc, char** argv)
 {
@@ -1078,6 +1110,8 @@ main(int argc, char** argv)
           // --boolean-to-isop needs reduce_basics.
           simplification_opts.reduce_basics = true;
         }
+      apply_extra_options();
+      extra_options.report_unused_options();
       spot::tl_simplifier simpl(simplification_opts, opt->dict);
 
       ltl_processor processor(simpl);
