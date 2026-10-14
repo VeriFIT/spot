@@ -1104,3 +1104,31 @@ test 3 = `ltlfilt -v -c --satisfiable formulas -f 'GFa & FG!a'`
 # represented correctly by checking the printed formula contains the bound.
 ltlfilt -f 'G({a} |-> ({b ##[1:1024] c}))' > out
 grep '[1:1024]' out
+
+
+# The following simplification used to be very slow (issue #660)
+tr -d "\r\n" >f.ltl <<EOF
+((os_0 <-> !((ox_0 & oy_0))) & (os_4 <-> !((ox_0 & oy_1))) & (os_8 <->
+!((ox_0 & oy_2))) & (os_12 <-> !((ox_0 & oy_3))) & (os_16 <-> !((ox_0
+& oy_4))) & (os_20 <-> !((ox_0 & oy_5))) & (os_1 <-> !((ox_1 & oy_0)))
+& (os_5 <-> !((ox_1 & oy_1))) & (os_9 <-> !((ox_1 & oy_2))) & (os_13
+<-> !((ox_1 & oy_3))) & (os_17 <-> !((ox_1 & oy_4))) & (os_21 <->
+!((ox_1 & oy_5))) & (os_2 <-> !((ox_2 & oy_0))) & (os_6 <-> !((ox_2 &
+oy_1))) & (os_10 <-> !((ox_2 & oy_2))) & (os_14 <-> !((ox_2 & oy_3)))
+& (os_18 <-> !((ox_2 & oy_4))) & (os_22 <-> !((ox_2 & oy_5))) & (os_3
+<-> !((ox_3 & oy_0))) & (os_7 <-> !((ox_3 & oy_1))) & (os_11 <->
+!((ox_3 & oy_2))) & (os_15 <-> !((ox_3 & oy_3))) & (os_19 <-> !((ox_3
+& oy_4))) & (os_23 <-> !((ox_3 & oy_5)))) & (G(a) -> G(((ix_0 & iy_0)
+-> !(os_0)) & ((ix_0 & iy_1) -> !(os_4)) & ((ix_0 & iy_2) -> !(os_8))
+& ((ix_0 & iy_3) -> !(os_12)) & ((ix_0 & iy_4) -> !(os_16)) & ((ix_0 &
+iy_5) -> !(os_20)) & ((ix_1 & iy_0) -> !(os_1)) & ((ix_1 & iy_1) ->
+!(os_5)) & ((ix_1 & iy_2) -> !(os_9)) & ((ix_1 & iy_3) -> !(os_13)) &
+((ix_1 & iy_4) -> !(os_17)) & ((ix_1 & iy_5) -> !(os_21)) & ((ix_2 &
+iy_0) -> !(os_2)) & ((ix_2 & iy_1) -> !(os_6)) & ((ix_2 & iy_2) ->
+!(os_10)) & ((ix_2 & iy_3) -> !(os_14)) & ((ix_2 & iy_4) -> !(os_18))
+& ((ix_2 & iy_5) -> !(os_22)) & ((ix_3 & iy_0) -> !(os_3)) & ((ix_3 &
+iy_1) -> !(os_7)) & ((ix_3 & iy_2)-> !(os_11)) & ((ix_3 & iy_3) ->
+!(os_15)) & ((ix_3 & iy_4) -> !(os_19)) & ((ix_3 & iy_5) ->
+!(os_23))))
+EOF
+ltlfilt --simplify=2 f.ltl >fout.ltl
