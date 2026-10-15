@@ -460,6 +460,12 @@ res=`ltl2tgba -D -G 'X((Fa & Fb & Fc & Fd) ^ GFe)' --stats='%s %g'`
 test "$res" = "17 (Inf(0) & Fin(1)) | (Fin(0) & Inf(1))"
 ltlcross 'ltl2tgba -D -G' 'ltl2tgba -G' -f '(Fa & Fb & Fc & Fd) ^ GFe'
 
+# Issue #662: The LTL-split machinery had a bug on thee formulas.
+ltlcross -f 'i1 <-> (i1 <-> FGi1)' \
+         -f 'i1 ^ (i1 ^ FGi1)' \
+         -f 'o2 <-> (Fi1 <-> (1 U !Fo2))' \
+    'ltl2tgba -G -D' 'ltl2tgba -G -D -x ltl-split=0'
+
 f='G(p1 | G!p0) M Xp1'
 test "6,1" = `ltl2tgba "$f" --stats=%s,%d`
 test "6,0" = `ltl2tgba -x wdba-minimize=2 "$f" --stats=%s,%d`

@@ -1866,4 +1866,11 @@ ltlsynt -f '\forall a: G(a->b)&G(b->c)&G(c->a)' --out=b,c --verbose 2>err &&
     exit 1
 grep -F 'forall a: (G(a -> b) & G(b -> a))' err
 
+# Issue #662: these were wrongly reported as unrealizable by the
+# default (LAR-based) algorithm, as well as ACD, because of a bug
+# in the LTL-splitting code used by the translator.
+for algo in ds sd acd lar lar.old; do
+    ltlsynt -f 'o2 <-> (Fi1 <-> (1 U !Fo2))' --algo=$algo --verify || exit 1
+done
+
 :
