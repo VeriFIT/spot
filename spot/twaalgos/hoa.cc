@@ -18,10 +18,11 @@
 
 #include "config.h"
 #include <ostream>
-#include <sstream>
 #include <cstring>
 #include <algorithm>
+#include <charconv>
 #include <map>
+#include <unordered_map>
 #include <spot/twa/twa.hh>
 #include <spot/twa/twagraph.hh>
 #include <spot/twaalgos/hoa.hh>
@@ -97,7 +98,7 @@ namespace spot
       return true_str_;
     if (label == bddfalse)
       return false_str_;
-    std::ostringstream s;
+    std::string s;
     bool notfirstor = false;
     if (aliases_)
       {
@@ -112,12 +113,13 @@ namespace spot
               if (rest != label)
                 {
                   if (notfirstor)
-                    s << or_str_;
-                  s << '@' << a.first;
+                    s += or_str_;
+                  s += '@';
+                  s += a.first;
                   notfirstor = true;
                   label = rest;
                   if (label == bddfalse)
-                    return s.str();
+                    return s;
                 }
             }
         // If the label was not completely translated as a
@@ -126,7 +128,7 @@ namespace spot
         // We first try to remove cubes, from the labels, and then
         // try to cover the rest with non-cubes.
         {
-          std::ostringstream s2;
+          std::string s2;
           bdd labelconj = orig_label; // start again
           bool notfirstand = false;
           unsigned alias_count = aliases_->size();
@@ -139,14 +141,15 @@ namespace spot
                   {
                     auto& a = (*aliases_)[i];
                     if (notfirstand)
-                      s2 << and_str_;
+                      s2 += and_str_;
                     if (acube != a.second)
-                      s2 << not_str_;
-                    s2 << '@' << a.first;
+                      s2 += not_str_;
+                    s2 += '@';
+                    s2 += a.first;
                     notfirstand = true;
                     labelconj = rest;
                     if (labelconj == bddtrue)
-                      return s2.str();
+                      return s2;
                   }
           // second pass using all non-cube aliases
           for (unsigned i = aliases_start; i < alias_count; ++i)
@@ -160,12 +163,13 @@ namespace spot
                   if (rest != labelconj)
                     {
                       if (notfirstand)
-                        s2 << and_str_;
-                      s2 << '@' << a.first;
+                        s2 += and_str_;
+                      s2 += '@';
+                      s2 += a.first;
                       notfirstand = true;
                       labelconj = rest;
                       if (labelconj == bddtrue)
-                        return s2.str();
+                        return s2;
                     }
                 }
               else if (!bdd_is_cube(neg)
@@ -175,12 +179,14 @@ namespace spot
                   if (rest != labelconj)
                     {
                       if (notfirstand)
-                        s2 << and_str_;
-                      s2 << not_str_ << '@' << a.first;
+                        s2 += and_str_;
+                      s2 += not_str_;
+                      s2 += '@';
+                      s2 += a.first;
                       notfirstand = true;
                       labelconj = rest;
                       if (labelconj == bddtrue)
-                        return s2.str();
+                        return s2;
                     }
                 }
             }
@@ -191,13 +197,13 @@ namespace spot
       }
     minato_isop isop(label);
     bdd cube = isop.next();
-    std::ostringstream s3;
+    std::string s3;
     while (cube != bddfalse)
       {
         if (notfirstor)
-          s << or_str_;
+          s += or_str_;
         bool notfirstand = false;
-        s3.str("");
+        s3.clear();
         if (aliases_)
           {
             // We know that cube did not match any aliases.  But
@@ -211,10 +217,11 @@ namespace spot
                       rest != cube)
                     {
                       if (notfirstand)
-                        s3 << and_str_;
+                        s3 += and_str_;
                       if (acube != (*aliases_)[i].second)
-                        s3 << not_str_;
-                      s3 << '@' << (*aliases_)[i].first;
+                        s3 += not_str_;
+                      s3 += '@';
+                      s3 += (*aliases_)[i].first;
                       cube = rest;
                       if (cube == bddtrue)
                         break;
@@ -224,16 +231,17 @@ namespace spot
         while (cube != bddtrue)
           {
             if (notfirstand)
-              s3 << and_str_;
+              s3 += and_str_;
             bdd h = bdd_high(cube);
             if (h == bddfalse)
               {
-                s3 << not_str_ << ap_printer_(bdd_var(cube));
+                s3 += not_str_;
+                s3 += ap_printer_(bdd_var(cube));
                 cube = bdd_low(cube);
               }
             else
               {
-                s3 << ap_printer_(bdd_var(cube));
+                s3 += ap_printer_(bdd_var(cube));
                 cube = h;
               }
             if (cube == bddtrue)
@@ -243,17 +251,118 @@ namespace spot
         bdd nextcube = isop.next();
 
         if (notfirstand && (notfirstor || nextcube != bddfalse))
-          s << lpar_str_ << s3.str() << rpar_str_;
+          {
+            s += lpar_str_;
+            s += s3;
+            s += rpar_str_;
+          }
         else
-          s << s3.str();
+          s += s3;
         cube = nextcube;
         notfirstor = true;
       }
-    return s.str();
+    return s;
   }
 
   namespace
   {
+    // Accumulate formatted output in a buffer and send it to the
+    // stream in large chunks.  This is much faster than relying on
+    // operator<< for every formatted item in the (very hot) body
+    // printing loop of print_hoa().  integers are formatted with
+    // std::to_chars, avoiding the locale-aware std::num_put facet.
+    class hoa_stream
+    {
+      static constexpr std::size_t flush_threshold = 1U << 16;
+      std::ostream& os_;
+      std::string buf_;
+
+    public:
+      explicit hoa_stream(std::ostream& os) : os_(os)
+      {
+      }
+
+      ~hoa_stream()
+      {
+        // Do not let a write error escape from the destructor.
+        try
+          {
+            flush();
+          }
+        catch (...)
+          {
+          }
+      }
+
+      hoa_stream(const hoa_stream&) = delete;
+      hoa_stream& operator=(const hoa_stream&) = delete;
+
+      void flush()
+      {
+        if (!buf_.empty())
+          {
+            os_.write(buf_.data(), buf_.size());
+            buf_.clear();
+          }
+      }
+
+      void put(char c)
+      {
+        buf_ += c;
+        maybe_flush();
+      }
+
+      void str(const char* s)
+      {
+        buf_.append(s, std::char_traits<char>::length(s));
+        maybe_flush();
+      }
+
+      void str(const std::string& s)
+      {
+        buf_ += s;
+        maybe_flush();
+      }
+
+      void num(unsigned v)
+      {
+        char tmp[10];
+        std::to_chars_result r = std::to_chars(tmp, tmp + sizeof(tmp), v);
+        buf_.append(tmp, r.ptr - tmp);
+        maybe_flush();
+      }
+
+    private:
+      void maybe_flush()
+      {
+        if (buf_.size() >= flush_threshold)
+          flush();
+      }
+    };
+
+    // Write a single character / an unsigned integer to either a
+    // hoa_stream or a std::ostream, so that the generic print_dst
+    // lambda below can be used for both the header and the body.
+    inline void hoa_put(std::ostream& os, char c)
+    {
+      os.put(c);
+    }
+
+    inline void hoa_put(hoa_stream& os, char c)
+    {
+      os.put(c);
+    }
+
+    inline void hoa_num(std::ostream& os, unsigned v)
+    {
+      os << v;
+    }
+
+    inline void hoa_num(hoa_stream& os, unsigned v)
+    {
+      os.num(v);
+    }
+
     struct metadata final
     {
       // Assign a number to each atomic proposition.
@@ -270,17 +379,26 @@ namespace spot
       bool use_implicit_labels;
       bool use_state_labels = true;
       bdd all_ap;
+      // Precomputed name (index in vap) of each atomic proposition, so
+      // that labels can be encoded without any map lookup or integer
+      // formatting.  Indexed by BDD variable number.
+      std::vector<std::string> ap_str;
       hoa_alias_formater haf;
 
       // Label support: the set of all conditions occurring in the
       // automaton.
-      typedef std::map<bdd, std::string, bdd_less_than> sup_map;
+      typedef std::unordered_map<bdd, std::string, bdd_hash> sup_map;
       sup_map sup;
 
       metadata(const const_twa_graph_ptr& aut, bool implicit,
                bool state_labels)
         : haf(aut, "f", "t", " | ", "&", "!", "", "",
-              [&ap=this->ap](int num){ return std::to_string(ap[num]); })
+              [this](int num) -> std::string
+              {
+                unsigned v = num;
+                assert(v < ap_str.size());
+                return ap_str[v];
+              })
       {
         check_det_and_comp(aut);
         use_implicit_labels = implicit && is_universal && is_complete;
@@ -288,30 +406,26 @@ namespace spot
         number_all_ap(aut);
       }
 
-      std::ostream&
-      emit_acc(std::ostream& os, acc_cond::mark_t b)
+      void emit_acc(hoa_stream& os, acc_cond::mark_t b)
       {
         // FIXME: We could use a cache for this.
         if (!b)
-          return os;
-        os << " {";
+          return;
+        os.str(" {");
         bool notfirst = false;
         for (auto v: b.sets())
           {
             if (notfirst)
-              os << ' ';
+              os.put(' ');
             else
               notfirst = true;
-            os << v;
+            os.num(v);
           }
-        os << '}';
-        return os;
+        os.put('}');
       }
 
       void check_det_and_comp(const const_twa_graph_ptr& aut)
       {
-        std::string empty;
-
         unsigned ns = aut->num_states();
         bool universal = true;
         bool complete = true;
@@ -342,7 +456,7 @@ namespace spot
                     else
                       available -= t.cond;
                   }
-                sup.insert(std::make_pair(t.cond, empty));
+                sup.try_emplace(t.cond);
                 if (st_acc)
                   {
                     if (notfirst && prev != t.acc)
@@ -435,6 +549,19 @@ namespace spot
             ap.insert(std::make_pair(v, vap.size()));
             vap.emplace_back(v);
           }
+
+        // Fill ap_str (indexed by BDD variable number) so that the
+        // printer lambda used to encode labels can return the number
+        // of an atomic proposition without any map lookup.  This must
+        // be done even if use_implicit_labels is set, because the
+        // aliases (printed in the header) may still be encoded.
+        unsigned max_var = 0;
+        for (int v: vap)
+          if (unsigned(v) > max_var)
+            max_var = v;
+        ap_str.resize(max_var + 1);
+        for (unsigned i = 0; i < vap.size(); ++i)
+          ap_str[vap[i]] = std::to_string(i);
 
         if (use_implicit_labels)
           return;
@@ -553,16 +680,16 @@ namespace spot
     if (acceptance == Hoa_Acceptance_States && !md.has_state_acc)
       acceptance = Hoa_Acceptance_Transitions;
 
-    auto print_dst = [&os, &aut](unsigned dst)
+    auto print_dst = [&aut](auto& os, unsigned dst)
       {
         bool notfirst = false;
         for (unsigned d: aut->univ_dests(dst))
           {
             if (notfirst)
-              os << '&';
+              hoa_put(os, '&');
             else
               notfirst = true;
-            os << d;
+            hoa_num(os, d);
           }
       };
 
@@ -577,7 +704,7 @@ namespace spot
     unsigned nap = md.vap.size();
     os << "States: " << num_states << nl
        << "Start: ";
-    print_dst(init);
+    print_dst(os, init);
     os << nl
        << "AP: " << nap;
     auto d = aut->get_dict();
@@ -885,7 +1012,9 @@ namespace spot
           outm.resize(1UL << nap);
       }
 
-    os << "--BODY--" << nl;
+    hoa_stream hoa_out(os);
+    hoa_out.str("--BODY--");
+    hoa_out.put(nl);
 
     auto sn = aut->get_named_prop<std::vector<std::string>>("state-names");
     for (unsigned i = 0; i < num_states; ++i)
@@ -895,22 +1024,28 @@ namespace spot
           this_acc = (md.common_acc[i] ?
                       Hoa_Acceptance_States : Hoa_Acceptance_Transitions);
 
-        os << "State: ";
+        hoa_out.str("State: ");
         if (state_labels)
           {
             bool output = false;
             for (auto& t: aut->out(i))
               {
-                os << '[' << md.sup[t.cond] << "] ";
+                hoa_out.put('[');
+                hoa_out.str(md.sup[t.cond]);
+                hoa_out.str("] ");
                 output = true;
                 break;
               }
             if (!output)
-              os << "[f] ";
+              hoa_out.str("[f] ");
           }
-        os << i;
+        hoa_out.num(i);
         if (sn && i < sn->size() && !(*sn)[i].empty())
-          os << " \"" << (*sn)[i] << '"';
+          {
+            hoa_out.str(" \"");
+            hoa_out.str((*sn)[i]);
+            hoa_out.put('"');
+          }
         if (this_acc == Hoa_Acceptance_States)
           {
             acc_cond::mark_t acc = {};
@@ -919,20 +1054,22 @@ namespace spot
                 acc = t.acc;
                 break;
               }
-            md.emit_acc(os, acc);
+            md.emit_acc(hoa_out, acc);
           }
-        os << nl;
+        hoa_out.put(nl);
 
         if (!implicit_labels && !state_labels)
           {
 
             for (auto& t: aut->out(i))
               {
-                os << '[' << md.sup[t.cond] << "] ";
-                print_dst(t.dst);
+                hoa_out.put('[');
+                hoa_out.str(md.sup[t.cond]);
+                hoa_out.str("] ");
+                print_dst(hoa_out, t.dst);
                 if (this_acc == Hoa_Acceptance_Transitions)
-                  md.emit_acc(os, t.acc);
-                os << nl;
+                  md.emit_acc(hoa_out, t.acc);
+                hoa_out.put(nl);
               }
           }
         else if (state_labels)
@@ -940,16 +1077,16 @@ namespace spot
             unsigned n = 0;
             for (auto& t: aut->out(i))
               {
-                print_dst(t.dst);
+                print_dst(hoa_out, t.dst);
                 if (this_acc == Hoa_Acceptance_Transitions)
                   {
-                    md.emit_acc(os, t.acc);
-                    os << nl;
+                    md.emit_acc(hoa_out, t.acc);
+                    hoa_out.put(nl);
                   }
                 else
                   {
                     ++n;
-                    os << (((n & 15) && t.next_succ) ? ' ' : nl);
+                    hoa_out.put(((n & 15) && t.next_succ) ? ' ' : nl);
                   }
               }
           }
@@ -981,21 +1118,23 @@ namespace spot
             unsigned n = out.size();
             for (unsigned i = 0; i < n;)
               {
-                print_dst(out[i]);
+                print_dst(hoa_out, out[i]);
                 if (this_acc != Hoa_Acceptance_States)
                   {
-                    md.emit_acc(os, outm[i]) << nl;
+                    md.emit_acc(hoa_out, outm[i]);
+                    hoa_out.put(nl);
                     ++i;
                   }
                 else
                   {
                     ++i;
-                    os << (((i & 15) && i < n) ? ' ' : nl);
+                    hoa_out.put(((i & 15) && i < n) ? ' ' : nl);
                   }
               }
           }
       }
-    os << "--END--";                // No newline.  Let the caller decide.
+    hoa_out.str("--END--");       // No newline.  Let the caller decide.
+    hoa_out.flush();
     return os;
   }
 
