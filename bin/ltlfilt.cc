@@ -36,6 +36,7 @@
 #include <spot/misc/optionmap.hh>
 #include <spot/misc/timer.hh>
 #include <spot/tl/simplify.hh>
+#include <spot/tl/contain.hh>
 #include <spot/tl/sonf.hh>
 #include <spot/tl/delta2.hh>
 #include <spot/tl/length.hh>
@@ -390,6 +391,14 @@ static bool to_delta2 = false;
 static bool satisfiable = false;
 static spot::option_map extra_options;
 
+// Bounds for the automata-based containment checks that ltlfilt
+// performs for --implied-by, --imply, and --equivalent-to.  Those
+// checks are not simplifications: they must be exact, so they are
+// unbounded by default.  These values are set by the -x cc-max-states
+// and -x cc-max-aps options.
+static unsigned cc_max_states = 0;
+static unsigned cc_max_aps = 0;
+
 // We want all these variables to be destroyed when we exit main, to
 // make sure it happens before all other global variables (like the
 // atomic propositions maps) are destroyed.  Otherwise we risk
@@ -703,11 +712,16 @@ namespace
   {
   public:
     spot::tl_simplifier& simpl;
+    // Separate checker, used only for the --implied-by, --imply, and
+    // --equivalent-to options: those queries need exact answers, while
+    // the simplifier above may skip costly containment checks.
+    spot::language_containment_checker& cc_lcc;
     fset_t unique_set;
     spot::relabeling_map relmap;
 
-    explicit ltl_processor(spot::tl_simplifier& simpl)
-      : simpl(simpl)
+    explicit ltl_processor(spot::tl_simplifier& simpl,
+                           spot::language_containment_checker& cc_lcc)
+      : simpl(simpl), cc_lcc(cc_lcc)
     {
       // --tlsf: ltlfilt never reads the TARGET of the specification,
       // and reads the partition of the atomic propositions only for
@@ -894,11 +908,11 @@ namespace
       if (matched && satisfiable)
         matched &= spot::ltl_satisfiable(f);
       if (matched && opt->implied_by)
-        matched &= simpl.implication(opt->implied_by, f);
+        matched &= cc_lcc.contained(opt->implied_by, f);
       if (matched && opt->imply)
-        matched &= simpl.implication(f, opt->imply);
+        matched &= cc_lcc.contained(f, opt->imply);
       if (matched && opt->equivalent_to)
-        matched &= simpl.are_equivalent(f, opt->equivalent_to);
+        matched &= cc_lcc.equal(f, opt->equivalent_to);
       if (matched && stutter_insensitive)
         matched &=spot::is_stutter_invariant(f);
 
@@ -1075,7 +1089,11 @@ apply_extra_options()
       simplification_opts.containment_checks = v > 1;
       simplification_opts.containment_checks_stronger = v > 2;
     }
-  v = extra_options.get("tls-max-states", -1);
+  // The tls-max-* options only affect how formulas are simplified by
+  // --simplify (with -r): skipping a costly containment check there
+  // only makes the output less simplified.  The tls-max-states
+  // default matches the other tools and the spot-x(7) documentation.
+  v = extra_options.get("tls-max-states", 64);
   if (v >= 0)
     simplification_opts.containment_max_states = v;
   v = extra_options.get("tls-max-ops", -1);
@@ -1084,6 +1102,15 @@ apply_extra_options()
   v = extra_options.get("tls-max-aps", -1);
   if (v >= 0)
     simplification_opts.containment_max_aps = v;
+  // The cc-max-* options bound the containment checks performed for
+  // --implied-by, --imply, and --equivalent-to.  Those answers must
+  // be exact, so by default they are not bounded.
+  v = extra_options.get("cc-max-states", -1);
+  if (v >= 0)
+    cc_max_states = v;
+  v = extra_options.get("cc-max-aps", -1);
+  if (v >= 0)
+    cc_max_aps = v;
 }
 
 int
@@ -1116,8 +1143,14 @@ main(int argc, char** argv)
       apply_extra_options();
       extra_options.report_unused_options();
       spot::tl_simplifier simpl(simplification_opts, opt->dict);
+      // Use the same translator flags as tl_simplifier_cache does for
+      // its own containment checker.
+      spot::language_containment_checker cc_lcc(opt->dict, false, true,
+                                                false, false,
+                                                cc_max_states,
+                                                cc_max_aps);
 
-      ltl_processor processor(simpl);
+      ltl_processor processor(simpl, cc_lcc);
       if (processor.run())
         return 2;
 

@@ -198,6 +198,13 @@ namespace spot
     ///
     /// This costly check performs up to four translations,
     /// two products, and two emptiness checks.
+    ///
+    /// \warning If this simplifier was constructed with non-zero
+    /// containment_max_states or containment_max_aps, this may return a
+    /// false negative: the automata needed to prove the equivalence
+    /// are not built, so the check reports that the formulas are not
+    /// equivalent even though they are.  Do not set these options when
+    /// an exact answer is required.
     bool are_equivalent(formula f, formula g);
 
 
@@ -206,6 +213,13 @@ namespace spot
     /// This operation is costlier than syntactic_implication()
     /// because it requires two translations, one product and one
     /// emptiness check.
+    ///
+    /// \warning If this simplifier was constructed with non-zero
+    /// containment_max_states or containment_max_aps, this may return a
+    /// false negative: the automata needed to prove the implication
+    /// are not built, so the check reports that \a f does not imply \a g
+    /// even though it does.  Do not set these options when an exact
+    /// answer is required.
     bool implication(formula f, formula g);
 
     /// \brief Convert a Boolean formula as a BDD.

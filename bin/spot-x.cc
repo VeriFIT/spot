@@ -51,6 +51,19 @@ implication-based simplifications are attempted.  Defaults to 16.") },
     { DOC("tls-max-aps",
           "Maximum number of atomic propositions in a formula on which \
 automata-based implication checks are attempted.  Defaults to 16.") },
+    { nullptr, 0, nullptr, 0, "Containment check options:", 0 },
+    { DOC("cc-max-aps",
+          "Maximum number of atomic propositions in a formula for which \
+containment checks are attempted outside of formula simplification (e.g. \
+by ltlfilt's --equivalent-to).  Unlike the tls-max-aps option, this \
+defaults to 0, i.e. no bound, because bounding those checks could make \
+them answer incorrectly.") },
+    { DOC("cc-max-states",
+          "Maximum number of states of automata built for containment \
+checks performed outside of formula simplification (e.g. by ltlfilt's \
+--equivalent-to).  Unlike the tls-max-states option, this defaults to 0, \
+i.e. no bound, because bounding those checks could make them answer \
+incorrectly.") },
     { nullptr, 0, nullptr, 0, "Translation options:", 0 },
     { DOC("ltl-split", "Set to 0 to disable the translation of automata \
 as product or sum of subformulas.") },

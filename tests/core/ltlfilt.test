@@ -1034,6 +1034,30 @@ ltlfilt -r3 -f "$f" > out
 diff exp out
 test 1 = "`ltlfilt -r3 -x tls-max-aps=17 -f "$f"`"
 
+# Containment checks performed for --equivalent-to must be exact, so
+# they use their own bounds (issue #650): unbounded by default, while
+# the checks made for simplifications are bounded.
+ltlfilt -q --equivalent-to 1 -f "$f"
+test 0 -eq `ltlfilt -c --equivalent-to 1 -x cc-max-aps=16 -f "$f"`
+test 1 -eq `ltlfilt -c --equivalent-to 1 -x cc-max-aps=100 -f "$f"`
+ltlfilt -q --equivalent-to 1 -x cc-max-states=0 -f "$f"
+# Bounding the checks used for simplifications does not affect those.
+ltlfilt -q --equivalent-to 1 -x tls-max-aps=16 -f "$f"
+ltlfilt -q --equivalent-to 1 -x tls-max-states=64 -f "$f"
+
+# The same holds for --implied-by and --imply.
+ltlfilt -q --implied-by 1 -f "$f"
+ltlfilt -q --implied-by 1 -x cc-max-aps=16 -f "$f" && exit 1
+ltlfilt -q --implied-by 1 -x tls-max-aps=16 -f "$f"
+ltlfilt -q --imply "$f" -f 1
+ltlfilt -q --imply "$f" -x cc-max-aps=16 -f 1 && exit 1
+# cc-max-states bounds those checks as well: this equivalence needs
+# automata with more than 64 states.
+psl='{(a1[*];a2[*]) ##[0:8] (b1;b2)}[]->c'
+psl2='{((a1[*];a2[*]):(b1;b2))|((a1[*];a2[*]);[*0:7];(b1;b2))}[]->c'
+ltlfilt -q --equivalent-to "$psl2" -f "$psl"
+ltlfilt -q --equivalent-to "$psl2" -x cc-max-states=64 -f "$psl" && exit 1
+
 ltlfilt --ignore-errors -f 'F' > out 2> out && exit 1
 test $? = 1
 cat >exp <<EOF

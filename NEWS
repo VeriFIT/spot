@@ -80,6 +80,14 @@ New in spot 2.16.0.dev  (not yet released)
     simplification options tls-impl, tls-max-states, and tls-max-ops
     all described in the spot-x(7) man page. (Issue #661.)
 
+  - ltlfilt now defaults to tls-max-states=64 for the implication-based
+    simplifications enabled by --simplify, as the other tools and the
+    spot-x(7) documentation already state.  The containment checks
+    performed for --implied-by, --implies, and --equivalent-to are left
+    unbounded by default, because those options require exact answers;
+    they can be bounded with the new -x cc-max-states=N and
+    -x cc-max-aps=N options.  (Issue #650.)
+
   Library:
 
   - acc_cond::acc_code::rabin_like() and

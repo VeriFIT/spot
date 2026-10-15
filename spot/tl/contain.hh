@@ -28,6 +28,15 @@ namespace spot
 
   /// \ingroup containment
   /// Check containment between LTL formulas.
+  ///
+  /// The \a max_states and \a max_aps arguments of the constructor
+  /// disable the translation of automata that would be too expensive
+  /// to build.  As a consequence, contained(), neg_contained(),
+  /// contained_neg(), and equal() may answer "no" for formulas that
+  /// are in fact in a containment relation.  These bounds therefore
+  /// make sense when checking containment is only a heuristic used to
+  /// simplify a formula (a skipped check then just yields a less
+  /// simplified formula), but not when an exact answer is required.
   class SPOT_API language_containment_checker
   {
     struct record_;
