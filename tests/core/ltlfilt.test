@@ -1009,6 +1009,31 @@ diff exp out
 ltlfilt -f a -x tls-impl=4 2>err && exit 1
 grep 'tls-impl should take a value between 0 and 3' err
 
+# Automata-based containment checks are not attempted on formulas using
+# too many atomic propositions (issue #650).  The implication below can
+# only be proven with automata.
+test 1 = "`ltlfilt -r3 -f 'G(p -> q) & Fp -> Fq'`"
+test 'G!p | F(q | (p & !q))' = \
+  "`ltlfilt -r3 -x tls-max-aps=1 -f 'G(p -> q) & Fp -> Fq'`"
+# tls-max-aps=0 removes the bound, and the formula above uses only 2
+# atomic propositions.
+test 1 = "`ltlfilt -r3 -x tls-max-aps=0 -f 'G(p -> q) & Fp -> Fq'`"
+test 1 = "`ltlfilt -r3 -x tls-max-aps=2 -f 'G(p -> q) & Fp -> Fq'`"
+
+# A valid formula using 17 atomic propositions: the default bound of 16
+# atomic propositions disables the checks, so the formula is left
+# unchanged, but raising the bound allows it to be simplified to true.
+f=`awk 'BEGIN {
+      printf "G(p -> (";
+      for (i = 0; i < 16; ++i) printf "%sq%d", (i ? " & " : ""), i;
+      printf ")) & Fp -> F(";
+      for (i = 0; i < 16; ++i) printf "%sq%d", (i ? " & " : ""), i;
+      print ")"; }'`
+ltlfilt -r3 -x tls-max-aps=16 -f "$f" > exp
+ltlfilt -r3 -f "$f" > out
+diff exp out
+test 1 = "`ltlfilt -r3 -x tls-max-aps=17 -f "$f"`"
+
 ltlfilt --ignore-errors -f 'F' > out 2> out && exit 1
 test $? = 1
 cat >exp <<EOF

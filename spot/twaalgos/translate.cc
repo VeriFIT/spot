@@ -72,6 +72,7 @@ namespace spot
     ltl_split_ = opt->get("ltl-split", 1);
     tls_max_states_ = std::max(0, opt->get("tls-max-states", 64));
     tls_max_ops_ = std::max(0, opt->get("tls-max-ops", 16));
+    tls_max_aps_ = std::max(0, opt->get("tls-max-aps", 16));
     exprop_ = opt->get("exprop", -1);
     branchpost_ = opt->get("branch-post", -1);
     new_oblig_ = opt->get("new-oblig", -1);
@@ -82,6 +83,7 @@ namespace spot
     tl_simplifier_options options(false, false, false);
     options.containment_max_states = tls_max_states_;
     options.containment_max_ops = tls_max_ops_;
+    options.containment_max_aps = tls_max_aps_;
     switch (level_)
       {
       case High:

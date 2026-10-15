@@ -40,7 +40,8 @@ namespace spot
                                  bool symb_merge = true,
                                  bool branching_postponement = false,
                                  bool fair_loop_approx = false,
-                                 unsigned max_states = 0U);
+                                 unsigned max_states = 0U,
+                                 unsigned max_aps = 0U);
 
     ~language_containment_checker();
 
@@ -70,6 +71,9 @@ namespace spot
     bool symb_merge_;   ///< Merge symbolic states.
     bool branching_postponement_; ///< Postpone branching choices.
     bool fair_loop_approx_;       ///< Approximate fair loops.
+    /// \brief Maximal number of atomic propositions in formulas to
+    /// translate (0 for no limit).
+    unsigned max_aps_ = 0;
     /* Translation Maps */
     trans_map_* translated_; ///< Translation cache.
     tl_simplifier_cache* c_; ///< Formula simplifier cache.

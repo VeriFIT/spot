@@ -181,6 +181,7 @@ namespace spot
     int branchpost_ = -1;
     unsigned tls_max_states_ = 64;
     unsigned tls_max_ops_ = 16;
+    unsigned tls_max_aps_ = 16;
     int exprop_;
     const option_map* opt_;
   };

@@ -48,6 +48,9 @@ implication checks for formula simplifications.  Defaults to 64.") },
     { DOC("tls-max-ops",
           "Maximum number of operands in n-ary operators (or, and) on which \
 implication-based simplifications are attempted.  Defaults to 16.") },
+    { DOC("tls-max-aps",
+          "Maximum number of atomic propositions in a formula on which \
+automata-based implication checks are attempted.  Defaults to 16.") },
     { nullptr, 0, nullptr, 0, "Translation options:", 0 },
     { DOC("ltl-split", "Set to 0 to disable the translation of automata \
 as product or sum of subformulas.") },

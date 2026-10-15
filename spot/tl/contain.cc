@@ -18,6 +18,7 @@
 
 #include "config.h"
 #include <spot/tl/contain.hh>
+#include <spot/tl/apcollect.hh>
 #include <spot/tl/formula.hh>
 #include <spot/twaalgos/product.hh>
 #include <spot/twaalgos/are_isomorphic.hh>
@@ -48,10 +49,11 @@ namespace spot
   language_containment_checker::language_containment_checker
   (bdd_dict_ptr dict, bool exprop, bool symb_merge,
    bool branching_postponement, bool fair_loop_approx,
-   unsigned max_states)
+   unsigned max_states, unsigned max_aps)
     : dict_(dict), exprop_(exprop), symb_merge_(symb_merge),
       branching_postponement_(branching_postponement),
       fair_loop_approx_(fair_loop_approx),
+      max_aps_(max_aps),
       translated_(new trans_map_)
   {
     if (max_states)
@@ -157,6 +159,13 @@ namespace spot
     auto i = translated_->find(f);
     if (i != translated_->end())
       return &i->second;
+
+    // Do not translate formulas using too many atomic propositions,
+    // if requested.  Keep a null translation, as the output
+    // aborter does, to remember that no containment check can be
+    // performed for this formula.
+    if (max_aps_ && ap_count_exceeds(f, max_aps_))
+      return &translated_->emplace(f, nullptr).first->second;
 
     const_twa_graph_ptr aut;
     if (f.is_quantified())

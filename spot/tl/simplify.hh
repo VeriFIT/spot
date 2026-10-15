@@ -114,6 +114,11 @@ namespace spot
     /// If greater than 0, maximal number of terms in a multop to perform
     /// containment checks on this multop.
     unsigned containment_max_ops = 16;
+    /// If greater than 0, maximal number of atomic propositions in a
+    /// formula for automata-based containment checks to be attempted on
+    /// that formula.  Formulas with more propositions are not translated,
+    /// because such translations are too expensive.
+    unsigned containment_max_aps = 16;
 
     /// Return true if any simplification option is enabled.
     bool is_enabled() const

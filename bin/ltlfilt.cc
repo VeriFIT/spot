@@ -1081,6 +1081,9 @@ apply_extra_options()
   v = extra_options.get("tls-max-ops", -1);
   if (v >= 0)
     simplification_opts.containment_max_ops = v;
+  v = extra_options.get("tls-max-aps", -1);
+  if (v >= 0)
+    simplification_opts.containment_max_aps = v;
 }
 
 int

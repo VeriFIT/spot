@@ -74,7 +74,8 @@ namespace spot
     tl_simplifier_cache(const bdd_dict_ptr& d,
                          const tl_simplifier_options& opt)
       : dict(d), options(opt),
-        lcc(d, false, true, false, false, opt.containment_max_states)
+        lcc(d, false, true, false, false, opt.containment_max_states,
+            opt.containment_max_aps)
     {
       options.containment_checks |= options.containment_checks_stronger;
       options.event_univ |= options.favor_event_univ;
@@ -4279,6 +4280,7 @@ namespace spot
     set("unit_prop", unit_prop);
     set("containment_max_states", static_cast<int>(containment_max_states));
     set("containment_max_ops", static_cast<int>(containment_max_ops));
+    set("containment_max_aps", static_cast<int>(containment_max_aps));
   }
 
   bool tl_simplifier_options::load_from_option_map(const option_map& om,
@@ -4319,6 +4321,8 @@ namespace spot
       { containment_max_states = static_cast<unsigned>(v); loaded = true; }
     if ((v = get("containment_max_ops", -1)) >= 0)
       { containment_max_ops = static_cast<unsigned>(v); loaded = true; }
+    if ((v = get("containment_max_aps", -1)) >= 0)
+      { containment_max_aps = static_cast<unsigned>(v); loaded = true; }
 
     return loaded;
   }
