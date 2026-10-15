@@ -245,7 +245,17 @@ namespace spot
         // not introduce marks.  If rest is non-empty, it seems
         // preferable to translate the safety inside rest, as this may
         // constrain the translation.
-        if (!rest.empty() && !oblg.empty())
+        //
+        // However this must not be done under op::Equiv or op::Xor:
+        // rebuilding such a formula with formula::multop() flattens
+        // nested subformulas of the same operator, and flattening an
+        // equivalence is not language-preserving (a <-> (a <-> f) is
+        // equivalent to f, not to the flattened (a <-> f) <-> a).
+        // It would also empty oblg and therefore skip the
+        // product_xnor()/product_xor() composition needed for those
+        // operators.
+        if (!rest.empty() && !oblg.empty()
+            && topop != op::Equiv && topop != op::Xor)
           {
             auto safety = [](formula f)
             {

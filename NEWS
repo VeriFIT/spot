@@ -176,6 +176,12 @@ New in spot 2.16.0.dev  (not yet released)
 
   - Improve speed of syntactic implication checks.  (Issue #660.)
 
+  - Translation from LTL to automata with generic acceptance
+    conditions (e.g., with `ltl2tgba G -D`) could produce an incorrect
+    automaton on formula involving <-> or xor, with a safety formula
+    in one operand, and some non-obligation formula on the other one.
+    (Issue #662.)
+
 New in spot 2.16  (2026-09-03)
 
   Build:
