@@ -64,9 +64,7 @@ namespace
     {
       spot::twa_graph_ptr a = trans.run(f);
       spot::twa_graph_ptr na = trans.run(spot::formula::Not(f));
-      spot::atomic_prop_set* ap = spot::atomic_prop_collect(f);
-      std::cout << formula << ',' << ap->size() << ',';
-      delete ap;
+      std::cout << formula << ',' << spot::ap_count(f) << ',';
       stats.print(a);
       stats.print(na);
 

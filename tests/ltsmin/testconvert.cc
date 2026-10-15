@@ -45,7 +45,6 @@ int main(int argc, char** argv)
   char* formula = argv[2];
   spot::formula f = nullptr;
   spot::default_environment& env = spot::default_environment::instance();
-  spot::atomic_prop_set ap;
   spot::const_twa_graph_ptr prop = nullptr;
   auto dict = spot::make_bdd_dict();
   {
@@ -54,8 +53,6 @@ int main(int argc, char** argv)
     spot::translator trans(dict);
     prop = trans.run(&f);
   }
-
-  atomic_prop_collect(f, &ap);
 
   auto propcube = spot::twa_to_twacube(prop);
 

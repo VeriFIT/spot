@@ -24,6 +24,7 @@
 #include <spot/misc/optionmap.hh>
 #include <spot/tl/relabel.hh>
 #include <spot/tl/ltlf.hh>
+#include <spot/tl/apcollect.hh>
 #include <spot/twaalgos/relabel.hh>
 #include <spot/twaalgos/remprop.hh>
 #include <spot/twaalgos/gfguarantee.hh>
@@ -859,9 +860,7 @@ namespace spot
     relabeling_map m;
     if (relabel_bool_ > 0 || relabel_overlap_ > 0)
       {
-        std::set<formula> aps;
-        atomic_prop_collect(to_work_on, &aps);
-        unsigned atomic_props = aps.size();
+        unsigned atomic_props = spot::ap_count(to_work_on);
 
         if ((relabel_bool_
              && atomic_props >= (unsigned) relabel_bool_)

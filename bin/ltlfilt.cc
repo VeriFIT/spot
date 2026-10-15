@@ -884,9 +884,7 @@ namespace
       matched &= !syntactic_si || f.is_syntactic_stutter_invariant();
       if (matched && (ap_n.min > 0 || ap_n.max >= 0))
         {
-          spot::atomic_prop_set* s = atomic_prop_collect(f);
-          int n = s->size();
-          delete s;
+          int n = spot::ap_count(f);
           matched &= (ap_n.min <= 0) || (n >= ap_n.min);
           matched &= (ap_n.max < 0) || (n <= ap_n.max);
         }
