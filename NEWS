@@ -114,6 +114,12 @@ New in spot 2.16.0.dev  (not yet released)
     This fixes commands like "ltlfilt -r3" taking forever on a
     specification using 58 atomic propositions.  (Issue #650.)
 
+  - twa_graph::merge_edges() was generalized to do a bit more on
+    acceptance conditions involving Fin(.).  It will now merge the
+    acceptance marks of transitions that have the same source,
+    destination, and condition, when they agree on every set that
+    appears in a Fin term.
+
   Bug fix:
 
   - is_generalized_rabin() and is_generalized_streett() could fails on

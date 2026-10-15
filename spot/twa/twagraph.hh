@@ -614,10 +614,13 @@ namespace spot
     /// This makes two passes over the automaton to reduce the number
     /// of edges with an identical pair of source and destination.
     ///
-    /// In the first pass, which is performed only on automata with
-    /// Fin-less acceptance, edges with the same source, destination,
+    /// In the first pass, edges with the same source, destination,
     /// and conditions are merged into a single edge whose set of
-    /// acceptance marks is the intersection of the sets of the edges.
+    /// acceptance marks is the union of the sets of the edges.  This
+    /// is performed only when the two edges agree on every set that
+    /// appears in a Fin term of the acceptance condition (which is
+    /// always the case for Fin-less acceptance): adding the other
+    /// marks can then not falsify the acceptance condition.
     ///
     /// In the second pass, edges that share their source, destination,
     /// and acceptance marks are merged into a single edge whose condition

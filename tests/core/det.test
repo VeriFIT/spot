@@ -294,6 +294,41 @@ EOF
 autfilt -q --is-deterministic in.hoa && exit 1
 autfilt --merge-transitions in.hoa | autfilt --is-deterministic
 
+# Same as above, but with a Fin acceptance: the two transitions can be
+# merged because they agree on the Fin-used set 0, so the Inf-only
+# difference between {0,1} and {0,3} can be merged away.
+cat >in.hoa <<EOF
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "a"
+Acceptance: 4 (Fin(0) & Inf(1)) | (Fin(2) & Inf(3))
+--BODY--
+State: 0
+[0] 0 {0 1}
+[0] 0 {0 3}
+--END--
+EOF
+autfilt -q --is-deterministic in.hoa && exit 1
+autfilt --merge-transitions in.hoa | autfilt --is-deterministic
+
+# These two transitions disagree on the Fin-used set 0, so they cannot
+# be merged: the run that takes the unmarked transition forever would
+# stop being accepting.
+cat >in.hoa <<EOF
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Fin(0)
+--BODY--
+State: 0
+[0] 0 {}
+[0] 0 {0}
+--END--
+EOF
+test `autfilt --merge-transitions in.hoa | grep -c '^\['` = 2
+
 
 
 # This is a peculiarity of Spot: because it supports only one initial

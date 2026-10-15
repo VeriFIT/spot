@@ -28,6 +28,156 @@ tc.assertEqual(aut.num_edges(), 2)
 aut.merge_edges()
 tc.assertEqual(aut.num_edges(), 1)
 
+# Colors can also be merged in the presence of Fin terms, as long as
+# the transitions agree on the sets used in Fin terms.  Here both
+# transitions have the same Fin part {0}, so the Inf-only difference
+# between {0,1} and {0,3} can be merged away.
+aut = spot.automaton("""
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "a"
+Acceptance: 4 (Fin(0) & Inf(1)) | (Fin(2) & Inf(3))
+properties: trans-labels explicit-labels trans-acc
+--BODY--
+State: 0
+[0] 0 {0 1}
+[0] 0 {0 3}
+--END--""")
+tc.assertEqual(aut.num_edges(), 2)
+aut.merge_edges()
+tc.assertEqual(aut.num_edges(), 1)
+
+# Merging the colors first can enable the second pass (merging of
+# conditions) to remove some non-determinism, as with Fin-less
+# acceptance.  Once the colors of each pair of transitions have been
+# merged, the two remaining transitions have the same acceptance and
+# are merged into one.
+aut = spot.automaton("""
+HOA: v1
+States: 1
+Start: 0
+AP: 2 "a" "b"
+Acceptance: 4 (Fin(0) & Inf(1)) | (Fin(2) & Inf(3))
+properties: trans-labels explicit-labels trans-acc
+--BODY--
+State: 0
+[0] 0 {0 1}
+[1] 0 {0 3}
+[0] 0 {0 3}
+[1] 0 {0 1}
+--END--""")
+tc.assertEqual(aut.num_edges(), 4)
+aut.merge_edges()
+tc.assertEqual(aut.num_edges(), 1)
+
+# Nothing can be merged when the Fin parts differ: merging {0} with {}
+# would lose the runs that visit set 0 only finitely often (here the
+# runs that take the unmarked transition forever).
+aut = spot.automaton("""
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Fin(0)
+properties: trans-labels explicit-labels trans-acc
+--BODY--
+State: 0
+[0] 0 {}
+[0] 0 {0}
+--END--""")
+tc.assertEqual(aut.num_edges(), 2)
+aut.merge_edges()
+tc.assertEqual(aut.num_edges(), 2)
+
+# The same holds for sets used both as Inf and Fin: set 0 is protected
+# by the Fin rule, so {0} and {} cannot be merged even though they
+# differ by an Inf-used mark.
+aut = spot.automaton("""
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "a"
+Acceptance: 1 Inf(0) | Fin(0)
+properties: trans-labels explicit-labels trans-acc
+--BODY--
+State: 0
+[0] 0 {}
+[0] 0 {0}
+--END--""")
+tc.assertEqual(aut.num_edges(), 2)
+aut.merge_edges()
+tc.assertEqual(aut.num_edges(), 2)
+
+# Marks of sets that do not appear in the acceptance condition can
+# always be merged.
+aut = spot.automaton("""
+HOA: v1
+States: 1
+Start: 0
+AP: 1 "a"
+Acceptance: 3 Fin(0)
+properties: trans-labels explicit-labels trans-acc
+--BODY--
+State: 0
+[0] 0 {1}
+[0] 0 {2}
+--END--""")
+tc.assertEqual(aut.num_edges(), 2)
+aut.merge_edges()
+tc.assertEqual(aut.num_edges(), 1)
+
+# Check that the merges performed on Fin acceptance preserve the
+# language.
+def check_equiv(a, b):
+    tc.assertTrue(spot.are_equivalent(a, b))
+
+orig = spot.automaton("""
+HOA: v1
+States: 2
+Start: 0
+AP: 1 "a"
+Acceptance: 4 (Fin(0) & Inf(1)) | (Fin(2) & Inf(3))
+properties: trans-labels explicit-labels trans-acc complete
+--BODY--
+State: 0
+[0] 0 {0 1}
+[0] 0 {0 3}
+[!0] 1 {0 1}
+[!0] 1 {0 3}
+State: 1
+[0] 0 {2 3}
+[0] 0 {2 3}
+[!0] 1 {0 1}
+[!0] 1 {0 3}
+--END--""")
+merged = spot.make_twa_graph(orig, spot.twa_prop_set.all())
+merged.merge_edges()
+tc.assertLess(merged.num_edges(), orig.num_edges())
+check_equiv(orig, merged)
+
+orig = spot.automaton("""
+HOA: v1
+States: 2
+Start: 0
+AP: 1 "a"
+Acceptance: 2 Fin(0) | Inf(1)
+properties: trans-labels explicit-labels trans-acc complete
+--BODY--
+State: 0
+[0] 0 {}
+[0] 0 {1}
+[!0] 1 {0 1}
+State: 1
+[0] 0 {}
+[0] 0 {1}
+[!0] 1 {0 1}
+--END--""")
+merged = spot.make_twa_graph(orig, spot.twa_prop_set.all())
+merged.merge_edges()
+tc.assertLess(merged.num_edges(), orig.num_edges())
+check_equiv(orig, merged)
+
 aut = spot.automaton("""
 HOA: v1
 States: 2

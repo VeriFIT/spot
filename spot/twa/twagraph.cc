@@ -351,18 +351,34 @@ namespace spot
     };
 
     // When two transitions have the same (src,cond,dst), we can merge
-    // their colors.  This only works for Fin-less acceptance.
+    // their colors by taking the union of their marks.
     //
-    // FIXME: We could should also merge edges when using
-    // fin_acceptance, but the rule for Fin sets are different than
-    // those for Inf sets, (and we need to be careful if a set is used
-    // both as Inf and Fin)
+    // For Inf-only acceptance this is always correct: the Inf atoms
+    // of the acceptance formula are monotone in the set of marks
+    // visited infinitely often, and a run visiting this pair of
+    // transitions infinitely often can alternate between the two
+    // transitions, so that the union of their marks is realized as
+    // well.
+    //
+    // When the acceptance uses Fin terms, we only merge transitions
+    // when their marks agree on every set that appears in a Fin term.
+    // The added marks then appear only in Inf terms (or in no term at
+    // all), so they cannot change the value of the acceptance
+    // condition.  (Sets used both as Inf and Fin are protected by
+    // this rule, as they should.)
+    acc_cond::mark_t fin_mask = {};
+    if (acc().uses_fin_acceptance())
+      fin_mask = acc().get_acceptance().used_inf_fin_sets().second;
+    // When the acceptance does not use Fin, the test on fin_mask
+    // below is useless, and we can use the cheaper sorting and
+    // comparison code from before Fin merging was supported.
+    bool has_fin = !!fin_mask;
     auto merge_colors = [&]()
     {
-      if (tend < 2 || acc().uses_fin_acceptance())
+      if (tend < 2)
         return;
       typedef graph_t::edge_storage_t tr_t;
-      g_.sort_edges_([](const tr_t& lhs, const tr_t& rhs)
+      g_.sort_edges_([fin_mask, has_fin](const tr_t& lhs, const tr_t& rhs)
       {
         if (lhs.src < rhs.src)
           return true;
@@ -373,8 +389,16 @@ namespace spot
         if (lhs.dst > rhs.dst)
           return false;
         bdd_less_than_stable lt;
-        return lt(lhs.cond, rhs.cond);
-        // Do not sort on acceptance, we'll merge them.
+        if (!has_fin)
+          return lt(lhs.cond, rhs.cond);
+        if (lt(lhs.cond, rhs.cond))
+          return true;
+        if (lt(rhs.cond, lhs.cond))
+          return false;
+        // Group transitions with the same Fin part, so that all the
+        // transitions that can be merged are contiguous.  Do not
+        // compare the Inf part of the acceptance, we'll merge it.
+        return (lhs.acc & fin_mask) < (rhs.acc & fin_mask);
       });
 
       // Start on the second position and try to merge it into the
@@ -385,11 +409,13 @@ namespace spot
       for (; in < tend; ++in)
         {
           // Merge edges with the same source, destination,
-          // and conditions.  (We test the source last, for the
-          // same reason as above.)
+          // conditions, and Fin part.  (We test the source last, for
+          // the same reason as above.)
           if (trans[out].dst == trans[in].dst
               && trans[out].cond.id() == trans[in].cond.id()
-              && trans[out].src == trans[in].src)
+              && trans[out].src == trans[in].src
+              && (!has_fin
+                  || !((trans[out].acc ^ trans[in].acc) & fin_mask)))
             {
               trans[out].acc |= trans[in].acc;
             }
