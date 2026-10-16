@@ -1,6 +1,6 @@
-New in spot 2.16.0.dev  (not yet released)
+New in spot 2.16.1  (2026-10-16)
 
-  Bug fix:
+  Bug fixes:
 
   - is_generalized_rabin() and is_generalized_streett() could fail on
     acceptance formulas that use the maximum number of colors
@@ -303,7 +303,7 @@ New in spot 2.16  (2026-09-03)
 
 New in spot 2.15.1  (2026-04-25)
 
-  Bugs fixes:
+  Bug fixes:
 
   - Fix compilation error due to std::result_of being removed from
     C++20.  (Issue #643.)
