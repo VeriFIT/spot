@@ -1,4 +1,4 @@
-New in spot 2.16.0.dev  (not yet released)
+New in spot 2.16.1.dev  (not yet released)
 
   Build:
 
@@ -120,16 +120,7 @@ New in spot 2.16.0.dev  (not yet released)
     destination, and condition, when they agree on every set that
     appears in a Fin term.
 
-  Bug fix:
-
-  - is_generalized_rabin() and is_generalized_streett() could fails on
-    acceptance formulas that use the maximum number of colors
-    supported by Spot.
-
-  - writing to files using `-o PATTERN.out` will now flush after each
-    formula or automaton is output.  This ensure that the file can be
-    properly read even if the tool hasn't yet closed it (because it
-    might append to it later).
+  Bug fixes:
 
   - The --ins, --outs, and --unobservable-ins options of ltlfilt,
     ltlsynt, ltlfsynt, and ltlmix, as well as the atomic propositions
@@ -142,6 +133,19 @@ New in spot 2.16.0.dev  (not yet released)
     "syfco" tool, the list of output signals is now requested with the
     same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
     syfco is the one performing the lower-casing.  (Issue #654.)
+
+New in spot 2.16.1  (2026-10-16)
+
+  Bug fixes:
+
+  - is_generalized_rabin() and is_generalized_streett() could fail on
+    acceptance formulas that use the maximum number of colors
+    supported by Spot.
+
+  - writing to files using `-o PATTERN.out` will now flush after each
+    formula or automaton is output.  This ensure that the file can be
+    properly read even if the tool hasn't yet closed it (because it
+    might append to it later).
 
   - Some algorithms that temporarily override the acceptance condition
     of an automaton (via scc_and_mark_filter) could lower the number
@@ -435,7 +439,7 @@ New in spot 2.16  (2026-09-03)
 
 New in spot 2.15.1  (2026-04-25)
 
-  Bugs fixes:
+  Bug fixes:
 
   - Fix compilation error due to std::result_of being removed from
     C++20.  (Issue #643.)
