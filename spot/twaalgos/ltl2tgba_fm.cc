@@ -19,6 +19,7 @@
 #include "config.h"
 #include <spot/misc/bddlt.hh>
 #include <spot/misc/minato.hh>
+#include <spot/misc/escape.hh>
 #include <spot/tl/print.hh>
 #include <spot/tl/apcollect.hh>
 #include <spot/tl/mark.hh>
@@ -27,6 +28,7 @@
 #include <utility>
 #include <algorithm>
 #include <set>
+#include <sstream>
 #include <spot/twaalgos/ltl2tgba_fm.hh>
 #include <spot/twaalgos/quantify.hh>
 #include <spot/twa/bddprint.hh>
@@ -2434,6 +2436,169 @@ namespace spot
     return impl_->d->dict;
   }
 
+  std::ostream&
+  ltl_to_tgba_fm_otf::print_dot(std::ostream& os)
+  {
+    // Explore all reachable formulas, decomposing the successor BDD
+    // of each one as in ltl_to_tgba_fm().
+    std::vector<formula> states;
+    {
+      std::set<formula> seen;
+      states.push_back(init_state());
+      seen.insert(states[0]);
+      for (size_t i = 0; i < states.size(); ++i)
+        for (auto& e: succ_as_raw_edges(states[i]))
+          if (seen.insert(e.dst).second)
+            states.push_back(e.dst);
+    }
+
+    std::ostringstream edges;
+
+    os << "digraph ltl_to_tgba_fm_otf {\n  rankdir=TB;\n"
+          "  node [shape=circle];\n";
+    static std::string extra = []()
+    {
+      auto s = getenv("SPOT_DOTEXTRA");
+      return s ? s : "";
+    }();
+    // Any extra text passed in the SPOT_DOTEXTRA environment
+    // variable should be output at the end of the "header", so
+    // that our setup can be overridden.
+    if (!extra.empty())
+      os << "  " << extra << '\n';
+
+    const char* opt_font_ = "Lato";
+    os << "  fontname=\"" << opt_font_
+        << "\"\n  node [fontname=\"" << opt_font_
+       << "\"]\n  edge [fontname=\"" << opt_font_
+       << "\"]\n";
+
+    auto esc = [&] (formula f) -> std::string
+      {
+        return escape_str(str_psl(f));
+      };
+
+    os << "  { rank = source; I [label=\"\", style=invis, width=0]; }\n";
+    edges << "  I -> S0 [tooltip=\"initial state\"]\n";
+
+    os << "  { rank = same;\n";
+    for (size_t i = 0; i < states.size(); ++i)
+      {
+        os << "    S" << i << " [shape=box, style=\"filled,rounded\", "
+              "fillcolor=\"#e9f4fb\", label=\"" << esc(states[i])
+           << "\", tooltip=\"[" << i << "]\"];\n";
+      }
+
+    // This is a heap of BDD nodes, with smallest level at the top.
+    std::vector<bdd> nodes;
+    robin_hood::unordered_set<int> seen_bdd;
+
+    nodes.reserve(states.size());
+    for (size_t i = 0; i < states.size(); ++i)
+      {
+        bdd b = succ_as_bdd(states[i]); // cached
+        edges << "  S" << i << " -> B" << b.id()
+              << " [tooltip=\"[" << i << "]\"];\n";
+        if (seen_bdd.insert(b.id()).second)
+          nodes.push_back(b);
+      }
+
+    auto bylvl = [&] (bdd a, bdd b) {
+      return bdd_level(a) > bdd_level(b);
+    };
+    std::make_heap(nodes.begin(), nodes.end(), bylvl);
+
+    int oldvar = -1;
+
+    while (!nodes.empty())
+      {
+        std::pop_heap(nodes.begin(), nodes.end(), bylvl);
+        bdd n = nodes.back();
+        nodes.pop_back();
+        if (n.id() <= 1)
+          {
+            if (oldvar != -2)
+              os << "  }\n  { rank = sink;\n";
+            os << "    B" << n.id()
+               << " [shape=square, style=filled, fillcolor=\"#ffe6cc\", "
+                  "label=\"" << n.id()
+               << "\", tooltip=\"bdd(" << n.id() << ")\" ";
+            if (n.id() == 1)
+              os << ", peripheries=2";
+            os << "];\n";
+            oldvar = -2;
+            continue;
+          }
+        int var = bdd_var(n);
+        if (var != oldvar)
+          {
+            os << "  }\n  { rank = same;\n";
+            oldvar = var;
+          }
+
+        const bdd_dict::bdd_info& bi = impl_->d->dict->bdd_map[var];
+        std::string label;
+        const char* shape = "circle";
+        const char* fillcolor = "#ffffff";
+        formula f = bi.f;
+        switch (bi.type)
+          {
+          case bdd_dict::anon:
+            // Next variable: display the destination formula.
+            f = impl_->d->next_formula_map[var];
+            assert(f); // Every anon variable is a Next variable.
+            shape = "box";
+            fillcolor = "#ffe5f1";
+            label = esc(f);
+            break;
+          case bdd_dict::acc:
+            // Acceptance promise P(f).
+            shape = "diamond";
+            fillcolor = "#e9f4fb";
+            label = "P(" + esc(f) + ")";
+            break;
+          default: // bdd_dict::var
+            // Atomic proposition.
+            assert(bi.type == bdd_dict::var);
+            label = esc(f);
+            break;
+          }
+
+        os << "    B" << n.id() << " [shape=" << shape
+           << ", style="
+           << (bi.type == bdd_dict::anon
+               ? "\"filled,rounded\""
+               : "filled")
+           << ", fillcolor=\"" << fillcolor
+           << "\", label=\"" << label << "\", tooltip=\"bdd("
+           << n.id() << ")\"];\n";
+
+        bdd low = bdd_low(n);
+        bdd high = bdd_high(n);
+        if (seen_bdd.insert(low.id()).second)
+          {
+            nodes.push_back(low);
+            std::push_heap(nodes.begin(), nodes.end(), bylvl);
+          }
+        if (seen_bdd.insert(high.id()).second)
+          {
+            nodes.push_back(high);
+            std::push_heap(nodes.begin(), nodes.end(), bylvl);
+          }
+        edges << "  B" << n.id() << " -> B" << low.id()
+              << " [style=dotted, tooltip=\"" << label
+              << "=0\"];\n  B" << n.id()
+              << " -> B" << high.id()
+              << " [style=filled, tooltip=\""
+              << label << "=1\"];\n";
+      }
+
+    os << "  }\n";
+    os << edges.str();
+    os << "}\n";
+    return os;
+  }
+
 
   // ---- ltl_to_ba_otf implementation ---------------------------------------
 
@@ -2610,6 +2775,168 @@ namespace spot
   ltl_to_ba_otf::get_dict() const
   {
     return impl_->dict;
+  }
+
+  std::ostream&
+  ltl_to_ba_otf::print_dot(std::ostream& os)
+  {
+    std::vector<ba_state> states;
+
+    // Explore all reachable states, calling succ_as_bdd() on each one
+    // so that all destination states get a next-state variable.
+    {
+      robin_hood::unordered_set<ba_state, ba_state_hash> seen;
+      seen.insert(init_state());
+      states.push_back(init_state());
+      for (size_t i = 0; i < states.size(); ++i)
+        {
+          // Also registers the next-state variables of each destination.
+          succ_as_bdd(states[i]);
+          for (auto& e: impl_->raw_ba_edges(states[i]))
+            if (seen.insert(e.dst).second)
+              states.push_back(e.dst);
+        }
+    }
+
+    std::ostringstream edges;
+
+    os << "digraph ltl_to_ba_otf {\n  rankdir=TB;\n"
+          "  node [shape=circle];\n";
+    static std::string extra = []()
+    {
+      auto s = getenv("SPOT_DOTEXTRA");
+      return s ? s : "";
+    }();
+    // Any extra text passed in the SPOT_DOTEXTRA environment
+    // variable should be output at the end of the "header", so
+    // that our setup can be overridden.
+    if (!extra.empty())
+      os << "  " << extra << '\n';
+
+    const char* opt_font_ = "Lato";
+    os << "  fontname=\"" << opt_font_
+        << "\"\n  node [fontname=\"" << opt_font_
+       << "\"]\n  edge [fontname=\"" << opt_font_
+       << "\"]\n";
+
+    auto pair_label = [&] (const ba_state& s) -> std::string
+      {
+        return "(" + escape_str(str_psl(s.f)) + ", "
+             + std::to_string(s.m) + ")";
+    };
+
+    os << "  { rank = source; I [label=\"\", style=invis, width=0]; }\n";
+    edges << "  I -> S0 [tooltip=\"initial state\"]\n";
+
+    os << "  { rank = same;\n";
+    for (size_t i = 0; i < states.size(); ++i)
+      {
+        const ba_state& s = states[i];
+        os << "    S" << i << " [shape=box, style=\"filled,rounded\", "
+              "fillcolor=\"#e9f4fb\", label=\"" << pair_label(s)
+           << "\", tooltip=\"[" << i << "]\"";
+        if (s.m == -1)
+          os << ", peripheries=2";
+        os << "];\n";
+      }
+
+    // This is a heap of BDD nodes, with smallest level at the top.
+    std::vector<bdd> nodes;
+    robin_hood::unordered_set<int> seen_bdd;
+
+    nodes.reserve(states.size());
+    for (size_t i = 0; i < states.size(); ++i)
+      {
+        bdd b = succ_as_bdd(states[i]); // cached
+        edges << "  S" << i << " -> B" << b.id()
+              << " [tooltip=\"[" << i << "]\"];\n";
+        if (seen_bdd.insert(b.id()).second)
+          nodes.push_back(b);
+      }
+
+    auto bylvl = [&] (bdd a, bdd b) {
+      return bdd_level(a) > bdd_level(b);
+    };
+    std::make_heap(nodes.begin(), nodes.end(), bylvl);
+
+    int oldvar = -1;
+
+    while (!nodes.empty())
+      {
+        std::pop_heap(nodes.begin(), nodes.end(), bylvl);
+        bdd n = nodes.back();
+        nodes.pop_back();
+        if (n.id() <= 1)
+          {
+            if (oldvar != -2)
+              os << "  }\n  { rank = sink;\n";
+            os << "    B" << n.id()
+               << " [shape=square, style=filled, fillcolor=\"#ffe6cc\", "
+                  "label=\"" << n.id()
+               << "\", tooltip=\"bdd(" << n.id() << ")\" ";
+            if (n.id() == 1)
+              os << ", peripheries=2";
+            os << "];\n";
+            oldvar = -2;
+            continue;
+          }
+        int var = bdd_var(n);
+        if (var != oldvar)
+          {
+            os << "  }\n  { rank = same;\n";
+            oldvar = var;
+          }
+
+        std::string label;
+        bool is_next = true;
+        if (formula f = impl_->dict->ap_from_var(var))
+          {
+            is_next = false;
+            label = escape_str(str_psl(f));
+          }
+        else
+          {
+            // Next-state variable: display the destination as a pair
+            // (f, m), with a doubled border if the round has been
+            // completed (m == -1).
+            ba_state d = state_from_var(var);
+            label = pair_label(d);
+          }
+
+        os << "    B" << n.id()
+           << (is_next
+               ? " [shape=box, style=\"filled,rounded\", "
+                 "fillcolor=\"#ffe5f1\""
+               : " [style=filled, fillcolor=\"#ffffff\"");
+        if (is_next && state_from_var(var).m == -1)
+          os << ", peripheries=2";
+        os << ", label=\"" << label << "\", tooltip=\"bdd(" << n.id()
+           << ")\"];\n";
+
+        bdd low = bdd_low(n);
+        bdd high = bdd_high(n);
+        if (seen_bdd.insert(low.id()).second)
+          {
+            nodes.push_back(low);
+            std::push_heap(nodes.begin(), nodes.end(), bylvl);
+          }
+        if (seen_bdd.insert(high.id()).second)
+          {
+            nodes.push_back(high);
+            std::push_heap(nodes.begin(), nodes.end(), bylvl);
+          }
+        edges << "  B" << n.id() << " -> B" << low.id()
+              << " [style=dotted, tooltip=\"" << label
+              << "=0\"];\n  B" << n.id()
+              << " -> B" << high.id()
+              << " [style=filled, tooltip=\""
+              << label << "=1\"];\n";
+      }
+
+    os << "  }\n";
+    os << edges.str();
+    os << "}\n";
+    return os;
   }
 
 

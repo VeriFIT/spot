@@ -188,17 +188,33 @@ namespace spot
     /// Normalizes the formula, initializes the BDD variable mappings,
     /// and prepares all internal data structures.
     ///
+    /// The explorer is on-the-fly: it never adds states or edges to
+    /// \a aut itself; the caller drives the exploration with
+    /// init_state() and succ_as_edges()/succ_as_bdd(), and fills \a aut
+    /// as it goes.  \a aut is used only as
+    ///
+    ///   - the owner of the shared bdd_dict: the atomic propositions
+    ///     of the formula are registered on \a aut, the BDD conditions
+    ///     returned by succ_as_edges() and succ_as_bdd() are expressed
+    ///     in that dict, and all variables are unregistered when the
+    ///     explorer is destroyed; and
+    ///   - the holder of the acceptance condition: the marks attached
+    ///     to the edges refer to \a aut's acceptance sets.
+    ///
+    /// Contrary to ltl_to_tgba_fm(), which starts from a fresh
+    /// automaton, nothing prevents passing an \a aut with existing
+    /// states, but the explorer requires a dict small enough that new
+    /// variables can be registered.
+    ///
     /// \param f          the LTL/PSL formula
-    /// \param aut        the automaton being built, used only to call
-    ///                   register_ap(); the explorer never adds states
-    ///                   or edges itself
+    /// \param aut        the automaton that will receive the translation
     /// \param opts       translation options
     /// \param simplifier optional LTL simplifier (owned by caller)
     /// \param unobs      optional set of unobservable events
     ltl_to_tgba_fm_otf(formula f, twa_graph_ptr aut,
-                options opts = options(),
-                tl_simplifier* simplifier = nullptr,
-                const atomic_prop_set* unobs = nullptr);
+                       options opts = options(),
+                       tl_simplifier* simplifier = nullptr,
+                       const atomic_prop_set* unobs = nullptr);
 
     ~ltl_to_tgba_fm_otf();
 
@@ -305,6 +321,23 @@ namespace spot
     /// variable index.
     int register_next_variable(formula f);
 
+    /// \brief Print the explored automaton in GraphViz dot format,
+    /// MTBDD-style.
+    ///
+    /// This is to succ_as_bdd() what mtdswa::print_dot() is to the
+    /// \c mtdswa data structure: every reachable state (a formula) is
+    /// displayed as a root, and the successors of each state are
+    /// represented by the BDD of succ_as_bdd().  Nodes of this BDD are
+    /// labeled either by atomic propositions, by acceptance promises
+    /// \c P(f), or by next-state variables, which are shown as the
+    /// destination formula.  Note that this ignores the \c exprop and
+    /// \c branching_postponement options, like succ_as_bdd().
+    ///
+    /// Calling this explores the automaton, using the destinations
+    /// returned by succ_as_raw_edges() to decide which Next variables
+    /// to register.
+    std::ostream& print_dot(std::ostream& os);
+
     /// The BDD dictionary.
     const bdd_dict_ptr& get_dict() const;
 
@@ -348,6 +381,37 @@ public:
   using options = ltl_to_tgba_fm_otf::options;
 
   /// \brief Constructor.
+  ///
+  /// Like ltl_to_tgba_fm_otf, this is an on-the-fly explorer that
+  /// never adds states or edges to \a aut itself: the caller drives
+  /// the exploration with init_state() and succ_as_ba_edges()/
+  /// succ_as_bdd().  \a aut is used only as
+  ///
+  ///   - the owner of the shared bdd_dict: the atomic propositions of
+  ///     the formula are registered on \a aut, the BDD conditions
+  ///     returned by succ_as_ba_edges() and the BDDs returned by
+  ///     succ_as_bdd() are expressed in that dict, the next-state
+  ///     variables decoded by state_from_var() are allocated in it,
+  ///     and everything is unregistered when the explorer is
+  ///     destroyed; and
+  ///   - the holder of the acceptance condition, although this class
+  ///     never uses any acceptance variable itself: states with
+  ///     \c m == -1 are accepting, and the caller is expected to
+  ///     implement the Büchi condition (set 0 on the successors of
+  ///     accepting states) when filling \a aut, as described in the
+  ///     class documentation above.
+  ///
+  /// Passing a freshly created automaton, such as the result of
+  /// make_twa_graph(), is enough to explore and inspect the
+  /// automaton without filling it.
+  ///
+  /// \param f          the LTL/PSL formula to convert to a Büchi
+  ///                   automaton
+  /// \param aut        the automaton that the caller will fill after
+  ///                   exploring
+  /// \param opts       translation options
+  /// \param simplifier optional LTL simplifier (owned by caller)
+  /// \param unobs      optional set of unobservable events
   ltl_to_ba_otf(formula f, twa_graph_ptr aut,
                 options opts = options(),
                 tl_simplifier* simplifier = nullptr,
@@ -457,6 +521,21 @@ public:
   /// \brief Return the next-state variable associated to \a s,
   /// registering it if needed.
   int register_next_state(ba_state s);
+
+  /// \brief Print the explored automaton in GraphViz dot format,
+  /// MTBDD-style.
+  ///
+  /// This is to succ_as_bdd() what mtdswa::print_dot() is to the
+  /// \c mtdswa data structure: every reachable state \c (f, m) is
+  /// displayed as a root, and the successors of each state are
+  /// represented by the BDD of succ_as_bdd().  Nodes of this BDD are
+  /// labeled either by atomic propositions, or by next-state
+  /// variables, which are shown as pairs \c (f, m); nodes of the form
+  /// \c (f, -1) (accepting states) use a doubled border.
+  ///
+  /// Calling this explores the automaton, registering next-state
+  /// variables as needed.
+  std::ostream& print_dot(std::ostream& os);
 
   /// The BDD dictionary.
   const bdd_dict_ptr& get_dict() const;

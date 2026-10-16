@@ -140,3 +140,61 @@ for text in formulas:
 for f in spot.randltl(3, 50, seed=42):
     tc.assertTrue(spot.are_equivalent(f, build_nba(f)), str(f))
     tc.assertTrue(spot.are_equivalent(f, build_nba(f, from_bdd=True)), str(f))
+
+
+# --- Dot rendering. -------------------------------------------------
+def print_ltlbaotf(formula_text):
+    """Return the output of print_dot() for an explored spot.ltl_to_ba_otf."""
+    ba = spot.ltl_to_ba_otf(spot.parse_formula(formula_text),
+                            spot.make_twa_graph(spot.make_bdd_dict()))
+    ostr = spot.ostringstream()
+    ba.print_dot(ostr)
+    return ostr.str()
+
+
+dot = print_ltlbaotf('a U b')
+tc.assertTrue(dot.startswith('digraph ltl_to_ba_otf'), dot)
+tc.assertIn('(a U b, 0)', dot)          # the initial state
+for s in ('(a U b, -1)', '(b, -1)', '(1, -1)'):
+    if s in dot:
+        break
+else:
+    tc.fail('no accepting state in the dot output')
+tc.assertIn('peripheries=2', dot)       # doubled border for (f, -1)
+tc.assertIn('"a"', dot)                 # BDD node for the AP a
+
+# State (formula "Xf") has no successor: its BDD is bddfalse.
+dot = print_ltlbaotf('Xf')
+tc.assertIn('B0 [shape=square', dot)
+
+
+def print_ltl_to_tgba(formula_text):
+    """Return print_dot() output for an explored ltl_to_tgba_fm_otf."""
+    ex = spot.ltl_to_tgba_fm_otf(spot.parse_formula(formula_text),
+                                 spot.make_twa_graph(spot.make_bdd_dict()))
+    ostr = spot.ostringstream()
+    ex.print_dot(ostr)
+    return ostr.str()
+
+
+# AP, promise, and Next nodes in the same graph.
+dot = print_ltl_to_tgba('a U b & X c')
+tc.assertTrue(dot.startswith('digraph ltl_to_tgba_fm_otf'), dot)
+tc.assertIn('label="a"', dot)                 # AP node
+tc.assertIn('label="P(1)"', dot)              # acceptance promise
+# (a U b & X c is syntactically persistent, so the translation uses a
+# single acceptance set, registered as Acc(1).)
+tc.assertIn('shape=diamond', dot)             # ... as a diamond
+tc.assertIn('label="a U b"', dot)             # Next variable
+tc.assertIn('label="c"', dot)                 # AP and Next var for c
+# Only the BDD terminal 1 has a doubled border.
+tc.assertTrue(dot.count('peripheries=2') == 1, dot)
+
+# A formula with two promises (non-persistent, so not single-acc).
+dot = print_ltl_to_tgba('G F a & G F b')
+tc.assertIn('label="P(a)"', dot)
+tc.assertIn('label="P(b)"', dot)
+
+# An unsatisfiable formula has no successor: its BDD is bddfalse.
+dot = print_ltl_to_tgba('Xf')
+tc.assertIn('B0 [shape=square', dot)
