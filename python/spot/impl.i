@@ -836,7 +836,10 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/ltl2taa.hh>
 %feature("flatnested") spot::ltl_to_ba_otf::ba_state;
 %feature("flatnested") spot::ltl_to_ba_otf::ba_edge;
+%feature("flatnested") spot::ltl_to_tgba_fm_otf::options;
 %include <spot/twaalgos/ltl2tgba_fm.hh>
+%template(vector_fm_edge) std::vector<spot::fm_edge>;
+%template(vector_fm_simple_edge) std::vector<spot::fm_simple_edge>;
 %template(vector_ba_edge) std::vector<spot::ltl_to_ba_otf::ba_edge>;
 %include <spot/twaalgos/ltlf2dfa.hh>
 %include <spot/twaalgos/gfguarantee.hh>

@@ -132,10 +132,9 @@ namespace spot
     {
     public:
 
-      translate_dict(twa_graph_ptr& a, tl_simplifier* ls, bool exprop,
-                     bool single_acc, bool unambiguous)
-        : a_(a),
-          dict(a->get_dict()),
+      translate_dict(bdd_dict_ptr dict, tl_simplifier* ls, void* owner,
+                     bool exprop, bool single_acc, bool unambiguous)
+        : dict(std::move(dict)),
           ls(ls),
           a_set(bddtrue),
           var_set(bddtrue),
@@ -143,17 +142,23 @@ namespace spot
           transdfa(*this),
           exprop(exprop),
           single_acc(single_acc),
-          acc(a->acc()),
-          unambiguous(unambiguous)
+          unambiguous(unambiguous),
+          owner_(owner ? owner : static_cast<void*>(this)),
+          num_colors_(0)
       {
       }
 
       ~translate_dict()
       {
+        // Atomic propositions are registered with our own identity,
+        // and are unregistered here.  The acceptance and next
+        // variables are registered with owner_'s identity, which is
+        // either an external object (such as the automaton being
+        // built), or the explorer itself when no owner was given; in
+        // both cases they are unregistered when that object dies.
         dict->unregister_all_my_variables(this);
       }
 
-      twa_graph_ptr& a_;
       bdd_dict_ptr dict;
       tl_simplifier* ls;
       mark_tools mt;
@@ -171,10 +176,25 @@ namespace spot
       ratexp_to_dfa transdfa;
       bool exprop;
       bool single_acc;
-      acc_cond& acc;
       // Map BDD variables to acceptance marks.
       robin_hood::unordered_flat_map<int, unsigned> bm;
       bool unambiguous;
+
+      /// Identity used to register acceptance and next variables.
+      void* owner_;
+      /// Number of colors (acceptance sets) allocated so far.
+      unsigned num_colors_;
+      /// Atomic propositions, in the order they were discovered by
+      /// boolean_to_bdd().
+      std::vector<formula> ap_order_;
+      /// BDD variables whose proposition is already in ap_order_.
+      std::vector<bool> ap_seen_;
+      /// Conjunction of the propositions discovered so far.  This
+      /// mirrors the bddaps_ member of the automaton built by the
+      /// caller.  It is accumulated as propositions are discovered,
+      /// at the same point the historical implementation updated the
+      /// automaton, so that BDD nodes are numbered identically.
+      bdd aps_bdd_ = bddtrue;
 
       enum translate_flags
         {
@@ -225,6 +245,9 @@ namespace spot
       int
       register_proposition(formula f)
       {
+        // Note that boolean_to_bdd() does not use this method: it
+        // registers propositions itself, so that it can remember them
+        // in discovery order and register each of them only once.
         int num = dict->register_proposition(f, this);
         var_set &= bdd_ithvar(num);
         return num;
@@ -340,12 +363,12 @@ namespace spot
       {
         if (single_acc)
           {
-            int num = dict->register_acceptance_variable(formula::tt(), this);
+            int num = dict->register_acceptance_variable(formula::tt(), owner_);
             a_set &= bdd_ithvar(num);
 
             auto p = bm.emplace(num, 0U);
             if (p.second)
-              p.first->second = acc.add_set();
+              p.first->second = num_colors_++;
             return num;
           }
         // A promise of 'x', noted P(x) is pretty much like the F(x)
@@ -387,12 +410,13 @@ namespace spot
               {
                 // P(a M b) = P(a & b)
                 formula g = formula::And(f[0], f[1]);
-                int num = dict->register_acceptance_variable(g, this);
+                int num =
+                  dict->register_acceptance_variable(g, owner_);
                 a_set &= bdd_ithvar(num);
 
                 auto p = bm.emplace(num, 0U);
                 if (p.second)
-                  p.first->second = acc.add_set();
+                  p.first->second = num_colors_++;
                 return num;
               }
             else if (f.is(op::F))
@@ -405,12 +429,12 @@ namespace spot
                 break;
               }
           }
-        int num = dict->register_acceptance_variable(f, this);
+        int num = dict->register_acceptance_variable(f, owner_);
         a_set &= bdd_ithvar(num);
 
         auto p = bm.emplace(num, 0U);
         if (p.second)
-          p.first->second = acc.add_set();
+          p.first->second = num_colors_++;
 
         return num;
       }
@@ -427,7 +451,7 @@ namespace spot
           }
         else
           {
-            num = dict->register_anonymous_variables(1, this);
+            num = dict->register_anonymous_variables(1, owner_);
             next_map[f] = num;
             next_formula_map.resize(bdd_varnum());
             next_formula_map[num] = f;
@@ -473,7 +497,27 @@ namespace spot
         while (sup != bddtrue)
           {
             int v = bdd_var(sup);
-            a_->register_ap(var_to_formula(v));
+            if (SPOT_UNLIKELY((unsigned)v >= ap_seen_.size()))
+              ap_seen_.resize(bdd_varnum(), false);
+            if (!ap_seen_[v])
+              {
+                ap_seen_[v] = true;
+                // The variable for this proposition was registered by
+                // the simplifier.  Register it again under our own
+                // identity so that it survives the destruction of the
+                // simplifier, and remember it in discovery order so
+                // that the caller can declare it with
+                // twa::register_ap().
+                formula ap = var_to_formula(v);
+                ap_order_.emplace_back(ap);
+                dict->register_proposition(ap, this);
+                // twa::register_ap() would conjoin the variable of
+                // the proposition into the bddaps_ member of the
+                // automaton.  Do the same conjunction here, at the
+                // same point the historical implementation did, so
+                // that the BDD nodes are numbered identically.
+                aps_bdd_ &= bdd_ithvar(v);
+              }
             sup = bdd_high(sup);
           }
         return res;
@@ -1971,7 +2015,8 @@ namespace spot
   struct ltl_to_tgba_fm_otf::impl
   {
     ltl_to_tgba_fm_otf::options opts;
-    twa_graph_ptr aut;
+    bdd_dict_ptr dict;
+    void* owner = nullptr; // registration identity for the dict
     tl_simplifier* simplifier = nullptr;
     tl_simplifier* dest_simplifier = nullptr;
     bool owns_simplifier = false;
@@ -1989,14 +2034,41 @@ namespace spot
     formula orig_f;
   };
 
-  ltl_to_tgba_fm_otf::ltl_to_tgba_fm_otf(formula f, twa_graph_ptr aut,
+  namespace
+  {
+    // Unregister all variables registered by \a me in \a dict when
+    // destroyed, unless disarmed.  This is used by constructors that
+    // register variables in a dict: should the construction fail,
+    // this object unregisters whatever was registered so far, since
+    // the destructor of a class whose constructor threw does not run.
+    struct unregister_on_fail
+    {
+      bdd_dict_ptr dict;
+      const void* me;
+      bool armed = true;
+      ~unregister_on_fail()
+      {
+        if (armed)
+          dict->unregister_all_my_variables(me);
+      }
+    };
+  }
+
+  ltl_to_tgba_fm_otf::ltl_to_tgba_fm_otf(formula f, bdd_dict_ptr dict,
                            options opts,
                            tl_simplifier* simplifier,
-                           const atomic_prop_set* unobs)
+                           const atomic_prop_set* unobs,
+                           void* owner)
     : impl_(new impl)
   {
+    // Identity used to register variables in the dict: the given
+    // owner, or ourselves when no owner was given (in which case our
+    // destructor unregisters everything we registered).
+    void* reg = owner ? owner : static_cast<void*>(this);
+    unregister_on_fail guard{dict, this};
     impl_->opts = opts;
-    impl_->aut = aut;
+    impl_->dict = dict;
+    impl_->owner = owner;
     impl_->unobs = unobs;
 
     // Simplify / normalize the formula.
@@ -2007,7 +2079,7 @@ namespace spot
       }
     else
       {
-        s = new tl_simplifier(aut->get_dict());
+        s = new tl_simplifier(dict);
         f = s->negative_normal_form(f, false);
         impl_->owns_simplifier = true;
       }
@@ -2017,7 +2089,7 @@ namespace spot
 
     // Extract quantifiers.
     std::pair<quantifier_list, formula> q =
-      extract_quantifier_list(f, aut->get_dict(), aut);
+      extract_quantifier_list(f, dict, reg);
     f = q.second;
     for (auto p: q.first)
       if (SPOT_UNLIKELY(p.first))
@@ -2031,7 +2103,7 @@ namespace spot
           : f.is_syntactic_persistence());
 
     // Create the translation dictionary.
-    impl_->d.reset(new translate_dict(impl_->aut, s, opts.exprop,
+    impl_->d.reset(new translate_dict(dict, s, reg, opts.exprop,
                                        one_set_enough, opts.unambiguous));
 
     // Compute the set of all promises.
@@ -2097,12 +2169,21 @@ namespace spot
       f = impl_->fc->canonicalize(f);
 
     impl_->init_state = f;
+    guard.armed = false;
   }
 
   ltl_to_tgba_fm_otf::~ltl_to_tgba_fm_otf()
   {
     if (impl_->owns_simplifier)
       delete impl_->simplifier;
+    // When an external owner (typically the automaton being built)
+    // was given, its variables are unregistered at the owner's own
+    // destruction; otherwise we unregister the variables we
+    // registered under our own identity.  (The propositions
+    // registered by translate_dict are unregistered by its own
+    // destructor.)
+    if (!impl_->owner)
+      impl_->dict->unregister_all_my_variables(this);
   }
 
   formula
@@ -2430,6 +2511,18 @@ namespace spot
     return impl_->d->register_next_variable(f);
   }
 
+  unsigned
+  ltl_to_tgba_fm_otf::num_colors() const
+  {
+    return impl_->d->num_colors_;
+  }
+
+  const std::vector<formula>&
+  ltl_to_tgba_fm_otf::ap() const
+  {
+    return impl_->d->ap_order_;
+  }
+
   const bdd_dict_ptr&
   ltl_to_tgba_fm_otf::get_dict() const
   {
@@ -2554,7 +2647,7 @@ namespace spot
           case bdd_dict::acc:
             // Acceptance promise P(f).
             shape = "diamond";
-            fillcolor = "#e9f4fb";
+            fillcolor = "#f4e9fb";
             label = "P(" + esc(f) + ")";
             break;
           default: // bdd_dict::var
@@ -2690,13 +2783,15 @@ namespace spot
     return raw_cache.emplace(s, std::move(res)).first->second;
   }
 
-  ltl_to_ba_otf::ltl_to_ba_otf(formula f, twa_graph_ptr aut,
+  ltl_to_ba_otf::ltl_to_ba_otf(formula f, bdd_dict_ptr dict,
                                options opts, tl_simplifier* simplifier,
-                               const atomic_prop_set* unobs)
+                               const atomic_prop_set* unobs,
+                               void* owner)
     : impl_(new impl)
   {
-    impl_->inner = std::make_unique<ltl_to_tgba_fm_otf>(f, aut, opts,
-                                                        simplifier, unobs);
+    impl_->inner = std::make_unique<ltl_to_tgba_fm_otf>(f, dict, opts,
+                                                        simplifier, unobs,
+                                                        owner);
     impl_->dict = impl_->inner->get_dict();
   }
 
@@ -2769,6 +2864,18 @@ namespace spot
   ltl_to_ba_otf::register_next_state(ba_state s)
   {
     return impl_->register_state(s);
+  }
+
+  unsigned
+  ltl_to_ba_otf::num_colors() const
+  {
+    return impl_->inner->num_colors();
+  }
+
+  const std::vector<formula>&
+  ltl_to_ba_otf::ap() const
+  {
+    return impl_->inner->ap();
   }
 
   const bdd_dict_ptr&
@@ -2959,7 +3066,13 @@ namespace spot
     opts.unambiguous = unambiguous;
     opts.force_obligation = force_obligation;
 
-    ltl_to_tgba_fm_otf expl(f2, a, opts, simplifier, unobs);
+    // No owner is given: the explorer registers its own acceptance and
+    // Next variables, and frees them when it is destroyed at the end
+    // of this function.  This matches the variable lifetime of the
+    // original translation, and is important for reproducibility: a
+    // different residual set of free variables in the bdd_dict would
+    // change the variable numbering used by subsequent algorithms.
+    ltl_to_tgba_fm_otf expl(f2, dict, opts, simplifier, unobs);
 
     formula init = expl.init_state();
     std::set<formula> formulas_to_translate;
@@ -2988,11 +3101,17 @@ namespace spot
           }
       }
 
+    // Register the atomic propositions found by the exploration, in
+    // the order they were discovered, then set the acceptance
+    // condition to generalized-Büchi over the number of colors
+    // allocated by the translation, and complement every mark with
+    // respect to that number of sets.
+    for (auto& ap: expl.ap())
+      a->register_ap(ap);
+    a->set_generalized_buchi(expl.num_colors());
     auto& acc = a->acc();
     for (auto& e: a->edges())
       e.acc = acc.comp(e.acc);
-
-    acc.set_generalized_buchi();
 
     formula orig_f = expl.orig_formula();
     if (orig_f.is_syntactic_stutter_invariant())

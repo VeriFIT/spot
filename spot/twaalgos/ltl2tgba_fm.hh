@@ -133,31 +133,32 @@ namespace spot
   ///
   /// \section acc_semantics Acceptance condition semantics
   ///
-  /// This class does not own a twa_graph; it receives one from the
-  /// caller (\a aut) and uses it only to call register_ap() as new
-  /// atomic propositions are discovered, and to update its acceptance
-  /// condition as new colors are allocated.  The acceptance condition
-  /// of \a aut is therefore mutated during the lifetime of the
-  /// explorer.
+  /// This class does not own an automaton, and does not build one: it
+  /// only needs a bdd_dict (to register atomic propositions, Next
+  /// variables, and promise variables), and it allocates its own
+  /// acceptance colors with dense indices starting at 0.  The marks
+  /// returned on the edges therefore never depend on any acceptance
+  /// set that could pre-exist in a caller's automaton.
   ///
   /// The Couvreur translation internally encodes promises P(…) using
-  /// negated Inf sets: the acceptance condition of \a aut effectively
+  /// negated Inf sets: the acceptance condition it assumes effectively
   /// represents Inf(!0)&Inf(!1)&…&Inf(!(N-1)), a form Spot does not
   /// directly support.  The acceptance marks returned in
   /// fm_edge::acc therefore correspond to this negated semantics.
   ///
-  /// Because the number of acceptance sets N grows during exploration
-  /// (each new promise allocates a fresh color), the marks cannot be
+  /// Because the number of colors N grows during exploration (each
+  /// new promise allocates a fresh color), the marks cannot be
   /// complemented on-the-fly; complementation must wait until
-  /// exploration is complete and the final N is known.  At that point,
-  /// build a proper TGBA by complementing each edge's mark with
-  /// respect to N and setting the acceptance condition to
-  /// generalized-Büchi:
+  /// exploration is complete and the final N is known.  At that
+  /// point, build a proper TGBA by setting the acceptance condition
+  /// of the target automaton to generalized-Büchi over the N sets
+  /// allocated by the exploration (num_colors()), and complementing
+  /// each edge's mark with respect to these N sets:
   /// \code
+  ///   aut->set_generalized_buchi(expl.num_colors());
   ///   auto& acc = aut->acc();
   ///   for (auto& e: aut->edges())
   ///     e.acc = acc.comp(e.acc);
-  ///   acc.set_generalized_buchi();
   /// \endcode
   /// This is exactly what ltl_to_tgba_fm() does before returning the
   /// completed automaton.
@@ -186,35 +187,40 @@ namespace spot
     /// \brief Constructor.
     ///
     /// Normalizes the formula, initializes the BDD variable mappings,
-    /// and prepares all internal data structures.
-    ///
-    /// The explorer is on-the-fly: it never adds states or edges to
-    /// \a aut itself; the caller drives the exploration with
-    /// init_state() and succ_as_edges()/succ_as_bdd(), and fills \a aut
-    /// as it goes.  \a aut is used only as
-    ///
-    ///   - the owner of the shared bdd_dict: the atomic propositions
-    ///     of the formula are registered on \a aut, the BDD conditions
-    ///     returned by succ_as_edges() and succ_as_bdd() are expressed
-    ///     in that dict, and all variables are unregistered when the
-    ///     explorer is destroyed; and
-    ///   - the holder of the acceptance condition: the marks attached
-    ///     to the edges refer to \a aut's acceptance sets.
-    ///
-    /// Contrary to ltl_to_tgba_fm(), which starts from a fresh
-    /// automaton, nothing prevents passing an \a aut with existing
-    /// states, but the explorer requires a dict small enough that new
-    /// variables can be registered.
+    /// and prepares all internal data structures.  The explorer
+    /// neither builds nor owns an automaton: the caller drives the
+    /// exploration with init_state() and succ_as_edges()/
+    /// succ_as_bdd().
     ///
     /// \param f          the LTL/PSL formula
-    /// \param aut        the automaton that will receive the translation
+    /// \param dict       the bdd_dict in which all BDD variables used
+    ///                   by the exploration (atomic propositions, Next
+    ///                   variables, and acceptance promises) are
+    ///                   registered; the BDD conditions returned by
+    ///                   succ_as_edges() and succ_as_bdd() are
+    ///                   expressed in this dict
     /// \param opts       translation options
     /// \param simplifier optional LTL simplifier (owned by caller)
     /// \param unobs      optional set of unobservable events
-    ltl_to_tgba_fm_otf(formula f, twa_graph_ptr aut,
+    /// \param owner      an optional identity under which the
+    ///                   acceptance and Next variables are
+    ///                   registered.  By default (null), the explorer
+    ///                   uses its own identity, and unregisters these
+    ///                   variables when it is destroyed.  Passing
+    ///                   another identity (e.g., the address of the
+    ///                   automaton being built, aut.get()) makes them
+    ///                   survive the destruction of the explorer.
+    ///                   In all cases, a caller that builds an
+    ///                   automaton should declare the atomic
+    ///                   propositions listed by ap(), in that order,
+    ///                   using twa::register_ap(), while the explorer
+    ///                   is still alive: the explorer unregisters them
+    ///                   when it is destroyed.
+    ltl_to_tgba_fm_otf(formula f, bdd_dict_ptr dict,
                        options opts = options(),
                        tl_simplifier* simplifier = nullptr,
-                       const atomic_prop_set* unobs = nullptr);
+                       const atomic_prop_set* unobs = nullptr,
+                       void* owner = nullptr);
 
     ~ltl_to_tgba_fm_otf();
 
@@ -321,6 +327,23 @@ namespace spot
     /// variable index.
     int register_next_variable(formula f);
 
+    /// \brief The number of colors (acceptance sets) allocated so far.
+    ///
+    /// Each promise registered by the translation allocates one color,
+    /// with a dense index starting at 0.  A caller that turns the
+    /// exploration into a TGBA can use this to size the acceptance
+    /// condition of the result (see \ref acc_semantics).
+    unsigned num_colors() const;
+
+    /// \brief The atomic propositions encountered so far, in the order
+    /// they were discovered.
+    ///
+    /// An automaton built from this exploration should register those
+    /// propositions with twa::register_ap() in this order, so that its
+    /// twa::ap() list is consistent with the order in which the
+    /// exploration discovered them (this is what ltl_to_tgba_fm() does).
+    const std::vector<formula>& ap() const;
+
     /// \brief Print the explored automaton in GraphViz dot format,
     /// MTBDD-style.
     ///
@@ -383,39 +406,31 @@ public:
   /// \brief Constructor.
   ///
   /// Like ltl_to_tgba_fm_otf, this is an on-the-fly explorer that
-  /// never adds states or edges to \a aut itself: the caller drives
-  /// the exploration with init_state() and succ_as_ba_edges()/
-  /// succ_as_bdd().  \a aut is used only as
-  ///
-  ///   - the owner of the shared bdd_dict: the atomic propositions of
-  ///     the formula are registered on \a aut, the BDD conditions
-  ///     returned by succ_as_ba_edges() and the BDDs returned by
-  ///     succ_as_bdd() are expressed in that dict, the next-state
-  ///     variables decoded by state_from_var() are allocated in it,
-  ///     and everything is unregistered when the explorer is
-  ///     destroyed; and
-  ///   - the holder of the acceptance condition, although this class
-  ///     never uses any acceptance variable itself: states with
-  ///     \c m == -1 are accepting, and the caller is expected to
-  ///     implement the Büchi condition (set 0 on the successors of
-  ///     accepting states) when filling \a aut, as described in the
-  ///     class documentation above.
-  ///
-  /// Passing a freshly created automaton, such as the result of
-  /// make_twa_graph(), is enough to explore and inspect the
-  /// automaton without filling it.
+  /// neither builds nor owns an automaton: the caller drives the
+  /// exploration with init_state() and succ_as_ba_edges()/
+  /// succ_as_bdd(), and may pass an automaton as \a owner when it
+  /// wants to build one from the exploration.  This class uses no
+  /// acceptance variable itself: states with \c m == -1 are
+  /// accepting, and the caller is expected to implement the Büchi
+  /// condition (set 0 on the successors of accepting states) in the
+  /// automaton it builds, as described in the class documentation
+  /// above.
   ///
   /// \param f          the LTL/PSL formula to convert to a Büchi
   ///                   automaton
-  /// \param aut        the automaton that the caller will fill after
-  ///                   exploring
+  /// \param dict       the bdd_dict in which the atomic propositions
+  ///                   and the next-state variables decoded by
+  ///                   state_from_var() are registered
   /// \param opts       translation options
   /// \param simplifier optional LTL simplifier (owned by caller)
   /// \param unobs      optional set of unobservable events
-  ltl_to_ba_otf(formula f, twa_graph_ptr aut,
+  /// \param owner      identity used to register the variables in \a
+  ///                   dict; see ltl_to_tgba_fm_otf
+  ltl_to_ba_otf(formula f, bdd_dict_ptr dict,
                 options opts = options(),
                 tl_simplifier* simplifier = nullptr,
-                const atomic_prop_set* unobs = nullptr);
+                const atomic_prop_set* unobs = nullptr,
+                void* owner = nullptr);
 
   ~ltl_to_ba_otf();
 
@@ -521,6 +536,19 @@ public:
   /// \brief Return the next-state variable associated to \a s,
   /// registering it if needed.
   int register_next_state(ba_state s);
+
+  /// \brief The number of colors allocated by the translation.
+  ///
+  /// Delegates to the inner ltl_to_tgba_fm_otf explorer.
+  /// See \ref acc_semantics.
+  unsigned num_colors() const;
+
+  /// \brief The atomic propositions encountered so far, in the order
+  /// they were discovered.
+  ///
+  /// Delegates to the inner ltl_to_tgba_fm_otf explorer; see
+  /// ltl_to_tgba_fm_otf::ap().
+  const std::vector<formula>& ap() const;
 
   /// \brief Print the explored automaton in GraphViz dot format,
   /// MTBDD-style.

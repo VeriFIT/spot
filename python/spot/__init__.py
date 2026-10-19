@@ -414,8 +414,25 @@ class mtdswa:
         from spot.jupyter import SVG
         return SVG(self._repr_svg_(opts))
 
+# The constructors of the two on-the-fly explorers take their
+# bdd_dict as a positional argument in C++.  In Python, make it an
+# optional named argument defaulting to the global spot._bdd_dict, as
+# for translate() or obligation_to_mtdswa().  The original
+# constructors are saved so that they can still be called with the
+# dictionary inserted at the right position.
+_ltl_to_tgba_fm_otf_init = ltl_to_tgba_fm_otf.__init__
+_ltl_to_ba_otf_init = ltl_to_ba_otf.__init__
+
+
 @_extend(ltl_to_tgba_fm_otf)
 class ltl_to_tgba_fm_otf:
+    def __init__(self, formula, *args, dict=_bdd_dict):
+        _ltl_to_tgba_fm_otf_init(self, formula, dict, *args)
+
+    # Keep the documentation of the original constructor, which
+    # describes all the arguments that can be given in *args.
+    __init__.__doc__ = _ltl_to_tgba_fm_otf_init.__doc__
+
     def _repr_svg_(self):
         """Output the explored automaton as SVG"""
         ostr = ostringstream()
@@ -436,6 +453,13 @@ class ltl_to_tgba_fm_otf:
 
 @_extend(ltl_to_ba_otf)
 class ltl_to_ba_otf:
+    def __init__(self, formula, *args, dict=_bdd_dict):
+        _ltl_to_ba_otf_init(self, formula, dict, *args)
+
+    # Keep the documentation of the original constructor, which
+    # describes all the arguments that can be given in *args.
+    __init__.__doc__ = _ltl_to_ba_otf_init.__doc__
+
     def _repr_svg_(self):
         """Output the explored automaton as SVG"""
         ostr = ostringstream()

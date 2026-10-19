@@ -22,6 +22,8 @@ from unittest import TestCase
 
 tc = TestCase()
 
+_keepalive = []
+
 
 def copy_state(s):
     # The ba_state objects returned by init_state()/succ_as_ba_edges()
@@ -32,7 +34,7 @@ def copy_state(s):
     return r
 
 
-def build_nba(f, from_bdd=False):
+def build_nba(f, from_bdd=False, opts=None):
     """Expand the on-the-fly explorer spot.ltl_to_ba_otf into an NBA.
 
     The automaton uses state-based Büchi acceptance: every state with
@@ -41,7 +43,14 @@ def build_nba(f, from_bdd=False):
     """
     d = spot.make_bdd_dict()
     aut = spot.make_twa_graph(d)
-    ba = spot.ltl_to_ba_otf(f, aut)
+    if opts is None:
+        ba = spot.ltl_to_ba_otf(f, dict=d)
+    else:
+        ba = spot.ltl_to_ba_otf(f, opts, dict=d)
+    # No owner was passed, so the dict variables die with the
+    # explorer: keep it alive while aut is in use.  (A C++ caller
+    # could instead pass aut as the owner argument.)
+    _keepalive.append(ba)
     idx = {}
     pending = []
 
@@ -80,7 +89,15 @@ def build_nba(f, from_bdd=False):
 f = spot.parse_formula('a U b')
 d = spot.make_bdd_dict()
 aut = spot.make_twa_graph(d)
-ba = spot.ltl_to_ba_otf(f, aut)
+ba = spot.ltl_to_ba_otf(f, dict=d)
+
+# The bdd_dict is an optional named argument that defaults to the
+# global spot._bdd_dict.  (bdd_dict.__eq__ compares the underlying
+# dictionaries, not the Python proxies.)
+tc.assertTrue(spot.ltl_to_ba_otf(f).get_dict() == spot._bdd_dict)
+tc.assertTrue(spot.ltl_to_tgba_fm_otf(f).get_dict() == spot._bdd_dict)
+tc.assertTrue(spot.ltl_to_ba_otf(f, dict=d).get_dict() == d)
+tc.assertFalse(spot.ltl_to_ba_otf(f).get_dict() == d)
 
 tc.assertEqual(str(ba.orig_formula()), 'a U b')
 s0 = ba.init_state()
@@ -142,11 +159,63 @@ for f in spot.randltl(3, 50, seed=42):
     tc.assertTrue(spot.are_equivalent(f, build_nba(f, from_bdd=True)), str(f))
 
 
+# --- Translation options. ------------------------------------------
+# spot.options is the flat name of the C++ struct
+# ltl_to_tgba_fm_otf::options (as spot.ba_state is that of
+# ltl_to_ba_otf::ba_state), and both explorers accept it.
+opts = spot.options()
+tc.assertFalse(opts.exprop)
+tc.assertTrue(opts.symb_merge)          # C++ default
+
+# The options are forwarded to the C++ explorer: turning on exprop,
+# branching postponement and the unambiguous translation keeps the
+# language intact.
+opts.exprop = True
+opts.branching_postponement = True
+for text in ('a U b', 'G F a & G F b', 'F(a & X(!a & F b))'):
+    f = spot.parse_formula(text)
+    tc.assertTrue(spot.are_equivalent(f, build_nba(f, opts=opts)), text)
+    tc.assertTrue(spot.are_equivalent(f, build_nba(f, from_bdd=True,
+                                                   opts=opts)), text)
+unam = spot.options()
+unam.unambiguous = True
+f = spot.parse_formula('F(a & X(!a & F b))')
+tc.assertTrue(spot.are_equivalent(f, build_nba(f, opts=unam)))
+
+# force_obligation is visible as a change in the allocated colors.
+obl = spot.options()
+obl.force_obligation = True
+f = spot.parse_formula('G F a & G F b')
+tc.assertEqual(spot.ltl_to_ba_otf(f).num_colors(), 2)
+tc.assertEqual(spot.ltl_to_ba_otf(f, obl).num_colors(), 1)
+
+# The TGBA explorer's edge vectors are usable from Python too.
+ex = spot.ltl_to_tgba_fm_otf(spot.parse_formula('a U b & X c'), opts)
+edges = ex.succ_as_edges(ex.init_state())
+tc.assertTrue(len(edges) > 0)
+tc.assertTrue(all(isinstance(e, spot.fm_edge) for e in edges))
+tc.assertTrue(all(isinstance(e.dst, spot.formula) for e in edges))
+tc.assertTrue(all(isinstance(e.acc, spot.mark_t) for e in edges))
+raw = ex.succ_as_raw_edges(ex.init_state())
+tc.assertTrue(all(isinstance(e, spot.fm_edge) for e in raw))
+simple = ex.succ_as_acc_and_dest(ex.init_state())
+tc.assertTrue(len(simple) > 0)
+tc.assertTrue(all(isinstance(e, spot.fm_simple_edge) for e in simple))
+tc.assertTrue(all(isinstance(e.dst, spot.formula) for e in simple))
+
+# ap() lists the atomic propositions discovered by the exploration, in
+# order of discovery.  This is what ltl_to_tgba_fm() uses to declare
+# the propositions of the automaton it builds.
+ex = spot.ltl_to_tgba_fm_otf(spot.parse_formula('a | b'),
+                             dict=spot.make_bdd_dict())
+ex.succ_as_edges(ex.init_state())
+tc.assertEqual({str(p) for p in ex.ap()}, {'a', 'b'})
+
+
 # --- Dot rendering. -------------------------------------------------
 def print_ltlbaotf(formula_text):
     """Return the output of print_dot() for an explored spot.ltl_to_ba_otf."""
-    ba = spot.ltl_to_ba_otf(spot.parse_formula(formula_text),
-                            spot.make_twa_graph(spot.make_bdd_dict()))
+    ba = spot.ltl_to_ba_otf(spot.parse_formula(formula_text))
     ostr = spot.ostringstream()
     ba.print_dot(ostr)
     return ostr.str()
@@ -170,8 +239,7 @@ tc.assertIn('B0 [shape=square', dot)
 
 def print_ltl_to_tgba(formula_text):
     """Return print_dot() output for an explored ltl_to_tgba_fm_otf."""
-    ex = spot.ltl_to_tgba_fm_otf(spot.parse_formula(formula_text),
-                                 spot.make_twa_graph(spot.make_bdd_dict()))
+    ex = spot.ltl_to_tgba_fm_otf(spot.parse_formula(formula_text))
     ostr = spot.ostringstream()
     ex.print_dot(ostr)
     return ostr.str()
