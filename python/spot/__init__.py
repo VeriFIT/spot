@@ -422,16 +422,81 @@ class mtdswa:
 # dictionary inserted at the right position.
 _ltl_to_tgba_fm_otf_init = ltl_to_tgba_fm_otf.__init__
 _ltl_to_ba_otf_init = ltl_to_ba_otf.__init__
+_ltl_to_tgba_fm_otf_options_init = ltl_to_tgba_fm_otf_options.__init__
+
+# The fields of spot::ltl_to_tgba_fm_otf_options, as exposed by SWIG.
+_otf_option_names = tuple(k for (k, v) in
+                          vars(ltl_to_tgba_fm_otf_options).items()
+                          if isinstance(v, property) and k != 'thisown')
+
+
+@_extend(ltl_to_tgba_fm_otf_options)
+class ltl_to_tgba_fm_otf_options:
+    def __init__(self, **kwargs):
+        """Build a translation-options object.
+
+        Each field of spot::ltl_to_tgba_fm_otf_options can be passed as
+        a keyword argument; omitted fields keep their C++ default.
+        """
+        _ltl_to_tgba_fm_otf_options_init(self)
+        for (k, v) in kwargs.items():
+            if k not in _otf_option_names:
+                raise TypeError(f"unexpected translation option '{k}'")
+            setattr(self, k, v)
+
+
+def _otf_options(opts, kwargs):
+    """Return the translation options to use, building them from the
+    keyword arguments in `kwargs` if any.
+
+    `opts` is the options object given positionally, or None; giving
+    both `opts` and keywords is an error.
+    """
+    if not kwargs:
+        return opts if opts is not None else ltl_to_tgba_fm_otf_options()
+    if opts is not None:
+        raise TypeError("options given both positionally and "
+                        "as keyword arguments")
+    return ltl_to_tgba_fm_otf_options(**kwargs)
+
+
+# Describe the keyword spellings of the option fields; this is appended
+# to the documentation of the original constructors.
+_otf_options_doc = f"""
+
+Besides being passed as an ltl_to_tgba_fm_otf_options object, the
+translation options can be given as keyword arguments, among
+{', '.join(_otf_option_names)}.
+"""
+
+
+def _doc_with_otf_options(doc):
+    """Append `_otf_options_doc` to the docstring `doc`.
+
+    `doc` is normally the docstring SWIG generated for the constructor
+    being wrapped, documenting the positional arguments.  However,
+    SWIG versions older than 4.2.0 are used without their -doxygen
+    option (see configure.ac), and generate no docstring at all: `doc`
+    is then None, and only the paragraph about keyword arguments is
+    kept.
+    """
+    if doc is None:
+        return _otf_options_doc.strip()
+    return doc + _otf_options_doc
 
 
 @_extend(ltl_to_tgba_fm_otf)
 class ltl_to_tgba_fm_otf:
-    def __init__(self, formula, *args, dict=_bdd_dict):
-        _ltl_to_tgba_fm_otf_init(self, formula, dict, *args)
+    def __init__(self, formula, opts=None, simplifier=None, unobs=None,
+                 owner=None, *, dict=_bdd_dict, **kwargs):
+        _ltl_to_tgba_fm_otf_init(self, formula, dict,
+                                 _otf_options(opts, kwargs),
+                                 simplifier, unobs, owner)
 
     # Keep the documentation of the original constructor, which
-    # describes all the arguments that can be given in *args.
-    __init__.__doc__ = _ltl_to_tgba_fm_otf_init.__doc__
+    # describes all the positional arguments.
+    __init__.__doc__ = _doc_with_otf_options(
+        _ltl_to_tgba_fm_otf_init.__doc__)
 
     def _repr_svg_(self):
         """Output the explored automaton as SVG"""
@@ -453,12 +518,16 @@ class ltl_to_tgba_fm_otf:
 
 @_extend(ltl_to_ba_otf)
 class ltl_to_ba_otf:
-    def __init__(self, formula, *args, dict=_bdd_dict):
-        _ltl_to_ba_otf_init(self, formula, dict, *args)
+    def __init__(self, formula, opts=None, simplifier=None, unobs=None,
+                 owner=None, *, dict=_bdd_dict, **kwargs):
+        _ltl_to_ba_otf_init(self, formula, dict,
+                            _otf_options(opts, kwargs),
+                            simplifier, unobs, owner)
 
     # Keep the documentation of the original constructor, which
-    # describes all the arguments that can be given in *args.
-    __init__.__doc__ = _ltl_to_ba_otf_init.__doc__
+    # describes all the positional arguments.
+    __init__.__doc__ = _doc_with_otf_options(
+        _ltl_to_ba_otf_init.__doc__)
 
     def _repr_svg_(self):
         """Output the explored automaton as SVG"""

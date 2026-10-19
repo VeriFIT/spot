@@ -836,8 +836,30 @@ def state_is_accepting(self, src) -> "bool":
 %include <spot/twaalgos/ltl2taa.hh>
 %feature("flatnested") spot::ltl_to_ba_otf::ba_state;
 %feature("flatnested") spot::ltl_to_ba_otf::ba_edge;
-%feature("flatnested") spot::ltl_to_tgba_fm_otf::options;
+// The owner argument of the on-the-fly explorers is an opaque
+// identity under which their BDD variables are registered; it must be
+// the address of the C++ object (typically a twa) that will later
+// release them, i.e. what that object passes to
+// bdd_dict::unregister_all_my_variables().  The default void* typemap
+// would instead give the address of the shared_ptr wrapper created by
+// SWIG, so resolve Python objects with ptr_for_bdddict(), as done by
+// the bdd_dict bindings.
+%typemap(in) void* owner {
+  if ($input == Py_None)
+    $1 = nullptr;
+  else
+    $1 = ptr_for_bdddict($input);
+}
 %include <spot/twaalgos/ltl2tgba_fm.hh>
+// SWIG cannot expose nested classes; spot::ltl_to_tgba_fm_otf_options
+// is a top-level class, so it is bound as
+// spot.ltl_to_tgba_fm_otf_options.  Re-attach it to both explorers so
+// that spot.ltl_to_tgba_fm_otf.options and spot.ltl_to_ba_otf.options
+// are usable as their C++ counterparts.
+%pythoncode %{
+ltl_to_tgba_fm_otf.options = ltl_to_tgba_fm_otf_options
+ltl_to_ba_otf.options = ltl_to_tgba_fm_otf_options
+%}
 %template(vector_fm_edge) std::vector<spot::fm_edge>;
 %template(vector_fm_simple_edge) std::vector<spot::fm_simple_edge>;
 %template(vector_ba_edge) std::vector<spot::ltl_to_ba_otf::ba_edge>;

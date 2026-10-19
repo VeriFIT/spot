@@ -118,6 +118,27 @@ namespace spot
   };
 
   /// \ingroup twa_ltl
+  /// \brief Bundle the boolean options of ltl_to_tgba_fm_otf() and
+  /// ltl_to_ba_otf().
+  struct SPOT_API ltl_to_tgba_fm_otf_options
+  {
+    /// Use all property combinations to reduce nondeterminism.
+    bool exprop = false;
+    /// Merge states with the same symbolic representation.
+    bool symb_merge = true;
+    /// Merge transitions with the same label leaving the same state.
+    bool branching_postponement = false;
+    /// Suppress acceptance conditions from incoming transitions of
+    /// unstable states.
+    bool fair_loop_approx = false;
+    /// Restrict to unambiguous transitions.
+    bool unambiguous = false;
+    /// Force the result to satisfy the obligation property.
+    bool force_obligation = false;
+    ltl_to_tgba_fm_otf_options() {}
+  };
+
+  /// \ingroup twa_ltl
   /// \brief On-the-fly LTL→TGBA explorer.
   ///
   /// Encapsulates the data structures from ltl_to_tgba_fm() so that
@@ -166,23 +187,8 @@ namespace spot
   {
   public:
     /// \brief Bundle the boolean options for translation.
-    struct options
-    {
-      /// Use all property combinations to reduce nondeterminism.
-      bool exprop = false;
-      /// Merge states with the same symbolic representation.
-      bool symb_merge = true;
-      /// Merge transitions with the same label leaving the same state.
-      bool branching_postponement = false;
-      /// Suppress acceptance conditions from incoming transitions of
-      /// unstable states.
-      bool fair_loop_approx = false;
-      /// Restrict to unambiguous transitions.
-      bool unambiguous = false;
-      /// Force the result to satisfy the obligation property.
-      bool force_obligation = false;
-      options() {}
-    };
+    /// \see ltl_to_tgba_fm_otf_options
+    using options = ltl_to_tgba_fm_otf_options;
 
     /// \brief Constructor.
     ///
@@ -217,7 +223,8 @@ namespace spot
     ///                   is still alive: the explorer unregisters them
     ///                   when it is destroyed.
     ltl_to_tgba_fm_otf(formula f, bdd_dict_ptr dict,
-                       options opts = options(),
+                       ltl_to_tgba_fm_otf_options opts =
+                         ltl_to_tgba_fm_otf_options(),
                        tl_simplifier* simplifier = nullptr,
                        const atomic_prop_set* unobs = nullptr,
                        void* owner = nullptr);
@@ -401,7 +408,7 @@ public:
   /// The options are those of ltl_to_tgba_fm_otf.  Note that \c exprop
   /// and \c branching_postponement only affect succ_as_ba_edges();
   /// succ_as_bdd() ignores them.
-  using options = ltl_to_tgba_fm_otf::options;
+  using options = ltl_to_tgba_fm_otf_options;
 
   /// \brief Constructor.
   ///
@@ -427,7 +434,8 @@ public:
   /// \param owner      identity used to register the variables in \a
   ///                   dict; see ltl_to_tgba_fm_otf
   ltl_to_ba_otf(formula f, bdd_dict_ptr dict,
-                options opts = options(),
+                ltl_to_tgba_fm_otf_options opts =
+                  ltl_to_tgba_fm_otf_options(),
                 tl_simplifier* simplifier = nullptr,
                 const atomic_prop_set* unobs = nullptr,
                 void* owner = nullptr);

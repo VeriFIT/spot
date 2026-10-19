@@ -20,6 +20,18 @@ import spot
 import buddy
 from unittest import TestCase
 
+# CPython use reference counting, so that automata are destructed
+# when we expect them to be.   However other implementations like
+# PyPy may call destructors latter, causing different output.
+from platform import python_implementation
+if python_implementation() == 'CPython':
+    def gcollect():
+        pass
+else:
+    import gc
+    def gcollect():
+        gc.collect()
+
 tc = TestCase()
 
 _keepalive = []
@@ -34,17 +46,18 @@ def copy_state(s):
     return r
 
 
-def build_nba(f, from_bdd=False, opts=None):
+def build_nba(f, from_bdd=False, opts=None, **kwargs):
     """Expand the on-the-fly explorer spot.ltl_to_ba_otf into an NBA.
 
     The automaton uses state-based Büchi acceptance: every state with
     m == -1 is accepting, so all its outgoing edges carry acceptance
-    set 0.
+    set 0.  When no options object is given, extra keyword arguments
+    are passed to the explorer as translation options.
     """
     d = spot.make_bdd_dict()
     aut = spot.make_twa_graph(d)
     if opts is None:
-        ba = spot.ltl_to_ba_otf(f, dict=d)
+        ba = spot.ltl_to_ba_otf(f, dict=d, **kwargs)
     else:
         ba = spot.ltl_to_ba_otf(f, opts, dict=d)
     # No owner was passed, so the dict variables die with the
@@ -160,12 +173,18 @@ for f in spot.randltl(3, 50, seed=42):
 
 
 # --- Translation options. ------------------------------------------
-# spot.options is the flat name of the C++ struct
-# ltl_to_tgba_fm_otf::options (as spot.ba_state is that of
-# ltl_to_ba_otf::ba_state), and both explorers accept it.
-opts = spot.options()
+# The translation options are the C++ struct
+# spot::ltl_to_tgba_fm_otf_options (spelled ltl_to_tgba_fm_otf::options
+# and ltl_to_ba_otf::options in C++).  SWIG cannot expose nested
+# classes, so it is also re-attached to both explorers as a class
+# attribute, mirroring the C++ names.
+opts = spot.ltl_to_tgba_fm_otf_options()
 tc.assertFalse(opts.exprop)
 tc.assertTrue(opts.symb_merge)          # C++ default
+tc.assertTrue(spot.ltl_to_tgba_fm_otf.options
+              is spot.ltl_to_tgba_fm_otf_options)
+tc.assertTrue(spot.ltl_to_ba_otf.options
+              is spot.ltl_to_tgba_fm_otf_options)
 
 # The options are forwarded to the C++ explorer: turning on exprop,
 # branching postponement and the unambiguous translation keeps the
@@ -177,17 +196,77 @@ for text in ('a U b', 'G F a & G F b', 'F(a & X(!a & F b))'):
     tc.assertTrue(spot.are_equivalent(f, build_nba(f, opts=opts)), text)
     tc.assertTrue(spot.are_equivalent(f, build_nba(f, from_bdd=True,
                                                    opts=opts)), text)
-unam = spot.options()
+unam = spot.ltl_to_ba_otf.options()
 unam.unambiguous = True
 f = spot.parse_formula('F(a & X(!a & F b))')
 tc.assertTrue(spot.are_equivalent(f, build_nba(f, opts=unam)))
 
 # force_obligation is visible as a change in the allocated colors.
-obl = spot.options()
+obl = spot.ltl_to_tgba_fm_otf.options()
 obl.force_obligation = True
 f = spot.parse_formula('G F a & G F b')
 tc.assertEqual(spot.ltl_to_ba_otf(f).num_colors(), 2)
 tc.assertEqual(spot.ltl_to_ba_otf(f, obl).num_colors(), 1)
+
+# The fields of the options struct can also be given as keyword
+# arguments, both to the options constructor and to the explorers.
+kwd = spot.ltl_to_tgba_fm_otf_options(exprop=True, symb_merge=False)
+tc.assertTrue(kwd.exprop)
+tc.assertFalse(kwd.symb_merge)
+tc.assertFalse(kwd.unambiguous)         # untouched fields keep defaults
+tc.assertEqual(spot.ltl_to_ba_otf(f, force_obligation=True).num_colors(), 1)
+tc.assertEqual(spot.ltl_to_tgba_fm_otf(f, obl).num_colors(), 1)
+tc.assertEqual(spot.ltl_to_tgba_fm_otf(f,
+                                       force_obligation=True).num_colors(), 1)
+
+# build_nba() forwards its keyword arguments to the explorer.
+for text in ('a U b', 'G F a & G F b', 'F(a & X(!a & F b))'):
+    f = spot.parse_formula(text)
+    tc.assertTrue(spot.are_equivalent(
+        f, build_nba(f, exprop=True, branching_postponement=True)), text)
+
+# Unknown options, and mixing a positional options object with option
+# keywords, are reported as errors.
+tc.assertRaises(TypeError, spot.ltl_to_tgba_fm_otf_options,
+                no_such_option=True)
+tc.assertRaises(TypeError, spot.ltl_to_tgba_fm_otf, f, no_such_option=True)
+tc.assertRaises(TypeError, spot.ltl_to_ba_otf, f, kwd, exprop=True)
+
+# --- Owner identity. --------------------------------------------------
+# The owner argument is an opaque identity under which the explorer
+# registers its BDD variables.  It must be the address of the C++
+# owner object (typically the automaton being built), so that this
+# object's destructor can release the variables.  It used to be the
+# address of the SWIG shared_ptr wrapper instead, so the variables
+# leaked and the bdd_dict destructor aborted with "some maps are not
+# empty".
+def all_vars_free(d):
+    ostr = spot.ostringstream()
+    d.dump(ostr)
+    # A variable with at least one owner is printed as " xN { ... }",
+    # while a free variable is printed as " Free".
+    return '{' not in ostr.str()
+
+
+f = spot.parse_formula('G F a & G F b')
+
+d = spot.make_bdd_dict()
+aut = spot.make_twa_graph(d)
+ba = spot.ltl_to_ba_otf(f, owner=aut, dict=d)
+ba.succ_as_ba_edges(ba.init_state())
+del ba
+del aut
+gcollect()
+tc.assertTrue(all_vars_free(d))
+
+d = spot.make_bdd_dict()
+aut = spot.make_twa_graph(d)
+ex = spot.ltl_to_tgba_fm_otf(f, owner=aut, dict=d)
+ex.succ_as_edges(ex.init_state())
+del ex
+del aut
+gcollect()
+tc.assertTrue(all_vars_free(d))
 
 # The TGBA explorer's edge vectors are usable from Python too.
 ex = spot.ltl_to_tgba_fm_otf(spot.parse_formula('a U b & X c'), opts)
