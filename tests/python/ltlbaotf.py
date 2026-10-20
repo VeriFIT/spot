@@ -316,12 +316,21 @@ dot = print_ltlbaotf('Xf')
 tc.assertIn('B0 [shape=square', dot)
 
 
-def print_ltl_to_tgba(formula_text):
+def print_ltl_to_tgba(formula_text, alternating=False):
     """Return print_dot() output for an explored ltl_to_tgba_fm_otf."""
     ex = spot.ltl_to_tgba_fm_otf(spot.parse_formula(formula_text))
     ostr = spot.ostringstream()
-    ex.print_dot(ostr)
+    ex.print_dot(ostr, alternating)
     return ostr.str()
+
+
+def state_labels(dot):
+    """Return the set of labels of the state boxes of a dot output."""
+    res = set()
+    for line in dot.splitlines():
+        if 'e9f4fb' in line:         # the fill color of state boxes
+            res.add(line.split('label="', 1)[1].split('"', 1)[0])
+    return res
 
 
 # AP, promise, and Next nodes in the same graph.
@@ -345,3 +354,37 @@ tc.assertIn('label="P(b)"', dot)
 # An unsatisfiable formula has no successor: its BDD is bddfalse.
 dot = print_ltl_to_tgba('Xf')
 tc.assertIn('B0 [shape=square', dot)
+
+# A conjunction of Next variables along an edge denotes a single
+# state in the default mode, but a conjunction of distinct states in
+# alternating mode: the states displayed are then simply the
+# reachable Next variables, with no conjunction performed.  (Here the
+# translation uses two Next variables, since r(X(a & b)) is
+# Next[a] & Next[b].)
+tc.assertEqual(state_labels(print_ltl_to_tgba('X(a & b)')),
+               {'X(a & b)', 'a & b'})
+tc.assertEqual(state_labels(print_ltl_to_tgba('X(a & b)', True)),
+               {'X(a & b)', 'a', 'b'})
+tc.assertEqual(state_labels(print_ltl_to_tgba('Xa & Xb')),
+               {'Xa & Xb', 'a & b'})
+tc.assertEqual(state_labels(print_ltl_to_tgba('Xa & Xb', True)),
+               {'Xa & Xb', 'a', 'b'})
+
+# Same, with a conjunction of Next variables that does not stem from
+# the special treatment of conjunctions by the X rule.
+tc.assertEqual(state_labels(print_ltl_to_tgba('a U b & X c')),
+               {'(a U b) & Xc', 'c', 'c & (a U b)', 'a U b'})
+tc.assertEqual(state_labels(print_ltl_to_tgba('a U b & X c', True)),
+               {'(a U b) & Xc', 'a U b', 'c'})
+
+# The alternating output remains a ltl_to_tgba_fm_otf digraph.
+tc.assertTrue(print_ltl_to_tgba('X(a & b)', True)
+              .startswith('digraph ltl_to_tgba_fm_otf'))
+
+# The true state 1 is never displayed as a state, in either mode.
+# (State boxes are told apart from the B0/B1 terminals of the MTBDD,
+# whose label is followed by tooltip="bdd(...)".)
+for formula_text in ('a U b & X c', 'X(a & b)'):
+    for alternating in (False, True):
+        tc.assertNotIn('label="1", tooltip="[',
+                       print_ltl_to_tgba(formula_text, alternating))

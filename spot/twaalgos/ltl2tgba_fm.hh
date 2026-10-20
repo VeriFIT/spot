@@ -363,10 +363,22 @@ namespace spot
     /// destination formula.  Note that this ignores the \c exprop and
     /// \c branching_postponement options, like succ_as_bdd().
     ///
-    /// Calling this explores the automaton, using the destinations
-    /// returned by succ_as_raw_edges() to decide which Next variables
-    /// to register.
-    std::ostream& print_dot(std::ostream& os);
+    /// When \a alternating is set, a conjunction of Next variables
+    /// along an edge denotes a conjunction of several successor
+    /// states, not a single state labeled by that conjunction: the
+    /// states displayed are then simply the initial state and every
+    /// Next-variable formula reachable from it, without any
+    /// conjunction being formed.
+    ///
+    /// The true state \c 1 is never displayed as a state, in either
+    /// mode.
+    ///
+    /// Calling this explores the automaton, registering the Next
+    /// variables needed by the states it displays: the destinations
+    /// returned by succ_as_raw_edges() in the default mode, or the
+    /// individual Next variables of succ_as_bdd() when \a alternating
+    /// is set.
+    std::ostream& print_dot(std::ostream& os, bool alternating = false);
 
     /// The BDD dictionary.
     const bdd_dict_ptr& get_dict() const;

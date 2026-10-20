@@ -2530,19 +2530,53 @@ namespace spot
   }
 
   std::ostream&
-  ltl_to_tgba_fm_otf::print_dot(std::ostream& os)
+  ltl_to_tgba_fm_otf::print_dot(std::ostream& os, bool alternating)
   {
     // Explore all reachable formulas, decomposing the successor BDD
-    // of each one as in ltl_to_tgba_fm().
+    // of each one as in ltl_to_tgba_fm().  When alternating is set,
+    // each Next variable of a successor BDD denotes an individual
+    // state: a conjunction of Next variables reads as a conjunction
+    // of states, not as a single state labeled by that conjunction,
+    // so the reachable Next variables are collected one by one,
+    // without any conjunction.  The true state 1 is never displayed.
     std::vector<formula> states;
     {
       std::set<formula> seen;
       states.push_back(init_state());
       seen.insert(states[0]);
-      for (size_t i = 0; i < states.size(); ++i)
-        for (auto& e: succ_as_raw_edges(states[i]))
-          if (seen.insert(e.dst).second)
-            states.push_back(e.dst);
+      if (alternating)
+        {
+          for (size_t i = 0; i < states.size(); ++i)
+            {
+              bdd succ = succ_as_bdd(states[i]);
+              if (succ == bddfalse)
+                continue;
+              // The support is a cube listing every variable used by
+              // the successors.  Walk it with bdd_high(), as
+              // boolean_to_bdd() does, and keep only the Next
+              // variables: atomic propositions and acceptance
+              // promises do not denote states.
+              for (bdd sup = bdd_support(succ); sup != bddtrue;
+                   sup = bdd_high(sup))
+                {
+                  int v = bdd_var(sup);
+                  if (v >= static_cast<int>
+                      (impl_->d->next_formula_map.size())
+                      || !impl_->d->next_formula_map[v])
+                    continue;
+                  formula f = impl_->d->next_formula_map[v];
+                  if (f.is_tt())
+                    continue;
+                  if (seen.insert(f).second)
+                    states.push_back(f);
+                }
+            }
+        }
+      else
+        for (size_t i = 0; i < states.size(); ++i)
+          for (auto& e: succ_as_raw_edges(states[i]))
+            if (!e.dst.is_tt() && seen.insert(e.dst).second)
+              states.push_back(e.dst);
     }
 
     std::ostringstream edges;

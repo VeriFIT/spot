@@ -498,23 +498,23 @@ class ltl_to_tgba_fm_otf:
     __init__.__doc__ = _doc_with_otf_options(
         _ltl_to_tgba_fm_otf_init.__doc__)
 
-    def _repr_svg_(self):
+    def _repr_svg_(self, alternating=False):
         """Output the explored automaton as SVG"""
         ostr = ostringstream()
-        self.print_dot(ostr)
+        self.print_dot(ostr, alternating)
         return _ostream_to_svg(ostr)
 
     # see spot.jupyter.SVG for why we need _repr_html_ instead of _repr_svg_
-    def _repr_html_(self):
-        return self._repr_svg_()
+    def _repr_html_(self, **kwargs):
+        return self._repr_svg_(**kwargs)
 
-    def show(self):
+    def show(self, **kwargs):
         """Display the explored automaton as SVG, in the IPython/Jupyter notebook"""
         # Load the SVG function only if we need it. This way the
         # bindings can still be used outside of IPython if IPython is
         # not installed.
         from spot.jupyter import SVG
-        return SVG(self._repr_svg_())
+        return SVG(self._repr_svg_(**kwargs))
 
 @_extend(ltl_to_ba_otf)
 class ltl_to_ba_otf:
