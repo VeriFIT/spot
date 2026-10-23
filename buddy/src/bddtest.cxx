@@ -399,6 +399,51 @@ void testRestrict()
       }
 }
 
+
+
+void testQuant()
+{
+  cout << "Testing quantification with uniform suffix optimization\n";
+
+
+  bdd vars[4];
+  for (int v = 0; v < 4; ++v) vars[v] = bdd_ithvar(v);
+
+  // Test exist quantification: x over {x} should be true
+  int varset1[] = {0};
+  bdd f1 = bdd_exist(vars[0], bdd_makeset(varset1, 1));
+  if (f1 != bddtrue) ERROR("bdd_exist over {x} failed");
+
+  // Test forall quantification: x over {x} should be false
+  bdd f2 = bdd_forall(vars[0], bdd_makeset(varset1, 1));
+  if (f2 != bddfalse) ERROR("bdd_forall over {x} failed");
+
+  // Test unique quantification: x over {x} should be true (1 path)
+  bdd f3 = bdd_unique(vars[0], bdd_makeset(varset1, 1));
+  if (f3 != bddtrue) ERROR("bdd_unique over {x} failed");
+
+  // Test with 2 variables: exist over {x,y} should be true
+  int varset2[] = {0, 1};
+  bdd f4 = bdd_exist(vars[0] | vars[1], bdd_makeset(varset2, 2));
+  if (f4 != bddtrue) ERROR("bdd_exist over {x,y} failed");
+
+  // Test forall over {x,y} should be false
+  bdd f5 = bdd_forall(vars[0] | vars[1], bdd_makeset(varset2, 2));
+  if (f5 != bddfalse) ERROR("bdd_forall over {x,y} failed");
+
+  // Test unique over {x,y} with x|y should be false (2 paths)
+  bdd f6 = bdd_unique(vars[0] | vars[1], bdd_makeset(varset2, 2));
+  if (f6 != bddfalse) ERROR("bdd_unique over {x|y}, {x,y} failed");
+
+  // Test with 3 variables: majority (x&y)|(x&z)|(y&z) over {x,y,z}
+  int varset3[] = {0, 1, 2};
+  bdd z = bdd_ithvar(2);
+  bdd maj = (vars[0] & vars[1]) | (vars[0] & z) | (vars[1] & z);
+  bdd f7 = bdd_unique(maj, bdd_makeset(varset3, 3));
+  // majority has 3 paths (odd), so unique should be true
+  if (f7 != bddtrue) ERROR("bdd_unique over majority, {x,y,z} failed");
+}
+
 int main(int ac, char** av)
 {
   bdd_init(1000,1000);
@@ -412,6 +457,7 @@ int main(int ac, char** av)
   testHaveCommon();
   testMtSccs();
   testRestrict();
+  testQuant();
 
   bdd_done();
   return 0;

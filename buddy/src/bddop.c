@@ -89,6 +89,7 @@
 #define CACHEID_APPALC       0xA
 #define CACHEID_APPUNC       0xB
 #define CACHEID_SPLITCUBE    0xC
+#define CACHEID_PATHPARITY   0xD
 
 
    /* Number of boolean operators */
@@ -4207,6 +4208,7 @@ static int have_collision_rec(BDD left, BDD right, int zlevel)
 }
 
 
+int pathparity_rec(BDD r);
 static int quant_rec(BDD r)
 {
    LOCAL_REC_STACKS;
@@ -4222,11 +4224,35 @@ static int quant_rec(BDD r)
          work:;
            /* I: -1 r ---   */
            /* R:      --- r */
-           if (ISCONST(r) || LEVEL(r) > quantlast)
-             {
-               PUSHREF_(r);
-             }
-           else
+          if (ISCONST(r))
+            {
+              PUSHREF_(r);
+            }
+          else if (LEVEL(r) >= quantlast)
+            {
+              if (!INVARSET(LEVEL(r)))
+                {
+                  /* none quantified: return subtree unchanged */
+                  PUSHREF_(r);
+                }
+              else if (applyop == bddop_or)
+                {
+                  /* all quantified + exist: result is true */
+                  PUSHREF_(1);
+                }
+              else if (applyop == bddop_and)
+                {
+                  /* all quantified + forall: result is false */
+                  PUSHREF_(0);
+                }
+              else
+                {
+                  assert(applyop == bddop_xor);
+                  /* all quantified + unique: path parity */
+                  PUSHREF_(pathparity_rec(r));
+                }
+            }
+          else
              {
                BddCacheData *entry2 =
                  BddCache_index(&quantcache, QUANTHASH(r), index);
@@ -4497,16 +4523,34 @@ static BDD appquant_rec(BDD l, BDD r)
            if (ISCONST(l) && ISCONST(r))
              RETURN(oprres[appexop][l<<1 | r]);
 
-           if (LEVEL(l) > quantlast && LEVEL(r) > quantlast)
-             {
-               int oldop = applyop;
-               applyop = appexop;
-               SYNC_REC_STACKS;
-               int res = apply_rec(l,r);
-               PUSHREF_(res);
-               applyop = oldop;
-               continue;
-             }
+           if (LEVEL(l) >= quantlast && LEVEL(r) >= quantlast)
+            {
+              int lvl = ISCONST(l) ? LEVEL(r) : LEVEL(l);
+
+              if (!INVARSET(lvl))
+                {
+                  /* none quantified: apply and return */
+                  int oldop = applyop;
+                  applyop = appexop;
+                  SYNC_REC_STACKS;
+                  int res = apply_rec(l,r);
+                  applyop = oldop;
+                  PUSHREF_(res);
+                  continue;
+                }
+              else if (appexop != bddop_xor)
+                {
+                  /* all quantified but not unique: apply then collapse */
+                  int oldop = applyop;
+                  applyop = appexop;
+                  SYNC_REC_STACKS;
+                  int res = apply_rec(l,r);
+                  applyop = oldop;
+                  PUSHREF_(appexop == bddop_or ? (res != 0) : (res == 1));
+                  continue;
+                }
+                /* unique + all quantified: fall through to normal recursion */
+            }
 
            /* empty macro arguments are undefined in ISO C90 and
               ISO C++98, so use + when we do not want to call any
@@ -4610,12 +4654,20 @@ static void splitcube_rec(BDD r, BDD* res_in_ptr, BDD* res_out_ptr)
                PUSHREF_(r);     /* out */
                PUSHREF_(r);     /* in */
              }
-           else if (LEVEL(r) > quantlast)
+           else if (LEVEL(r) >= quantlast)
              {
-               /* I: -1 r ---            */
-               /* R:      --- in=1 out=r */
-               PUSHREF_(r);     /* out */
-               PUSHREF_(1);     /* in */
+               /* I: -1 r ---                       */
+               /* R:      --- in=1 out=r (or in=r out=1) */
+               if (INVARSET(LEVEL(r)))
+                 {
+                   PUSHREF_(1);     /* out */
+                   PUSHREF_(r);     /* in */
+                 }
+               else
+                 {
+                   PUSHREF_(r);     /* out */
+                   PUSHREF_(1);     /* in */
+                 }
              }
            else
              {
@@ -5936,16 +5988,26 @@ static int varset2vartable(BDD r, int comp)
        quantvarsetID++;
      }
 
-   for (n=r ; n > 1 ; n=HIGH(n))
+   /* Compute the first level of the maximal uniform suffix:
+      all levels >= quantlast are handled uniformly (all quantified
+      or all kept). */
    {
-      quantvarset[LEVEL(n)] = quantvarsetID;
-      quantlast = LEVEL(n);
+      int top = -1;
+      for (n=r ; n > 1 ; n=HIGH(n))
+        {
+          top = LEVEL(n);
+          quantvarset[top] = quantvarsetID;
+        }
+      /* If the highest level is quantified, walk down the topmost run
+         of levels that are quantified too. */
+      if (top >= 0 && top == bddvarnum - 1)
+        {
+          int q = INVARSET(top);
+          while (top >= 0 && INVARSET(top) == q)
+            --top;
+        }
+      quantlast = top + 1;
    }
-
-   /* When the varset is complemented, make sure all variables will
-      be tested.  */
-   if (comp)
-      quantlast = bddvarnum;
 
    return 0;
 }
@@ -5990,6 +6052,39 @@ static int varset2svartable(BDD r)
    }
 
    return 0;
+}
+
+
+/*
+ NAME    {* pathparity_rec *}
+ SECTION {* internal *}
+ SHORT   {* compute parity of paths to bddtrue *}
+ PROTO   {* int pathparity_rec(BDD r) *}
+ DESCRIPTION {* Returns the parity (0/1) of the number of paths from the root
+   of the BDD {	t r} to the {	t bddtrue} terminal, using XOR
+   over the two children at each node. This is the semantics
+   used by {	t bdd\_unique} when all remaining variables are
+   quantified. *}
+ RETURN  {* 0 or 1, the parity *}
+ */
+int pathparity_rec(BDD r)
+{
+   BddCacheData *entry;
+
+   if (ISZERO(r))
+      return 0;
+   if (ISONE(r))
+      return 1;
+
+   entry = BddCache_lookup(&misccache, PATHCOUHASH(r));
+   if (entry->i.a == r && entry->i.c == CACHEID_PATHPARITY)
+      return entry->i.res;
+
+   int p = pathparity_rec(LOW(r)) ^ pathparity_rec(HIGH(r));
+   entry->i.a = r;
+   entry->i.c = CACHEID_PATHPARITY;
+   entry->i.res = p;
+   return p;
 }
 
 
