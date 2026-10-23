@@ -340,6 +340,65 @@ void testHaveCommon()
     }
 }
 
+void testRestrict()
+{
+  cout << "Testing bdd_restrict()\n";
+
+  bdd vars[6];
+  for (int v = 0; v < 6; ++v)
+    vars[v] = bdd_ithvar(v);
+
+  const bdd fs[] = {
+    bddtrue,
+    bddfalse,
+    vars[0],
+    vars[5],
+    (vars[0] & vars[1]) | (vars[2] & !vars[3]) | vars[4],
+    bdd_ite(vars[0], vars[4] & vars[5], !vars[1] & vars[2])
+  };
+
+  // Cubes over variables 0..3, represented by positive and negative
+  // masks.
+  struct cube_t
+  {
+    unsigned pos;
+    unsigned neg;
+  };
+
+  const cube_t cubes[] = {
+    {0, 0},               // empty cube
+    {1, 0},               // v0
+    {0, 1},               // !v0
+    {1 | 4, 0},           // v0 & v2
+    {0, 2 | 4},           // !v1 & !v2
+    {8, 0},               // v3
+    {1 | 2 | 4 | 8, 0},   // v0 & v1 & v2 & v3
+    {0, 1 | 2 | 4 | 8}    // !v0 & !v1 & !v2 & !v3
+  };
+
+  for (const bdd& f : fs)
+    for (const cube_t& c : cubes)
+      {
+        bdd var = bddtrue;
+        bdd expected = f;
+        for (int v = 0; v < 4; ++v)
+          {
+            if (c.pos & (1U << v))
+              {
+                var &= vars[v];
+                expected = bdd_compose(expected, bddtrue, v);
+              }
+            else if (c.neg & (1U << v))
+              {
+                var &= !vars[v];
+                expected = bdd_compose(expected, bddfalse, v);
+              }
+          }
+        if (bdd_restrict(f, var) != expected)
+          ERROR("bdd_restrict() failed on a cube");
+      }
+}
+
 int main(int ac, char** av)
 {
   bdd_init(1000,1000);
@@ -352,6 +411,7 @@ int main(int ac, char** av)
   testIsCube();
   testHaveCommon();
   testMtSccs();
+  testRestrict();
 
   bdd_done();
   return 0;

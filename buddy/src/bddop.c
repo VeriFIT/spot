@@ -5972,19 +5972,21 @@ static int varset2svartable(BDD r)
        quantvarsetID++;
      }
 
+   quantlast = -1;
    for (n=r ; !ISCONST(n) ; )
    {
+      int lvl = LEVEL(n);
       if (ISZERO(LOW(n)))
       {
-	 quantvarset[LEVEL(n)] = quantvarsetID;
+	 quantvarset[lvl] = quantvarsetID;
 	 n = HIGH(n);
       }
       else
       {
-	 quantvarset[LEVEL(n)] = -quantvarsetID;
+	 quantvarset[lvl] = -quantvarsetID;
 	 n = LOW(n);
       }
-      quantlast = LEVEL(n);
+      quantlast = lvl;
    }
 
    return 0;
