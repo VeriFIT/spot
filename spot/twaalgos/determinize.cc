@@ -16,6 +16,105 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// ----------------------------------------------------------------------
+// Determinization of a TGBA into a deterministic parity automaton.
+//
+// This implements the construction described by Redziejowski ("An improved
+// construction of deterministic omega-automaton using derivatives", Fund.
+// Inform. 119, 2012), adapted to transition-based acceptance.  The A1--A5
+// steps in the code are the steps of that paper.  The structure is the
+// usual Safra/Piterman tree, but the paper does not use that terminology:
+// it presents the tree using the brace notation shown by pretty_print below.
+//
+// Input/output: Unlike what the name `tgba_determinize()` implies,
+// generalized Büchi acceptance is not really handled.  The input is
+// degeneralized into a transition-based Buchi automaton (TBA), so the
+// construction only deals with a single acceptance set on
+// transitions.  The deterministic result has "parity min odd"
+// acceptance; cleanup_parity_here() may merge unused sets and reduce
+// it to a simpler acceptance (e.g. Buchi or co-Buchi).  The output is
+// complete only if the input was complete.
+//
+// The Safra/Piterman tree
+// -----------------------
+// An output state is a Safra/Piterman tree whose nodes are called *braces*.
+// A brace carries a set of input states; a state in a brace also belongs to
+// all its ancestors.  safra_state stores the forest as two vectors:
+//   - braces_[i]: parent of brace i (-1 for a root).  Since parents always
+//     have a smaller index, indices also encode nesting and creation order.
+//   - nodes_: for each tracked input state, the index of its innermost
+//     brace.  Following braces_ from there enumerates its ancestors.
+// A brace with no state of its own but with descendants is *green*: it has
+// just been emptied, which is the accepting event.  A brace whose whole
+// subtree is empty is removed; this is a *red* event.
+//
+// A transition
+// ------------
+// Labels are BDDs over the atomic propositions.  For one Safra state,
+// safra_support computes the letters that can enable distinct transitions:
+// either the minterms of the joint support of the tracked states, or, when
+// there are many APs, a small basis of representative labels computed by
+// edge_separator.  For each letter, compute_succ builds the successor:
+//   A1  outside the SCC optimization, transitions of tracked states keep
+//       their destination in the same brace, except that an accepting
+//       transition opens a fresh child brace around its destination;
+//   A2  if the same destination is reached several times, keep only the
+//       occurrence with the smallest nesting pattern.
+// finalize_construction() then performs the remaining steps:
+//   A3  empty braces are removed and emit red;
+//   A4  green braces (emptied but still surrounding other braces) emit
+//       green, and braces nested inside a green pair are removed;
+//   A5  surviving braces are renumbered to keep indices contiguous.
+// Only braces that existed before the transition may emit a color: braces
+// created by A1 are temporary.  The emitted color is min(red, green), or
+// none if neither is set, with red = 2*i and green = 2*i+1 for brace i.
+// "Parity min odd" then means that a run is accepting iff the smallest color
+// seen infinitely often is odd: the oldest (smallest-indexed) brace with
+// infinitely many events must be emptied (green), not removed (red).
+//
+// Main loop
+// ---------
+// tgba_determinize() explores Safra trees with a worklist.  The
+// power_set "seen" maps each tree to its output state number and is
+// used for deduplication; "todo" stores references to its elements.
+// For each queued tree and relevant letter, one edge is added,
+// labeled by the letter and carrying the emitted color; empty
+// successors are skipped (a sink can be added later by completion).
+// An output_aborter, if any, is polled before each queued tree.
+//
+// Optional optimizations (on by default, individually disableable)
+// ----------------------------------------------------------------
+// use_scc: braces are only needed to detect accepting cycles.  Leaving an
+//   SCC drops all braces; entering an accepting SCC opens a fresh top-level
+//   brace, entering a non-accepting one opens none.  The initial state gets
+//   a brace only when its SCC is accepting.
+// use_simulation: a simulation relation tells when the language of one
+//   state is included in another; when both occur in a tree, the subsumed
+//   one can be dropped.  This is combined with SCC reachability so that a
+//   state is dropped only if it cannot be reached back from the state that
+//   subsumes it.  The TBA is first cleaned by scc_filter() and reduced by
+//   simulation(); the optimization is disabled with 2^16 SCCs or more.
+// use_stutter: if the input is stutter-invariant, reading L may be followed
+//   by any number of L's.  Instead of exploring all of them, the successor
+//   computation loops on L until a Safra tree repeats, selects a canonical
+//   tree of the cycle (preferably one already seen, else the smallest), and
+//   emits the minimum color seen.  This is an idea from ltl2dstar.
+//
+// Debugging aids
+// --------------
+// With pretty_print, states are named after their Safra tree, with braces
+// printed using subscript indices.  This is exactly the notation used in
+// Redziejowski's paper (which does not talk about Safra trees).  For example
+// "{₀0{₁1₁}₀}" means state 0 in brace 0, with state 1 in a brace 1 nested
+// in brace 0.  With want_classes, the "original-classes" property groups
+// output states tracking the same set of original input states/classes.
+//
+// Reading guide: safra_state holds the tree, hashing/equality, and A3--A5;
+// safra_build is the temporary structure used to build a successor (A1--A2);
+// compute_succs iterates over (letter, successor, color); safra_support
+// chooses representative letters; tgba_determinize does preprocessing, the
+// worklist loop, and the output.
+
 #include "config.h"
 #include <algorithm>
 #include <deque>
@@ -39,77 +138,42 @@ namespace spot
 {
   namespace
   {
-    // forward declaration
+    // forward declarations
     struct safra_build;
     class compute_succs;
-  }
 
-  class safra_state final
-  {
-  public:
-    // a helper method to check invariants
-    void
-    check() const
+    class safra_state final
     {
-      // do not refer to braces that do not exist
-      for (const auto& p : nodes_)
-        if (p.second >= 0)
-          if (((unsigned)p.second) >= braces_.size())
-            assert(false);
+    public:
+      using state_t = unsigned;
+      using safra_node_t = std::pair<state_t, std::vector<int>>;
 
-      // braces_ describes the parenthood relation, -1 meaning toplevel
-      // so braces_[b] < b always, and -1 is the only negative number allowed
-      for (int b : braces_)
-        {
-          if (b < 0 && b != -1)
-            assert(false);
-          if (b >= 0 && braces_[b] > b)
-            assert(false);
-        }
+      bool operator<(const safra_state&) const;
+      bool operator==(const safra_state&) const;
+      size_t hash() const;
 
-      // no unused braces
-      std::set<int> used_braces;
-      for (const auto& n : nodes_)
-        {
-          int b = n.second;
-          while (b >= 0)
-            {
-              used_braces.insert(b);
-              b = braces_[b];
-            }
-        }
-      assert(used_braces.size() == braces_.size());
-    }
+      // default constructor
+      safra_state();
+      safra_state(state_t state_number, bool acceptance_scc = false);
+      safra_state(const safra_build& s, const compute_succs& cs,
+                  unsigned& color, unsigned topbrace);
+      // Compute successor for transition ap
+      safra_state
+      compute_succ(const compute_succs& cs, const bdd& ap,
+                   unsigned& color) const;
+      void
+      merge_redundant_states(const std::vector<std::vector<char>>& implies);
+      unsigned
+      finalize_construction(const std::vector<int>& buildbraces,
+                            const compute_succs& cs, unsigned topbrace);
 
-  public:
-    using state_t = unsigned;
-    using safra_node_t = std::pair<state_t, std::vector<int>>;
-
-    bool operator<(const safra_state&) const;
-    bool operator==(const safra_state&) const;
-    size_t hash() const;
-
-    // Print the number of states in each brace
-    // default constructor
-    safra_state();
-    safra_state(state_t state_number, bool acceptance_scc = false);
-    safra_state(const safra_build& s, const compute_succs& cs, unsigned& color,
-                unsigned topbrace);
-    // Compute successor for transition ap
-    safra_state
-    compute_succ(const compute_succs& cs, const bdd& ap, unsigned& color) const;
-    void
-    merge_redundant_states(const std::vector<std::vector<char>>& implies);
-    unsigned
-    finalize_construction(const std::vector<int>& buildbraces,
-                          const compute_succs& cs, unsigned topbrace);
-
-    // each brace points to its parent.
-    // braces_[i] is the parent of i
-    // Note that braces_[i] < i, -1 stands for "no parent" (top-level)
-    std::vector<int> braces_;
-    std::vector<std::pair<state_t, int>> nodes_;
-  };
+      // each brace points to its parent.
+      // braces_[i] is the parent of i
+      // Note that braces_[i] < i, -1 stands for "no parent" (top-level)
+      std::vector<int> braces_;
+      std::vector<std::pair<state_t, int>> nodes_;
+    };
+  }
 
   namespace
   {
@@ -119,17 +183,6 @@ namespace spot
       operator()(const safra_state& s) const noexcept
       {
         return s.hash();
-      }
-    };
-
-    template<class T>
-    struct ref_wrap_equal
-    {
-      bool
-      operator()(const std::reference_wrapper<T>& x,
-                 const std::reference_wrapper<T>& y) const
-      {
-        return std::equal_to<T>()(x.get(), y.get());
       }
     };
 
@@ -249,7 +302,7 @@ namespace spot
     // safra_state under that label, and return the new nodes in res.
     class compute_succs final
     {
-      friend class spot::safra_state;
+      friend class safra_state;
 
       const safra_state* src;
       const std::vector<bdd>* all_bdds;
@@ -563,7 +616,7 @@ namespace spot
       std::vector<std::set<unsigned>> state_sets(sz);
       for (const auto& p: states)
         {
-          // Get the set of original stats of this
+          // Get the set of original states of this
           std::set<unsigned> s;
           for (auto& n: p.first.nodes_)
             {
