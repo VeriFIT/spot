@@ -173,6 +173,11 @@ namespace spot
       bdd var_set;
       bdd next_set;
 
+      /// Cache for positive_vars().
+      bdd positive_vars_ = bddtrue;
+      bdd positive_a_set_ = bddtrue;
+      bdd positive_next_set_ = bddtrue;
+
       ratexp_to_dfa transdfa;
       bool exprop;
       bool single_acc;
@@ -574,6 +579,37 @@ namespace spot
         return conj_bdd_to_formula(b, op::AndRat);
       }
 
+      /// \brief Cube of variables that are positive-unate in every
+      /// successor BDD.
+      ///
+      /// Next variables and promise variables are only ever conjoined
+      /// positively by the translation, so a_set & next_set is a cube
+      /// of variables in which every successor BDD is positive-unate.
+      /// The cube is cached because a_set and next_set only change
+      /// when a new variable is registered.
+      const bdd&
+      positive_vars()
+      {
+        if (positive_a_set_ != a_set || positive_next_set_ != next_set)
+          {
+            positive_vars_ = a_set & next_set;
+            positive_a_set_ = a_set;
+            positive_next_set_ = next_set;
+          }
+        return positive_vars_;
+      }
+
+      /// \brief Prepare an ISOP decomposer for the successor BDD \a f.
+      ///
+      /// The caller promises that every successor BDD is
+      /// positive-unate in the variables returned by positive_vars().
+      /// Violating this would silently drop cubes in release builds.
+      minato_isop
+      isop_of(bdd f)
+      {
+        return minato_isop(f, bdd_support(f), positive_vars());
+      }
+
       formula
       bdd_to_formula(bdd f)
       {
@@ -581,7 +617,7 @@ namespace spot
           return formula::ff();
 
         vec v;
-        minato_isop isop(f);
+        minato_isop isop = isop_of(f);
         bdd cube;
         while ((cube = isop.next()) != bddfalse)
           v.emplace_back(conj_bdd_to_formula(cube));
@@ -595,7 +631,7 @@ namespace spot
           return formula::ff();
 
         vec v;
-        minato_isop isop(f);
+        minato_isop isop = isop_of(f);
         bdd cube;
         while ((cube = isop.next()) != bddfalse)
           v.emplace_back(conj_bdd_to_sere(cube));
@@ -674,7 +710,7 @@ namespace spot
       {
         if (!to_concat_)
           return in;
-        minato_isop isop(in);
+        minato_isop isop = dict_.isop_of(in);
         bdd cube;
         bdd out = bddfalse;
         while ((cube = isop.next()) != bddfalse)
@@ -780,7 +816,7 @@ namespace spot
                       //  3. add |g
                       bdd res = recurse(bo[0]);
                       //   f*;g  ->  f;f*;g
-                      minato_isop isop(res);
+                      minato_isop isop = dict_.isop_of(res);
                       bdd cube;
                       res = bddfalse;
                       while ((cube = isop.next()) != bddfalse)
@@ -809,7 +845,7 @@ namespace spot
                   bdd tail_bdd;
                   bool tail_computed = false;
 
-                  minato_isop isop(recurse(bo[0]));
+                  minato_isop isop = dict_.isop_of(recurse(bo[0]));
                   bdd cube;
                   bdd res = bddfalse;
                   if (min == 0)
@@ -961,7 +997,7 @@ namespace spot
 
               //trace_ltl_bdd(dict_, res);
 
-              minato_isop isop(res);
+              minato_isop isop = dict_.isop_of(res);
               bdd cube;
               res = bddfalse;
               while ((cube = isop.next()) != bddfalse)
@@ -1573,7 +1609,7 @@ namespace spot
                 }
               else
                 {
-                  minato_isop isop(f1);
+                  minato_isop isop = dict_.isop_of(f1);
                   bdd cube;
                   while ((cube = isop.next()) != bddfalse)
                     {
@@ -1640,7 +1676,7 @@ namespace spot
               else
                 {
                   bdd res = bddtrue;
-                  minato_isop isop(f1);
+                  minato_isop isop = dict_.isop_of(f1);
                   bdd cube;
                   while ((cube = isop.next()) != bddfalse)
                     {
@@ -1870,7 +1906,7 @@ namespace spot
               }
             for (bdd label: minterms_of(all_props, var_set))
               {
-                minato_isop isop(t.symbolic & label);
+                minato_isop isop = d_.isop_of(t.symbolic & label);
                 bdd cube;
                 while ((cube = isop.next()) != bddfalse)
                   {
@@ -2272,7 +2308,8 @@ namespace spot
         // Of course both formulas are logically equivalent, but the
         // latter is "more deterministic" than the former, so it should
         // be preferred.
-        minato_isop isop(bdd_restrict(res, one_prop_set));
+        minato_isop isop =
+          impl_->d->isop_of(bdd_restrict(res, one_prop_set));
         bdd cube;
         while ((cube = isop.next()) != bddfalse)
           {
@@ -2387,7 +2424,7 @@ namespace spot
       return {};
 
     dest_map dests;
-    minato_isop isop(res);
+    minato_isop isop = impl_->d->isop_of(res);
     bdd cube;
     while ((cube = isop.next()) != bddfalse)
       {
@@ -2449,7 +2486,7 @@ namespace spot
 
     std::vector<fm_simple_edge> edges;
 
-    minato_isop isop(res);
+    minato_isop isop = impl_->d->isop_of(res);
     bdd cube;
     while ((cube = isop.next()) != bddfalse)
       {

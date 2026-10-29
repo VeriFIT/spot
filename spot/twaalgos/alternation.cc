@@ -71,7 +71,8 @@ namespace spot
 
   void outedge_combiner::new_dests(unsigned st, bdd out) const
   {
-    minato_isop isop(out);
+    // OUT only conjoins state variables positively.
+    minato_isop isop(out, bdd_support(out), vars_);
     bdd cube;
     std::vector<unsigned> univ_dest;
     while ((cube = isop.next()) != bddfalse)
@@ -499,7 +500,10 @@ namespace spot
             // the combination of destinations, create the edges.
             auto create_edges = [&](bdd label, bdd dest_formula)
             {
-              minato_isop isop(dest_formula);
+              // DEST_FORMULA only conjoins state and mark
+              // variables positively.
+              minato_isop isop(dest_formula, bdd_support(dest_formula),
+                               all_vars_);
               bdd dest;
               while ((dest = isop.next()) != bddfalse)
                 {
@@ -721,7 +725,10 @@ namespace spot
               cond_ = oneletter;
               all_letters_ -= oneletter;
               // Get a sum of possible transitions matching this letter.
-              isop_ = minato_isop(bdd_restrict(transitions_, oneletter));
+              // TRANSITIONS_ only conjoins state variables positively.
+              bdd restricted = bdd_restrict(transitions_, oneletter);
+              isop_ = minato_isop(restricted, bdd_support(restricted),
+                                  all_states_);
               dest_ = isop_.next();
             }
           std::set<unsigned> dest = bdd_to_state(dest_);

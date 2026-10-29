@@ -591,8 +591,10 @@ namespace spot
           // means would see C1 then (!C1)C2, instead of C1 then
           // C2.  With minatop_isop, we ensure that no negative
           // class variable will be seen (likewise for
-          // promises).
-          minato_isop isop(dest);
+          // promises).  This works because signatures only
+          // conjoin class and acceptance variables positively,
+          // so minato_isop can skip their negative pass.
+          minato_isop isop(dest, bdd_support(dest), nonapvars);
 
           ++nb_minterms;
           bdd cond_acc_dest;

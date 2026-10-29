@@ -124,6 +124,21 @@ New in spot 2.16.1.dev  (not yet released)
     on-the-fly LTL-to-TGBA explorer ltl_to_tgba_fm_otf into an
     on-the-fly LTL-to-NBA explorer with state-based Büchi acceptance.
 
+  - minato_isop has a new constructor taking an additional cube of
+    variables in which the input function is known to be
+    positive-unate.  In that case the first step of the algorithm is
+    skipped, which speeds up the decomposition.  ltl2tgba_fm() uses
+    this constructor for the variables that its translation only ever
+    conjoins positively.  The simulation/cosimulation, dualization,
+    alternation-removal, and to-weak reductions use it for the state,
+    class, and acceptance variables that they only ever conjoin
+    positively.  This makes the decomposition 20% to 30% faster when
+    the whole support of the function is positive-unate, as is the
+    case for the successor and signature BDDs built by those
+    algorithms.  On the genltl families this yields a 3% to 8%
+    speedup of ltl2tgba's translation phase, and up to 33% on the
+    simulation phase for formulas such as --sejk-k.
+
   Bug fixes:
 
   - The --ins, --outs, and --unobservable-ins options of ltlfilt,

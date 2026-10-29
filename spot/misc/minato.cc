@@ -29,8 +29,19 @@ namespace spot
   }
 
   minato_isop::minato_isop(bdd input, bdd vars)
+    : minato_isop(input, vars, bddtrue)
+  {
+  }
+
+  minato_isop::minato_isop(bdd input, bdd vars, bdd positive_vars)
     : ret_(bddfalse)
   {
+    assert(positive_vars != bddfalse);
+#ifndef NDEBUG
+    // POSITIVE_VARS must be a cube of positive literals.
+    for (bdd p = positive_vars; p != bddtrue; p = bdd_high(p))
+      assert(bdd_low(p) == bddfalse);
+#endif
     // If INPUT has the form a&b&c&(binary function) we want to
     // compute the ISOP of the only binary and prepend a&b&c later.
     //
@@ -39,7 +50,7 @@ namespace spot
     // original algorithm, because in many cases we are trying to
     // build ISOPs out of formulas that are already cubes.
     cube_.push(bdd_satprefix(input));
-    todo_.emplace(input, input, vars);
+    todo_.emplace(input, input, vars, positive_vars);
   }
 
   minato_isop::minato_isop(bdd input_min, bdd input_max, bool)
@@ -55,7 +66,7 @@ namespace spot
         cube_.push(bddtrue);
       }
     bdd common = input_min & input_max;
-    todo_.emplace(input_min, input_max, bdd_support(common));
+    todo_.emplace(input_min, input_max, bdd_support(common), bddtrue);
   }
 
   bdd
@@ -90,14 +101,15 @@ namespace spot
               // bdd_var().
               int v = bdd_var(l.vars);
               l.vars = bdd_high(l.vars);
+              // Drop positive variables that are below V.
+              while (l.pos != bddtrue && bdd_var(l.pos) < v)
+                l.pos = bdd_high(l.pos);
               int v_min = bdd_var(l.f_min);
               int v_max = bdd_var(l.f_max);
               if (v < v_min && v < v_max)
                 // Do not use a while() for this goto, because we want
                 // `continue' to be relative to the outermost while().
                 goto next_var;
-
-              l.step = local_vars::SecondStep;
 
               bdd v0 = bdd_nithvar(v);
               l.v1 = bdd_ithvar(v);
@@ -137,8 +149,25 @@ namespace spot
                   l.f1_max = l.f0_max = l.f_max;
                 }
 
-              cube_.push(cube_.top() & v0);
-              todo_.emplace(l.f0_min - l.f1_max, l.f0_max, l.vars);
+              // When V is positive-unate, f0_max <= f1_max, so the
+              // first step of the algorithm (which looks for cubes
+              // containing !v) is empty and can be skipped entirely.
+              l.positive = (l.pos != bddtrue && bdd_var(l.pos) == v);
+              assert(!l.positive || bdd_implies(l.f0_max, l.f1_max));
+              if (l.positive)
+                {
+                  l.step = local_vars::ThirdStep;
+                  cube_.push(cube_.top() & l.v1);
+                  todo_.emplace(l.f1_min - l.f0_max, l.f1_max,
+                                l.vars, l.pos);
+                }
+              else
+                {
+                  l.step = local_vars::SecondStep;
+                  cube_.push(cube_.top() & v0);
+                  todo_.emplace(l.f0_min - l.f1_max, l.f0_max,
+                                l.vars, l.pos);
+                }
             }
             continue;
 
@@ -147,22 +176,37 @@ namespace spot
             l.g0 = ret_;
             cube_.pop();
             cube_.push(cube_.top() & l.v1);
-            todo_.emplace(l.f1_min - l.f0_max, l.f1_max, l.vars);
+            todo_.emplace(l.f1_min - l.f0_max, l.f1_max,
+                          l.vars, l.pos);
             continue;
 
           case local_vars::ThirdStep:
             l.step = local_vars::FourthStep;
             l.g1 = ret_;
             cube_.pop();
-            {
-              bdd fs_max = l.f0_max & l.f1_max;
-              bdd fs_min = fs_max & ((l.f0_min - l.g0) | (l.f1_min - l.g1));
-              todo_.emplace(fs_min, fs_max, l.vars);
-            }
+            if (l.positive)
+              {
+                // f0_max & f1_max == f0_max, and f1_min - g1 is
+                // included in f0_max, so the general formula
+                //   fs_max & ((f0_min - g0) | (f1_min - g1))
+                // simplifies to the following.
+                todo_.emplace(l.f0_min | (l.f1_min - l.g1),
+                              l.f0_max, l.vars, l.pos);
+              }
+            else
+              {
+                bdd fs_max = l.f0_max & l.f1_max;
+                bdd fs_min =
+                  fs_max & ((l.f0_min - l.g0) | (l.f1_min - l.g1));
+                todo_.emplace(fs_min, fs_max, l.vars, l.pos);
+              }
             continue;
 
           case local_vars::FourthStep:
-            ret_ |= bdd_ite(l.v1, l.g1, l.g0);
+            if (l.positive)
+              ret_ |= l.v1 & l.g1;
+            else
+              ret_ |= bdd_ite(l.v1, l.g1, l.g0);
             todo_.pop();
             continue;
           }

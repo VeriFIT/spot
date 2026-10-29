@@ -161,7 +161,10 @@ namespace spot
             // Create edges with label LABEL, and destinations states
             // encoded in the Boolean function RESTRICTED_DELTA.
             auto create_edges = [&](bdd label, bdd restricted_delta) {
-              minato_isop isop(restricted_delta);
+              // RESTRICTED_DELTA only conjoins state and mark
+              // variables positively.
+              minato_isop isop(restricted_delta,
+                               bdd_support(restricted_delta), all_vars_);
               bdd dest;
               while ((dest = isop.next()) != bddfalse)
                 {

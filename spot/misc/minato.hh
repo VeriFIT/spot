@@ -42,6 +42,20 @@ namespace spot
     minato_isop(bdd input, bdd vars);
     /// \brief Constructor.
     ///
+    /// This version is given a set of variables in which \a input is
+    /// known to be positive-unate, i.e., for each variable v of
+    /// \a positive_vars, input restricted to v=0 implies input
+    /// restricted to v=1.  For those variables, next() will never
+    /// produce a negative literal, and the first step of the
+    /// algorithm is skipped.
+    ///
+    /// \arg input The BDD function to translate in ISOP.
+    /// \arg vars  The set of BDD variables to factorize in \a input.
+    /// \arg positive_vars A cube (bddtrue for none) of variables in
+    ///      which \a input is positive-unate.
+    minato_isop(bdd input, bdd vars, bdd positive_vars);
+    /// \brief Constructor.
+    ///
     /// This version allows some flexibility in computing the ISOP.
     /// the result must be within \a input_min and \a input_max.
     /// \arg input_min The minimum BDD function to translate in ISOP.
@@ -68,12 +82,19 @@ namespace spot
       // The list of variables to factorize.  This is an addition to
       // the original algorithm.
       bdd vars;
+      // Suffix of the positive-variable cube, restricted to the
+      // variables that have not been considered yet in this frame.
+      // This is an addition to the original algorithm.
+      bdd pos;
       bdd v1;
       bdd f0_min, f0_max;
       bdd f1_min, f1_max;
       bdd g0, g1;
-      local_vars(bdd f_min, bdd f_max, bdd vars) noexcept
-        : f_min(f_min), f_max(f_max), step(FirstStep), vars(vars) {}
+      // Whether the variable we are splitting on is positive-unate.
+      bool positive;
+      local_vars(bdd f_min, bdd f_max, bdd vars, bdd pos) noexcept
+        : f_min(f_min), f_max(f_max), step(FirstStep),
+          vars(vars), pos(pos), positive(false) {}
     };
     std::stack<local_vars> todo_;
     std::stack<bdd> cube_;

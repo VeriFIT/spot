@@ -178,7 +178,10 @@ namespace spot
 
               for (bdd oneletter: minterms_of(letters, ap))
                 {
-                  minato_isop isop(bdd_restrict(delta, oneletter));
+                  // DELTA only conjoins state variables positively.
+                  bdd restricted = bdd_restrict(delta, oneletter);
+                  minato_isop isop(restricted, bdd_support(restricted),
+                                   all_states_);
                   bdd dest;
 
                   while ((dest = isop.next()) != bddfalse)
