@@ -25,7 +25,8 @@
 #include <spot/twaalgos/emptiness.hh>
 #include <spot/twaalgos/emptiness_stats.hh>
 
-#include <stack>
+#include <algorithm>
+#include <vector>
 
 namespace spot
 {
@@ -303,7 +304,7 @@ namespace spot
       }
 
       automaton_ptr<is_explicit> aut;
-      std::stack<scc> root;
+      std::vector<scc> root;
       typename T::template state_map<int> h;
       typename T::state_t cycle_seed;
 
@@ -357,7 +358,7 @@ namespace spot
       unsigned
       acss_states() const override
       {
-        int scc_root = ecs_->root.top().index;
+        int scc_root = ecs_->root.back().index;
         return T::h_count(ecs_->h,
             [scc_root](int s) noexcept { return s >= scc_root; });
       }
@@ -372,7 +373,7 @@ namespace spot
       accepting_cycle()
       {
         acc_cond::mark_t acc_to_traverse =
-          ecs_->aut->acc().accepting_sets(ecs_->root.top().condition);
+          ecs_->aut->acc().accepting_sets(ecs_->root.back().condition);
         // Compute an accepting cycle using successive BFS that are
         // restarted from the point reached after we have discovered a
         // transition with a new acceptance condition.
@@ -405,7 +406,7 @@ namespace spot
                       acc_cond::mark_t& acc_to_traverse)
                 : bfs_steps(ecs->aut), ecs(ecs), r(r)
                 , acc_to_traverse(acc_to_traverse)
-                , scc_root(ecs->root.top().index)
+                , scc_root(ecs->root.back().index)
               {
               }
 
@@ -675,7 +676,7 @@ namespace spot
         // * h, a hash of all visited nodes with their order,
         //    ("Hash" in Couvreur's paper)
         // * arc, a stack of acceptance conditions between each of these SCC.
-        std::stack<acc_cond::mark_t> arc;
+        std::vector<acc_cond::mark_t> arc;
         // * num, the number of visited nodes.  Used to set the order of each
         //   visited node.
         int num = 1;
@@ -684,19 +685,30 @@ namespace spot
         //   successors of STATE.  In our use, ITERATOR should always be freed
         //   when todo is popped, but STATE should not because it is also used
         //   as a key in h.
-        std::stack<pair_state_iter> todo;
+        std::vector<pair_state_iter> todo;
         // * live, a stack of live nodes
-        std::deque<state_t> live;
+        std::vector<state_t> live;
+
+        // Growing those stacks reallocates and copies their content.
+        // For an explicit automaton, the number of states bounds the
+        // length of the DFS path, so reserve that much when that is
+        // reasonable.
+        const auto depth = std::min<size_t>(ecs_->h.size(), 1 << 16);
+        todo.reserve(depth);
+        live.reserve(depth);
+        ecs_->root.reserve(depth);
+        if (is_strong)
+          arc.reserve(depth);
 
         // Setup depth-first search from the initial state.
         {
           state_t init = T::initial_state(ecs_->aut);
           ecs_->h[init] = 1;
-          ecs_->root.push(1);
+          ecs_->root.push_back(scc(1));
           if (is_strong)
-            arc.push({});
+            arc.emplace_back();
           auto iter = T::succ(ecs_->aut, init);
-          todo.emplace(init, iter);
+          todo.emplace_back(init, iter);
           live.emplace_back(init);
           inc_depth();
         }
@@ -707,27 +719,27 @@ namespace spot
               assert(ecs_->root.size() == arc.size());
 
             // We are looking at the next successor in SUCC.
-            auto& succ = todo.top().second;
+            auto& succ = todo.back().second;
 
             // If there are no more successors, backtrack.
             if (succ->done())
               {
                 // We have explored all successors of state CURR.
-                state_t curr = todo.top().first;
+                state_t curr = todo.back().first;
 
                 // Backtrack todo.
-                todo.pop();
+                todo.pop_back();
 
                 // When backtracking the root of an SCC, we must also remove
                 // that SCC from the ARC/ROOT stacks. We must discard from H
                 // all reachable states from this SCC.
                 assert(!ecs_->root.empty());
-                if (ecs_->root.top().index == ecs_->h[curr])
+                if (ecs_->root.back().index == ecs_->h[curr])
                   {
                     if (is_strong)
                       {
                         assert(!arc.empty());
-                        arc.pop();
+                        arc.pop_back();
                       }
                     // Remove all elements of this SCC from the live stack.
                     auto i = std::find(live.rbegin(), live.rend(), curr);
@@ -738,7 +750,7 @@ namespace spot
                       ecs_->h[*it] = -1;
                     }
                     live.erase(i.base(), live.end());
-                    ecs_->root.pop();
+                    ecs_->root.pop_back();
                   }
                 T::it_destroy(ecs_->aut, succ);
                 // Do not destroy curr: it is a key in h.
@@ -770,11 +782,11 @@ namespace spot
               {
                 // Yes.  Bump number, stack the stack, and register its
                 // successors for later processing.
-                ecs_->root.push(++num);
+                ecs_->root.push_back(scc(++num));
                 if (is_strong)
-                  arc.push(acc);
+                  arc.push_back(acc);
                 iterator_t iter = T::succ(ecs_->aut, dest);
-                todo.emplace(dest, iter);
+                todo.emplace_back(dest, iter);
                 live.emplace_back(dest);
                 inc_depth();
                 continue;
@@ -798,34 +810,39 @@ namespace spot
             // the SCC of S2 (called the "threshold").
             int threshold = p.first.second;
             // TODO optimize if this is a self-loop?
-            while (threshold < ecs_->root.top().index)
+            while (threshold < ecs_->root.back().index)
               {
                 assert(!ecs_->root.empty());
                 if (is_strong)
                   {
                     assert(!arc.empty());
-                    acc |= ecs_->root.top().condition;
-                    acc |= arc.top();
-                    arc.pop();
+                    const scc& top = ecs_->root.back();
+                    acc |= top.condition | arc.back();
+                    arc.pop_back();
                   }
-                ecs_->root.pop();
+                ecs_->root.pop_back();
               }
             // Note that we do not always have
-            //  threshold == root.top().index
+            //  threshold == root.back().index
             // after this loop, the SCC whose index is threshold might have
             // been merged with a lower SCC.
 
             // Accumulate all acceptance conditions into the merged SCC.
-            ecs_->root.top().condition |= acc;
+            // The merged condition is kept in a local variable, so that
+            // the call to accepting() below cannot make the compiler
+            // reload it from root.
+            scc& merged = ecs_->root.back();
+            const acc_cond::mark_t condition = merged.condition | acc;
+            merged.condition = condition;
 
-            if (ecs_->aut->acc().accepting(ecs_->root.top().condition))
+            if (ecs_->aut->acc().accepting(condition))
               {
                 // We have found an accepting SCC.
                 // Release all iterators in todo.
                 while (!todo.empty())
                   {
-                    T::it_destroy(ecs_->aut, todo.top().second);
-                    todo.pop();
+                    T::it_destroy(ecs_->aut, todo.back().second);
+                    todo.pop_back();
                     dec_depth();
                   }
                 // Use this state to start the computation of an
