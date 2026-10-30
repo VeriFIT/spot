@@ -20,6 +20,7 @@
 #include <spot/twaalgos/split.hh>
 #include <spot/misc/bddlt.hh>
 #include <spot/priv/robin_hood.hh>
+#include <algorithm>
 #include <unordered_set>
 
 namespace spot
@@ -48,6 +49,15 @@ namespace spot
       // instead.
       typedef robin_hood::pair<unsigned, unsigned> cached_t;
       robin_hood::unordered_map<int, cached_t> split_cond;
+      // There is at most one cache entry per edge, and at most one
+      // per distinct label.  A label is an arbitrary Boolean function
+      // of the atomic propositions, so the number of labels is at most
+      // 2^(2^ap).  For 5 propositions or more that bound is already
+      // above 1<<16, so clamp the exponent instead of the result.
+      const size_t ap = aut->ap().size();
+      const size_t labels = ap < 5 ? size_t{1} << (size_t{1} << ap)
+                                   : size_t{1} << 16;
+      split_cond.reserve(std::min<size_t>(aut->num_edges(), labels));
 
       internal::univ_dest_mapper<twa_graph::graph_t> uniq(out->get_graph());
 

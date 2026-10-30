@@ -3726,6 +3726,9 @@ namespace spot
     else                        // state-based
       {
         robin_hood::unordered_map<int, unsigned> bdd_to_state_map;
+        // One entry per state, plus the two extra states for
+        // bddtrue and bddfalse.
+        bdd_to_state_map.reserve(n + 2);
         std::vector<bdd> states;
         states.reserve(n);
         bdd init_state = bdd_terminal(0);
@@ -4465,6 +4468,9 @@ namespace spot
       }
 
     robin_hood::unordered_map<int, unsigned> bdd_to_state_map;
+    // One entry per root, plus one for the accepting sink represented
+    // by bddtrue (a root that is already bddtrue shares that entry).
+    bdd_to_state_map.reserve(n + 1);
     std::vector<bdd> states;
     states.reserve(n);
 

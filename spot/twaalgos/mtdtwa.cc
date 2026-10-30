@@ -100,6 +100,10 @@ namespace spot
     robin_hood::unordered_map<std::pair<acc_cond::mark_t,
                                         unsigned>,
                               unsigned, pairmu_hash> term_map;
+    // Terminals are keyed by an (acceptance mark, state) pair, and
+    // there is one per state in the common case of state-based
+    // acceptance.
+    term_map.reserve(n);
 
     auto new_terminal([&term_map, &dfa](acc_cond::mark_t acc, unsigned state) {
       auto p = std::make_pair(acc, state);

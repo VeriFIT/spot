@@ -537,6 +537,12 @@ namespace spot
         // instead.
         typedef robin_hood::pair<unsigned, unsigned> cached_t;
         robin_hood::unordered_map<bdd, cached_t, bdd_hash> split_cond;
+        // This cache is only used when the basis approach is selected,
+        // i.e. with more than 5 atomic propositions and few enough
+        // distinct labels for the basis to be built.  Each class then
+        // contributes exactly one key (the atomic-proposition part of
+        // its signature), so the number of classes is an exact bound.
+        split_cond.reserve(sorted_classes_.size());
 
         auto state_mapping = new std::vector<unsigned>();
         state_mapping->resize(a_->num_states());

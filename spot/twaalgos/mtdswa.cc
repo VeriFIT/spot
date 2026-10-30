@@ -3120,6 +3120,9 @@ namespace spot
       }
 
     robin_hood::unordered_map<int, unsigned> bdd_to_state_map;
+    // One entry per root, plus one for the accepting sink represented
+    // by bddtrue (a root that is already bddtrue shares that entry).
+    bdd_to_state_map.reserve(n + 1);
     std::vector<bdd> states;
     states.reserve(n);
 
