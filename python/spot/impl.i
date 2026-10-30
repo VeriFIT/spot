@@ -172,6 +172,7 @@
 #include <spot/twaalgos/parity.hh>
 #include <spot/twaalgos/postproc.hh>
 #include <spot/twaalgos/powerset.hh>
+#include <spot/twaalgos/intersect.hh>
 #include <spot/twaalgos/product.hh>
 #include <spot/twaalgos/stutter.hh>
 #include <spot/twaalgos/synthesis.hh>
@@ -909,6 +910,7 @@ ltl_to_ba_otf.options = ltl_to_tgba_fm_otf_options
 %include <spot/twaalgos/parity.hh>
 %include <spot/twaalgos/postproc.hh>
 %include <spot/twaalgos/powerset.hh>
+%include <spot/twaalgos/intersect.hh>
 %include <spot/twaalgos/product.hh>
 %include <spot/twaalgos/split.hh>
 %include <spot/twaalgos/sum.hh>

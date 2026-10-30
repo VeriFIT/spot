@@ -75,3 +75,34 @@ State: 2
 State: 3
 [t] 3
 --END--""")
+
+# spot.intersects() and spot.intersecting_run() work directly on
+# explicit automata, without building their product.  Both automata
+# are read from the same stream so that they share their BDD dict.
+x, y = spot.automata(spot.translate('F a').to_str()
+                     + spot.translate('F !a').to_str())
+tc.assertTrue(spot.intersects(x, y))
+tc.assertTrue(x.intersects(y))
+r = spot.intersecting_run(x, y)
+tc.assertTrue(r is not None)
+w = spot.twa_word(r).as_automaton()
+tc.assertTrue(w.intersects(x))
+tc.assertTrue(w.intersects(y))
+
+x, y = spot.automata(spot.translate('G a').to_str()
+                     + spot.translate('G !a').to_str())
+tc.assertFalse(spot.intersects(x, y))
+tc.assertEqual(spot.intersecting_run(x, y), None)
+
+# Automata that do not share their BDD dict cannot be intersected: the
+# BDD variables would denote different atomic propositions in the two
+# automata, so the product would be meaningless.
+x = spot.translate('F a')
+y = spot.translate('F a', dict=spot.make_bdd_dict())
+tc.assertNotEqual(x.get_dict(), y.get_dict())
+with tc.assertRaises(RuntimeError) as cm:
+    spot.intersects(x, y)
+tc.assertIn('bdd_dict', str(cm.exception))
+with tc.assertRaises(RuntimeError) as cm:
+    spot.intersecting_run(x, y)
+tc.assertIn('bdd_dict', str(cm.exception))

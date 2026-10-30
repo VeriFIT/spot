@@ -29,6 +29,7 @@
 #include <spot/twaalgos/complement.hh>
 #include <spot/twaalgos/isdet.hh>
 #include <spot/twaalgos/product.hh>
+#include <spot/twaalgos/intersect.hh>
 #include <spot/twaalgos/genem.hh>
 #include <utility>
 
@@ -152,6 +153,11 @@ namespace spot
       }
     self = remove_fin_maybe(self); // remove alternation, not Fin
     other = remove_fin_maybe(other);
+    // If both operands are explicit automata, run the emptiness check
+    // on the product without building it.
+    if (auto g1 = is_twa_graph(self))
+      if (auto g2 = is_twa_graph(other))
+        return spot::intersects(g1, g2);
     return !otf_product(self, other)->is_empty();
   }
 
@@ -183,6 +189,11 @@ namespace spot
       }
     self = remove_fin_maybe(self); // remove alternation, not Fin
     other = remove_fin_maybe(other);
+    // If both operands are explicit automata, search the product
+    // without building it.
+    if (auto g1 = is_twa_graph(self))
+      if (auto g2 = is_twa_graph(other))
+        return spot::intersecting_run(g1, g2);
     auto run = otf_product(self, other)->accepting_run();
     if (!run)
       return nullptr;

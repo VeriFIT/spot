@@ -57,6 +57,7 @@ twaalgos_HEADERS = \
   gfguarantee.hh \
   gv04.hh \
   hoa.hh \
+  intersect.hh \
   iscolored.hh \
   isdet.hh \
   isunamb.hh \
@@ -140,6 +141,7 @@ libtwaalgos_la_SOURCES = \
   gfguarantee.cc \
   gv04.cc \
   hoa.cc \
+  intersect.cc \
   iscolored.cc \
   isdet.cc \
   isunamb.cc \

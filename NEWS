@@ -139,6 +139,22 @@ New in spot 2.16.1.dev  (not yet released)
     speedup of ltl2tgba's translation phase, and up to 33% on the
     simulation phase for formulas such as --sejk-k.
 
+  - New functions spot::intersects() and spot::intersecting_run()
+    respectively check whether two explicit automata (twa_graph)
+    accept a common word, and return an accepting run of the first
+    one.  They run Couvreur's emptiness check on the product of the
+    two automata without ever building that product: a product state
+    is represented by a pair of state numbers, and the DFS stacks
+    hold one acceptance mark set per operand.  Both operands must be
+    existential and use a Fin-less acceptance condition.
+
+    twa::intersects() and twa::intersecting_run() now use these
+    functions whenever both operands are twa_graph with Fin-less
+    acceptance, instead of building an otf_product() and going
+    through its abstract state* interface.  On empty products of a
+    few hundred to tens of thousands of states, this makes
+    twa::intersects() about 8 to 9 times faster.
+
   Bug fixes:
 
   - The --ins, --outs, and --unobservable-ins options of ltlfilt,
