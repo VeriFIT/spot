@@ -29,6 +29,8 @@
 
 #include <string>
 #include <cstdlib>
+#include <algorithm>
+#include <vector>
 #include "bddx.h"
 #include "bvecx.h"
 
@@ -444,6 +446,223 @@ void testQuant()
   if (f7 != bddtrue) ERROR("bdd_unique over majority, {x,y,z} failed");
 }
 
+/* Return the literals of a cube as a vector of signed variable
+   numbers (v for x, ~v for !x), in increasing level order. */
+static std::vector<int> isop_literals(const bdd& c)
+{
+  std::vector<int> res;
+  bdd l = c;
+  while (l != bddtrue)
+    {
+      if (bdd_low(l) == bddfalse)
+        {
+          res.push_back(bdd_var(l));
+          l = bdd_high(l);
+        }
+      else
+        {
+          res.push_back(~bdd_var(l));
+          l = bdd_low(l);
+        }
+    }
+  std::reverse(res.begin(), res.end());
+  return res;
+}
+
+/* Check that CUBES is an irredundant cover of F made of prime
+   implicants. */
+static void check_isop(const std::vector<bdd>& cubes, const bdd& f,
+                       const char* what)
+{
+  bdd cover = bddfalse;
+  for (const bdd& c : cubes)
+    {
+      if (!bdd_is_cube(c))
+        ERROR(string(what) + ": non-cube in the ISOP");
+      if ((c - f) != bddfalse)
+        ERROR(string(what) + ": non-implicant in the ISOP");
+      cover |= c;
+    }
+  if (cover != f)
+    ERROR(string(what) + ": the ISOP does not cover the function");
+
+  for (unsigned i = 0; i < cubes.size(); ++i)
+    {
+      bdd others = bddfalse;
+      for (unsigned j = 0; j < cubes.size(); ++j)
+        if (i != j)
+          others |= cubes[j];
+      if ((cubes[i] - others) == bddfalse)
+        ERROR(string(what) + ": redundant cube in the ISOP");
+
+      /* A prime implicant cannot be weakened by dropping a literal. */
+      std::vector<int> lits = isop_literals(cubes[i]);
+      for (unsigned k = 0; k < lits.size(); ++k)
+        {
+          std::vector<int> sub = lits;
+          sub.erase(sub.begin() + k);
+          bdd weaker = bdd_ibuildcube2(static_cast<int>(sub.size()),
+                                       sub.data());
+          if ((weaker - f) == bddfalse)
+            ERROR(string(what) + ": non-prime cube in the ISOP");
+        }
+    }
+}
+
+static bool has_cube(const std::vector<bdd>& cubes, const bdd& c)
+{
+  return std::find(cubes.begin(), cubes.end(), c) != cubes.end();
+}
+
+/* Handler of the C entry points, and the number of times it was called.
+   Running a garbage collection here checks that the cube handed to the
+   handler is referenced: were it not, the cube would be reclaimed
+   before it is stored. */
+static unsigned isop_hits;
+
+static void isop_collect(BDD cube, void* data)
+{
+  ++isop_hits;
+  bdd_gbc();
+  static_cast<std::vector<bdd>*>(data)->push_back(bdd_from_int(cube));
+}
+
+/* Check that the three C entry points pass the same cubes to their
+   handler as the corresponding C++ wrappers. */
+static void check_c_api(const bdd& f, const bdd& positive_vars)
+{
+  std::vector<bdd> expected;
+  std::vector<bdd> got;
+
+  bdd_isop(f, expected);
+  isop_hits = 0;
+  bdd_isop(f.id(), isop_collect, &got);
+  if (got != expected || isop_hits != expected.size())
+    ERROR("the C API of bdd_isop() disagrees with the C++ wrapper");
+
+  bdd_isop(f, positive_vars, expected);
+  got.clear();
+  isop_hits = 0;
+  bdd_isop_with_positive_vars(f.id(), positive_vars.id(), isop_collect,
+                              &got);
+  if (got != expected || isop_hits != expected.size())
+    ERROR("the C API of bdd_isop_with_positive_vars() disagrees with "
+          "the C++ wrapper");
+
+  bdd_isop_all_positive(f, expected);
+  got.clear();
+  isop_hits = 0;
+  bdd_isop_all_positive(f.id(), isop_collect, &got);
+  if (got != expected || isop_hits != expected.size())
+    ERROR("the C API of bdd_isop_all_positive() disagrees with the "
+          "C++ wrapper");
+}
+
+void testIsop()
+{
+  cout << "Testing bdd_isop()\n";
+
+  bdd a = bdd_ithvar(0);
+  bdd b = bdd_ithvar(1);
+  bdd c = bdd_ithvar(2);
+  bdd d = bdd_ithvar(3);
+
+  std::vector<bdd> res;
+
+  bdd_isop(bddfalse, res);
+  if (!res.empty())
+    ERROR("bdd_isop(false) should be empty");
+  bdd_isop(bddtrue, res);
+  if (res.size() != 1 || res[0] != bddtrue)
+    ERROR("bdd_isop(true) should be {true}");
+
+  /* A single cube */
+  bdd_isop(a & b & !c, res);
+  if (res.size() != 1 || res[0] != (a & b & !c))
+    ERROR("bdd_isop() of a cube");
+
+  /* The result vector is cleared, and its memory reused, by successive
+     calls. */
+  res.reserve(42);
+  bdd_isop(a & b, res);
+  bdd_isop(c, res);
+  if (res.size() != 1 || res[0] != c)
+    ERROR("bdd_isop() does not reset its result vector");
+  if (res.capacity() < 42)
+    ERROR("bdd_isop() released the memory of its result vector");
+
+  /* The example from the Minato-Morreale paper: the prime implicants
+     of (a&b) | c | (a&d) are {a,b}, {a,d}, and {c}. */
+  for (bdd f : {(a & b) | c | (a & d), a | b, a ^ b, c & d,
+                (a | b) & (c | d), (a & c) | (b & !c) | (!a & d)})
+    {
+      bdd_isop(f, res);
+      check_isop(res, f, "hand-written function");
+    }
+
+  bdd f = (a & b) | c | (a & d);
+  bdd_isop(f, res);
+  if (res.size() != 3 || !has_cube(res, a & b) || !has_cube(res, a & d)
+      || !has_cube(res, c))
+    ERROR("bdd_isop() should return {a&b, a&d, c}");
+
+  /* Positive variants.  (a|b)&(c|d) is positive-unate in all its
+     variables. */
+  f = (a | b) & (c | d);
+  bdd_isop_all_positive(f, res);
+  if (res.size() != 4 || !has_cube(res, a & c) || !has_cube(res, a & d)
+      || !has_cube(res, b & c) || !has_cube(res, b & d))
+    ERROR("bdd_isop_all_positive() should return the four cubes");
+  bdd_isop(f, a & b & c & d, res);
+  if (res.size() != 4 || !has_cube(res, a & c) || !has_cube(res, a & d)
+      || !has_cube(res, b & c) || !has_cube(res, b & d))
+    ERROR("bdd_isop() with positive variables should return four cubes");
+
+  check_c_api(f, a & b & c & d);
+
+  bdd vars[4] = {a, b, c, d};
+  unsigned seed = 12345;
+  auto rnd = [&seed](unsigned n)
+    {
+      seed = seed * 1103515245u + 12345u;
+      return (seed >> 16) % n;
+    };
+
+  for (int i = 0; i < 300; ++i)
+    {
+      bdd g = bddfalse;
+      bdd h = bddfalse;
+      unsigned nterm = 1 + rnd(6);
+      for (unsigned t = 0; t < nterm; ++t)
+        {
+          bdd ct = bddtrue;
+          bdd ht = bddtrue;
+          for (unsigned v = 0; v < 4; ++v)
+            switch (rnd(3))
+              {
+              case 0:
+                ct &= vars[v];
+                ht &= vars[v];
+                break;
+              case 1:
+                ct &= !vars[v];
+                break;
+              default:
+                break;
+              }
+          g |= ct;
+          h |= ht;
+        }
+      /* G is an arbitrary function, H is monotone. */
+      bdd_isop(g, res);
+      check_isop(res, g, "random function");
+      bdd_isop_all_positive(h, res);
+      check_isop(res, h, "random monotone function");
+      bdd_isop(h, a & b & c & d, res);
+      check_isop(res, h, "random monotone function with positive variables");
+    }
+}
+
 int main(int ac, char** av)
 {
   bdd_init(1000,1000);
@@ -458,6 +677,7 @@ int main(int ac, char** av)
   testMtSccs();
   testRestrict();
   testQuant();
+  testIsop();
 
   bdd_done();
   return 0;

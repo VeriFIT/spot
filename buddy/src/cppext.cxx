@@ -688,6 +688,36 @@ std::vector<bdd> leaves_of(const std::vector<bdd>& b)
   return res;
 }
 
+/*************************************************************************
+  Irredundant sum of products
+*************************************************************************/
+
+/* Callback of bdd_isop() and friends.  bdd_from_int() takes the
+   reference that the vector will release when the cube is destroyed. */
+static void isop_push(BDD cube, void* data)
+{
+  static_cast<std::vector<bdd>*>(data)->push_back(bdd_from_int(cube));
+}
+
+void bdd_isop(const bdd& f, std::vector<bdd>& res)
+{
+  res.clear();
+  ::bdd_isop(f.root, isop_push, &res);
+}
+
+void bdd_isop(const bdd& f, const bdd& positive_vars, std::vector<bdd>& res)
+{
+  res.clear();
+  ::bdd_isop_with_positive_vars(f.root, positive_vars.root, isop_push, &res);
+}
+
+void bdd_isop_all_positive(const bdd& f, std::vector<bdd>& res)
+{
+  res.clear();
+  ::bdd_isop_all_positive(f.root, isop_push, &res);
+}
+
+
 static bool find_leaf_rec(int b, bool (*pred)(int))
 {
   if (MARKED(b))

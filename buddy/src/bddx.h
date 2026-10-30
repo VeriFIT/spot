@@ -493,6 +493,18 @@ BUDDY_API int      bdd_have_common_assignment(BDD, BDD);
 BUDDY_API int      bdd_is_cube(BDD);
 BUDDY_API void     bdd_splitcube(BDD, BDD, BDD*, BDD*);
 
+/* In file "isop.c" */
+
+  /* Called by bdd_isop() and friends with each prime implicant.  CUBE
+     is referenced for the duration of the call: a handler that wants to
+     keep it must call bdd_addref(). */
+typedef void (*bddisophandler)(BDD cube, void *data);
+
+BUDDY_API void     bdd_isop(BDD, bddisophandler, void *);
+BUDDY_API void     bdd_isop_with_positive_vars(BDD, BDD, bddisophandler,
+                                               void *);
+BUDDY_API void     bdd_isop_all_positive(BDD, bddisophandler, void *);
+
 /* In file "bddio.c" */
 
 BUDDY_API void     bdd_printall(void);
@@ -846,6 +858,9 @@ protected:
    friend std::vector<bdd> leaves_of(const std::vector<bdd>& b);
    friend bool   bdd_has_true(const std::vector<bdd>& b);
    friend bool   bdd_find_leaf(const std::vector<bdd>& b, bool (*)(int));
+   friend void   bdd_isop(const bdd&, std::vector<bdd>&);
+   friend void   bdd_isop(const bdd&, const bdd&, std::vector<bdd>&);
+   friend void   bdd_isop_all_positive(const bdd&, std::vector<bdd>&);
 
    friend bdd    fdd_ithvarpp(int, int);
    friend bdd    fdd_ithsetpp(int);
@@ -1549,6 +1564,43 @@ BUDDY_API int bdd_anodecountpp(const std::vector<bdd>& b,
                                int& terms, bool& has_true, bool& has_false);
 BUDDY_API bool bdd_has_true(const std::vector<bdd>& b);
 BUDDY_API bool bdd_find_leaf(const std::vector<bdd>& b, bool (*)(int));
+
+/*=== Irredundant sum of products ===*/
+
+// Append to RES the irredundant sum of products (ISOP) of F, computed
+// with the recursive Minato-Morreale algorithm: one cube per prime
+// implicant of F used in the cover, whose disjunction is F.  The cover
+// is irredundant, i.e., no cube can be removed without changing the
+// function.
+//
+// RES is cleared first, but its memory is reused, so the same vector
+// can be passed to successive calls (e.g. in a loop).
+//
+// The variables that are factorized are the variables of F's support,
+// so there is no need to call bdd_support() beforehand.  Variables
+// that do not occur in F never appear in the cubes.  F must be a
+// plain BDD, not a multi-terminal one.
+//
+// bdd_isop(F, POSITIVE_VARS, RES) should be used when F is known to be
+// positive-unate in some variables, i.e., when F|v=0 implies F|v=1 for
+// each variable v of POSITIVE_VARS.  POSITIVE_VARS must be a cube (a
+// conjunction of positive literals, or bddtrue for none) listing those
+// variables; for them, no negative literal will be produced and the
+// algorithm is faster.  bdd_isop(F, bddtrue, RES) is equivalent to
+// bdd_isop(F, RES).
+//
+// bdd_isop_all_positive(F, RES) is the same, but assumes that F is
+// positive-unate in *all* its variables (i.e., F is monotone).  It is
+// slightly cheaper than building POSITIVE_VARS, and much cheaper than
+// enumerating the negative branches that would turn out to be empty.
+//
+// These are wrappers around the C functions of the same name, which
+// pass the cubes one at a time to a bddisophandler.
+
+BUDDY_API void bdd_isop(const bdd& f, std::vector<bdd>& res);
+BUDDY_API void bdd_isop(const bdd& f, const bdd& positive_vars,
+                        std::vector<bdd>& res);
+BUDDY_API void bdd_isop_all_positive(const bdd& f, std::vector<bdd>& res);
 
 // Decompose the states (whose transition relation is encoded by
 // bdd_terminal nodes, mapped to state indices via term_succ) into

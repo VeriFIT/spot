@@ -18,6 +18,7 @@ libbddx_la_SOURCES = \
  fdd.c \
  imatrix.c \
  imatrix.h \
+ isop.c \
  kernel.c \
  kernel.h \
  pairs.c \
