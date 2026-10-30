@@ -181,8 +181,11 @@ namespace spot
       ratexp_to_dfa transdfa;
       bool exprop;
       bool single_acc;
-      // Map BDD variables to acceptance marks.
-      robin_hood::unordered_flat_map<int, unsigned> bm;
+      // Map BDD variables to acceptance marks, indexed by BDD
+      // variable number.  Entries that are not acceptance variables
+      // hold -1.  This used to be a hash table, but cubes are walked
+      // one literal at a time and an array lookup is much cheaper.
+      std::vector<int> bm_by_var;
       bool unambiguous;
 
       /// Identity used to register acceptance and next variables.
@@ -258,6 +261,17 @@ namespace spot
         return num;
       }
 
+      /// Record that BDD variable \a num is an acceptance variable
+      /// whose mark is the next available color.
+      void
+      add_acc_var(int num)
+      {
+        if (num >= static_cast<int>(bm_by_var.size()))
+          bm_by_var.resize(bdd_varnum(), -1);
+        if (bm_by_var[num] < 0)
+          bm_by_var[num] = num_colors_++;
+      }
+
       acc_cond::mark_t
       bdd_to_mark(bdd a)
       {
@@ -273,7 +287,8 @@ namespace spot
             a = bdd_low(a);
             if (h != bddfalse)
               {
-                res.set(bm[v]);
+                assert(bm_by_var[v] >= 0);
+                res.set(bm_by_var[v]);
                 if (a == bddfalse)
                   a = h;
               }
@@ -288,6 +303,12 @@ namespace spot
       /// BDD variable as belonging to \c a_set (acceptance), \c next_set
       /// (destination formulas), or \c var_set (atomic propositions).
       /// The condition BDD is built from the bottom up for efficiency.
+      ///
+      /// Callers whose cubes cannot contain atomic proposition
+      /// literals need no special case: succ_as_edges() under exprop
+      /// restricts \c res by a full minterm over var_set, and
+      /// succ_as_acc_and_dest() existentially quantifies var_set away,
+      /// so the returned \c cond is \c bddtrue for them anyway.
       struct split_result
       {
         bdd cond;
@@ -312,12 +333,13 @@ namespace spot
             bool positive = (high != bddfalse);
             cube = positive ? high : bdd_low(cube);
 
-            auto bm_it = bm.find(v);
-            if (bm_it != bm.end())
+            int mark = (v < static_cast<int>(bm_by_var.size()))
+              ? bm_by_var[v] : -1;
+            if (mark >= 0)
               {
                 // a_set variable: accumulate acceptance marks.
                 if (positive)
-                  acc.set(bm_it->second);
+                  acc.set(mark);
               }
             else if (v < static_cast<int>(next_formula_map.size())
                      && next_formula_map[v])
@@ -371,9 +393,7 @@ namespace spot
             int num = dict->register_acceptance_variable(formula::tt(), owner_);
             a_set &= bdd_ithvar(num);
 
-            auto p = bm.emplace(num, 0U);
-            if (p.second)
-              p.first->second = num_colors_++;
+            add_acc_var(num);
             return num;
           }
         // A promise of 'x', noted P(x) is pretty much like the F(x)
@@ -419,9 +439,7 @@ namespace spot
                   dict->register_acceptance_variable(g, owner_);
                 a_set &= bdd_ithvar(num);
 
-                auto p = bm.emplace(num, 0U);
-                if (p.second)
-                  p.first->second = num_colors_++;
+                add_acc_var(num);
                 return num;
               }
             else if (f.is(op::F))
@@ -437,9 +455,7 @@ namespace spot
         int num = dict->register_acceptance_variable(f, owner_);
         a_set &= bdd_ithvar(num);
 
-        auto p = bm.emplace(num, 0U);
-        if (p.second)
-          p.first->second = num_colors_++;
+        add_acc_var(num);
 
         return num;
       }
@@ -2313,12 +2329,13 @@ namespace spot
         bdd cube;
         while ((cube = isop.next()) != bddfalse)
           {
+            // When exprop is enabled, the cube was restricted by a
+            // full minterm over var_set, so it holds no atomic
+            // proposition literals and cond is already bddtrue: use
+            // the minterm itself as condition.
             auto [cond, dest, acc] =
               impl_->d->split_cube_as_cond_dest_and_acc(cube);
 
-            // When exprop is enabled, the condition is the full
-            // minterm, not just the AP variables appearing in the
-            // cube (which may be a subset after bdd_restrict).
             if (impl_->opts.exprop)
               cond = one_prop_set;
 
