@@ -730,11 +730,12 @@ namespace spot
       return it->second;
 
     // Is it worth checking if it is a cube?
-    bdd prod;
-    minato_isop cond(b);
+    std::vector<bdd> cubes;
+    bdd_isop(b, cubes);
     plus_vars_.clear();
+    plus_vars_.reserve(cubes.size());
 
-    while ((prod = cond.next()) != bddfalse)
+    for (bdd prod : cubes)
       plus_vars_.push_back(cube2var_(prod,
                                      use_split_off == 2 ? 0 : use_split_off));
     // Done building -> sum them
@@ -890,15 +891,8 @@ namespace spot
         // Compute the ISOP of the primal and dual
         // Use the repr that adds less terms
 
-        bdd prod;
-
-        minato_isop cond_isop(b);
-        while ((prod = cond_isop.next()) != bddfalse)
-          sum_terms_pos.push_back(prod);
-
-        cond_isop = minato_isop(bdd_not(b));
-        while ((prod = cond_isop.next()) != bddfalse)
-          sum_terms_neg.push_back(prod);
+        bdd_isop(b, sum_terms_pos);
+        bdd_isop(bdd_not(b), sum_terms_neg);
 
         std::sort(sum_terms_pos.begin(), sum_terms_pos.end(),
                   bdd_less_than());

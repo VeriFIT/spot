@@ -587,24 +587,26 @@ namespace spot
         auto all_inf = all_inf_;
         unsigned srcst = 0;
 
+        // Scratch space reused by all calls to create_edges().
+        std::vector<bdd> cubes;
+
         auto create_edges = [&](int srcid, bdd one, bdd dest) {
           if (dest == bddfalse)
             return;
           // Iterate over all possible destination classes.  We
-          // use minato_isop here, because if the same valuation
+          // use the ISOP here, because if the same valuation
           // of atomic properties can go to two different
           // classes C1 and C2, iterating on C1 + C2 with other
           // means would see C1 then (!C1)C2, instead of C1 then
-          // C2.  With minatop_isop, we ensure that no negative
+          // C2.  With the ISOP, we ensure that no negative
           // class variable will be seen (likewise for
           // promises).  This works because signatures only
           // conjoin class and acceptance variables positively,
-          // so minato_isop can skip their negative pass.
-          minato_isop isop(dest, bdd_support(dest), nonapvars);
+          // so they can all be declared positive-unate.
+          bdd_isop(dest, nonapvars, cubes);
 
           ++nb_minterms;
-          bdd cond_acc_dest;
-          while ((cond_acc_dest = isop.next()) != bddfalse)
+          for (bdd cond_acc_dest : cubes)
             {
               ++stat.edges;
               ++nb_minato;

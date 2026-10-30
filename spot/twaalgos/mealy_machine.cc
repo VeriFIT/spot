@@ -3496,12 +3496,7 @@ namespace
                                          std::vector<bdd>());
 
             if (inserted)
-              {
-                minato_isop econd_isop(econd);
-                bdd prod;
-                while ((prod = econd_isop.next()) != bddfalse)
-                  it->second.push_back(prod);
-              }
+              bdd_isop(econd, it->second);
           }
       }
     // Decomposed all newly discovered conflicts

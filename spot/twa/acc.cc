@@ -1282,10 +1282,10 @@ namespace spot
     if (res == bddfalse)
       return f();
 
-    minato_isop isop(res);
-    bdd cube;
+    std::vector<bdd> cubes;
+    bdd_isop(res, cubes);
     acc_code rescode = f();
-    while ((cube = isop.next()) != bddfalse)
+    for (bdd cube : cubes)
       {
         mark_t i = {};
         acc_code f;
@@ -1351,10 +1351,10 @@ namespace spot
     if (res == bddfalse)
       return f();
 
-    minato_isop isop(!res);
-    bdd cube;
+    std::vector<bdd> cubes;
+    bdd_isop(!res, cubes);
     acc_code rescode;
-    while ((cube = isop.next()) != bddfalse)
+    for (bdd cube : cubes)
       {
         mark_t m = {};
         acc_code i = f();
@@ -1674,10 +1674,10 @@ namespace spot
     if (res == bddfalse)
       return {};
 
-    minato_isop isop(res);
-    bdd cube;
+    std::vector<bdd> cubes;
+    bdd_isop(res, cubes);
     std::vector<std::vector<int>> result;
-    while ((cube = isop.next()) != bddfalse)
+    for (bdd cube : cubes)
       {
         std::vector<int> partial;
         while (cube != bddtrue)

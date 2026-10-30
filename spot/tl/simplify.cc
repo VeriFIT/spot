@@ -179,10 +179,10 @@ namespace spot
       bdd in = as_bdd(f);
       if (cnf)
         in = !in;
-      minato_isop isop(in);
-      bdd cube;
+      std::vector<bdd> cubes;
+      bdd_isop(in, cubes);
       vec clauses;
-      while ((cube = isop.next()) != bddfalse)
+      for (bdd cube : cubes)
         {
           vec literals;
           while (cube != bddtrue)

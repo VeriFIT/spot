@@ -176,15 +176,14 @@ namespace spot
               bdd ap = bdd_exist(bdd_support(delta), all_states_);
               bdd letters = bdd_exist(delta, all_states_);
 
+              std::vector<bdd> cubes;
               for (bdd oneletter: minterms_of(letters, ap))
                 {
                   // DELTA only conjoins state variables positively.
                   bdd restricted = bdd_restrict(delta, oneletter);
-                  minato_isop isop(restricted, bdd_support(restricted),
-                                   all_states_);
-                  bdd dest;
+                  bdd_isop(restricted, all_states_, cubes);
 
-                  while ((dest = isop.next()) != bddfalse)
+                  for (bdd dest : cubes)
                     {
                       states.clear();
                       while (dest != bddtrue)

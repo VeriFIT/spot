@@ -177,6 +177,10 @@ namespace spot
       bdd positive_vars_ = bddtrue;
       bdd positive_a_set_ = bddtrue;
       bdd positive_next_set_ = bddtrue;
+      // Vector of prime implicants, reused by every call to isop_of().
+      // See the comment there: callers that keep iterating over the
+      // cubes while calling isop_of() again must move it locally.
+      std::vector<bdd> isop_buf_;
 
       ratexp_to_dfa transdfa;
       bool exprop;
@@ -615,15 +619,39 @@ namespace spot
         return positive_vars_;
       }
 
-      /// \brief Prepare an ISOP decomposer for the successor BDD \a f.
+      /// \brief Compute the prime implicants of the successor BDD \a f.
       ///
       /// The caller promises that every successor BDD is
       /// positive-unate in the variables returned by positive_vars().
       /// Violating this would silently drop cubes in release builds.
-      minato_isop
+      ///
+      /// The cubes are left in a vector owned by this dictionary, so
+      /// that decomposing several BDDs in a row reuses the same memory.
+      /// That vector is overwritten by the next call to isop_of(), so
+      /// a caller that must keep reading the cubes while calling
+      /// isop_of() again (directly, or indirectly through recurse() or
+      /// canonicalize()) has to move the result into a local vector
+      /// first; see the FStar and Fusion cases below.
+      std::vector<bdd>&
       isop_of(bdd f)
       {
-        return minato_isop(f, bdd_support(f), positive_vars());
+        bdd_isop(f, positive_vars(), isop_buf_);
+        return isop_buf_;
+      }
+
+      /// \brief Prime implicants of a BDD that only mentions variables
+      /// of positive_vars().
+      ///
+      /// This is like isop_of(), but it tells bdd_isop_all_positive()
+      /// that it does not even have to look at the variables: it must
+      /// only be used on BDDs whose support is included in
+      /// positive_vars().  Unlike isop_of(), this does not assert it,
+      /// because the check would cost more than the walk it saves.
+      std::vector<bdd>&
+      isop_all_positive(bdd f)
+      {
+        bdd_isop_all_positive(f, isop_buf_);
+        return isop_buf_;
       }
 
       formula
@@ -633,9 +661,7 @@ namespace spot
           return formula::ff();
 
         vec v;
-        minato_isop isop = isop_of(f);
-        bdd cube;
-        while ((cube = isop.next()) != bddfalse)
+        for (bdd cube : isop_of(f))
           v.emplace_back(conj_bdd_to_formula(cube));
         return formula::Or(std::move(v));
       }
@@ -647,9 +673,7 @@ namespace spot
           return formula::ff();
 
         vec v;
-        minato_isop isop = isop_of(f);
-        bdd cube;
-        while ((cube = isop.next()) != bddfalse)
+        for (bdd cube : isop_of(f))
           v.emplace_back(conj_bdd_to_sere(cube));
         return formula::OrRat(std::move(v));
       }
@@ -673,9 +697,9 @@ namespace spot
       std::cerr << "Displaying BDD ";
       bdd_print_set(std::cerr, d.dict, f) << ":\n";
 
-      minato_isop isop(f);
-      bdd cube;
-      while ((cube = isop.next()) != bddfalse)
+      std::vector<bdd> cubes;
+      bdd_isop(f, cubes);
+      for (bdd cube : cubes)
         {
           auto [dest_bdd, label] = bdd_splitcube(cube, d.next_set);
           formula dest = d.conj_bdd_to_formula(dest_bdd);
@@ -726,10 +750,8 @@ namespace spot
       {
         if (!to_concat_)
           return in;
-        minato_isop isop = dict_.isop_of(in);
-        bdd cube;
         bdd out = bddfalse;
-        while ((cube = isop.next()) != bddfalse)
+        for (bdd cube : dict_.isop_of(in))
           {
             auto [dest_bdd, label] = bdd_splitcube(cube, dict_.next_set);
             formula dest = dict_.conj_bdd_to_sere(dest_bdd);
@@ -832,10 +854,11 @@ namespace spot
                       //  3. add |g
                       bdd res = recurse(bo[0]);
                       //   f*;g  ->  f;f*;g
-                      minato_isop isop = dict_.isop_of(res);
-                      bdd cube;
+                      // This loop does not call isop_of(), so the
+                      // shared buffer can be iterated directly.
+                      const std::vector<bdd>& cubes = dict_.isop_of(res);
                       res = bddfalse;
-                      while ((cube = isop.next()) != bddfalse)
+                      for (bdd cube : cubes)
                         {
                           auto [dest_bdd, label] =
                             bdd_splitcube(cube, dict_.next_set);
@@ -861,15 +884,17 @@ namespace spot
                   bdd tail_bdd;
                   bool tail_computed = false;
 
-                  minato_isop isop = dict_.isop_of(recurse(bo[0]));
-                  bdd cube;
+                  // The loop below calls recurse(), hence isop_of():
+                  // move the cubes out of the shared buffer first.
+                  std::vector<bdd> cubes =
+                    std::move(dict_.isop_of(recurse(bo[0])));
                   bdd res = bddfalse;
                   if (min == 0)
                     {
                       // f[:*0..j];g  can be satisfied by X(g).
                       res = next_to_concat();
                     }
-                  while ((cube = isop.next()) != bddfalse)
+                  for (bdd cube : cubes)
                     {
                       auto [dest_bdd, label] =
                         bdd_splitcube(cube, dict_.next_set);
@@ -1013,10 +1038,12 @@ namespace spot
 
               //trace_ltl_bdd(dict_, res);
 
-              minato_isop isop = dict_.isop_of(res);
-              bdd cube;
+              // The loop below calls concat_dests() and recurse(),
+              // hence isop_of(): move the cubes out of the shared
+              // buffer first.
+              std::vector<bdd> cubes = std::move(dict_.isop_of(res));
               res = bddfalse;
-              while ((cube = isop.next()) != bddfalse)
+              for (bdd cube : cubes)
                 {
                   auto [dest_bdd, label] = bdd_splitcube(cube, dict_.next_set);
                   formula dest = dict_.conj_bdd_to_sere(dest_bdd);
@@ -1625,9 +1652,7 @@ namespace spot
                 }
               else
                 {
-                  minato_isop isop = dict_.isop_of(f1);
-                  bdd cube;
-                  while ((cube = isop.next()) != bddfalse)
+                  for (bdd cube : dict_.isop_of(f1))
                     {
                       auto [dest_bdd, label] =
                         bdd_splitcube(cube, dict_.next_set);
@@ -1692,9 +1717,7 @@ namespace spot
               else
                 {
                   bdd res = bddtrue;
-                  minato_isop isop = dict_.isop_of(f1);
-                  bdd cube;
-                  while ((cube = isop.next()) != bddfalse)
+                  for (bdd cube : dict_.isop_of(f1))
                     {
                       auto [dest_bdd, label] =
                         bdd_splitcube(cube, dict_.next_set);
@@ -1922,9 +1945,7 @@ namespace spot
               }
             for (bdd label: minterms_of(all_props, var_set))
               {
-                minato_isop isop = d_.isop_of(t.symbolic & label);
-                bdd cube;
-                while ((cube = isop.next()) != bddfalse)
+                for (bdd cube : d_.isop_of(t.symbolic & label))
                   {
                     auto [dest_bdd, label] = bdd_splitcube(cube, d_.next_set);
                     formula dest = d_.conj_bdd_to_formula(dest_bdd);
@@ -2324,34 +2345,70 @@ namespace spot
         // Of course both formulas are logically equivalent, but the
         // latter is "more deterministic" than the former, so it should
         // be preferred.
-        minato_isop isop =
-          impl_->d->isop_of(bdd_restrict(res, one_prop_set));
-        bdd cube;
-        while ((cube = isop.next()) != bddfalse)
+        //
+        bdd restricted = bdd_restrict(res, one_prop_set);
+
+        auto emit = [&](const std::vector<bdd>& cubes)
           {
-            // When exprop is enabled, the cube was restricted by a
-            // full minterm over var_set, so it holds no atomic
-            // proposition literals and cond is already bddtrue: use
-            // the minterm itself as condition.
-            auto [cond, dest, acc] =
-              impl_->d->split_cube_as_cond_dest_and_acc(cube);
-
-            if (impl_->opts.exprop)
-              cond = one_prop_set;
-
-            // Simplify the formula, if requested.
-            if (impl_->dest_simplifier)
+            for (bdd cube : cubes)
               {
-                dest = impl_->dest_simplifier->simplify(dest);
-                if (dest.is_ff())
-                  continue;
+                // When exprop is enabled, the cube was restricted by
+                // a full minterm over var_set, so it holds no atomic
+                // proposition literals and cond is already bddtrue:
+                // use the minterm itself as condition.
+                auto [cond, dest, acc] =
+                  impl_->d->split_cube_as_cond_dest_and_acc(cube);
+
+                if (impl_->opts.exprop)
+                  cond = one_prop_set;
+
+                // Simplify the formula, if requested.
+                if (impl_->dest_simplifier)
+                  {
+                    dest = impl_->dest_simplifier->simplify(dest);
+                    if (dest.is_ff())
+                      continue;
+                  }
+
+                // Canonicalize if symb_merge is enabled.  This may
+                // translate a formula, hence call isop_of(), which is
+                // why the cubes are moved to a local vector below.
+                if (impl_->opts.symb_merge)
+                  dest = impl_->fc->canonicalize(dest);
+
+                dests.emplace_back(transition(dest, cond, acc));
               }
+          };
 
-            // Canonicalize if symb_merge is enabled.
-            if (impl_->opts.symb_merge)
-              dest = impl_->fc->canonicalize(dest);
-
-            dests.emplace_back(transition(dest, cond, acc));
+        // With EXPROP, ONE_PROP_SET is a full minterm over the atomic
+        // propositions of RES, so RESTRICTED mentions none of them, and
+        // its support is included in positive_vars(): the ISOP may then
+        // assume that every one of its variables is positive-unate and
+        // skip the walk over the positive-variable cube.  Without
+        // EXPROP, ONE_PROP_SET is bddtrue and RESTRICTED is RES itself,
+        // which still contains propositions of either polarity (they
+        // occur negated in guards), so the general ISOP is required:
+        // assuming those to be positive-unate would drop cubes.
+        if (impl_->opts.exprop)
+          {
+            // A proposition left in RESTRICTED would be such a
+            // non-positive-unate variable, and the cubes returned by
+            // isop_all_positive() would not cover RESTRICTED.  Do not
+            // check this with the tempting
+            // bdd_existcomp(bdd_support(restricted), var_set) ==
+            // bddtrue: that allocates BDD nodes, which shifts the node
+            // numbers of everything computed later and makes the
+            // expected outputs depend on whether assertions are
+            // enabled.
+            std::vector<bdd> cubes =
+              std::move(impl_->d->isop_all_positive(restricted));
+            emit(cubes);
+          }
+        else
+          {
+            std::vector<bdd> cubes =
+              std::move(impl_->d->isop_of(restricted));
+            emit(cubes);
           }
       }
 
@@ -2441,9 +2498,10 @@ namespace spot
       return {};
 
     dest_map dests;
-    minato_isop isop = impl_->d->isop_of(res);
-    bdd cube;
-    while ((cube = isop.next()) != bddfalse)
+    // canonicalize() below may translate a formula, hence call
+    // isop_of() and overwrite the shared buffer: move the cubes out.
+    std::vector<bdd> cubes = std::move(impl_->d->isop_of(res));
+    for (bdd cube : cubes)
       {
         auto [cond, dest, acc] =
           impl_->d->split_cube_as_cond_dest_and_acc(cube);
@@ -2503,9 +2561,10 @@ namespace spot
 
     std::vector<fm_simple_edge> edges;
 
-    minato_isop isop = impl_->d->isop_of(res);
-    bdd cube;
-    while ((cube = isop.next()) != bddfalse)
+    // canonicalize() below may translate a formula, hence call
+    // isop_of() and overwrite the shared buffer: move the cubes out.
+    std::vector<bdd> cubes = std::move(impl_->d->isop_of(res));
+    for (bdd cube : cubes)
       {
         auto [cond, dest, acc] =
           impl_->d->split_cube_as_cond_dest_and_acc(cube);

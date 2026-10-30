@@ -143,9 +143,10 @@ namespace spot
 
     std::vector<formula> v;
 
-    minato_isop isop(f);
-    bdd cube;
-    while ((cube = isop.next()) != bddfalse)
+    std::vector<bdd> cubes;
+    bdd_isop(f, cubes);
+    v.reserve(cubes.size());
+    for (bdd cube : cubes)
       v.emplace_back(conj_to_formula<false>(cube, d));
     return formula::Or(std::move(v));
   }
@@ -158,9 +159,10 @@ namespace spot
 
     std::vector<formula> v;
 
-    minato_isop isop(!f);
-    bdd cube;
-    while ((cube = isop.next()) != bddfalse)
+    std::vector<bdd> cubes;
+    bdd_isop(!f, cubes);
+    v.reserve(cubes.size());
+    for (bdd cube : cubes)
       v.emplace_back(conj_to_formula<true>(cube, d));
     return formula::And(std::move(v));
   }

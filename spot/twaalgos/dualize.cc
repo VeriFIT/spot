@@ -148,6 +148,8 @@ namespace spot
         unsigned n = aut_->num_states();
         unsigned n_ap = res->ap().size();
         std::vector<bdd> labels;
+        // Scratch space reused by all calls to create_edges().
+        std::vector<bdd> cubes;
 
         for (unsigned i = 0; i < n; ++i)
           {
@@ -163,10 +165,8 @@ namespace spot
             auto create_edges = [&](bdd label, bdd restricted_delta) {
               // RESTRICTED_DELTA only conjoins state and mark
               // variables positively.
-              minato_isop isop(restricted_delta,
-                               bdd_support(restricted_delta), all_vars_);
-              bdd dest;
-              while ((dest = isop.next()) != bddfalse)
+              bdd_isop(restricted_delta, all_vars_, cubes);
+              for (bdd dest : cubes)
                 {
                   st.clear();
                   acc_cond::mark_t m = bdd_to_state(dest, st);

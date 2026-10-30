@@ -195,11 +195,12 @@ namespace spot
           // our (possibly partial) disjunction.
         }
       }
-    minato_isop isop(label);
-    bdd cube = isop.next();
+    std::vector<bdd> cubes;
+    bdd_isop(label, cubes);
     std::string s3;
-    while (cube != bddfalse)
+    for (std::size_t i = 0; i < cubes.size(); ++i)
       {
+        bdd cube = cubes[i];
         if (notfirstor)
           s += or_str_;
         bool notfirstand = false;
@@ -248,9 +249,7 @@ namespace spot
               break;
             notfirstand = true;
           }
-        bdd nextcube = isop.next();
-
-        if (notfirstand && (notfirstor || nextcube != bddfalse))
+        if (notfirstand && (notfirstor || i + 1 < cubes.size()))
           {
             s += lpar_str_;
             s += s3;
@@ -258,7 +257,6 @@ namespace spot
           }
         else
           s += s3;
-        cube = nextcube;
         notfirstor = true;
       }
     return s;

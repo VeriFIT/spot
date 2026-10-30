@@ -72,10 +72,10 @@ namespace spot
   void outedge_combiner::new_dests(unsigned st, bdd out) const
   {
     // OUT only conjoins state variables positively.
-    minato_isop isop(out, bdd_support(out), vars_);
-    bdd cube;
+    std::vector<bdd> cubes;
+    bdd_isop(out, vars_, cubes);
     std::vector<unsigned> univ_dest;
-    while ((cube = isop.next()) != bddfalse)
+    for (bdd cube : cubes)
       {
         auto [dest, cond] = bdd_splitcube(cube, vars_);
         while (dest != bddtrue)
@@ -481,6 +481,8 @@ namespace spot
         robin_hood::unordered_map<bdd, cached_t, bdd_hash> split_cond;
 
         state_set v;
+        // Scratch space reused by all calls to create_edges().
+        std::vector<bdd> cubes;
         while (!todo.empty())
           {
             if (aborter && aborter->too_large(res))
@@ -502,10 +504,8 @@ namespace spot
             {
               // DEST_FORMULA only conjoins state and mark
               // variables positively.
-              minato_isop isop(dest_formula, bdd_support(dest_formula),
-                               all_vars_);
-              bdd dest;
-              while ((dest = isop.next()) != bddfalse)
+              bdd_isop(dest_formula, all_vars_, cubes);
+              for (bdd dest : cubes)
                 {
                   v.clear();
                   acc_cond::mark_t m = bdd_to_state(dest, v);
@@ -660,7 +660,10 @@ namespace spot
     bdd all_letters_;
     bdd dest_;
     bdd cond_;
-    minato_isop isop_;
+    // Prime implicants of TRANSITIONS_ for the current letter; the
+    // ones following the current destination are still to be visited.
+    std::vector<bdd> dests_;
+    std::size_t next_dest_ = 0;
     const std::map<int, unsigned>& var_to_state_;
     univ_remover_state* dst_ = nullptr;
 
@@ -676,7 +679,7 @@ namespace spot
                                const std::map<int, unsigned>& var_to_state,
                                bdd all_states)
       : transitions_(bddtrue), all_states_(all_states), dest_(bddfalse),
-        cond_(bddfalse), isop_(bddfalse), var_to_state_(var_to_state)
+        cond_(bddfalse), var_to_state_(var_to_state)
     {
       // Build the bdd transitions_, from which we extract the successors.
       for (unsigned s : state->states())
@@ -715,25 +718,26 @@ namespace spot
 
     void one_transition()
     {
-      dest_ = isop_.next();
-      if (dest_ != bddfalse || all_letters_ != bddfalse)
+      // If it was the last transition, try the next letter.
+      while (next_dest_ == dests_.size() && all_letters_ != bddfalse)
         {
-          // If it was the last transition, try the next letter.
-          if (dest_ == bddfalse)
-            {
-              bdd oneletter = bdd_satoneset(all_letters_, ap_, bddfalse);
-              cond_ = oneletter;
-              all_letters_ -= oneletter;
-              // Get a sum of possible transitions matching this letter.
-              // TRANSITIONS_ only conjoins state variables positively.
-              bdd restricted = bdd_restrict(transitions_, oneletter);
-              isop_ = minato_isop(restricted, bdd_support(restricted),
-                                  all_states_);
-              dest_ = isop_.next();
-            }
-          std::set<unsigned> dest = bdd_to_state(dest_);
-          dst_ = new univ_remover_state(dest);
+          bdd oneletter = bdd_satoneset(all_letters_, ap_, bddfalse);
+          cond_ = oneletter;
+          all_letters_ -= oneletter;
+          // Get the sum of possible transitions matching this letter.
+          // TRANSITIONS_ only conjoins state variables positively.
+          bdd restricted = bdd_restrict(transitions_, oneletter);
+          bdd_isop(restricted, all_states_, dests_);
+          next_dest_ = 0;
         }
+      if (next_dest_ == dests_.size())
+        {
+          dest_ = bddfalse;
+          return;
+        }
+      dest_ = dests_[next_dest_++];
+      std::set<unsigned> dest = bdd_to_state(dest_);
+      dst_ = new univ_remover_state(dest);
     }
 
     virtual bool first() override

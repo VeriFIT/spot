@@ -191,10 +191,10 @@ namespace spot
   {
     dict = d.get();
     want_acc = true;
-    minato_isop isop(b);
+    std::vector<bdd> cubes;
+    bdd_isop(b, cubes);
 
-    bdd p;
-    while ((p = isop.next()) != bddfalse)
+    for (bdd p : cubes)
       {
         os << bdd_format_set(d, p);
       }
