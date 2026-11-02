@@ -171,6 +171,10 @@ New in spot 2.16.1.dev  (not yet released)
     explorer it uses was built with a simplifier; see the deprecation
     above.  (Issue #663.)
 
+  - Spot would not compile on case-insensitive file systems, because
+    the file cadical/VERSION was picked up when libc++'s <limits>
+    includes <version>.  (Issue #664.)
+
   - The --ins, --outs, and --unobservable-ins options of ltlfilt,
     ltlsynt, ltlfsynt, and ltlmix, as well as the atomic propositions
     declared in a --part-file, are no longer converted to lower case:

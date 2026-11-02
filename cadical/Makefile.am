@@ -15,7 +15,14 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-AUTOMAKE_OPTIONS = subdir-objects
+# CaDiCaL ships a file called VERSION at the top of its directory.  On
+# case-insensitive file systems, that file would be found when
+# libc++'s <limits> includes <version>, because automake's default
+# DEFAULT_INCLUDES put the build directory (-I.) on the include path of
+# every CaDiCaL source file.  The "nostdinc" option drops those default
+# include directories; CaDiCaL sources include no generated header, and
+# -I$(srcdir)/src (below) is all they need.
+AUTOMAKE_OPTIONS = subdir-objects nostdinc
 
 noinst_LTLIBRARIES = libcadical.la
 
