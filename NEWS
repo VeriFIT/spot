@@ -1,6 +1,22 @@
 New in spot 2.16.1.dev  (not yet released)
 
-  Nothing yet.
+  Library:
+
+  - The "simplifier" argument of ltl_to_tgba_fm(), and the equivalent
+    argument of the ltl_to_tgba_fm_otf() constructor, are deprecated.
+    When given, that simplifier used to simplify the formula
+    representing each state of the automaton before computing its
+    successors, but this is unsound in general, and was not used by
+    Spot in practice, except for the recent otf_satisfiable()
+    addition.  The argument is now only used to simplify the input
+    formula, and will be removed in a future release.  (Issue #663.)
+
+  Bug fixes:
+
+  - ltl_satisfiable() could report an unsatisfiable formula as
+    satisfiable, e.g., G(b -> XXd) & Gb & FG!d, because the on-the-fly
+    explorer it uses was built with a simplifier; see the deprecation
+    above.  (Issue #663.)
 
 New in spot 2.16.1  (2026-10-16)
 

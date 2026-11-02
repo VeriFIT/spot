@@ -59,12 +59,8 @@ namespace spot
       auto dict = make_bdd_dict();
       auto aut = make_twa_graph(dict);
 
-      // The formula has already been put in NNF by ltl_satisfiable(),
-      // but the explorer will simplify it again; this is harmless.
-      tl_simplifier simp(dict);
-
       ltl_to_tgba_fm_otf::options opts;
-      ltl_to_tgba_fm_otf expl(f, aut, opts, &simp);
+      ltl_to_tgba_fm_otf expl(f, aut, opts);
 
       // h: formula → DFS order.  0 = not yet assigned, -1 = dead
       robin_hood::unordered_node_map<formula, int> h;

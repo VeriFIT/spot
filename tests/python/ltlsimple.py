@@ -263,6 +263,10 @@ satisfiability_tests = [
     ('G!a & Fa', False),
     ('G!c & a U (b R c)', False),
     ('G(a <-> X!a) & FGa', False),
+    # Issue #663: simplifying the destination formulas used to rewrite
+    # "Xd & FG!d" as "X(d & FG!d)", which moves the promise of FG!d
+    # under a temporal operator and loses its acceptance mark.
+    ('G(b -> XXd) & Gb & FG!d', False),
 ]
 
 for fstr, expected in satisfiability_tests:

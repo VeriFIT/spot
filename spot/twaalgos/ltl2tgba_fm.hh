@@ -61,11 +61,18 @@ namespace spot
   /// formula are observable events, and \c unobs can be filled with
   /// additional unobservable events.
   ///
-  /// \param simplifier If this parameter is set, the LTL formulas
-  /// representing each state of the automaton will be simplified
-  /// before computing the successor.  \a simpl should be configured
-  /// for the type of reduction you want, see spot::tl_simplifier.
-  /// This idea is taken from \cite thirioux.02.fmics .
+  /// \param simplifier Deprecated.  This argument used to simplify the
+  /// LTL formula representing each state of the automaton before
+  /// computing its successors, an idea taken from
+  /// \cite thirioux.02.fmics .  This is unsound: a simplifier may
+  /// rewrite a destination in a way that moves a promise under a
+  /// temporal operator (e.g., Xd & FG!d is rewritten as X(d & FG!d)),
+  /// while the acceptance marks attached to a transition are collected
+  /// from the unsimplified destination, so the resulting automaton can
+  /// accept too much.  The argument is now only used to simplify \a f
+  /// itself before the translation starts, and it will be removed in a
+  /// future release: call spot::tl_simplifier::simplify() on \a f
+  /// before calling this function instead.
   ///
   /// \param unambiguous When true, unambiguous TGBA will be produced
   /// using the trick described in \cite benedikt.13.tacas .
@@ -125,7 +132,7 @@ namespace spot
   /// the full automaton.  Two views are provided:
   ///
   ///   - succ_as_bdd(): a symbolic BDD view (cached, no exprop)
-  ///   - succ_as_edges(): an explicit edge list (exprop, simplification,
+  ///   - succ_as_edges(): an explicit edge list (exprop,
   ///     canonicalization, and branching postponement applied here)
   ///
   /// The class also exposes accessors so that a client can decompose
@@ -193,7 +200,9 @@ namespace spot
     ///                   register_ap(); the explorer never adds states
     ///                   or edges itself
     /// \param opts       translation options
-    /// \param simplifier optional LTL simplifier (owned by caller)
+    /// \param simplifier deprecated optional LTL simplifier (owned by
+    ///                   the caller); it is now only applied to \a f
+    ///                   itself, see ltl_to_tgba_fm()
     /// \param unobs      optional set of unobservable events
     ltl_to_tgba_fm_otf(formula f, twa_graph_ptr aut,
                 options opts = options(),
@@ -237,8 +246,8 @@ namespace spot
     ///
     /// Internally calls succ_as_bdd(), then extracts edges via
     /// minato_isop (with minterm iteration when exprop is enabled).
-    /// Applies simplification, canonicalization (symb_merge), and
-    /// branching postponement.  Promises are converted to mark_t.
+    /// Applies canonicalization (symb_merge) and branching
+    /// postponement.  Promises are converted to mark_t.
     ///
     /// The acceptance marks returned in fm_edge::acc use negated
     /// Inf semantics; see the class-level documentation for how to
@@ -259,8 +268,8 @@ namespace spot
     /// Internally calls succ_as_bdd(), existentially quantifies all
     /// atomic propositions away (so the BDD only contains Next and
     /// acceptance variables), then extracts (acc, dst) pairs via
-    /// minato_isop.  Applies simplification and canonicalization
-    /// (symb_merge), but skips branching postponement and all
+    /// minato_isop.  Applies canonicalization (symb_merge), but skips
+    /// branching postponement and all
     /// condition-related post-processing.  The \c exprop option is
     /// ignored: since no conditions are extracted, there is no need to
     /// iterate over all combinations of atomic propositions.

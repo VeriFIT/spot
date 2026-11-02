@@ -97,8 +97,6 @@ syntax(char* prog)
     "  -u    use Compositional translation\n"
     "\n"
     "Options for Couvreur's FM algorithm (-f):\n"
-    "  -fr   reduce formula at each step of FM\n"
-    "          as specified with the -r{1..7} options\n"
     "  -fu   build unambiguous automata\n"
     "  -L    fair-loop approximation (implies -f)\n"
     "  -p    branching postponement (implies -f)\n"
@@ -226,7 +224,6 @@ checked_main(int argc, char** argv)
   bool utf8_opt = false;
   enum { NoDegen, DegenTBA, DegenSBA } degeneralize_opt = NoDegen;
   enum { TransFM, TransTAA, TransCompo } translation = TransFM;
-  bool fm_red = false;
   bool fm_exprop_opt = false;
   bool fm_symb_merge_opt = true;
   bool fm_unambiguous = false;
@@ -397,11 +394,6 @@ checked_main(int argc, char** argv)
         }
       else if (!strcmp(argv[formula_index], "-f"))
         {
-          translation = TransFM;
-        }
-      else if (!strcmp(argv[formula_index], "-fr"))
-        {
-          fm_red = true;
           translation = TransFM;
         }
       else if (!strcmp(argv[formula_index], "-fu"))
@@ -874,7 +866,7 @@ checked_main(int argc, char** argv)
                                        post_branching,
                                        fair_loop_approx,
                                        unobservables,
-                                       fm_red ? simp : nullptr,
+                                       nullptr, // no simplifier
                                        fm_unambiguous);
               break;
             case TransCompo:
