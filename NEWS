@@ -155,7 +155,21 @@ New in spot 2.16.1.dev  (not yet released)
     few hundred to tens of thousands of states, this makes
     twa::intersects() about 8 to 9 times faster.
 
+  - The "simplifier" argument of ltl_to_tgba_fm(), and the equivalent
+    argument of the ltl_to_tgba_fm_otf() is deprecated.  When given,
+    that simplifier used to simplify the formula representing each
+    state of the automaton before computing its successors, but this
+    is unsound in general, and was not used by Spot in practice,
+    except for the recent otf_satisfiable() addition.  The argument is
+    now only used to simplify the input formula, and will be removed
+    in a future release.  (Issue #663.)
+
   Bug fixes:
+
+  - ltl_satisfiable() could report an unsatisfiable formula as
+    satisfiable, e.g., G(b -> XXd) & Gb & FG!d, because the on-the-fly
+    explorer it uses was built with a simplifier; see the deprecation
+    above.  (Issue #663.)
 
   - The --ins, --outs, and --unobservable-ins options of ltlfilt,
     ltlsynt, ltlfsynt, and ltlmix, as well as the atomic propositions

@@ -61,11 +61,18 @@ namespace spot
   /// formula are observable events, and \c unobs can be filled with
   /// additional unobservable events.
   ///
-  /// \param simplifier If this parameter is set, the LTL formulas
-  /// representing each state of the automaton will be simplified
-  /// before computing the successor.  \a simpl should be configured
-  /// for the type of reduction you want, see spot::tl_simplifier.
-  /// This idea is taken from \cite thirioux.02.fmics .
+  /// \param simplifier Deprecated.  This argument used to simplify the
+  /// LTL formula representing each state of the automaton before
+  /// computing its successors, an idea taken from
+  /// \cite thirioux.02.fmics .  This is unsound: a simplifier may
+  /// rewrite a destination in a way that moves a promise under a
+  /// temporal operator (e.g., Xd & FG!d is rewritten as X(d & FG!d)),
+  /// while the acceptance marks attached to a transition are collected
+  /// from the unsimplified destination, so the resulting automaton can
+  /// accept too much.  The argument is now only used to simplify \a f
+  /// itself before the translation starts, and it will be removed in a
+  /// future release: call spot::tl_simplifier::simplify() on \a f
+  /// before calling this function instead.
   ///
   /// \param unambiguous When true, unambiguous TGBA will be produced
   /// using the trick described in \cite benedikt.13.tacas .
@@ -206,7 +213,9 @@ namespace spot
     ///                   succ_as_edges() and succ_as_bdd() are
     ///                   expressed in this dict
     /// \param opts       translation options
-    /// \param simplifier optional LTL simplifier (owned by caller)
+    /// \param simplifier deprecated optional LTL simplifier (owned by
+    ///                   the caller); it is now only applied to \a f
+    ///                   itself, see ltl_to_tgba_fm()
     /// \param unobs      optional set of unobservable events
     /// \param owner      an optional identity under which the
     ///                   acceptance and Next variables are
@@ -266,8 +275,8 @@ namespace spot
     ///
     /// Internally calls succ_as_bdd(), then extracts edges via
     /// minato_isop (with minterm iteration when exprop is enabled).
-    /// Applies simplification, canonicalization (symb_merge), and
-    /// branching postponement.  Promises are converted to mark_t.
+    /// Applies canonicalization (symb_merge) and branching
+    /// postponement.  Promises are converted to mark_t.
     ///
     /// The acceptance marks returned in fm_edge::acc use negated
     /// Inf semantics; see the class-level documentation for how to
@@ -441,7 +450,9 @@ public:
   ///                   and the next-state variables decoded by
   ///                   state_from_var() are registered
   /// \param opts       translation options
-  /// \param simplifier optional LTL simplifier (owned by caller)
+  /// \param simplifier deprecated optional LTL simplifier (owned by
+  ///                   the caller); it is now only applied to \a f
+  ///                   itself, see ltl_to_tgba_fm()
   /// \param unobs      optional set of unobservable events
   /// \param owner      identity used to register the variables in \a
   ///                   dict; see ltl_to_tgba_fm_otf
@@ -505,7 +516,7 @@ public:
   ///
   /// Applies the option-dependent machinery of
   /// ltl_to_tgba_fm_otf::succ_as_edges() (exprop, branching
-  /// postponement, simplification, canonicalization) and pairs each
+  /// postponement, canonicalization) and pairs each
   /// transition with its new minimum unfulfilled promise.
   ///
   /// Results are cached.

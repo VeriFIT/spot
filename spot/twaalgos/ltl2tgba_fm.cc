@@ -2091,7 +2091,6 @@ namespace spot
     bdd_dict_ptr dict;
     void* owner = nullptr; // registration identity for the dict
     tl_simplifier* simplifier = nullptr;
-    tl_simplifier* dest_simplifier = nullptr;
     bool owns_simplifier = false;
     const atomic_prop_set* unobs = nullptr;
 
@@ -2144,7 +2143,12 @@ namespace spot
     impl_->owner = owner;
     impl_->unobs = unobs;
 
-    // Simplify / normalize the formula.
+    // Simplify / normalize the formula.  A user-supplied simplifier
+    // is only applied to the input formula, never to the formulas
+    // representing the states of the automaton: simplifying those
+    // would break the correspondence between their promises and the
+    // acceptance marks collected on each transition (see
+    // ltl_to_tgba_fm()).
     tl_simplifier* s = simplifier;
     if (s)
       {
@@ -2157,7 +2161,6 @@ namespace spot
         impl_->owns_simplifier = true;
       }
     impl_->simplifier = s;
-    impl_->dest_simplifier = simplifier;
     assert(f.is_in_nenoform());
 
     // Extract quantifiers.
@@ -2362,14 +2365,6 @@ namespace spot
                 if (impl_->opts.exprop)
                   cond = one_prop_set;
 
-                // Simplify the formula, if requested.
-                if (impl_->dest_simplifier)
-                  {
-                    dest = impl_->dest_simplifier->simplify(dest);
-                    if (dest.is_ff())
-                      continue;
-                  }
-
                 // Canonicalize if symb_merge is enabled.  This may
                 // translate a formula, hence call isop_of(), which is
                 // why the cubes are moved to a local vector below.
@@ -2506,14 +2501,6 @@ namespace spot
         auto [cond, dest, acc] =
           impl_->d->split_cube_as_cond_dest_and_acc(cube);
 
-        // Simplify the formula, if requested.
-        if (impl_->dest_simplifier)
-          {
-            dest = impl_->dest_simplifier->simplify(dest);
-            if (dest.is_ff())
-              continue;
-          }
-
         // Canonicalize if symb_merge is enabled.
         if (impl_->opts.symb_merge)
           dest = impl_->fc->canonicalize(dest);
@@ -2569,14 +2556,6 @@ namespace spot
         auto [cond, dest, acc] =
           impl_->d->split_cube_as_cond_dest_and_acc(cube);
         (void) cond; // unused in this path
-
-        // Simplify the formula, if requested.
-        if (impl_->dest_simplifier)
-          {
-            dest = impl_->dest_simplifier->simplify(dest);
-            if (dest.is_ff())
-              continue;
-          }
 
         // Canonicalize if symb_merge is enabled.
         if (impl_->opts.symb_merge)
