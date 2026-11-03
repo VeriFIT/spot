@@ -153,7 +153,7 @@ namespace spot
   /// the full automaton.  Two views are provided:
   ///
   ///   - succ_as_bdd(): a symbolic BDD view (cached, no exprop)
-  ///   - succ_as_edges(): an explicit edge list (exprop, simplification,
+  ///   - succ_as_edges(): an explicit edge list (exprop,
   ///     canonicalization, and branching postponement applied here)
   ///
   /// The class also exposes accessors so that a client can decompose
@@ -313,8 +313,8 @@ namespace spot
     /// Internally calls succ_as_bdd(), existentially quantifies all
     /// atomic propositions away (so the BDD only contains Next and
     /// acceptance variables), then extracts (acc, dst) pairs via
-    /// minato_isop.  Applies simplification and canonicalization
-    /// (symb_merge), but skips branching postponement and all
+    /// minato_isop.  Applies canonicalization (symb_merge), but skips
+    /// branching postponement and all
     /// condition-related post-processing.  The \c exprop option is
     /// ignored: since no conditions are extracted, there is no need to
     /// iterate over all combinations of atomic propositions.
