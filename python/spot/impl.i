@@ -583,6 +583,7 @@ namespace std {
   %template(vectorunsignedchar) vector<unsigned char>;
   %template(vectorvectorunsigned) vector<vector<unsigned>>;
   %template(vectorvectorint) vector<vector<int>>;
+  %template(vectorvectorstring) vector<vector<string>>;
   %template(vectorpairunsigned) vector<pair<unsigned, unsigned>>;
   %template(vectoracccond) vector<spot::acc_cond>;
   %template(vectoracccode) vector<spot::acc_cond::acc_code>;

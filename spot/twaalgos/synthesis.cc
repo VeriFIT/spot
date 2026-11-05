@@ -27,6 +27,13 @@
 #include <spot/twaalgos/mealy_machine.hh>
 #include <spot/twaalgos/sbacc.hh>
 #include <spot/twaalgos/synthesis.hh>
+#include <spot/tl/apcollect.hh>
+#include <spot/twa/bdddict.hh>
+#include <spot/twa/twa.hh>
+#include <spot/twa/twagraph.hh>
+#include <spot/twaalgos/aiger.hh>
+#include <spot/twaalgos/game.hh>
+#include <spot/twaalgos/mtdswa.hh>
 #include <spot/twaalgos/translate.hh>
 #include <spot/twaalgos/zlktree.hh>
 #include <spot/twaalgos/toparity.hh>
@@ -36,9 +43,18 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <map>
+#include <regex>
+#include <set>
+#include <stdexcept>
 #include <string>
 #include <stack>
 #include <variant>
+#include <set>
+#include <stdexcept>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #ifndef NDEBUG
 #include <spot/twaalgos/hoa.hh>
@@ -3048,6 +3064,42 @@ namespace spot
     return split_independent_formulas(parse_formula(f), outs);
   }
 
+  formula
+  get_negated_assumptions(formula f)
+  {
+    std::vector<formula> assumptions;
+
+    auto add_antecedent = [&](formula a)
+    {
+      if (a.is(op::And))
+        {
+          for (formula c : a)
+            assumptions.push_back(c);
+        }
+      else
+        assumptions.push_back(a);
+    };
+
+    if (f.is(op::Implies))
+      {
+        add_antecedent(f[0]);
+      }
+    else if (f.is(op::And))
+      {
+        for (formula c : f)
+          if (c.is(op::Implies))
+            add_antecedent(c[0]);
+      }
+    else
+      {
+        return formula();
+      }
+
+    if (assumptions.empty())
+      return formula();
+    return formula::Not(formula::And(assumptions));
+  }
+
   bool
   solve_game(twa_graph_ptr arena, synthesis_info& gi)
   {
@@ -3165,4 +3217,1214 @@ namespace spot
     arena_r.unregister_ap(arena_r.register_ap(out_mark_s));
   }
 
+
+  namespace
+  {
+    // Deep copy a Mealy machine, preserving named properties such as
+    // "synthesis-outputs" and "state-player".
+    twa_graph_ptr
+    clone_graph(const const_twa_graph_ptr& g)
+    {
+      return make_twa_graph(g, twa::prop_set::all(), true);
+    }
+  }
+
+  struct synthesis_problem::data
+  {
+    // Input data.
+    formula original_f;
+    std::vector<std::string> input_aps;
+    std::vector<std::string> output_aps;
+    std::vector<std::string> unobs_aps;
+    synthesis_info si;
+
+    // Simplification and decomposition state.
+    std::vector<std::string> input_and_unobs;
+    std::unique_ptr<realizability_simplifier> rs;
+    bool prepared_global = false;
+    bool prepared_sub = false;
+    bool sub_mapping_merged = false;
+    formula f;
+    std::vector<formula> sub_form;
+    std::vector<std::unique_ptr<realizability_simplifier>> sub_rs;
+    std::vector<std::set<formula>> sub_outs;
+    std::vector<std::vector<std::string>> sub_outs_str;
+    std::vector<formula> unobs_vec;
+    std::unique_ptr<bdd_dict_preorder> preorder;
+
+    // Negated-assumption pre-check state (item 1 of the report in
+    // issue #665).  This is computed at most once, and reused when the
+    // solution is rebuilt in another representation.
+    bool precheck_done = false;
+    bool precheck_accepted = false;
+    mealy_like precheck_machine;
+
+    // Solving state.
+    bool solved = false;
+    bool solved_with_strategy = false;
+    bool solved_split = false;
+    bool realizable = false;
+    bool assumptions_violated = false;
+    bool assumptions_checked = false;
+    bool precheck_used = false;
+    std::vector<mealy_like> mealy_machines;
+    std::vector<twa_graph_ptr> raw_sub_strategies;
+    std::vector<twa_graph_ptr> sub_strategies_;
+    twa_graph_ptr strategy_;
+    std::vector<twa_graph_ptr> games_;
+    bool games_built = false;
+
+    // AIG cache.
+    std::string aig_mode;
+    aig_ptr aig_;
+
+    unsigned simplification_options() const;
+    void prepare_global();
+    void prepare_sub();
+    void merge_sub_mappings();
+    void prepare();
+    void reset_solution();
+    mealy_like solve_one(formula f,
+                         const std::vector<std::string>& outs_str,
+                         bool want_strategy,
+                         bool split_out,
+                         bool use_obligation);
+    bool run_precheck();
+    void accept_precheck(bool want_strategy, bool split_out);
+    void solve_impl(bool want_strategy, bool split_out);
+    void check_strategy(const twa_graph_ptr& strategy) const;
+    void detect_assumptions_violated();
+  };
+
+  unsigned
+  synthesis_problem::data::simplification_options() const
+  {
+    unsigned opt = 0;
+    if (si.polarity != synthesis_info::simplification_stage::never)
+      opt |= realizability_simplifier::polarity;
+    if (si.global_equiv != synthesis_info::simplification_stage::never)
+      opt |= si.game_output_only
+        ? realizability_simplifier::global_equiv_output_only
+        : (si.moore
+           ? realizability_simplifier::global_equiv_moore
+           : realizability_simplifier::global_equiv);
+    return opt;
+  }
+
+  void
+  synthesis_problem::data::prepare_global()
+  {
+    if (prepared_global)
+      return;
+    prepared_global = true;
+    f = original_f;
+
+    // Attempt to remove superfluous atomic propositions.
+    if (si.polarity != synthesis_info::simplification_stage::never
+        || si.global_equiv != synthesis_info::simplification_stage::never)
+      {
+        input_and_unobs.reserve(input_aps.size() + unobs_aps.size());
+        input_and_unobs.insert(input_and_unobs.end(),
+                               input_aps.begin(), input_aps.end());
+        input_and_unobs.insert(input_and_unobs.end(),
+                               unobs_aps.begin(), unobs_aps.end());
+
+        rs = std::make_unique<realizability_simplifier>(
+          original_f, input_and_unobs, simplification_options(),
+          si.verbose_stream);
+        f = rs->simplified_formula();
+      }
+
+    if (si.decompose)
+      {
+        auto subs = split_independent_formulas(f, output_aps);
+        if (si.verbose_stream)
+          *si.verbose_stream << "there are "
+                             << subs.first.size()
+                             << " subformulas\n";
+        if (subs.first.size() > 1)
+          {
+            sub_form = std::move(subs.first);
+            sub_outs = std::move(subs.second);
+          }
+      }
+
+    // When trying to split the formula, we can apply transformations
+    // that increase its size.  This is why we use the original formula
+    // if it has not been cut.
+    if (sub_form.empty())
+      {
+        sub_form = { f };
+        sub_outs.resize(1);
+        if (rs)
+          {
+            std::set<formula> removed_outputs;
+            for (auto [from, from_is_input, to] : rs->get_mapping())
+              {
+                (void) to;
+                if (!from_is_input)
+                  removed_outputs.insert(from);
+              }
+            for (const std::string& apstr: output_aps)
+              {
+                formula ap = formula::ap(apstr);
+                if (!removed_outputs.contains(ap))
+                  sub_outs[0].insert(ap);
+              }
+          }
+        else
+          {
+            for (const std::string& apstr: output_aps)
+              sub_outs[0].insert(formula::ap(apstr));
+          }
+      }
+
+    if (si.bv)
+      si.bv->sub_specs = sub_form.size();
+
+    sub_outs_str.reserve(sub_outs.size());
+    for (const auto& forms: sub_outs)
+      {
+        std::vector<std::string> r;
+        r.reserve(forms.size());
+        for (auto f: forms)
+          r.push_back(f.ap_name());
+        sub_outs_str.push_back(std::move(r));
+      }
+
+    assert((sub_form.size() == sub_outs.size())
+           && (sub_form.size() == sub_outs_str.size()));
+  }
+
+  void
+  synthesis_problem::data::prepare_sub()
+  {
+    if (prepared_sub)
+      return;
+    prepared_sub = true;
+
+    // Apply per-subformula polarity/global-equiv simplifications
+    // before checking which subformulas are obligations, so that the
+    // coming BDD variable preorder is set correctly.
+    if (sub_form.size() > 1
+        && (si.polarity
+              == synthesis_info::simplification_stage::
+                   before_and_after_decomposition
+            || si.global_equiv
+              == synthesis_info::simplification_stage::
+                   before_and_after_decomposition))
+      {
+        unsigned opt = 0;
+        if (si.polarity
+            == synthesis_info::simplification_stage::
+                 before_and_after_decomposition)
+          opt |= realizability_simplifier::polarity;
+        if (si.global_equiv
+            == synthesis_info::simplification_stage::
+                 before_and_after_decomposition)
+          opt |= si.game_output_only
+            ? realizability_simplifier::global_equiv_output_only
+            : (si.moore
+               ? realizability_simplifier::global_equiv_moore
+               : realizability_simplifier::global_equiv);
+        if (si.verbose_stream)
+          *si.verbose_stream << "attempting to simplify subformulas\n";
+        for (auto& sf: sub_form)
+          {
+            if (si.verbose_stream)
+              *si.verbose_stream << "considering subformula " << sf << '\n';
+            auto rsub = std::make_unique<realizability_simplifier>(
+              sf, input_and_unobs, opt, si.verbose_stream);
+            sf = rsub->simplified_formula();
+            sub_rs.push_back(std::move(rsub));
+          }
+      }
+
+    bool has_oblig = false;
+    if (si.obligation_synthesis)
+      for (const formula& sf: sub_form)
+        if (sf.is_syntactic_obligation())
+          {
+            has_oblig = true;
+            break;
+          }
+
+    if (has_oblig)
+      {
+        // For Mealy semantics, inputs should appear first in the
+        // MTBDDs.  For Moore semantics, outputs should be first.
+        // Pre-registering those variables will ensure that.  We want
+        // to register them in the order they are found in the formula,
+        // this way variables that are used together are more likely to
+        // be close in the order.
+        std::vector<unsigned char> come_first;
+        come_first.resize(formula::apid_count(), 0U);
+
+        unsigned val = si.moore ? 2 : 1;
+        for (const std::string& s: input_aps)
+          come_first[formula::ap(s).apid()] = val;
+        val = 3 - val;
+        for (const std::string& s: output_aps)
+          come_first[formula::ap(s).apid()] = val;
+
+        unobs_vec.reserve(unobs_aps.size());
+        for (const std::string& s: unobs_aps)
+          {
+            formula ap = formula::ap(s);
+            come_first[ap.apid()] = 3;
+            unobs_vec.push_back(ap);
+          }
+
+        preorder = std::make_unique<bdd_dict_preorder>(si.dict);
+        f.traverse([&](const formula& f) {
+          if (!f.is(op::ap))
+            return false;
+          if (come_first[f.apid()] == 1)
+            preorder->register_proposition(f);
+          return false;
+        });
+        // obligation_synthesis() will register output variables, and
+        // then all quantified variables.  If Moore semantics are used
+        // we have already registered output variables, but if
+        // quantified variables are used, let's register input
+        // variables too, so that quantified variables are put below.
+        if (si.moore && (!unobs_aps.empty() || f.is_quantified()))
+          {
+            f.traverse([&](const formula& f) {
+              if (!f.is(op::ap))
+                return false;
+              if (come_first[f.apid()] == 2)
+                preorder->register_proposition(f);
+              return false;
+            });
+          }
+      }
+  }
+
+  void
+  synthesis_problem::data::merge_sub_mappings()
+  {
+    if (sub_mapping_merged)
+      return;
+    sub_mapping_merged = true;
+    if (!rs)
+      return;
+    // The mapping of a subformula is only valid inside that
+    // subformula, so it is merged into the global mapping only when a
+    // complete strategy (or an AIG) is built.
+    for (auto& rsub: sub_rs)
+      rs->merge_mapping(*rsub);
+  }
+
+  void
+  synthesis_problem::data::prepare()
+  {
+    prepare_global();
+    prepare_sub();
+  }
+
+  void
+  synthesis_problem::data::reset_solution()
+  {
+    solved = false;
+    solved_with_strategy = false;
+    solved_split = false;
+    realizable = false;
+    assumptions_violated = false;
+    assumptions_checked = false;
+    precheck_used = false;
+    mealy_machines.clear();
+    raw_sub_strategies.clear();
+    sub_strategies_.clear();
+    strategy_ = nullptr;
+    aig_ = nullptr;
+    aig_mode.clear();
+    if (si.bv)
+      {
+        si.bv = synthesis_info::bench_var{};
+        si.bv->sub_specs = sub_form.size();
+      }
+  }
+
+  mealy_like
+  synthesis_problem::data::solve_one(
+    formula f,
+    const std::vector<std::string>& outs_str,
+    bool want_strategy,
+    bool split_out,
+    bool use_obligation)
+  {
+    mealy_like m_like
+      {
+        mealy_like::realizability_code::UNKNOWN,
+        nullptr,
+        bddfalse
+      };
+
+    auto& bv = si.bv;
+
+    if (use_obligation && si.obligation_synthesis
+        && f.is_syntactic_obligation())
+      {
+        if (si.verbose_stream)
+          *si.verbose_stream << ("formula is an obligation; "
+                                 "solving with the on-the-fly "
+                                 "construction\n");
+        stopwatch sw;
+        if (bv)
+          sw.start();
+        formula sf = f;
+        if (!unobs_vec.empty())
+          sf = formula::forall(unobs_vec, sf);
+        mtdswa_ptr aut =
+          obligation_synthesis(sf, si.dict, outs_str,
+                               !want_strategy);
+        if (bv)
+          {
+            auto delta = sw.stop();
+            bv->sum_trans_time += delta;
+            if (si.verbose_stream)
+              *si.verbose_stream << "solving done in " << delta
+                                 << " seconds\n";
+          }
+        if (aut->acc.is_f())
+          {
+            m_like.success =
+              mealy_like::realizability_code::UNREALIZABLE;
+          }
+        else
+          {
+            m_like.success =
+              mealy_like::realizability_code::REALIZABLE_REGULAR;
+            if (want_strategy)
+              {
+                if (bv)
+                  sw.start();
+                m_like.mealy_like =
+                  mtdswa_strategy_to_mealy(aut, false, false);
+                if (bv)
+                  {
+                    bv->sum_strat2aut_time += sw.stop();
+                    unsigned ns = m_like.mealy_like->num_states();
+                    unsigned ne = m_like.mealy_like->num_edges();
+                    if (std::tie(bv->max_strat_states,
+                                 bv->max_strat_edges)
+                        < std::tie(ns, ne))
+                      {
+                        bv->max_strat_states = ns;
+                        bv->max_strat_edges = ne;
+                      }
+                    bv->sum_strat_states += ns;
+                    bv->sum_strat_edges += ne;
+                  }
+              }
+          }
+      }
+    else
+      {
+        if (si.use_bypass && unobs_aps.empty())
+          m_like = try_create_direct_strategy(f, outs_str, si,
+                                              want_strategy);
+
+        if (m_like.success == mealy_like::realizability_code::UNKNOWN)
+          {
+            auto arena = ltl_to_game(f, outs_str, si, &unobs_aps);
+#ifndef NDEBUG
+            auto spptr =
+              arena->get_named_prop<std::vector<bool>>("state-player");
+            assert(spptr);
+            assert((spptr->at(arena->get_init_state_number()) == si.moore)
+                   && "incorrect first player");
+#endif
+            if (bv)
+              {
+                unsigned ns = arena->num_states();
+                unsigned nc = arena->num_sets();
+                if (std::tie(bv->max_game_states, bv->max_game_colors)
+                    < std::tie(ns, nc))
+                  {
+                    bv->max_game_states = ns;
+                    bv->max_game_colors = nc;
+                  }
+              }
+            if (!solve_game(arena, si))
+              {
+                m_like.success =
+                  mealy_like::realizability_code::UNREALIZABLE;
+                m_like.mealy_like = nullptr;
+                m_like.glob_cond = bddfalse;
+                return m_like;
+              }
+            m_like.success =
+              mealy_like::realizability_code::REALIZABLE_REGULAR;
+            if (want_strategy)
+              {
+                m_like.mealy_like = solved_game_to_mealy(arena, si);
+                m_like.glob_cond = bddfalse;
+              }
+          }
+      }
+
+    switch (m_like.success)
+      {
+      case mealy_like::realizability_code::UNREALIZABLE:
+        return m_like;
+
+      case mealy_like::realizability_code::UNKNOWN:
+        SPOT_UNREACHABLE();
+
+      case mealy_like::realizability_code::REALIZABLE_REGULAR:
+        assert(!want_strategy
+               || (m_like.mealy_like
+                   && "Expected success but found no mealy!"));
+        if (want_strategy)
+          simplify_mealy_here(m_like.mealy_like, si, split_out);
+        return m_like;
+
+      case mealy_like::realizability_code::REALIZABLE_DTGBA:
+        return m_like;
+      }
+    SPOT_UNREACHABLE();
+  }
+
+  bool
+  synthesis_problem::data::run_precheck()
+  {
+    if (precheck_done)
+      return precheck_accepted;
+    precheck_done = true;
+
+    // The pre-check is only needed when the syntactic decomposition
+    // would actually split the specification: otherwise the ordinary
+    // solver already handles the assumptions correctly.
+    if (!si.decompose || sub_form.size() <= 1)
+      return false;
+
+    // rs holds the mapping of the global simplification only: the
+    // mappings of the subformulas are merged by merge_sub_mappings(),
+    // which runs after this pre-check, because they are not
+    // necessarily valid for the whole specification.  This also means
+    // the simplifier is run only once.
+    formula neg_ass = get_negated_assumptions(f);
+    if (!neg_ass)
+      return false;
+
+    if (si.verbose_stream)
+      *si.verbose_stream << "checking the negation of the assumptions: "
+                         << neg_ass << '\n';
+
+    // Solve the negation of the assumptions without decomposing it
+    // again.  There is no need for the on-the-fly obligation path
+    // here, and disabling it avoids having to set up the MTBDD
+    // variable preorder for this formula.
+    mealy_like m =
+      solve_one(neg_ass, output_aps, true, true, false);
+    if (m.success != mealy_like::realizability_code::REALIZABLE_REGULAR
+        || !m.mealy_like)
+      return false;
+
+    // When several implications are conjoined, the candidate strategy
+    // may satisfy the negation of all assumptions while violating one
+    // of the guarantees.  Check it against the complete specification
+    // before accepting it.
+    twa_graph_ptr cand = m.mealy_like;
+    if (cand->get_named_prop<region_t>("state-player"))
+      cand = unsplit_mealy(cand);
+    cand = clone_graph(cand);
+    if (rs)
+      rs->patch_mealy(cand);
+    try
+      {
+        check_strategy(cand);
+      }
+    catch (const std::runtime_error&)
+      {
+        if (si.verbose_stream)
+          *si.verbose_stream
+            << "the negated-assumption strategy does not satisfy the "
+               "specification; falling back to decomposition\n";
+        return false;
+      }
+
+    precheck_machine = std::move(m);
+    precheck_accepted = true;
+    return true;
+  }
+
+  void
+  synthesis_problem::data::accept_precheck(bool want_strategy,
+                                           bool split_out)
+  {
+    assumptions_violated = true;
+    assumptions_checked = true;
+    precheck_used = true;
+    realizable = true;
+    if (si.bv)
+      si.bv->realizable = true;
+
+    if (want_strategy)
+      {
+        if (split_out)
+          {
+            mealy_machines.clear();
+            mealy_machines.push_back(precheck_machine);
+          }
+        else
+          {
+            twa_graph_ptr raw = precheck_machine.mealy_like;
+            if (raw->get_named_prop<region_t>("state-player"))
+              raw = unsplit_mealy(raw);
+            twa_graph_ptr patched = clone_graph(raw);
+            if (rs)
+              rs->patch_mealy(patched);
+            sub_strategies_.clear();
+            sub_strategies_.push_back(std::move(patched));
+            strategy_ = clone_graph(raw);
+            if (rs)
+              rs->patch_mealy(strategy_);
+          }
+        solved_with_strategy = true;
+        solved_split = split_out;
+      }
+    solved = true;
+  }
+
+  void
+  synthesis_problem::data::solve_impl(bool want_strategy, bool split_out)
+  {
+    if (solved)
+      {
+        if (!want_strategy)
+          return;
+        if (solved_with_strategy && solved_split == split_out)
+          return;
+        reset_solution();
+      }
+
+    stopwatch sw_total;
+    if (si.bv)
+      sw_total.start();
+
+    prepare();
+
+    auto finish = [&]()
+    {
+      if (si.bv)
+        si.bv->total_time = sw_total.stop();
+    };
+
+    // Item 1 of the report in issue #665: before decomposing, check
+    // whether the negation of the assumptions is realizable.  If so,
+    // the strategy violating the assumptions also solves the
+    // specification.
+    if (run_precheck())
+      {
+        accept_precheck(want_strategy, split_out);
+        finish();
+        return;
+      }
+
+    // Only a complete strategy needs the mappings of the subformulas;
+    // applying them any earlier would pollute the pre-check above.
+    merge_sub_mappings();
+
+    for (size_t i = 0; i < sub_form.size(); ++i)
+      {
+        if (sub_form.size() > 1 && si.verbose_stream)
+          *si.verbose_stream << "working on subformula "
+                             << sub_form[i] << '\n';
+
+        mealy_like m_like = solve_one(sub_form[i], sub_outs_str[i],
+                                      want_strategy, split_out, true);
+        switch (m_like.success)
+          {
+          case mealy_like::realizability_code::UNREALIZABLE:
+            realizable = false;
+            finish();
+            return;
+
+          case mealy_like::realizability_code::UNKNOWN:
+            SPOT_UNREACHABLE();
+
+          case mealy_like::realizability_code::REALIZABLE_REGULAR:
+          case mealy_like::realizability_code::REALIZABLE_DTGBA:
+            if (want_strategy)
+              mealy_machines.push_back(std::move(m_like));
+            break;
+          }
+      }
+
+    realizable = true;
+    if (si.bv)
+      si.bv->realizable = true;
+
+    if (want_strategy)
+      {
+        assert(mealy_machines.size() == sub_form.size()
+               && "There is a subformula for which no mealy-like object"
+               " has been created.");
+
+        // When split_out is true the machines are only needed by aig().
+        // Otherwise build the user-facing separated strategies now, in
+        // the same order as the historical ltlsynt pipeline.
+        if (!split_out)
+          {
+            raw_sub_strategies.clear();
+            sub_strategies_.clear();
+            for (auto& ml: mealy_machines)
+              {
+                if (!ml.mealy_like || !is_mealy(ml.mealy_like))
+                  throw std::runtime_error("synthesis_problem: strategy is "
+                                           "not a Mealy machine");
+                raw_sub_strategies.push_back(ml.mealy_like);
+                twa_graph_ptr patched = clone_graph(ml.mealy_like);
+                if (rs)
+                  rs->patch_mealy(patched);
+                sub_strategies_.push_back(std::move(patched));
+              }
+
+            if (raw_sub_strategies.size() == 1)
+              strategy_ = clone_graph(raw_sub_strategies[0]);
+            else
+              {
+                strategy_ = raw_sub_strategies[0];
+                for (size_t i = 1; i < raw_sub_strategies.size(); ++i)
+                  strategy_ = mealy_product(strategy_,
+                                            raw_sub_strategies[i]);
+              }
+            if (rs)
+              rs->patch_mealy(strategy_);
+          }
+        solved_with_strategy = true;
+        solved_split = split_out;
+      }
+
+    solved = true;
+    finish();
+  }
+
+  void
+  synthesis_problem::data::check_strategy(const twa_graph_ptr& strategy) const
+  {
+    const char* incomplete_machine =
+      si.moore
+      ? "Strategy is not an output-complete Moore machine"
+      : "Strategy is not an input-complete Mealy machine";
+    const char* nondeterministic_machine =
+      "Strategy is not an input-deterministic machine";
+
+    unsigned num_states = strategy->num_states();
+    if (num_states == 0)
+      throw std::runtime_error(incomplete_machine);
+
+    translator trans(si.dict, &si.opt);
+    twa_graph_ptr neg_spec = trans.run(formula::Not(original_f));
+
+    if (neg_spec->intersects(strategy))
+      throw std::runtime_error("Strategy and negated specification "
+                               "do intersect");
+
+    bdd bdd_outs;
+    try
+      {
+        bdd_outs = get_synthesis_outputs(strategy);
+      }
+    catch (const std::runtime_error& error)
+      {
+        assert(std::string(error.what())
+               == "get_synthesis_outputs(): synthesis-outputs not defined");
+        throw std::runtime_error("Outputs are not defined");
+      }
+
+    // For Moore: we check output-consistency (all edges from a state
+    // must agree on the output), plus input-completeness and
+    // input-determinism.
+    // For Mealy: we check input-completeness and input-determinism.
+    if (si.moore)
+      {
+        bdd bdd_ins = bdd_exist(strategy->ap_vars(), bdd_outs);
+        for (unsigned state = 0; state < num_states; ++state)
+          {
+            bdd bdd_state_input = bddfalse;
+            bdd output_cond = bddfalse;
+            for (const auto& edge: strategy->out(state))
+              {
+                bdd edge_out = bdd_exist(edge.cond, bdd_ins);
+                bdd edge_in = bdd_exist(edge.cond, bdd_outs);
+                if (output_cond == bddfalse)
+                  output_cond = edge_out;
+                else if (edge_out != output_cond)
+                  throw std::runtime_error("Strategy has inconsistent "
+                                           "output (not a Moore machine)");
+                if (bdd_have_common_assignment(edge_in, bdd_state_input))
+                  throw std::runtime_error(nondeterministic_machine);
+                bdd_state_input |= edge_in;
+              }
+            if (bdd_state_input != bddtrue)
+              throw std::runtime_error(incomplete_machine);
+          }
+      }
+    else
+      {
+        for (unsigned state = 0; state < num_states; ++state)
+          {
+            bdd bdd_state_cond = bddfalse;
+            for (const auto& edge: strategy->out(state))
+              {
+                bdd edge_cond = bdd_exist(edge.cond, bdd_outs);
+                if (bdd_have_common_assignment(edge_cond, bdd_state_cond))
+                  throw std::runtime_error(nondeterministic_machine);
+                bdd_state_cond |= edge_cond;
+              }
+            if (bdd_state_cond != bddtrue)
+              throw std::runtime_error(incomplete_machine);
+          }
+      }
+  }
+
+  // The pre-check can only flag the solution it builds itself.  When
+  // the specification is not split into independent conjuncts, the
+  // ordinary solver is used instead, and it may well return a strategy
+  // that never satisfies the assumptions (this is the only way to
+  // answer specifications that are not realizable under the
+  // assumptions).  Detect that case so that
+  // assumptions_violated() stays accurate.
+  void
+  synthesis_problem::data::detect_assumptions_violated()
+  {
+    if (assumptions_checked)
+      return;
+    assumptions_checked = true;
+    if (assumptions_violated || !realizable || !strategy_)
+      return;
+
+    formula neg_ass = get_negated_assumptions(original_f);
+    if (!neg_ass)
+      return;
+
+    // The strategy violates the assumptions iff none of its behaviours
+    // satisfy them, i.e. iff it does not intersect the assumptions
+    // A = not (not A).
+    translator trans(si.dict, &si.opt);
+    twa_graph_ptr ass = trans.run(formula::Not(neg_ass));
+    if (!ass->intersects(strategy_))
+      assumptions_violated = true;
+  }
+
+  namespace
+  {
+    // Classification of an atomic proposition, mirroring the
+    // --ins/--outs/--unobservable-ins options of ltlsynt.
+    enum class ap_type
+    {
+      input,
+      output,
+      unobservable
+    };
+
+    // Element of an input/output list: either a proposition name, or
+    // a regular expression between slashes.
+    static bool
+    is_a_pattern(const std::string& s)
+    {
+      return s.size() >= 2 && s.front() == '/' && s.back() == '/';
+    }
+
+    static std::vector<std::regex>
+    compile_patterns(const std::vector<std::string>& patterns,
+                     const char* list)
+    {
+      std::vector<std::regex> res;
+      for (const std::string& p: patterns)
+        if (is_a_pattern(p))
+          try
+            {
+              res.emplace_back(p.substr(1, p.size() - 2));
+            }
+          catch (const std::regex_error& e)
+            {
+              throw std::invalid_argument("invalid regular expression " + p
+                                          + " in the " + list + " list: "
+                                          + e.what());
+            }
+      return res;
+    }
+
+    static bool
+    matches(const std::vector<std::regex>& regexes, const std::string& ap)
+    {
+      for (const std::regex& r: regexes)
+        if (std::regex_search(ap, r))
+          return true;
+      return false;
+    }
+
+    // Decide in which class a proposition that was not named exactly
+    // falls.  \a ins_given, \a outs_given, and \a unobs_given tell
+    // which lists the user provided; unclassified propositions are
+    // inferred from them, as in ltlsynt.
+    static ap_type
+    find_ap_type(const std::string& ap,
+                 const std::vector<std::regex>& regex_in,
+                 const std::vector<std::regex>& regex_out,
+                 const std::vector<std::regex>& regex_unobs,
+                 bool ins_given, bool outs_given, bool unobs_given)
+    {
+      bool found_unobs = matches(regex_unobs, ap);
+      bool found_in = !found_unobs && matches(regex_in, ap);
+      bool found_out = matches(regex_out, ap);
+      bool has_input_specs = ins_given || unobs_given;
+
+      if (has_input_specs == outs_given)
+        {
+          if (!has_input_specs)
+            {
+              // Nothing was specified: guess from the first letter.
+              switch (ap[0])
+                {
+                case 'i':
+                case 'I':
+                  found_in = true;
+                  break;
+                case 'o':
+                case 'O':
+                  found_out = true;
+                  break;
+                case 'u':
+                case 'U':
+                  found_unobs = true;
+                  break;
+                }
+            }
+          if (found_in && found_out)
+            throw std::invalid_argument("'" + ap + "' matches both the "
+                                        "input and the output list");
+          if (found_unobs && found_out)
+            throw std::invalid_argument("'" + ap + "' matches both the "
+                                        "unobservable-input and the "
+                                        "output list");
+          if (!found_in && !found_out && !found_unobs)
+            {
+              if (has_input_specs && !ins_given)
+                // Only outputs (and maybe unobservable inputs) were
+                // given, so the inputs were not specified.
+                found_in = true;
+              else if (unobs_given && !ins_given)
+                throw std::invalid_argument("one of the input, "
+                                            "unobservable-input, or "
+                                            "output lists should match '"
+                                            + ap + "'");
+              else if (has_input_specs || outs_given)
+                throw std::invalid_argument("one of the input or output "
+                                            "lists should match '"
+                                            + ap + "'");
+              else
+                throw std::invalid_argument("since '" + ap + "' does not "
+                                            "start with 'i', 'o', or 'u', "
+                                            "it is unclear whether it is "
+                                            "an input, an output, or an "
+                                            "unobservable input; give the "
+                                            "input or output list");
+            }
+        }
+      else
+        {
+          // Only one side was specified.
+          if (outs_given && !found_out)
+            found_in = true;
+          else if (ins_given && !outs_given && !found_in && !found_unobs)
+            found_out = true;
+          else if (!found_unobs && !found_in && !found_out)
+            throw std::invalid_argument("one of the input, "
+                                        "unobservable-input, or output "
+                                        "lists should match '" + ap + "'");
+        }
+      if (found_unobs)
+        return ap_type::unobservable;
+      if (found_in)
+        return ap_type::input;
+      return ap_type::output;
+    }
+
+    struct ap_partition
+    {
+      std::vector<std::string> ins;
+      std::vector<std::string> outs;
+      std::vector<std::string> unobs;
+    };
+
+    // Split the atomic propositions of \a f into inputs, outputs, and
+    // unobservable inputs, following the rules of the ltlsynt options.
+    // The synthesis pipeline relies on such a partition: propositions
+    // that would be left out are treated as inputs by some stages and
+    // as outputs by others.
+    static ap_partition
+    classify_aps(formula f,
+                 const std::vector<std::string>* input_aps,
+                 const std::vector<std::string>* output_aps,
+                 const std::vector<std::string>* unobs_aps)
+    {
+      // An unspecified list is a null pointer, while a specified one
+      // may be empty (as with "--ins=" on the command line).
+      static const std::vector<std::string> no_list;
+      const std::vector<std::string>& ins =
+        input_aps ? *input_aps : no_list;
+      const std::vector<std::string>& outs =
+        output_aps ? *output_aps : no_list;
+      const std::vector<std::string>& unobs =
+        unobs_aps ? *unobs_aps : no_list;
+
+      // First, handle the propositions that are named exactly, and
+      // diagnose conflicts.  An unobservable input is also an input,
+      // so naming it in both lists is not a conflict.
+      std::map<std::string, ap_type> named;
+      std::vector<std::string> named_order;
+      for (const std::string& n: ins)
+        if (!is_a_pattern(n) && named.try_emplace(n, ap_type::input).second)
+          named_order.push_back(n);
+      for (const std::string& n: unobs)
+        if (!is_a_pattern(n))
+          {
+            auto [it, is_new] = named.try_emplace(n, ap_type::unobservable);
+            if (is_new)
+              named_order.push_back(n);
+            else if (it->second == ap_type::input)
+              it->second = ap_type::unobservable;
+          }
+      for (const std::string& n: outs)
+        if (!is_a_pattern(n))
+          {
+            auto [it, is_new] = named.try_emplace(n, ap_type::output);
+            if (is_new)
+              named_order.push_back(n);
+            else if (it->second == ap_type::input)
+              throw std::invalid_argument("'" + n + "' appears in both "
+                                          "the input and the output "
+                                          "lists");
+            else if (it->second == ap_type::unobservable)
+              throw std::invalid_argument("'" + n + "' appears in both "
+                                          "the unobservable-input and "
+                                          "the output lists");
+          }
+
+      auto regex_in = compile_patterns(ins, "input");
+      auto regex_out = compile_patterns(outs, "output");
+      auto regex_unobs = compile_patterns(unobs, "unobservable-input");
+
+      ap_partition res;
+      std::set<std::string> seen;
+      auto add = [&](const std::string& n, ap_type t)
+        {
+          switch (t)
+            {
+            case ap_type::input:
+              res.ins.push_back(n);
+              break;
+            case ap_type::output:
+              res.outs.push_back(n);
+              break;
+            case ap_type::unobservable:
+              res.unobs.push_back(n);
+              break;
+            }
+          seen.insert(n);
+        };
+      // Named propositions keep the order in which they were given.
+      for (const std::string& n: named_order)
+        add(n, named[n]);
+
+      // Classify the remaining propositions, in order of appearance.
+      bool ins_given = input_aps != nullptr;
+      bool outs_given = output_aps != nullptr;
+      bool unobs_given = unobs_aps != nullptr;
+      std::vector<std::string> aps;
+      f.traverse([&](const formula& g)
+                 {
+                   if (g.is(op::ap))
+                     {
+                       std::string n = g.ap_name();
+                       if (!seen.contains(n))
+                         aps.push_back(std::move(n));
+                     }
+                   return false;
+                 });
+      for (const std::string& ap: aps)
+        add(ap, find_ap_type(ap, regex_in, regex_out, regex_unobs,
+                             ins_given, outs_given, unobs_given));
+      return res;
+    }
+  }
+
+  synthesis_problem::synthesis_problem(
+    formula f,
+    const std::vector<std::string>* input_aps,
+    const std::vector<std::string>* output_aps,
+    const std::vector<std::string>* unobservable_aps,
+    synthesis_info si)
+    : data_(new data)
+  {
+    ap_partition part = classify_aps(f, input_aps, output_aps,
+                                     unobservable_aps);
+    data_->original_f = f;
+    data_->input_aps = std::move(part.ins);
+    data_->output_aps = std::move(part.outs);
+    data_->unobs_aps = std::move(part.unobs);
+    data_->si = std::move(si);
+    // Always collect statistics in the problem object; the caller can
+    // inspect them with statistics().
+    data_->si.bv = synthesis_info::bench_var{};
+  }
+
+  synthesis_problem::~synthesis_problem() = default;
+
+  bool
+  synthesis_problem::is_realizable()
+  {
+    data_->solve_impl(false, false);
+    return data_->realizable;
+  }
+
+  twa_graph_ptr
+  synthesis_problem::strategy()
+  {
+    data_->solve_impl(true, false);
+    return data_->strategy_;
+  }
+
+  const std::vector<twa_graph_ptr>&
+  synthesis_problem::sub_strategies()
+  {
+    data_->solve_impl(true, false);
+    return data_->sub_strategies_;
+  }
+
+  aig_ptr
+  synthesis_problem::aig(const char* mode)
+  {
+    data_->solve_impl(true, true);
+    if (!data_->realizable)
+      return nullptr;
+
+    if (data_->aig_ && data_->aig_mode == mode)
+      return data_->aig_;
+
+    stopwatch sw;
+    if (data_->si.bv)
+      sw.start();
+    std::vector<std::vector<std::string>> outs_for_aig;
+    if (data_->precheck_used)
+      outs_for_aig.push_back(data_->output_aps);
+    else
+      outs_for_aig = data_->sub_outs_str;
+    data_->aig_ = mealy_machines_to_aig(data_->mealy_machines, mode,
+                                        data_->input_aps,
+                                        outs_for_aig,
+                                        data_->rs.get());
+    if (data_->si.bv)
+      {
+        auto& bv = data_->si.bv;
+        bv->aig_time = sw.stop();
+        bv->aig_latches = data_->aig_->num_latches();
+        bv->aig_gates = data_->aig_->num_gates();
+      }
+    data_->aig_mode = mode;
+    return data_->aig_;
+  }
+
+  const std::vector<twa_graph_ptr>&
+  synthesis_problem::games()
+  {
+    auto& d = *data_;
+    if (d.games_built)
+      return d.games_;
+
+    stopwatch sw;
+    if (d.si.bv)
+      sw.start();
+    d.prepare();
+    d.merge_sub_mappings();
+
+    d.games_.reserve(d.sub_form.size());
+    for (size_t i = 0; i < d.sub_form.size(); ++i)
+      {
+        auto arena = ltl_to_game(d.sub_form[i], d.sub_outs_str[i],
+                                 d.si, &d.unobs_aps);
+        if (d.rs)
+          d.rs->patch_game(arena);
+        d.games_.push_back(std::move(arena));
+      }
+    d.games_built = true;
+    if (d.si.bv)
+      d.si.bv->total_time = sw.stop();
+    return d.games_;
+  }
+
+  const std::vector<formula>&
+  synthesis_problem::sub_specifications()
+  {
+    static const std::vector<formula> empty;
+    data_->prepare();
+    if (data_->precheck_used)
+      return empty;
+    return data_->sub_form;
+  }
+
+  const std::vector<std::vector<std::string>>&
+  synthesis_problem::sub_outputs()
+  {
+    static const std::vector<std::vector<std::string>> empty;
+    data_->prepare();
+    if (data_->precheck_used)
+      return empty;
+    return data_->sub_outs_str;
+  }
+
+  bool
+  synthesis_problem::assumptions_violated() const
+  {
+    // Answering this needs the strategy, so solve on demand.  This is
+    // a diagnostic: building the strategy eagerly would slow down the
+    // callers that only need is_realizable().
+    if (!data_->solved
+        || (data_->realizable && !data_->solved_with_strategy))
+      data_->solve_impl(true, false);
+    data_->detect_assumptions_violated();
+    return data_->assumptions_violated;
+  }
+
+  const synthesis_info&
+  synthesis_problem::options() const
+  {
+    return data_->si;
+  }
+
+  const synthesis_info::bench_var&
+  synthesis_problem::statistics() const
+  {
+    return *data_->si.bv;
+  }
+
+  void
+  synthesis_problem::verify_strategy()
+  {
+    data_->solve_impl(true, false);
+    if (!data_->realizable || !data_->strategy_)
+      throw std::runtime_error("synthesis_problem::verify_strategy(): "
+                               "no strategy to verify");
+    data_->check_strategy(data_->strategy_);
+  }
+
+  void
+  synthesis_problem::verify_aig(const const_aig_ptr& circuit)
+  {
+    if (!circuit)
+      throw std::runtime_error("synthesis_problem::verify_aig(): "
+                               "no circuit to verify");
+    translator trans(data_->si.dict, &data_->si.opt);
+    auto neg_spec = trans.run(formula::Not(data_->original_f));
+    auto saigaut = circuit->as_automaton(false);
+    if (neg_spec->intersects(saigaut))
+      throw std::runtime_error("Aiger and negated specification do "
+                               "intersect: circuit is not OK.");
+  }
 } // spot

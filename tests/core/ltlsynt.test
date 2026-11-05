@@ -825,6 +825,17 @@ there are 2 subformulas
 attempting to simplify subformulas
 considering subformula (b & (b | y)) -> y
 considering subformula (a | x) -> x
+checking the negation of the assumptions: !(b & (a | x) & (b | y))
+trying to create strategy directly for !(b & (a | x) & (b | y))
+direct strategy might exist but was not found.
+translating formula done in X seconds
+automaton has 2 states and 0 colors
+LAR construction done in X seconds
+DPA has 2 states, 0 colors
+split inputs and outputs done in X seconds
+automaton has 6 states
+solving game with acceptance: co-Büchi
+game solved in X seconds
 working on subformula (b & (b | y)) -> y
 trying to create strategy directly for (b & (b | y)) -> y
 direct strategy might exist but was not found.
@@ -975,6 +986,17 @@ attempting to simplify subformulas
 considering subformula a -> b
 considering subformula a -> c
 considering subformula a -> d
+checking the negation of the assumptions: !a
+trying to create strategy directly for !a
+direct strategy might exist but was not found.
+translating formula done in X seconds
+automaton has 2 states and 0 colors
+LAR construction done in X seconds
+DPA has 2 states, 0 colors
+split inputs and outputs done in X seconds
+automaton has 5 states
+solving game with acceptance: co-Büchi
+game solved in X seconds
 working on subformula a -> b
 trying to create strategy directly for a -> b
 direct strategy might exist but was not found.
@@ -1888,5 +1910,25 @@ grep -F 'forall a: (G(a -> b) & G(b -> a))' err
 for algo in ds sd acd lar lar.old; do
     ltlsynt -f 'o2 <-> (Fi1 <-> (1 U !Fo2))' --algo=$algo --verify || exit 1
 done
+
+# Item 1 of the report in issue #665: before decomposing, ltlsynt must
+# check whether the negation of the assumptions is realizable.  Both
+# specifications below are realizable by violating the assumptions, so
+# they must not be reported as unrealizable by the decomposition.
+test 'REALIZABLE' = "$(ltlsynt \
+  -f '(G(i -> o1) & G(o2 <-> j)) -> (G(i & o1) & F o2)' \
+  --ins=i,j --outs=o1,o2 --realizability --decompose=yes \
+  --bypass=no --pol=no --global-equivalence=no)"
+ltlsynt -f '(G(i -> o1) & G(o2 <-> j)) -> (G(i & o1) & F o2)' \
+        --ins=i,j --outs=o1,o2 --decompose=yes \
+        --bypass=no --pol=no --global-equivalence=no --verify >/dev/null
+
+test 'REALIZABLE' = "$(ltlsynt \
+  -f '(GF(p & (x->q)) & GF!(p & (x->q))) -> (X false & G(q->p))' \
+  --ins=x --outs=p,q --realizability --decompose=yes \
+  --bypass=no --pol=no --global-equivalence=no)"
+ltlsynt -f '(GF(p & (x->q)) & GF!(p & (x->q))) -> (X false & G(q->p))' \
+        --ins=x --outs=p,q --decompose=yes \
+        --bypass=no --pol=no --global-equivalence=no --verify >/dev/null
 
 :

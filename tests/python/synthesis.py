@@ -55,3 +55,138 @@ gi.dict = game_ref.get_dict()
 game = spot.ltl_to_game("GFa", [], gi)
 
 tc.assertTrue(spot.are_equivalent(game, game_ref))
+
+# The synthesis_problem class, with the simplification stages disabled so
+# that the decomposition really happens (as in the ltlsynt regression
+# tests of item 1 of the report in issue #665).
+def no_simplification():
+    si = spot.synthesis_info()
+    si.use_bypass = False
+    si.polarity = spot.synthesis_info.simplification_stage_never
+    si.global_equiv = spot.synthesis_info.simplification_stage_never
+    return si
+
+# In both specifications below the negation of the assumptions is
+# realizable, so the specification is realizable by violating the
+# assumptions.  Before the fix, the decomposition reported them as
+# unrealizable.
+for f, ins, outs in [
+        ("(G(i -> o1) & G(o2 <-> j)) -> (G(i & o1) & F o2)",
+         ["i", "j"], ["o1", "o2"]),
+        ("(GF(p & (x->q)) & GF!(p & (x->q))) -> (X false & G(q->p))",
+         ["x"], ["p", "q"])]:
+    pr = spot.synthesis_problem(spot.formula(f), ins, outs, [],
+                                no_simplification())
+    tc.assertTrue(pr.is_realizable())
+    tc.assertTrue(pr.assumptions_violated())
+    # The pre-check solves the negation of the assumptions, so there is
+    # no sub-specification to report.
+    tc.assertEqual(len(pr.sub_specifications()), 0)
+    tc.assertEqual(len(pr.sub_outputs()), 0)
+    st = pr.strategy()
+    tc.assertIsNotNone(st)
+    # The strategy falsifies the assumptions, so it does not intersect
+    # the negated specification.
+    pr.verify_strategy()
+    circuit = pr.aig("ite")
+    tc.assertIsNotNone(circuit)
+    pr.verify_aig(circuit)
+    tc.assertIsNotNone(pr.statistics())
+
+# The pre-check is only performed when the specification is decomposed.
+# Without decomposition the ordinary solver is used, so the problem is
+# reported as a single sub-specification, but the flag stays accurate:
+# the strategy it returns still violates the assumptions.
+si = no_simplification()
+si.decompose = False
+pr = spot.synthesis_problem(
+    spot.formula("(GF(p & (x->q)) & GF!(p & (x->q))) -> "
+                 "(X false & G(q->p))"),
+    ["x"], ["p", "q"], [], si)
+tc.assertTrue(pr.is_realizable())
+tc.assertTrue(pr.assumptions_violated())
+tc.assertEqual(len(pr.sub_specifications()), 1)
+tc.assertIsNotNone(pr.strategy())
+pr.verify_strategy()
+
+# A single conjunct never triggers the pre-check, yet the flag must
+# report the strategy violating the assumptions: X false is only
+# realizable by falsifying G(o1 <-> j).
+pr = spot.synthesis_problem(spot.formula("G(o1 <-> j) -> X false"),
+                            ["j"], ["o1"], [], no_simplification())
+tc.assertTrue(pr.is_realizable())
+tc.assertTrue(pr.assumptions_violated())
+tc.assertEqual(len(pr.sub_specifications()), 1)
+tc.assertIsNotNone(pr.strategy())
+pr.verify_strategy()
+
+# Here the negation of the assumptions is not realizable, because i is
+# an input and the specification cannot force it to be false.  The
+# pre-check must decline, no strategy can violate the assumptions, and
+# the usual strategy must be returned.
+pr = spot.synthesis_problem(spot.formula("G(i) -> G(o1)"), ["i"], ["o1"],
+                            [], no_simplification())
+tc.assertTrue(pr.is_realizable())
+tc.assertFalse(pr.assumptions_violated())
+tc.assertEqual(len(pr.sub_specifications()), 1)
+tc.assertEqual(list(pr.sub_outputs()[0]), ["o1"])
+tc.assertEqual(len(pr.games()), 1)
+tc.assertTrue(pr.options().decompose)
+pr.verify_strategy()
+
+# The proposition lists are read like ltlsynt's --ins and --outs: each
+# element is either a name or a /regex/, None means the list was not
+# specified, and the side that is not specified is inferred.
+f = spot.formula("G(i1 <-> X o1)")
+circuit = spot.synthesis_problem(f, ["i1"], ["o1"]).aig("ite")
+tc.assertIsNotNone(circuit)
+for ins, outs in [(["i1"], None),        # o1 is inferred to be output
+                  (None, ["o1"]),        # i1 is inferred to be input
+                  (["/^i/"], None)]:     # regex matching i1
+    pr = spot.synthesis_problem(f, ins, outs)
+    tc.assertEqual(pr.aig("ite").to_str(), circuit.to_str())
+
+# When no list is given, propositions are classified by their first
+# letter, as in ltlsynt.
+tc.assertTrue(spot.synthesis_problem(spot.formula("G(i <-> X o)")
+                                     ).is_realizable())
+
+# An empty list is not an unspecified one: with an empty input list and
+# an output list, the outputs must cover the whole specification.
+tc.assertRaises(ValueError, spot.synthesis_problem, f, [], ["o1"])
+# With an empty input list and no output list, the outputs are
+# inferred, so the x of G(x) is an output (as with --ins=), and the
+# specification is realizable.
+tc.assertIsNotNone(spot.synthesis_problem(spot.formula("G(x)"),
+                                          [], None).aig("ite"))
+# With an empty output list and no input list, x is an input (as with
+# --outs=), and the specification is unrealizable.
+tc.assertIsNone(spot.synthesis_problem(spot.formula("G(x)"),
+                                       None, []).aig("ite"))
+
+# A proposition cannot belong to both sides, and both sides together
+# must cover the specification.
+for spec, ins, outs, unobs in [
+        # p matches no list, although both are given
+        ("G(i <-> X (o & p))", ["i"], ["o"], None),
+        # o is listed in both
+        ("G(o)", ["i", "o"], ["o"], None),
+        # every proposition matches both patterns
+        ("G(i -> o)", ["/./"], ["/./"], None),
+        # u matches the unobservable and the output patterns
+        ("G(u -> i)", None, ["/u/"], ["/u/"]),
+        ]:
+    tc.assertRaises(ValueError, spot.synthesis_problem,
+                    spot.formula(spec), ins, outs, unobs)
+
+# Without any list, a proposition whose first letter says nothing is
+# ambiguous.
+tc.assertRaises(ValueError, spot.synthesis_problem,
+                spot.formula("G(p <-> X q)"))
+
+# Unobservable inputs are also inputs, but they are declared apart; the
+# side that is not specified is still inferred.
+for ins in (["i"], None):
+    pr = spot.synthesis_problem(spot.formula("G((i & u) -> o)"),
+                                ins, ["o"], ["u"])
+    tc.assertTrue(pr.is_realizable())

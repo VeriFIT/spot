@@ -18,7 +18,12 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include <spot/twa/twagraph.hh>
+#include <spot/twaalgos/aiger.hh>
 #include <spot/twaalgos/game.hh>
 #include <spot/twaalgos/relabel.hh>
 #include <bddx.h>
@@ -48,6 +53,14 @@ namespace spot
       EXPL,  // Explicit enumerations of inputs
       SEMISYM,  // Works on one bdd per env state
       FULLYSYM  // Works on a fully symbolic version of the automaton
+    };
+
+    /// \brief When to apply realizability-preserving simplifications.
+    enum class simplification_stage
+    {
+      never,                          ///< Never simplify.
+      before_decomposition,           ///< Simplify only before decomposition.
+      before_and_after_decomposition  ///< Also simplify each sub-specification.
     };
 
     /// \brief Benchmarking variables tracking timing and counts for
@@ -134,6 +147,29 @@ namespace spot
     option_map opt; ///< Additional options.
     bool moore; ///< Use Moore (output-first) semantics instead of Mealy.
     bdd_dict_ptr dict; ///< BDD dictionary.
+    /// \brief Whether to decompose the specification into independent
+    /// sub-specifications.
+    bool decompose = true;
+    /// \brief Whether to try the direct-strategy bypass before building
+    /// a game.
+    bool use_bypass = true;
+    /// \brief Whether to use on-the-fly MTBDD-based synthesis for
+    /// syntactic obligations.
+    bool obligation_synthesis = true;
+    /// \brief When to remove atomic propositions with a single polarity.
+    simplification_stage polarity =
+      simplification_stage::before_and_after_decomposition;
+    /// \brief When to remove atomic propositions that are always
+    /// equivalent to another one.
+    simplification_stage global_equiv =
+      simplification_stage::before_and_after_decomposition;
+    /// \brief Restrict global-equivalence simplifications to
+    /// output/output equivalences.
+    ///
+    /// This is required when the game is going to be printed: moves
+    /// are separated in a game, so equivalences between an input and
+    /// an output cannot be recovered by patch_game().
+    bool game_output_only = false;
   };
 
   /// \addtogroup synthesis Reactive Synthesis
@@ -314,6 +350,20 @@ namespace spot
   /// @}
 
   /// \ingroup synthesis
+  /// \brief Return the negation of the assumptions of \a f.
+  ///
+  /// If \a f is an implication `A → G`, return `¬A`.  If \a f is a
+  /// conjunction, collect the antecedents of all its top-level
+  /// implications and return their negated conjunction.  This is the
+  /// `getNegAss()` pre-check of the compositional-synthesis algorithm
+  /// of Finkbeiner et al.  Input-only conjuncts of \a f are ignored
+  /// (they cannot be assumptions of an implication), but they are
+  /// still part of the specification checked by the caller.
+  ///
+  /// Returns a null formula when \a f has no top-level implication.
+  SPOT_API formula get_negated_assumptions(formula f);
+
+  /// \ingroup synthesis
   /// \brief Creates a strategy for the formula given by calling all
   ///        intermediate steps
   ///
@@ -378,4 +428,176 @@ namespace spot
   relabel_game_here(twa_graph_ptr& arena,
                     game_relabeling_map& rel_maps);
 
+
+  /// \ingroup synthesis
+  /// \brief One reactive-synthesis problem.
+  ///
+  /// This object stores a specification, the partition of its atomic
+  /// propositions into inputs and outputs (plus optional unobservable
+  /// inputs), and a #spot::synthesis_info structure controlling the
+  /// synthesis pipeline.
+  ///
+  /// The expensive stages (simplification, decomposition, solving,
+  /// strategy extraction, and AIG encoding) are performed lazily and
+  /// memoized.  However each entry point tunes the pipeline for the
+  /// artefact it returns: is_realizable() may avoid building any
+  /// strategy, while strategy() and aig() enable the optimizations
+  /// that make that artefact smaller.  Asking for one artefact and
+  /// then for another can therefore solve the problem twice, so call
+  /// directly for what you need: a null strategy() or aig() already
+  /// answers the realizability question.
+  ///
+  /// This class is not thread-safe.
+  class SPOT_API synthesis_problem
+  {
+  public:
+    /// \brief Build a reactive-synthesis problem.
+    ///
+    /// The three lists classify the atomic propositions of \a f, using
+    /// the same rules as the --ins, --outs, and --unobservable-ins
+    /// options of ltlsynt.  An element of a list is either the name of
+    /// a proposition, or a regular expression enclosed in slashes that
+    /// is matched (with std::regex_search) against those names.  A
+    /// proposition may be an output, an input, or an unobservable
+    /// input, but it cannot be both an output and an input: the latter
+    /// case is an error.
+    ///
+    /// A proposition matched by none of the lists is inferred: it is
+    /// an output when only \a input_aps (and possibly \a
+    /// unobservable_aps) is given, an input when only \a output_aps is
+    /// given, and an error when both sides are given.  When none of
+    /// the three lists is given, propositions are classified by their
+    /// first letter ('i' for inputs, 'o' for outputs, 'u' for
+    /// unobservable inputs), and an ambiguous proposition is an error.
+    ///
+    /// The three lists are passed by pointer so that a list that is
+    /// not specified (a null pointer) can be distinguished from a list
+    /// that specifies nothing (a pointer to an empty vector): the
+    /// former triggers the inference above, exactly like omitting the
+    /// --ins, --outs, or --unobservable-ins option of ltlsynt, while
+    /// the latter is taken literally, like passing --ins= with an
+    /// empty argument.  In Python, pass None for an unspecified list
+    /// and [] for an empty one.
+    ///
+    /// std::invalid_argument is thrown when the lists are inconsistent
+    /// or leave a proposition unclassified, and when a regular
+    /// expression is invalid.
+    ///
+    /// \param f The specification.
+    /// \param input_aps Patterns selecting the input propositions, or
+    ///        nullptr when the inputs are not specified.
+    /// \param output_aps Patterns selecting the output propositions,
+    ///        or nullptr when the outputs are not specified.
+    /// \param unobservable_aps Patterns selecting additional
+    ///        unobservable input propositions, or nullptr when they are
+    ///        not specified.
+    /// \param si Synthesis options and statistics.
+    synthesis_problem(formula f,
+                      const std::vector<std::string>* input_aps = nullptr,
+                      const std::vector<std::string>* output_aps = nullptr,
+                      const std::vector<std::string>* unobservable_aps
+                      = nullptr,
+                      synthesis_info si = {});
+
+    ~synthesis_problem();
+
+    synthesis_problem(const synthesis_problem&) = delete;
+    synthesis_problem& operator=(const synthesis_problem&) = delete;
+
+    // --- Solving services -----------------------------------------
+
+    /// \brief Check realizability.
+    ///
+    /// This avoids building the strategy when the selected algorithms
+    /// can decide realizability without it.  Use it only when no
+    /// controller is wanted: strategy() and aig() decide realizability
+    /// as well, with the optimizations suited to the artefact they
+    /// return.
+    bool is_realizable();
+
+    /// \brief Return a controller as a Mealy machine.
+    ///
+    /// Returns nullptr when the specification is unrealizable, so this
+    /// also answers the realizability question.
+    twa_graph_ptr strategy();
+
+    /// \brief Return one controller per sub-specification.
+    ///
+    /// The returned vector has size one when no decomposition was
+    /// used, and is empty when the specification is unrealizable.
+    const std::vector<twa_graph_ptr>& sub_strategies();
+
+    /// \brief Encode the strategy (or sub-strategies) as an AIG.
+    ///
+    /// \param mode Encoding mode, as documented by
+    ///        spot::mealy_machine_to_aig().
+    /// Returns nullptr when the specification is unrealizable, so this
+    /// also answers the realizability question.
+    aig_ptr aig(const char* mode = "ite");
+
+    // --- Games and decomposition ----------------------------------
+
+    /// \brief Return the games corresponding to the syntactic
+    /// decomposition.
+    ///
+    /// This does not solve anything and does not perform the
+    /// negated-assumption pre-check.  The returned vector has size one
+    /// when no decomposition was used.
+    const std::vector<twa_graph_ptr>& games();
+
+    /// \brief Return the sub-specifications used by the solver.
+    ///
+    /// This is empty when the negated-assumption pre-check produced
+    /// the solution, because no sub-specification was solved then.
+    const std::vector<formula>& sub_specifications();
+
+    /// \brief Return the output propositions of each sub-specification.
+    const std::vector<std::vector<std::string>>& sub_outputs();
+
+    /// \brief Whether the returned strategy violates the assumptions.
+    ///
+    /// This is true when the strategy has no behaviour satisfying the
+    /// assumptions: it then solves the negation of the assumptions
+    /// instead of enforcing the guarantees (item 1 of the report in
+    /// issue #665).
+    ///
+    /// The negated-assumption pre-check establishes this directly.
+    /// When the specification is not split into independent conjuncts
+    /// that pre-check is not used, so the strategy is compared with
+    /// the assumptions instead.  That comparison requires the
+    /// strategy: calling this function may therefore have to solve the
+    /// problem.
+    ///
+    /// The assumptions are the left-hand side of the top-level
+    /// implication, or of each top-level implication of a conjunction.
+    /// A formula without such an implication has no assumptions to
+    /// violate, so the flag is false for it.
+    bool assumptions_violated() const;
+
+    // --- Configuration and statistics -----------------------------
+
+    /// \brief Return the options used by this problem.
+    const synthesis_info& options() const;
+
+    /// \brief Return benchmarking data collected while solving.
+    const synthesis_info::bench_var& statistics() const;
+
+    // --- Verification ---------------------------------------------
+
+    /// \brief Verify strategy() against the original specification.
+    ///
+    /// Throws std::runtime_error if the strategy is invalid or does
+    /// not satisfy the specification.
+    void verify_strategy();
+
+    /// \brief Verify an AIG against the original specification.
+    ///
+    /// Throws std::runtime_error if the circuit is invalid or does not
+    /// satisfy the specification.
+    void verify_aig(const const_aig_ptr& circuit);
+
+  private:
+    struct data;
+    std::unique_ptr<data> data_;
+  };
 }

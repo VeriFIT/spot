@@ -281,18 +281,31 @@ static const char* const polarity_args[] =
     "before-decompose",
     nullptr
   };
-enum polarity_choice { pol_no, pol_yes, pol_before_decompose };
-static polarity_choice polarity_values[] =
+static spot::synthesis_info::simplification_stage polarity_values[] =
   {
-    pol_yes, pol_yes, pol_yes, pol_yes,
-    pol_no, pol_no, pol_no, pol_no,
-    pol_before_decompose
+    spot::synthesis_info::simplification_stage::
+      before_and_after_decomposition,
+    spot::synthesis_info::simplification_stage::
+      before_and_after_decomposition,
+    spot::synthesis_info::simplification_stage::
+      before_and_after_decomposition,
+    spot::synthesis_info::simplification_stage::
+      before_and_after_decomposition,
+    spot::synthesis_info::simplification_stage::never,
+    spot::synthesis_info::simplification_stage::never,
+    spot::synthesis_info::simplification_stage::never,
+    spot::synthesis_info::simplification_stage::never,
+    spot::synthesis_info::simplification_stage::before_decomposition
   };
 ARGMATCH_VERIFY(polarity_args, polarity_values);
 
 bool opt_decompose_ltl = true;
-polarity_choice opt_polarity = pol_yes;
-polarity_choice opt_gequiv = pol_yes;
+spot::synthesis_info::simplification_stage opt_polarity =
+  spot::synthesis_info::simplification_stage::
+    before_and_after_decomposition;
+spot::synthesis_info::simplification_stage opt_gequiv =
+  spot::synthesis_info::simplification_stage::
+    before_and_after_decomposition;
 
 static const char* const simplify_args[] =
   {
@@ -340,16 +353,8 @@ namespace
   }
 
   static void
-  dispatch_print_hoa(spot::twa_graph_ptr& game,
-                     const spot::realizability_simplifier* rs = nullptr)
+  dispatch_print_hoa(const spot::const_twa_graph_ptr& game)
   {
-    // Add any AP we removed. This is a game, so player moves are
-    // separated.  Consequently at this point we cannot deal with
-    // removed signals such as "o1 <-> i2": if the game has to be
-    // printed, we can only optimize for signals such as o1 <-> o2.
-    if (rs)
-      rs->patch_game(game);
-
     if (opt_dot)
       spot::print_dot(std::cout, game, opt_dot_arg);
     else if (opt_print_pg)
@@ -488,581 +493,149 @@ namespace
     outf.close(opt_csv);
   }
 
-  const char*
-  is_valid_strategy(const spot::formula& f, spot::twa_graph_ptr solution)
-  {
-    const char* incomplete_machine =
-        opt_semantics == semantics_moore
-        ? "Strategy is not an output-complete Moore machine"
-        : "Strategy is not an input-complete Mealy machine";
-    const char* nondeterministic_machine =
-        "Strategy is not an input-deterministic machine";
-
-    unsigned num_states = solution->num_states();
-    if (num_states == 0)
-      return incomplete_machine;
-
-    spot::translator trans(gi->dict, &gi->opt);
-    spot::twa_graph_ptr neg_spec = trans.run(spot::formula::Not(f));
-
-    if (neg_spec->intersects(solution))
-      return "Strategy and negated specification do intersect";
-
-    bdd bdd_outs;
-    try {
-      bdd_outs = get_synthesis_outputs(solution);
-    }
-    catch (const std::runtime_error& error)
-    {
-      assert(strcmp(error.what(),
-              "get_synthesis_outputs(): synthesis-outputs not defined") == 0);
-      return "Outputs are not defined";
-    }
-    // For Moore: we check output-consistency (all edges from a state
-    // must agree on the output), plus input-completeness and
-    // input-determinism.
-    // For Mealy: we check input-completeness and input-determinism.
-    if (opt_semantics == semantics_moore)
-      {
-        bdd bdd_ins = bdd_exist(solution->ap_vars(), bdd_outs);
-        for (unsigned state = 0; state < num_states; ++state)
-        {
-          bdd bdd_state_input = bddfalse;
-          bdd output_cond = bddfalse;
-          for (const auto &edge : solution->out(state))
-          {
-            bdd edge_out = bdd_exist(edge.cond, bdd_ins);
-            bdd edge_in = bdd_exist(edge.cond, bdd_outs);
-            // Output consistency: all edges from a state must agree on output
-            if (output_cond == bddfalse)
-              output_cond = edge_out;
-            else if (edge_out != output_cond)
-              return "Strategy has inconsistent output (not a Moore machine)";
-            // Input determinism: no two edges share an input assignment
-            if (bdd_have_common_assignment(edge_in, bdd_state_input))
-              return nondeterministic_machine;
-            bdd_state_input |= edge_in;
-          }
-          if (bdd_state_input != bddtrue)
-            return incomplete_machine;
-        }
-      }
-    else
-      {
-        for (unsigned state = 0; state < num_states; ++state)
-        {
-          bdd bdd_state_cond = bddfalse;
-          for (const auto &edge : solution->out(state))
-          {
-            bdd edge_cond = bdd_exist(edge.cond, bdd_outs);
-            if (bdd_have_common_assignment(edge_cond, bdd_state_cond))
-              return nondeterministic_machine;
-            bdd_state_cond |= edge_cond;
-          }
-          if (bdd_state_cond != bddtrue)
-            return incomplete_machine;
-        }
-      }
-    return nullptr;
-  }
-
   static int
   solve_formula(spot::formula original_f,
                 const std::vector<std::string>& input_aps,
                 const std::vector<std::string>& output_aps,
                 const std::vector<std::string>& unobs_aps)
   {
-    if (opt_semantics == semantics_moore)
-      gi->moore = true;
-    spot::formula f = original_f;
+    gi->moore = (opt_semantics == semantics_moore);
+    gi->decompose = opt_decompose_ltl;
+    gi->use_bypass = opt_bypass;
+    gi->obligation_synthesis = opt_obligation_synthesis;
+    gi->polarity = opt_polarity;
+    gi->global_equiv = opt_gequiv;
+    gi->game_output_only = want_game();
+
     if (opt_csv)              // reset benchmark data
       gi->bv = spot::synthesis_info::bench_var();
 
-    spot::stopwatch sw;
-    if (gi->bv)
-      sw.start();
+    spot::synthesis_problem p(original_f, &input_aps, &output_aps,
+                              &unobs_aps, *gi);
 
-    auto safe_tot_time = [&]()
-    {
-      if (gi->bv)
-        gi->bv->total_time = sw.stop();
-    };
-
-
-    // union of inputs_aps and unobs_aps, only filled if the
-    // realizability_simplifier is set.
-    std::vector<std::string> input_and_unobs;
-
-    // Attempt to remove superfluous atomic propositions
-    std::unique_ptr<spot::realizability_simplifier> rs = nullptr;
-    if (opt_polarity != pol_no || opt_gequiv != pol_no)
+    auto sync_stats = [&]()
       {
-        input_and_unobs.reserve(input_aps.size() + unobs_aps.size());
-        input_and_unobs.insert(input_and_unobs.end(),
-                               input_aps.begin(), input_aps.end());
-        input_and_unobs.insert(input_and_unobs.end(),
-                               unobs_aps.begin(), unobs_aps.end());
+        if (p.options().bv)
+          gi->bv = *p.options().bv;
+      };
 
-        unsigned opt = 0;
-        if (opt_polarity != pol_no)
-          opt |= spot::realizability_simplifier::polarity;
-        if (opt_gequiv != pol_no)
-          {
-            if (want_game())
-              opt |= spot::realizability_simplifier::global_equiv_output_only;
-            else if (opt_semantics == semantics_moore)
-              opt |= spot::realizability_simplifier::global_equiv_moore;
-            else
-              opt |= spot::realizability_simplifier::global_equiv;
-          }
-        rs.reset(new spot::realizability_simplifier(original_f, input_and_unobs,
-                                                    opt,
-                                                    gi ? gi->verbose_stream
-                                                       : nullptr));
-        f = rs->simplified_formula();
-      }
-
-    std::vector<spot::formula> sub_form;
-    std::vector<std::set<spot::formula>> sub_outs;
-    if (opt_decompose_ltl)
-    {
-      auto subs = split_independent_formulas(f, output_aps);
-      if (gi->verbose_stream)
-        {
-          *gi->verbose_stream << "there are "
-                              << subs.first.size()
-                              << " subformulas\n";
-        }
-      if (subs.first.size() > 1)
-        {
-          sub_form = subs.first;
-          sub_outs = subs.second;
-        }
-    }
-    // When trying to split the formula, we can apply transformations that
-    // increase its size. This is why we will use the original formula if it
-    // has not been cut.
-    if (sub_form.empty())
-      {
-        sub_form = { f };
-        sub_outs.resize(1);
-        if (rs)
-          {
-            robin_hood::unordered_set<spot::formula> removed_outputs;
-            for (auto [from, from_is_input, to] : rs->get_mapping())
-              {
-                (void) to;
-                if (!from_is_input)
-                  removed_outputs.insert(from);
-              }
-            for (const std::string& apstr: output_aps)
-              {
-                spot::formula ap = spot::formula::ap(apstr);
-                if (!removed_outputs.contains(ap))
-                  sub_outs[0].insert(ap);
-              }
-          }
-        else
-          {
-            for (const std::string& apstr: output_aps)
-              sub_outs[0].insert(spot::formula::ap(apstr));
-          }
-
-      }
-    if (gi->bv)
-      gi->bv->sub_specs = sub_form.size();
-    std::vector<std::vector<std::string>> sub_outs_str;
-    std::transform(sub_outs.begin(), sub_outs.end(),
-                   std::back_inserter(sub_outs_str),
-                   [](const auto& forms) {
-                     std::vector<std::string> r;
-                     r.reserve(forms.size());
-                     for (auto f: forms)
-                       r.push_back(f.ap_name());
-                     return r;
-                   });
-
-    assert((sub_form.size() == sub_outs.size())
-           && (sub_form.size() == sub_outs_str.size()));
-
-    // Apply per-subformula polarity/global-equiv simplifications
-    // before checking which subformulas are obligations, so that the
-    // coming BDD variable preorder is set correctly.
-    if (sub_form.size() > 1
-        && (opt_polarity == pol_yes || opt_gequiv == pol_yes))
-      {
-        unsigned opt = 0;
-        if (opt_polarity == pol_yes)
-          opt |= spot::realizability_simplifier::polarity;
-        if (opt_gequiv == pol_yes)
-          {
-            if (want_game())
-              opt |= spot::realizability_simplifier::global_equiv_output_only;
-            else if (opt_semantics == semantics_moore)
-              opt |= spot::realizability_simplifier::global_equiv_moore;
-            else
-              opt |= spot::realizability_simplifier::global_equiv;
-          }
-        if (gi->verbose_stream)
-          *gi->verbose_stream << "attempting to simplify subformulas\n";
-        for (auto& sf: sub_form)
-          {
-            if (gi->verbose_stream)
-              *gi->verbose_stream << "considering subformula " << sf << '\n';
-            spot::realizability_simplifier rsub(sf, input_and_unobs, opt,
-                                                gi ?
-                                                gi->verbose_stream : nullptr);
-            sf = rsub.simplified_formula();
-            rs->merge_mapping(rsub);
-          }
-      }
-
-    spot::bdd_dict_preorder preorder(gi->dict); // in case we are using MTBDDs.
-    bool has_oblig = false;
-    if (opt_obligation_synthesis)
-      for (spot::formula f: sub_form)
-        if (f.is_syntactic_obligation())
-          {
-            has_oblig = true;
-            break;
-          }
-    std::vector<spot::formula> unobs_vec;
-    if (has_oblig)
-      {
-        // For Mealy semantics, inputs should appear first in the
-        // MTBDDs.  For Moore semantics, outputs should be first.
-        // Pre-registering those variables will ensure that.  We want to
-        // register them in the order they are found in the formula,
-        // this ways variables that are used together are more
-        // likely to be close in the order.
-        std::vector<unsigned char> come_first;
-        come_first.resize(spot::formula::apid_count(), 0U);
-
-        unsigned val = (opt_semantics != semantics_moore) ? 1 : 2;
-        for (const std::string& s: input_aps)
-          come_first[spot::formula::ap(s).apid()] = val;
-        val = 3 - val;
-        for (const std::string& s: output_aps)
-          come_first[spot::formula::ap(s).apid()] = val;
-
-        unobs_vec.reserve(unobs_aps.size());
-        for (const std::string& s: unobs_aps)
-          {
-            spot::formula ap = spot::formula::ap(s);
-            come_first[ap.apid()] = 3;
-            unobs_vec.push_back(ap);
-          }
-
-        f.traverse([&](const spot::formula& f) {
-          if (!f.is(spot::op::ap))
-            return false;
-          if (come_first[f.apid()] == 1)
-            preorder.register_proposition(f);
-          return false;
-        });
-        // obligation_synthesis() will register output variables, and
-        // then all quantified variables.  If Moore semantics are used
-        // we have already registered output variables, but if
-        // quantified variables are used, let's register input
-        // variables too, so that quantified variables are put below.
-        if (opt_semantics == semantics_moore
-            && (!unobs_aps.empty() || f.is_quantified()))
-          {
-            f.traverse([&](const spot::formula& f) {
-              if (!f.is(spot::op::ap))
-                return false;
-              if (come_first[f.apid()] == 2)
-                preorder.register_proposition(f);
-              return false;
-            });
-          }
-      }
-
-    //gi->dict->dump(std::cerr);
-
-    std::vector<spot::twa_graph_ptr> arenas;
-
-    auto sub_f = sub_form.begin();
-    auto sub_o = sub_outs_str.begin();
-    std::vector<spot::mealy_like> mealy_machines;
-
-    for (; sub_f != sub_form.end(); ++sub_f, ++sub_o)
-    {
-      spot::mealy_like m_like
-              {
-                spot::mealy_like::realizability_code::UNKNOWN,
-                nullptr,
-                bddfalse
-              };
-
-      // Per-subformula simplification was done above.
-      if (sub_form.size() > 1 && gi->verbose_stream)
-        *gi->verbose_stream << "working on subformula " << *sub_f << '\n';
-
-      // If we want to print a game, we never use the direct approach
-      // or the obligation code.
-      if (!want_game())
-        {
-          if (opt_obligation_synthesis && sub_f->is_syntactic_obligation())
-            {
-              auto vs = gi->verbose_stream;
-              if (vs)
-                *vs << ("formula is an obligation; "
-                        "solving with the on-the-fly construction\n");
-              spot::stopwatch sw;
-              auto& bv = gi->bv;
-              if (bv)
-                sw.start();
-              if (!unobs_vec.empty())
-                *sub_f = spot::formula::forall(unobs_vec, *sub_f);
-              spot::mtdswa_ptr aut =
-                spot::obligation_synthesis(*sub_f, gi->dict, *sub_o,
-                                           opt_real);
-              if (bv)
-                {
-                  auto delta = sw.stop();
-                  bv->sum_trans_time += delta;
-                  if (vs)
-                    *vs << "solving done in " << delta << " seconds\n";
-                }
-              if (aut->acc.is_f())
-                {
-                  m_like.success =
-                    spot::mealy_like::realizability_code::UNREALIZABLE;
-                }
-              else
-                {
-                  m_like.success =
-                    spot::mealy_like::realizability_code::REALIZABLE_REGULAR;
-                  if (bv)
-                    sw.start();
-                  spot::twa_graph_ptr m =
-                    mtdswa_strategy_to_mealy(aut, false, false);
-                  m_like.mealy_like = m;
-                  if (bv)
-                    {
-                      bv->sum_strat2aut_time += sw.stop();
-                      unsigned ns = m->num_states();
-                      unsigned ne = m->num_edges();
-                      if (std::tie(bv->max_strat_states, bv->max_strat_edges)
-                          < std::tie(ns, ne))
-                        {
-                          bv->max_strat_states = ns;
-                          bv->max_strat_edges = ne;
-                        }
-                      bv->sum_strat_states += ns;
-                      bv->sum_strat_edges += ne;
-                    }
-                }
-            }
-          else if (opt_bypass && unobs_aps.empty())
-            {
-              m_like = spot::try_create_direct_strategy(*sub_f, *sub_o,
-                                                        *gi, !opt_real);
-            }
-        }
-
-      switch (m_like.success)
-      {
-      case spot::mealy_like::realizability_code::UNREALIZABLE:
-        {
-          if (show_status)
-            std::cout << "UNREALIZABLE" << std::endl;
-          safe_tot_time();
-          return 1;
-        }
-      case spot::mealy_like::realizability_code::UNKNOWN:
-        {
-          auto arena = spot::ltl_to_game(*sub_f, *sub_o, *gi, &unobs_aps);
-#ifndef NDEBUG
-          auto spptr =
-            arena->get_named_prop<std::vector<bool>>("state-player");
-          assert(spptr);
-          assert((spptr->at(arena->get_init_state_number()) == gi->moore)
-                 && "incorrect first player");
-#endif
-          if (gi->bv)
-            {
-              unsigned ns = arena->num_states();
-              unsigned nc = arena->num_sets();
-              if (std::tie(gi->bv->max_game_states, gi->bv->max_game_colors)
-                  < std::tie(ns, nc))
-                {
-                  gi->bv->max_game_states = ns;
-                  gi->bv->max_game_colors = nc;
-                }
-            }
-          if (want_game())
-            {
-              dispatch_print_hoa(arena, rs.get());
-              continue;
-            }
-          if (!spot::solve_game(arena, *gi))
-            {
-              if (show_status)
-                std::cout << "UNREALIZABLE" << std::endl;
-              safe_tot_time();
-              return 1;
-            }
-          // Create the (partial) strategy
-          // only if we need it
-          if (!opt_real)
-            {
-              spot::mealy_like ml;
-              ml.success =
-                spot::mealy_like::realizability_code::REALIZABLE_REGULAR;
-              // By default this produces a split machine
-              ml.mealy_like =
-                  spot::solved_game_to_mealy(arena, *gi);
-              // Keep the machine split for aiger
-              // else -> separated
-              spot::simplify_mealy_here(ml.mealy_like, *gi, opt_aiger);
-              ml.glob_cond = bddfalse;
-              mealy_machines.push_back(ml);
-            }
-          break;
-        }
-      case spot::mealy_like::realizability_code::REALIZABLE_REGULAR:
-        {
-          // the direct approach yielded a strategy
-          // which can now be minimized
-          // We minimize only if we need it
-          assert(opt_real ||
-            (m_like.mealy_like && "Expected success but found no mealy!"));
-          if (!opt_real)
-            {
-              // Keep the machine split for aiger
-              // else -> separated
-              spot::simplify_mealy_here(m_like.mealy_like, *gi, opt_aiger);
-            }
-          SPOT_FALLTHROUGH;
-        }
-      case spot::mealy_like::realizability_code::REALIZABLE_DTGBA:
-        if (!opt_real)
-          mealy_machines.push_back(m_like);
-        break;
-      default:
-        error(2, 0, "unexpected success code during mealy machine generation "
-              "(please send bug report)");
-      }
-    }
-    if (gi->bv)
-      gi->bv->realizable = true;
-
-    // If we only wanted to print the game we are done
     if (want_game())
       {
-        safe_tot_time();
+        for (const auto& arena: p.games())
+          dispatch_print_hoa(arena);
+        sync_stats();
         return 0;
+      }
+
+    spot::aig_ptr saig = nullptr;
+    spot::twa_graph_ptr tot_strat = nullptr;
+
+    if (opt_real)
+      {
+        if (!p.is_realizable())
+          {
+            if (show_status)
+              std::cout << "UNREALIZABLE" << std::endl;
+            sync_stats();
+            return 1;
+          }
+      }
+    else if (opt_aiger)
+      {
+        saig = p.aig(opt_aiger);
+        if (!saig)
+          {
+            if (show_status)
+              std::cout << "UNREALIZABLE" << std::endl;
+            sync_stats();
+            return 1;
+          }
+      }
+    else
+      {
+        tot_strat = p.strategy();
+        if (!tot_strat)
+          {
+            if (show_status)
+              std::cout << "UNREALIZABLE" << std::endl;
+            sync_stats();
+            return 1;
+          }
       }
 
     if (show_status)
       std::cout << "REALIZABLE" << std::endl;
     if (opt_real)
       {
-        safe_tot_time();
+        sync_stats();
         return 0;
       }
-    // If we reach this line
-    // a strategy was found for each subformula
-    assert(mealy_machines.size() == sub_form.size()
-           && ("There are subformula for which no mealy like object"
-               " has been created."));
 
-    spot::aig_ptr saig = nullptr;
-    spot::twa_graph_ptr tot_strat = nullptr;
     automaton_printer printer;
     spot::process_timer timer_printer_dummy;
 
     if (opt_aiger)
       {
-        spot::stopwatch sw2;
-        if (gi->bv)
-          sw2.start();
-        saig = spot::mealy_machines_to_aig(mealy_machines, opt_aiger,
-                                           input_aps, sub_outs_str, rs.get());
-        if (gi->bv)
-          {
-            gi->bv->aig_time = sw2.stop();
-            gi->bv->aig_latches = saig->num_latches();
-            gi->bv->aig_gates = saig->num_gates();
-          }
         if (gi->verbose_stream)
           {
             *gi->verbose_stream << "AIG circuit was created in "
-                               << gi->bv->aig_time
-                               << " seconds and has " << saig->num_latches()
-                               << " latches and "
-                               << saig->num_gates() << " gates\n";
+                                << p.statistics().aig_time
+                                << " seconds and has "
+                                << p.statistics().aig_latches
+                                << " latches and "
+                                << p.statistics().aig_gates << " gates\n";
           }
         if (opt_dot)
           spot::print_dot(std::cout, saig, opt_dot_arg);
         else if (automaton_format != Quiet)
           spot::print_aiger(std::cout, saig) << '\n';
       }
+    else if (opt_print_emm)
+      {
+        // Print each mealy machine individually.
+        for (const auto& m: p.sub_strategies())
+          printer.print(m, timer_printer_dummy);
+      }
     else
       {
-        assert(std::all_of(
-           mealy_machines.begin(), mealy_machines.end(),
-           [](const auto& ml)
-           {return ml.success ==
-               spot::mealy_like::realizability_code::REALIZABLE_REGULAR; })
-               && "ltlsynt: Cannot handle TGBA as strategy.");
-        if (opt_print_emm)
-          {
-            // Print each mealy machine individually
-            for (const auto& ml: mealy_machines)
-              {
-                if (rs)
-                  rs->patch_mealy(ml.mealy_like);
-                printer.print(ml.mealy_like, timer_printer_dummy);
-              }
-          }
-        else
-          {
-            tot_strat = mealy_machines.front().mealy_like;
-            for (size_t i = 1; i < mealy_machines.size(); ++i)
-              tot_strat = spot::mealy_product(tot_strat,
-                                              mealy_machines[i].mealy_like);
-            if (rs)        // Add any AP we removed
-              rs->patch_mealy(tot_strat);
-            printer.print(tot_strat, timer_printer_dummy);
-          }
+        printer.print(tot_strat, timer_printer_dummy);
       }
 
-    // Final step: Do verification if demanded
+    // Final step: do verification if demanded.
     if (!opt_do_verify)
       {
-        safe_tot_time();
+        sync_stats();
         return 0;
       }
 
     if (saig)
       {
-        // TODO: different options to speed up verification?!
-        spot::translator trans(gi->dict, &gi->opt);
-        auto neg_spec = trans.run(spot::formula::Not(original_f));
-        // Test the aiger
-        auto saigaut = saig->as_automaton(false);
-        if (neg_spec->intersects(saigaut))
-          error(2, 0, "Aiger and negated specification do intersect: "
-                "circuit is not OK.");
+        try
+          {
+            p.verify_aig(saig);
+          }
+        catch (const std::runtime_error& e)
+          {
+            error(2, 0, "%s", e.what());
+          }
         std::cout << "c\nCircuit was verified\n";
       }
-    else if  (tot_strat)
+    else if (tot_strat)
       {
-        const char* is_valid = is_valid_strategy(original_f, tot_strat);
-        if (is_valid != nullptr)
-          error(2, 0, "%s: strategy is not OK.",
-                is_valid);
+        try
+          {
+            p.verify_strategy();
+          }
+        catch (const std::runtime_error& e)
+          {
+            error(2, 0, "%s: strategy is not OK.", e.what());
+          }
         std::cout << "/*Strategy was verified*/\n";
       }
-    // Done
 
-    safe_tot_time();
+    sync_stats();
     return 0;
   }
-
 
   class ltl_processor final : public job_processor
   {
