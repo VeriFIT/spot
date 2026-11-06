@@ -1,0 +1,538 @@
+# -*- coding: utf-8 -*-
+#+TITLE: Synthesizing an AIGER circuit
+#+DESCRIPTION: Solving a synthesis problem with ltlsynt, C++, and Python
+#+INCLUDE: setup.org
+#+HTML_LINK_UP: tut.html
+#+PROPERTY: header-args:sh :results verbatim :exports both
+#+PROPERTY: header-args:python :results output :exports both
+#+PROPERTY: header-args:C+++ :results verbatim :exports both
+
+Reactive synthesis is the problem of building a controller that
+interacts with an environment: at every step, the controller reads the
+current values of some *input* propositions, and chooses the values of
+some *output* propositions.  The specification describes, for every
+infinite execution, which sequences of inputs and outputs are
+acceptable.  [[file:ltlsynt.org][=ltlsynt=]] solves this problem for
+specifications written in LTL or [[file:tlsf.org][TLSF]]: it either reports
+that the specification is unrealizable (i.e., no controller can
+satisfy it against all possible environments), or it produces a
+controller, possibly encoded as an [[http://fmv.jku.at/aiger/][AIGER]] circuit.
+
+Our running example is the specification
+
+: G(i -> (o <-> X!o)) & G(!i -> X!o) & !o
+
+where =i= is the only input, and =o= is the only output.  It describes
+a blinking device: the lamp =o= is off initially, it must be off at the
+next step whenever =i= is off, and it must flip at the next step
+whenever =i= is on.  The controller therefore needs to remember the
+current value of the lamp.
+
+* Shell command
+
+The specification is passed with =-f=, while the partition between
+inputs and outputs is given with =--ins= and =--outs=.
+
+** The controller as a Mealy machine
+
+The default output of [[file:ltlsynt.org][=ltlsynt=]] is to print the strategy as a Mealy
+machine in HOA format.
+
+#+BEGIN_SRC sh
+ltlsynt --ins=i --outs=o -f 'G(i -> (o <-> X!o)) & G(!i -> X!o) & !o'
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+REALIZABLE
+HOA: v1
+States: 2
+Start: 0
+AP: 2 "i" "o"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic weak
+controllable-AP: 1
+--BODY--
+State: 0
+[!0&!1] 0
+[0&!1] 1
+State: 1
+[1] 0
+--END--
+#+end_example
+
+The above HOA output can be interpreted as follows:
+
+#+NAME: tut61mealy
+#+BEGIN_SRC sh :exports none
+ltlsynt --ins=i --outs=o --hide-status --dot -f 'G(i -> (o <-> X!o)) & G(!i -> X!o) & !o'
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut61mealy.svg :var txt=tut61mealy :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut61mealy.svg]]
+
+The machine has two states, one per value of the lamp: the initial
+state corresponds to a lamp that is off, and the other state to a lamp
+that is on.  From the initial state, an input =!i= loops back to it
+(keeping the lamp off) while an input =i= moves to the other state
+(turning the lamp on).  From the other state, both values of =i= lead
+back to the initial state: that edge is labeled =1 / o=, where =1= is
+the constant true, i.e., "whatever the input", because the lamp must be
+cleared when =i= is off and flipped when =i= is on, and both cases lead
+to the same off state.
+
+** The AIGER circuit
+
+Passing =--aiger= asks for the controller to be printed as an AIGER
+circuit, and the =ite= argument selects the encoding of the gates.
+
+#+BEGIN_SRC sh
+ltlsynt --ins=i --outs=o -f 'G(i -> (o <-> X!o)) & G(!i -> X!o) & !o' --aiger=ite
+#+END_SRC
+
+#+RESULTS:
+: REALIZABLE
+: aag 3 1 1 1 1
+: 2
+: 4 6
+: 4
+: 6 2 5
+: i0 i
+: o0 o
+
+The first line is the verdict.  The remaining lines are the circuit in
+the ASCII AIGER format: the header =aag M I L O A= gives the maximal
+variable index, then the numbers of inputs, latches, outputs, and AND
+gates.  So here we have three variables, one input =i0=, one latch, one
+output =o0=, and one AND gate.  The following lines give the literal of
+the input, the current and next literals of the latch, the literal of
+the output, and the definition of the gate.  Reading those literals,
+the output =o0= is the current value of the latch, whose next value is
+the conjunction of =i0= with the negation of the latch: the lamp
+therefore starts off (the latch is initialized to 0), stays off while
+the input is off, and flips when the input is on, as requested.  Other
+encodings can be selected by replacing =ite= with =isop=, or by using
+=both= to keep the smallest of the two.
+
+** The circuit as a graph
+
+Combining =--aiger= with =--dot= renders the AND-inverter graph itself
+instead of its textual encoding.
+
+#+NAME: tut61aig
+#+BEGIN_SRC sh :exports code
+ltlsynt --ins=i --outs=o --hide-status --aiger=ite --dot=h -f 'G(i -> (o <-> X!o)) & G(!i -> X!o) & !o'
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut61aig.svg :var txt=tut61aig :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut61aig.svg]]
+
+The latch =L0= holds the lamp: its output feeds the output pin =o= and,
+negated (the edge ending with a dot), one input of the AND gate labeled
+=6=; the other input of that gate is =i=, and the gate result feeds the
+next value of the latch.  The layout is vertical by default; but we used
+=--dot=h= to get a horizontal one.
+
+* Python bindings
+
+The same problem is solved with the =spot.synthesis_problem= class.
+Its constructor takes the specification and the lists of input and
+output propositions, which are read like =--ins= and =--outs=.  The
+expensive stages (simplification, decomposition, solving, and the AIG
+encoding) are performed as needed to build the requested output.
+
+** The controller as a Mealy machine
+
+The =strategy()= method returns the controller as a =twa_graph=, which
+prints itself in the HOA format, with the same =controllable-AP= header
+as =ltlsynt=.
+
+#+BEGIN_SRC python
+import spot
+
+f = spot.formula('G(i -> (o <-> X!o)) & G(!i -> X!o) & !o')
+pr = spot.synthesis_problem(f, ['i'], ['o'])
+machine = pr.strategy()             # None when unrealizable
+if machine is None:
+    print('UNREALIZABLE')
+else:
+    print('REALIZABLE')
+    print(machine.to_str())
+#+END_SRC
+
+#+RESULTS:
+: REALIZABLE
+: HOA: v1
+: States: 2
+: Start: 0
+: AP: 2 "i" "o"
+: acc-name: all
+: Acceptance: 0 t
+: properties: trans-labels explicit-labels state-acc deterministic weak
+: controllable-AP: 1
+: --BODY--
+: State: 0
+: [!0&!1] 0
+: [0&!1] 1
+: State: 1
+: [1] 0
+: --END--
+
+** The AIGER circuit
+
+The =aig()= method returns the same controller as an AIGER circuit
+instead, and its argument selects the gate encoding, as =--aiger= does.
+
+#+BEGIN_SRC python
+import spot
+
+f = spot.formula('G(i -> (o <-> X!o)) & G(!i -> X!o) & !o')
+pr = spot.synthesis_problem(f, ['i'], ['o'])
+circuit = pr.aig('ite')             # None when unrealizable
+if circuit is None:
+    print('UNREALIZABLE')
+else:
+    print('REALIZABLE')
+    print(circuit.to_str())
+#+END_SRC
+
+#+RESULTS:
+: REALIZABLE
+: aag 3 1 1 1 1
+: 2
+: 4 6
+: 4
+: 6 2 5
+: i0 i
+: o0 o
+
+When only the verdict is needed, call =pr.is_realizable()= rather than
+checking =strategy()= or =aig()= for =None=: several optimizations are
+then enabled to decide realizability without building a full strategy.
+Conversely, when a strategy or a circuit is wanted, do not call
+=pr.is_realizable()= first: call =pr.strategy()= or =pr.aig()=
+directly, so that the problem is solved once and not twice.
+
+** The circuit as a graph
+
+The =to_str()= method of the circuit also accepts ='dot'=, which
+prints the AND-inverter graph itself; the second argument is a string
+of DOT options, here =h= for the horizontal layout of the figure
+above.
+
+#+NAME: tut61pydot
+#+BEGIN_SRC python :exports code
+import spot
+
+f = spot.formula('G(i -> (o <-> X!o)) & G(!i -> X!o) & !o')
+pr = spot.synthesis_problem(f, ['i'], ['o'])
+print(pr.aig('ite').to_str('dot', 'h'))
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut61pyaig.svg :var txt=tut61pydot :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut61pyaig.svg]]
+
+Because the class keeps the problem alive, =verify_aig()= can be called
+on the circuit to check it against the original specification (it
+raises an exception if the circuit does not satisfy it), and
+=assumptions_violated()= tells whether the controller only solves the
+specification by falsifying its assumptions.  For the Mealy machine,
+=verify_strategy()= performs the same check.
+
+* C++
+
+The C++ interface is the same, except that the output stream must be
+given to =spot::print_hoa()=, =spot::print_aiger()=, and
+=spot::print_dot()= explicitly, and that the three lists are passed by
+address: the default =nullptr= means that a list was not specified,
+while a pointer to an empty vector means that it specifies nothing.
+
+** The controller as a Mealy machine
+
+#+NAME: tut61cppmealy
+#+BEGIN_SRC C++
+#include <iostream>
+#include <string>
+#include <vector>
+#include <spot/tl/parse.hh>
+#include <spot/twaalgos/hoa.hh>
+#include <spot/twaalgos/synthesis.hh>
+
+int main()
+{
+  spot::parsed_formula pf =
+    spot::parse_infix_psl("G(i -> (o <-> X!o)) & G(!i -> X!o) & !o");
+  if (pf.format_errors(std::cerr))
+    return 1;
+
+  std::vector<std::string> ins{"i"};
+  std::vector<std::string> outs{"o"};
+  spot::synthesis_problem p(pf.f, &ins, &outs);
+  spot::twa_graph_ptr machine = p.strategy();  // null when unrealizable
+  if (!machine)
+    {
+      std::cout << "UNREALIZABLE\n";
+      return 0;
+    }
+  std::cout << "REALIZABLE\n";
+  spot::print_hoa(std::cout, machine) << '\n';
+}
+#+END_SRC
+
+After [[file:compile.org][compiling and running]] this program, we get:
+
+#+RESULTS: tut61cppmealy
+#+begin_example
+REALIZABLE
+HOA: v1
+States: 2
+Start: 0
+AP: 2 "i" "o"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic weak
+controllable-AP: 1
+--BODY--
+State: 0
+[!0&!1] 0
+[0&!1] 1
+State: 1
+[1] 0
+--END--
+#+end_example
+
+** The AIGER circuit
+
+#+NAME: tut61cppaig
+#+BEGIN_SRC C++
+#include <iostream>
+#include <string>
+#include <vector>
+#include <spot/tl/parse.hh>
+#include <spot/twaalgos/aiger.hh>
+#include <spot/twaalgos/synthesis.hh>
+
+int main()
+{
+  spot::parsed_formula pf =
+    spot::parse_infix_psl("G(i -> (o <-> X!o)) & G(!i -> X!o) & !o");
+  if (pf.format_errors(std::cerr))
+    return 1;
+
+  std::vector<std::string> ins{"i"};
+  std::vector<std::string> outs{"o"};
+  spot::synthesis_problem p(pf.f, &ins, &outs);
+  spot::aig_ptr circuit = p.aig("ite");  // null when unrealizable
+  if (!circuit)
+    {
+      std::cout << "UNREALIZABLE\n";
+      return 0;
+    }
+  std::cout << "REALIZABLE\n";
+  spot::print_aiger(std::cout, circuit) << '\n';
+}
+#+END_SRC
+
+#+RESULTS: tut61cppaig
+: REALIZABLE
+: aag 3 1 1 1 1
+: 2
+: 4 6
+: 4
+: 6 2 5
+: i0 i
+: o0 o
+
+** The circuit as a graph
+
+#+NAME: tut61ccdot
+#+BEGIN_SRC C++ :exports code
+#include <iostream>
+#include <string>
+#include <vector>
+#include <spot/tl/parse.hh>
+#include <spot/twaalgos/aiger.hh>
+#include <spot/twaalgos/dot.hh>
+#include <spot/twaalgos/synthesis.hh>
+
+int main()
+{
+  spot::parsed_formula pf =
+    spot::parse_infix_psl("G(i -> (o <-> X!o)) & G(!i -> X!o) & !o");
+  if (pf.format_errors(std::cerr))
+    return 1;
+
+  std::vector<std::string> ins{"i"};
+  std::vector<std::string> outs{"o"};
+  spot::synthesis_problem p(pf.f, &ins, &outs);
+  spot::aig_ptr circuit = p.aig("ite");  // null when unrealizable
+  if (!circuit)
+    {
+      std::cout << "UNREALIZABLE\n";
+      return 0;
+    }
+  spot::print_dot(std::cout, circuit, "h");
+}
+#+END_SRC
+
+#+BEGIN_SRC dot :file tut61ccaig.svg :var txt=tut61ccdot :exports results
+$txt
+#+END_SRC
+
+#+RESULTS:
+[[file:tut61ccaig.svg]]
+
+* Additional comments
+
+All the examples above use the default settings of
+[[file:ltlsynt.org][=ltlsynt=]].  The tuning options such as =--algo=, =--decompose=, or =--semantics=,
+are not parameters of =synthesis_problem=: they are fields of the
+=spot::synthesis_info= structure, which the constructor accepts as its
+last argument.  That structure is the one used internally by
+=ltlsynt=, so the correspondence is direct.
+
+| =ltlsynt= option    | ~spot::synthesis_info~ field             |
+|---------------------+------------------------------------------|
+| =--algo=sd=         | ~si.s = synthesis_info::algo::SPLIT_DET~ |
+| =--algo=ds=         | ~si.s = synthesis_info::algo::DET_SPLIT~ |
+| =--algo=ps=         | ~si.s = synthesis_info::algo::DPA_SPLIT~ |
+| =--algo=lar=        | ~si.s = synthesis_info::algo::LAR~       |
+| =--algo=lar.old=    | ~si.s = synthesis_info::algo::LAR_OLD~   |
+| =--algo=acd=        | ~si.s = synthesis_info::algo::ACD~       |
+| =--decompose=no=    | ~si.decompose = false~                   |
+| =--semantics=Moore= | ~si.moore = true~                        |
+
+The defaults are those of =ltlsynt=: =--algo=lar=, =--decompose=yes=,
+and =--semantics=Mealy=, which correspond to =LAR=, =true=, and
+=false= in the structure.  In Python, a fresh structure is built with
+=spot.synthesis_info()=, the enumeration members are spelled
+=spot.synthesis_info.algo_DPA_SPLIT= and so on, and the two Booleans
+take =True= or =False=.  The structure is copied by the constructor,
+so modifying =si= afterwards has no effect on the problem.
+
+The program below solves our specification with =--algo=ps=,
+=--decompose=no=, and =--semantics=Moore=.  In Python, the fourth
+argument of the constructor is the list of unobservable inputs, which
+is =None= here, and the structure comes last.
+
+#+BEGIN_SRC python
+import spot
+
+f = spot.formula('G(i -> (o <-> X!o)) & G(!i -> X!o) & !o')
+si = spot.synthesis_info()
+si.s = spot.synthesis_info.algo_DPA_SPLIT  # --algo=ps
+si.decompose = False                       # --decompose=no
+si.moore = True                            # --semantics=Moore
+pr = spot.synthesis_problem(f, ['i'], ['o'], None, si)
+machine = pr.strategy()
+if machine is None:
+    print('UNREALIZABLE')
+else:
+    print(machine.to_str())
+#+END_SRC
+
+#+RESULTS:
+: HOA: v1
+: States: 2
+: Start: 0
+: AP: 2 "o" "i"
+: acc-name: all
+: Acceptance: 0 t
+: properties: trans-labels explicit-labels state-acc deterministic weak
+: controllable-AP: 0
+: --BODY--
+: State: 0
+: [!0&!1] 0
+: [!0&1] 1
+: State: 1
+: [0] 0
+: --END--
+
+Under Moore semantics the controller chooses its outputs before it
+reads the inputs, so the output propositions come first: the automaton
+has =AP: 2 "o" "i"= and =controllable-AP: 0=, while the Mealy machine
+of the first section had =AP: 2 "i" "o"= and =controllable-AP: 1=.
+The number of states and edges is unchanged on this example, but other
+algorithms can produce very different strategies.
+
+The C++ version differs only in the syntax:
+
+#+BEGIN_SRC C++
+#include <iostream>
+#include <string>
+#include <vector>
+#include <spot/tl/parse.hh>
+#include <spot/twaalgos/hoa.hh>
+#include <spot/twaalgos/synthesis.hh>
+
+int main()
+{
+  spot::parsed_formula pf =
+    spot::parse_infix_psl("G(i -> (o <-> X!o)) & G(!i -> X!o) & !o");
+  if (pf.format_errors(std::cerr))
+    return 1;
+
+  spot::synthesis_info si;
+  si.s = spot::synthesis_info::algo::DPA_SPLIT;  // --algo=ps
+  si.decompose = false;                          // --decompose=no
+  si.moore = true;                               // --semantics=Moore
+
+  std::vector<std::string> ins{"i"};
+  std::vector<std::string> outs{"o"};
+  spot::synthesis_problem p(pf.f, &ins, &outs, nullptr, si);
+  spot::twa_graph_ptr machine = p.strategy();
+  if (!machine)
+    {
+      std::cout << "UNREALIZABLE\n";
+      return 0;
+    }
+  spot::print_hoa(std::cout, machine) << '\n';
+}
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+HOA: v1
+States: 2
+Start: 0
+AP: 2 "o" "i"
+acc-name: all
+Acceptance: 0 t
+properties: trans-labels explicit-labels state-acc deterministic weak
+controllable-AP: 0
+--BODY--
+State: 0
+[!0&!1] 0
+[!0&1] 1
+State: 1
+[0] 0
+--END--
+#+end_example
+
+Finally, =pr.options()= returns the =synthesis_info= that was used, so
+a caller can check which settings were in effect, and
+=pr.statistics()= returns the benchmarking data collected while
+solving, i.e., the counters that =--csv= reports in =ltlsynt=.  The
+other fields of the structure (=use_bypass=, =polarity=,
+=global_equiv=, =minimize_lvl=, ...) drive the remaining fine-tuning
+options; they are documented in =spot/twaalgos/synthesis.hh=.
+
+#  LocalWords:  utf AIGER ltlsynt LTL TLSF html ite isop aag Mealy sd
+#  LocalWords:  unrealizable iostream DPA LAR ACD args HOA SRC acc si
+#  LocalWords:  svg txt aiger encodings aig twa str realizability ds
+#  LocalWords:  pydot pyaig nullptr cppmealy cppaig ccdot ccaig algo
+#  LocalWords:  ps lar acd moore Booleans unobservable benchmarking
+#  LocalWords:  csv lvl

@@ -146,6 +146,7 @@ ORG_FILES = \
   org/tut51.org \
   org/tut52.org \
   org/tut60.org \
+  org/tut61.org \
   org/tut90.org \
   org/tut91.org \
   org/upgrade2.org \

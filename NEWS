@@ -156,22 +156,8 @@ New in spot 2.16.2.dev  (not yet released)
     twa::intersects() about 8 to 9 times faster.
 
   - spot::synthesis_problem is a new class that exposes the whole
-    synthesis pipeline used by ltlsynt: preprocessing of the
-    specification, syntactic decomposition into independent
-    sub-specifications, solving as a parity game or with the
-    obligation-specific construction, extraction of the strategy as a
-    Mealy machine (possibly one machine per sub-specification), and
-    encoding of that machine as an AIG circuit.  The class also gives
-    access to the games built for --decompose, to the
-    sub-specifications that were actually solved, and to the
-    benchmarking data collected for --csv, and it can verify its own
-    result against the original specification.  Its input, output, and
-    unobservable-input lists follow the syntax of the --ins, --outs,
-    and --unobservable-ins options: each element is a proposition name
-    or a /regular expression/, the side that is not specified is
-    inferred, and propositions that cannot be classified are rejected.
-    ltlsynt has been rewritten on top of this class, which is also
-    available from Python.
+    synthesis pipeline used by ltlsynt.  See
+    http://spot.lre.epita.fr/tut61.html for some examples.
 
   Bug fixes:
 
