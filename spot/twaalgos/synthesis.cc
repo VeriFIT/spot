@@ -2774,8 +2774,8 @@ namespace // anonymous for subsformula
               std::set_intersection(outs_f.begin(), outs_f.end(),
                                     decRelProps_outs.begin(),
                                     decRelProps_outs.end(),
-                                    std::inserter(ins_f_dec,
-                                                  ins_f_dec.begin()));
+                                    std::inserter(outs_f_dec,
+                                                  outs_f_dec.begin()));
               for (unsigned i = 0; i < forms_size; ++i)
                 {
                   if (done[i])

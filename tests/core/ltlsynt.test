@@ -1931,4 +1931,16 @@ ltlsynt -f '(GF(p & (x->q)) & GF!(p & (x->q))) -> (X false & G(q->p))' \
         --ins=x --outs=p,q --decompose=yes \
         --bypass=no --pol=no --global-equivalence=no --verify >/dev/null
 
+# The guarantees G(o1 <-> i) and Go1 share only the output o1, so the
+# fusion step must group them: Go1 has to stay in the sub-specification
+# of G(o1 <-> i), with the same antecedent, instead of being detached
+# and solved on its own.  The second set_intersection() of the fusion
+# used to store its result in the input set, leaving the output set
+# empty, so guarantees sharing only an output were never fused.
+f='(G(i) & G(j)) -> (G(o1 <-> i) & G(o2 <-> j) & G(o1) & G(o2))'
+ltlsynt -f "$f" --ins=i,j --outs=o1,o2 --realizability \
+        --decompose=yes --bypass=no --verbose 2>err
+grep -F 'considering subformula (Gi & Gj) -> (G(i <-> o1) & Go1)' err
+grep -F 'considering subformula (Gi & Gj) -> (G(j <-> o2) & Go2)' err
+
 :
