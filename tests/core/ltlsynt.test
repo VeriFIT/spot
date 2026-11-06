@@ -1943,4 +1943,15 @@ ltlsynt -f "$f" --ins=i,j --outs=o1,o2 --realizability \
 grep -F 'considering subformula (Gi & Gj) -> (G(i <-> o1) & Go1)' err
 grep -F 'considering subformula (Gi & Gj) -> (G(j <-> o2) & Go2)' err
 
+# An assumption that only mentions outputs must be bound to the
+# component of that output instead of being treated as free: while
+# G(o1) was free, it was conjoined to the antecedent of every
+# sub-specification and both guarantees stayed in a single one.
+f='(G(o1) & G(j -> o2)) -> (F o1 & F o2)'
+ltlsynt -f "$f" --ins=j --outs=o1,o2 --realizability \
+        --decompose=yes --bypass=no --pol=no --global-equivalence=no \
+        --verbose >out 2>err
+grep -F 'there are 2 subformulas' err
+grep -F 'REALIZABLE' out
+
 :

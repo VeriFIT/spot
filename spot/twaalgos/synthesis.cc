@@ -2857,10 +2857,12 @@ namespace // anonymous for subsformula
           continue;
         done_ass[i] = true;
         auto &ass = assumptions_split[i];
-        std::set<formula> left_aps = form2props.aps_of(ass).first;
-        // If an assumption hasn't any decRelProp, it is considered as
-        // a free assumption.
-        if (!are_intersecting(left_aps, decRelProps_ins))
+        // An assumption is free when it shares no decomposition-critical
+        // proposition with the other formulas: both its inputs and its
+        // outputs have to be considered.
+        auto [ass_ins, ass_outs] = form2props.aps_of(ass);
+        if (!are_intersecting(ass_ins, decRelProps_ins)
+            && !are_intersecting(ass_outs, decRelProps_outs))
           free_assumptions = formula::And(free_assumptions, ass);
         else
           {
