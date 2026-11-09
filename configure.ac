@@ -107,6 +107,10 @@ AX_CHECK_COMPILE_FLAG([-Werror -fvisibility=hidden],
   AX_CHECK_COMPILE_FLAG([-fvisibility-inlines-hidden],
     [CXXFLAGS="$CXXFLAGS -fvisibility-inlines-hidden"])])
 
+# Initialize Libtool before we check $enable_shared
+LT_CONFIG_LTDL_DIR([ltdl])
+LT_INIT([win32-dll])
+LTDL_INIT([subproject convenience])
 
 # clang 17.0 and later have broken assumptions about the vtables
 # it generates for final classes.  See
@@ -185,10 +189,6 @@ oLIBS=$LIBS
 LIBS="$LIBS -pthread"
 AC_CHECK_FUNCS([pthread_setaffinity_np])
 LIBS=$oLIBS
-
-LT_CONFIG_LTDL_DIR([ltdl])
-LT_INIT([win32-dll])
-LTDL_INIT([subproject convenience])
 
 AX_BSYMBOLIC
 
