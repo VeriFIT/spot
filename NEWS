@@ -169,6 +169,9 @@ New in spot 2.16.2.dev  (not yet released)
     same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
     syfco is the one performing the lower-casing.  (Issue #654.)
 
+  - Hopefully fix some test-suite failures with Clang on OSX
+    (issue #609 again).
+
 New in spot 2.16.2  (2026-11-03)
 
   Library:
