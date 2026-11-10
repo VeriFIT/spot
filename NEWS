@@ -172,6 +172,14 @@ New in spot 2.16.2.dev  (not yet released)
   - Hopefully fix some test-suite failures with Clang on OSX
     (issue #609 again).
 
+  - Fix missing simplification during propositional equivalence of
+    obligation formulas.  For instance G(i) -> G(i <-> XXX(0)) was
+    reduced to !G(i) during the propositional equivalence, but because
+    !G(i) is not a known subformula, the original formula was used as
+    representative instead.  The fix modifies the handling of ->, <->
+    and xor.  Additionally, it improves the detection of
+    unsatisfiable/tautological subformulas below X.  (Issue #666.)
+
 New in spot 2.16.2  (2026-11-03)
 
   Library:

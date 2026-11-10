@@ -433,6 +433,45 @@ for i in range(len(obligations)):
                   + "is not equivalent to LTL universal quantification: "
                   + f"{obligations[i]}")
 
+# X(0) is equivalent to false over infinite words, but Spot keeps it
+# unsimplified for LTLf.  The obligation translator must fold it away,
+# otherwise the acceptance classification and the propositional
+# equivalence merging disagree and formulas such as
+# G(i <-> XXX false) are wrongly reported realizable.
+for fstr in ["G(i <-> XX false)", "G(i <-> XXX false)",
+             "G(i <-> XXXX false)", "G(i <-> XXXF false)",
+             "G(i <-> X(X(X(0))))"]:
+    f = spot.formula(fstr)
+    m = spot.obligation_to_mtdswa(f)
+    tc.assertTrue(spot.are_equivalent(m.as_twa(), spot.translate(f)),
+                  f"obligation_to_mtdswa({fstr}) is wrong")
+    a = spot.obligation_synthesis(f, [], dict=spot.bdd_dict(),
+                                  realizability=True)
+    tc.assertTrue(a.acc.is_f(),
+                  f"obligation_synthesis({fstr}) wrongly reports "
+                  "realizable")
+
+# X(f) is equivalent to false whenever f is propositionally false,
+# even if f is not syntactically 0.  Without folding it in residuals,
+# G i -> G(i <-> XX(p & !p)) keeps an accepting i=true self-loop and
+# is wrongly reported realizable.
+for fstr in ["G ii -> G(ii <-> XX(ii & !ii))",
+             "G i -> G(i <-> XX(p & !p))",
+             "G i -> G(i <-> XXX(p & !p))",
+             "G i -> G(i <-> XX(p <-> !p))",
+             "G i -> G(i <-> XX(p & !p & q))",
+             "G i -> G(i <-> Xp & X!p)",
+             "G i -> G(i <-> X(Xp & X!p))"]:
+    f = spot.formula(fstr)
+    m = spot.obligation_to_mtdswa(f)
+    tc.assertTrue(spot.are_equivalent(m.as_twa(), spot.translate(f)),
+                  f"obligation_to_mtdswa({fstr}) is wrong")
+    a = spot.obligation_synthesis(f, [], dict=spot.bdd_dict(),
+                                  realizability=True)
+    tc.assertTrue(a.acc.is_f(),
+                  f"obligation_synthesis({fstr}) wrongly reports "
+                  "realizable")
+
 # Test multi-variable quantification via vector of APs.
 # Sequential quantification should be equivalent to vector quantification.
 for fstr in ["Gp0 & Fp1", "(p0 U p1) & Fp2", "G(p0 -> Xp1)"]:
