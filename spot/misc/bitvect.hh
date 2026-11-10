@@ -65,11 +65,27 @@ namespace spot
     {
     }
 
+    /// Allocate a bit-vector of \a bitcount bits.
+    explicit bitvect(size_t bitcount):
+      size_(0),
+      block_count_(1),
+      storage_(&local_storage_),
+      local_storage_(0)
+    {
+      const size_t bpb = 8 * sizeof(block_t);
+      size_t blocks = (bitcount + bpb - 1) / bpb;
+      if (blocks > 1)
+        reserve_blocks(blocks);
+      size_ = bitcount;
+      clear_all();
+    }
+
     /// Copy constructor.
     bitvect(const bitvect& other):
       size_(other.size_),
       block_count_(1),
-      storage_(&local_storage_)
+      storage_(&local_storage_),
+      local_storage_(0)
     {
       *this = other;
     }
@@ -285,7 +301,7 @@ namespace spot
     }
 
     /// Return true if *this and \a other share any set bit.
-    bool intersects(const bitvect& other)
+    bool intersects(const bitvect& other) const
     {
       SPOT_ASSERT(other.size_ <= size_);
       unsigned m = std::min(other.block_count_, block_count_);

@@ -56,10 +56,10 @@ EOF
 
 t <<EOF
 G(d & e) | FG(Xf| !c) | h | i
-p0 | Gp1 | FG(p2 | Xp3)
+p0 | Gp1 | FG(!p2 | Xp3)
   p0   ->   h | i
   p1   ->   d & e
-  p2   ->   !c
+  p2   ->   c
   p3   ->   f
 EOF
 
@@ -67,6 +67,25 @@ t <<EOF
 a <-> b
 p0
   p0   ->   a <-> b
+EOF
+
+# The atomic proposition a occurs twice, and even on both sides of the
+# equivalence, but all its occurrences are inside the whole Boolean
+# formula, so the whole formula can be replaced by a single
+# proposition.  (This used to be relabeled as p0 & (p0 <-> p1).)
+t <<EOF
+a & (b <-> a)
+p0
+  p0   ->   a & (a <-> b)
+EOF
+
+# The operands of this Boolean formula are not disjoint, so it used to
+# be relabeled as p0 & p1 with p0 = c & (a <-> b) and p1 = a, hiding
+# the fact that both share the atomic proposition a.
+t <<EOF
+a & c & (a <-> b)
+p0
+  p0   ->   a & c & (a <-> b)
 EOF
 
 t <<EOF
@@ -81,22 +100,22 @@ EOF
 # in the relabeling function.  Reported by František Blahoudek.
 t <<EOF
 <>p1 -> ((p0 -> (!p1 U (!p1 && p3 && !p5 && X((!p1 && !p5) U p4)))) U p1)
-Fp0 -> ((p1 -> (!p0 U (!p0 & p2 & p3 & X((!p0 & p3) U p4)))) U p0)
+Fp0 -> ((p1 -> (!p0 U (!p0 & !p2 & p3 & X((!p0 & !p2) U p4)))) U p0)
   p0   ->   p1
   p1   ->   p0
-  p2   ->   p3
-  p3   ->   !p5
+  p2   ->   p5
+  p3   ->   p3
   p4   ->   p4
 EOF
 
 # Variant to check that p3 & p6 can be gathered.
 t <<EOF
 <>p1 -> ((p0 -> (!p1 U (!p1 && p3 && !p5 && X((!p1 && !p5) U p4) & p6))) U p1)
-Fp0 -> ((p1 -> (!p0 U (!p0 & p2 & p3 & X((!p0 & p3) U p4)))) U p0)
+Fp0 -> ((p1 -> (!p0 U (!p0 & !p2 & p3 & X((!p0 & !p2) U p4)))) U p0)
   p0   ->   p1
   p1   ->   p0
-  p2   ->   p3 & p6
-  p3   ->   !p5
+  p2   ->   p5
+  p3   ->   p3 & p6
   p4   ->   p4
 EOF
 

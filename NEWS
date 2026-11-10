@@ -180,6 +180,14 @@ New in spot 2.16.2.dev  (not yet released)
     and xor.  Additionally, it improves the detection of
     unsatisfiable/tautological subformulas below X.  (Issue #666.)
 
+  - spot::relabel_bse() has been rewritten.  This fixes two problems:
+    some relabelings were missed (e.g., "a & (b <-> a)" is now
+    relabeled as p0 instead of "p0 & (p0 <-> p1)"), and some were
+    illegal because the relabeled subformulas could share atomic
+    propositions (e.g., "a & c & (a <-> b)" used to be relabeled as
+    "p0 & p1" with p0 = c & (a <-> b) and p1 = a, hiding the fact that
+    both use a).  (Issue #667.)
+
 New in spot 2.16.2  (2026-11-03)
 
   Library:
