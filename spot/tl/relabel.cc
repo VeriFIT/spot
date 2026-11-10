@@ -17,13 +17,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
+#include <spot/misc/bitvect.hh>
 #include <spot/tl/relabel.hh>
 #include <spot/tl/simplify.hh>
+#include <algorithm>
+#include <memory>
 #include <sstream>
 #include <map>
 #include <set>
-#include <stack>
-#include <iostream>
+#include <unordered_set>
+#include <vector>
 
 namespace spot
 {
@@ -198,75 +201,6 @@ namespace spot
     return relabel_do<true>(f, style, m);
   }
 
-  namespace
-  {
-    typedef std::map<formula, int> sub_formula_count_t;
-
-    static void
-    sub_formula_collect(formula f, sub_formula_count_t* s)
-    {
-      assert(s);
-      f.traverse([&](const formula& f)
-                 {
-                   auto p = s->emplace(f, 1);
-                   if (p.second)
-                     return false;
-                   p.first->second += 1;
-                   return true;
-                 });
-    }
-
-    static std::pair<formula, formula>
-    split_used_once(formula f, const sub_formula_count_t& subcount)
-    {
-      assert(f.is_boolean());
-      unsigned sz = f.size();
-      if (sz <= 2)
-        return {f, nullptr};
-      // If we have a Boolean formula with more than two
-      // children, like (a & b & c & d) where some children
-      // (assume {a,b}) are used only once, but some other
-      // (assume {c,d}) are used multiple time in the formula,
-      // then split that into ((a & b) & (c & d)) to give
-      // (a & b) a chance to be relabeled as a whole.
-      bool has_once = false;
-      bool has_mult = false;
-      for (unsigned j = 0; j < sz; ++j)
-        {
-          auto p = subcount.find(f[j]);
-          assert(p != subcount.end());
-          unsigned sc = p->second;
-          assert(sc > 0);
-          if (sc == 1)
-            has_once = true;
-          else
-            has_mult = true;
-          if (has_once && has_mult)
-            {
-              std::vector<formula> once;
-              std::vector<formula> mult;
-              for (unsigned i = 0; i < j; ++i)
-                mult.push_back(f[i]);
-              once.push_back(f[j]);
-              if (sc > 1)
-                std::swap(once, mult);
-              for (++j; j < sz; ++j)
-                {
-                  auto p = subcount.find(f[j]);
-                  assert(p != subcount.end());
-                  unsigned sc = p->second;
-                  ((sc == 1) ? once : mult).push_back(f[j]);
-                }
-              formula f1 = formula::multop(f.kind(), std::move(once));
-              formula f2 = formula::multop(f.kind(), std::move(mult));
-              return { f1, f2 };
-            }
-        }
-      return {f, nullptr};
-    }
-  }
-
-
   //////////////////////////////////////////////////////////////////////
   // Boolean-subexpression relabeler
   //////////////////////////////////////////////////////////////////////
@@ -275,378 +209,758 @@ namespace spot
   //   "a & b & X(c & d) & GF(c & d)" into "p0 & Xp1 & GFp1"
   // where Boolean subexpressions are replaced by fresh propositions.
   //
-  // Detecting Boolean subexpressions is not a problem.
-  // Furthermore, because we are already representing LTL formulas
-  // with sharing of identical sub-expressions we can easily rename
-  // a subexpression (such as c&d above) only once.  However this
-  // scheme (done by relabel_overlapping_bse()) has two problems:
+  // Let us say that a Boolean subformula is "closed" if all the
+  // occurrences of all its atomic propositions are inside that
+  // subformula.  Replacing a closed subformula by a fresh proposition
+  // preserves the semantics: the new proposition is equivalent to the
+  // subformula, and since the atomic propositions of the subformula
+  // appear nowhere else, no correlation with the rest of the formula
+  // is lost.
   //
-  //   A. It will not detect inter-dependent Boolean subexpressions.
-  //      For instance it will mistakenly relabel "(a & b) U (a & !b)"
-  //      as "p0 U p1", hiding the dependency between a&b and a&!b.
+  // Replacing a subformula that is not closed would be wrong: for
+  // instance in "(a & b) U (a & !b)", relabeling both "a & b" and
+  // "a & !b" as p0 and p1 would hide the fact that both depend on "a".
+  // Instead only the atomic propositions may be renamed, giving
+  // "(p0 & p1) U (p0 & !p1)".
   //
-  //   B. Because of our n-ary operators, it will fail to
-  //      notice that (a & b) is a sub-expression of (a & b & c).
+  // Distinct closed subformulas may still share atomic propositions
+  // when one is nested in the other (e.g., "a & b" and "!(a & b)").
+  // Only one of them can be renamed, so we greedily select the
+  // subformulas that hide the largest number of atomic propositions,
+  // making sure that no two selected subformulas share an atomic
+  // proposition.  This is the minimal renaming we are looking for:
+  // every selected subformula replaces at least two atomic
+  // propositions by a single one.
   //
-  // The way we compute the subexpressions that can be relabeled is by
-  // transforming the formula syntax tree into an undirected graph,
-  // and computing the cut-points of this graph.  The cut-points (or
-  // articulation points) are the nodes whose removal would split the
-  // graph in two components; in our case, we extend this definition to
-  // also consider the leaves as cut-points.
+  // Detecting closed subformulas is cheap: for each subformula we
+  // compute the set of atomic propositions it uses, and the set of
+  // atomic propositions that occur outside of it; the subformula is
+  // closed iff the second set is empty.  The first set is computed
+  // bottom-up and the second top-down, in two traversals of the syntax
+  // DAG.  Atomic propositions are identified by their index and sets
+  // of indices are stored as bit-vectors, so unions and intersections
+  // are a few machine-word operations.
   //
-  // For instance ((a|b)&c&d)U(!d&e&f) is represented by
-  // the following graph, were cut-points are marked with *.
+  // Renaming must remain cheap, so no BDD is involved in detecting
+  // closed subformulas.  A BDD is needed only for the subformulas
+  // that are actually renamed: replacing an unsatisfiable (or
+  // tautological) subformula by a fresh proposition would be wrong,
+  // so such a subformula must be replaced by "false" (or "true")
+  // instead, and that can only be decided semantically.  This check
+  // (as_bdd()) is therefore restricted to the selected subformulas,
+  // and it is skipped for those in which each atomic proposition
+  // occurs at most once: such "read-once" formulas are never
+  // equivalent to true or false.  That property is tested locally, in
+  // rename(), on the subformula being renamed: the subformula is
+  // scanned as a tree (not as a DAG) and its atomic propositions are
+  // marked in a bit-vector, the second occurrence of any of them
+  // aborting the scan.
   //
-  //             ((a|b)&c&d)U(!d&e&f)
-  //                 ╱           ╲
-  //            ((a|b)&c&d)*   (!d&e&f)*
-  //             ╱   │   ╲     ╱  │  ╲
-  //           a|b*  │    ╲   !   │   ╲
-  //           ╱ ╲   │     ╲ ╱    │    ╲
-  //          a*  b* c*     d     e*    f*
+  // One subtlety remains.  Because And and Or are n-ary, a formula
+  // such as "(a & b & c) U X(a & b)" would not relabel "a & b": "a"
+  // and "b" occur outside of that node (as operands of the first "&").
+  // However, since "&" is associative and commutative, "(a & b & c)"
+  // may be regrouped as "((a & b) & c)", making the shared "a & b"
+  // explicit; after that regrouping, all the occurrences of "a" and
+  // "b" are inside "a & b", which therefore becomes closed.  So we
+  // regroup the operands of n-ary And/Or nodes using the Boolean
+  // subformulas that already exist elsewhere in the formula.  This
+  // regrouping only affects the analysis graph: the output formula
+  // stays flat.
   //
-  // The relabeling of a formula is done in 3 passes:
-  //  1. Convert the formula's syntax tree into an undirected graph.
-  //  2. Compute the (Boolean) cut points of that graph, using the
-  //     Hopcroft-Tarjan algorithm (see below for a reference).
-  //  3. Recursively scan the formula's tree until we reach
-  //     a (Boolean) cut-point.  If all the children of this node
-  //     are cut-points, rename the node with a fresh label.
-  //     If it's a n-ary operator, group all children that are
-  //     and cut-points relabel them as a whole.
-  //
-  // On the above example, when processing the cut-point
-  // ((a|b)&c&d) we group its children that are cut-points
-  // (a|b)&c and rename this group as p0.   Then d gets
-  // its own name p1, and when processing (!d&e&f) we group
-  // e&f because they are both cut-points, are rename them p1.
-  // The result is (p0 & p1) U (!p1 & p2).
-  //
-  // Problem #B above (handling of n-ary expression) need some
-  // additional tricks.  Consider (a&b&c&d) U X(c&d), and assume
-  // {a,b,c,d} are Boolean subformulas.  The construction, as we have
-  // presented it, would interconnect all of {a,b,c,d}, preventing c&d
-  // from being relabeled together.  To help with that, we count the
-  // number of times each subformula is used (or how many parents
-  // its has in the syntax DAG), and use that to split (a&b&c&d) into
-  // (a&b)&(c&d), separating subformulas that are used only once.  The
-  // counting is done by sub_formula_collect(), and the split by
-  // split_used_once().
+  // Finally, in an n-ary node, all Boolean operands whose atomic
+  // propositions never occur elsewhere may be grouped in a single
+  // subformula, so that "a & b & Xc" is relabeled as "p0 & Xp1" (with
+  // p0 = a & b) instead of "p0 & p1 & Xp2".
   namespace
   {
-    typedef std::vector<formula> succ_vec;
-    typedef std::map<formula, succ_vec> fgraph;
+    typedef std::vector<formula> fvec;
+    typedef std::vector<unsigned> uvec;
 
-    // Convert the formula's syntax tree into an undirected graph
-    // labeled by subformulas.
-    class formula_to_fgraph final
+    // Disjoint-set structure, used to group the operands of n-ary
+    // operators that share atomic propositions.
+    class union_find
     {
     public:
-      fgraph& g;
-      std::stack<formula> s;
-      sub_formula_count_t& subcount;
-
-      formula_to_fgraph(fgraph& g, sub_formula_count_t& subcount)
-        : g(g), subcount(subcount)
+      union_find(unsigned n = 0)
       {
+        reset(n);
       }
 
-      void visit(formula f)
+      // Reuse an existing union-find structure for n elements.
+      void reset(unsigned n)
       {
-        {
-          // Connect to parent
-          auto in = g.emplace(f, succ_vec());
-          if (!s.empty())
-            {
-              formula top = s.top();
-              in.first->second.emplace_back(top);
-              g[top].emplace_back(f);
-              if (!in.second)
-                return;
-            }
-          else
-            {
-              assert(in.second);
-            }
-        }
-        s.push(f);
-
-        unsigned sz = f.size();
-        unsigned i = 0;
-        if (sz > 2 && f.is_boolean())
-          {
-            // If we have a Boolean formula with more than two
-            // children, like (a & b & c & d) where some children
-            // (assume {a,b}) are used only once, but some other
-            // (assume {c,d}) are used multiple time in the formula,
-            // then split that into ((a & b) & (c & d)) to give
-            // (a & b) a chance to be relabeled as a whole.
-            auto pair = split_used_once(f, subcount);
-            if (pair.second)
-              {
-                visit(pair.first);
-                visit(pair.second);
-                g[pair.first].emplace_back(pair.second);
-                g[pair.second].emplace_back(pair.first);
-                goto done;
-              }
-          }
-        if (sz > 2 && !f.is_boolean() && f.is(op::And, op::Or))
-          {
-            /// If we have a formula like (a & b & Xc), consider
-            /// it as ((a & b) & Xc) in the graph to isolate the
-            /// Boolean operands as a single node.
-            formula b = f.boolean_operands(&i);
-            if (b)
-              visit(b);
-          }
-        for (; i < sz; ++i)
-          visit(f[i]);
-      done:
-        s.pop();
+        parent_.resize(n);
+        for (unsigned i = 0; i != n; ++i)
+          parent_[i] = i;
       }
-    };
 
-
-    typedef std::set<formula> fset;
-    struct data_entry // for each node of the graph
-    {
-      unsigned num; // serial number, in pre-order
-      unsigned low; // lowest number accessible via unstacked descendants
-      data_entry(unsigned num = 0, unsigned low = 0)
-        : num(num), low(low)
+      unsigned find(unsigned i)
       {
+        while (parent_[i] != i)
+          i = parent_[i] = parent_[parent_[i]];
+        return i;
       }
-    };
-    typedef std::unordered_map<formula, data_entry> fmap_t;
-    struct stack_entry
-    {
-      formula grand_parent;
-      formula parent;        // current node
-      succ_vec::const_iterator current_child;
-      succ_vec::const_iterator last_child;
-    };
-    typedef std::stack<stack_entry> stack_t;
 
-    // Fill c with the Boolean cutpoints of g, starting from start.
+      void unite(unsigned i, unsigned j)
+      {
+        i = find(i);
+        j = find(j);
+        if (i != j)
+          parent_[j] = i;
+      }
+
+    private:
+      std::vector<unsigned> parent_;
+    };
+
+    // The subformulas of the formula to relabel, organized as a graph.
     //
-    // This is based no "Efficient Algorithms for Graph
-    // Manipulation", J. Hopcroft & R. Tarjan, in Communications of
-    // the ACM, 16 (6), June 1973.
+    // This is the syntax DAG of the formula, except that the operands
+    // of n-ary And/Or nodes may be regrouped: if all the operands of an
+    // existing Boolean subformula m are operands of an And/Or node f,
+    // then m can be used as an operand of f instead of its own
+    // operands.  Since And and Or are associative, this does not change
+    // the formula, but it makes the shared use of m explicit, so that
+    // the atomic propositions of m can be hidden behind a single
+    // proposition even if they also occur in f.
     //
-    // It differs from the original algorithm by returning only the
-    // Boolean cut-points, not dealing with the initial state
-    // properly (our initial state will always be considered as a
-    // cut-point, but since we only return Boolean cut-points it's
-    // OK: if the top-most formula is Boolean we want to replace it
-    // as a whole), and considering the atomic propositions that
-    // are leaves as cutpoints too.
-    void cut_points(const fgraph& g, fset& c, formula start)
-    {
-      stack_t s;
-
-      unsigned num = 0;
-      fmap_t data;
-      data_entry d = { num, num };
-      data[start] = d;
-      ++num;
-      const succ_vec& children = g.find(start)->second;
-      stack_entry e = { start, start, children.begin(), children.end() };
-      s.push(e);
-
-      while (!s.empty())
-        {
-          stack_entry& e  = s.top();
-          if (e.current_child != e.last_child)
-            {
-              // Skip the edge if it is just the reverse of the one
-              // we took.
-              formula child = *e.current_child;
-              if (child == e.grand_parent)
-                {
-                  ++e.current_child;
-                  continue;
-                }
-              auto i = data.emplace(std::piecewise_construct,
-                                    std::forward_as_tuple(child),
-                                    std::forward_as_tuple(num, num));
-              if (i.second)        // New destination.
-                {
-                  ++num;
-                  const succ_vec& children = g.find(child)->second;
-                  stack_entry newe = { e.parent, child,
-                                       children.begin(), children.end() };
-                  s.push(newe);
-                }
-              else           // Destination exists.
-                {
-                  data_entry& dparent = data[e.parent];
-                  data_entry& dchild = i.first->second;
-                  // If this is a back-edge, update
-                  // the low field of the parent.
-                  if (dchild.num <= dparent.num)
-                    if (dparent.low > dchild.num)
-                      dparent.low = dchild.num;
-                }
-              ++e.current_child;
-            }
-          else
-            {
-              formula grand_parent = e.grand_parent;
-              formula parent = e.parent;
-              s.pop();
-              if (!s.empty())
-                {
-                  data_entry& dparent = data[parent];
-                  data_entry& dgrand_parent = data[grand_parent];
-                  if (dparent.low >= dgrand_parent.num // cut-point
-                      && grand_parent.is_boolean())
-                    {
-                      c.insert(grand_parent);
-                      // Also consider atomic propositions as
-                      // cut-points if they are leaves.
-                      if (parent.is(op::ap)
-                          && g.find(parent)->second.size() == 1)
-                        c.insert(parent);
-                    }
-                  if (dparent.low < dgrand_parent.low)
-                    dgrand_parent.low = dparent.low;
-                }
-            }
-        }
-    }
-
-
-    class bse_relabeler final: public relabeler<false, true>
+    // Every subformula (and every atomic proposition) is given a dense
+    // index by scan().  All the tables below are indexed by that
+    // number, and the operands of a node are stored as indices, so the
+    // algorithms never have to hash a formula, except in scan().
+    class subformula_graph
     {
     public:
-      const fset& c;
-      const sub_formula_count_t& subcount;
+      std::vector<formula> node;                  // index -> formula
+      std::vector<uvec> children_;                // index -> operand indices
+      std::vector<int> ap_bit;                    // index -> AP bit or -1
+      std::vector<unsigned> order;                // indices, topologically
+      std::unordered_map<formula, unsigned> idx;  // formula -> index
+      unsigned nap = 0;                           // number of APs
 
-      bse_relabeler(ap_generator* gen, const fset& c,
-                    relabeling_map* m, const sub_formula_count_t& subcount)
-        : relabeler(gen, m), c(c), subcount(subcount)
+      // The operand indices of a node, after regrouping.
+      const uvec& children(unsigned id) const
       {
+        return children_[id];
       }
 
-      using relabeler::visit;
-
-      formula visit(formula f)
+      unsigned root() const
       {
+        return root_;
+      }
+
+      // The atomic propositions of a node, and those used outside of
+      // it.  Both tables are allocated by allocate_sets().
+      const bitvect& aps(unsigned id) const
+      {
+        return aps_->at(id);
+      }
+
+      bitvect& aps(unsigned id)
+      {
+        return aps_->at(id);
+      }
+
+      const bitvect& esc(unsigned id) const
+      {
+        return esc_->at(id);
+      }
+
+      bitvect& esc(unsigned id)
+      {
+        return esc_->at(id);
+      }
+
+      // Allocate the AP sets now that the number of nodes and the
+      // number of atomic propositions are known.  Storing all the sets
+      // in a single bitvect_array avoids one allocation per node.
+      void allocate_sets()
+      {
+        aps_.reset(make_bitvect_array(nap, node.size()));
+        esc_.reset(make_bitvect_array(nap, node.size()));
+        before_ = bitvect(nap);
+        after_ = bitvect(nap);
+      }
+
+      // Record all the subformulas of f.
+      void scan(formula f)
+      {
+        auto p = idx.emplace(f, node.size());
+        if (!p.second)
+          return;
+        unsigned id = node.size();
+        node.push_back(f);
+        children_.emplace_back();
+        ap_bit.push_back(-1);
+        if (parents_.size() < node.size())
+          parents_.resize(node.size());
         if (f.is(op::ap))
-          return rename(f);
-
-        // This is Boolean cut-point?
-        // We can only relabel it if all its children are cut-points.
-        if (c.contains(f))
           {
-            unsigned fsz = f.size();
-            assert(fsz > 0);    // A cut point has children
-            if (fsz == 1
-                || (fsz == 2
-                    && ((c.contains(f[0])) == (c.contains(f[1])))))
-              return rename(f);
-            if (fsz > 2)
+            ap_bit[id] = nap++;
+            return;
+          }
+        unsigned sz = f.size();
+        for (unsigned i = 0; i != sz; ++i)
+          scan(f[i]);
+        // The recursion above may have reallocated children_, so index
+        // it again now that it is over.
+        uvec& ch = children_[id];
+        ch.reserve(sz);
+        bool andor = sz > 1 && f.is(op::And, op::Or);
+        for (unsigned i = 0; i != sz; ++i)
+          {
+            unsigned cid = idx.at(f[i]);
+            ch.push_back(cid);
+            if (andor)
+              parents_[cid].push_back(id);
+          }
+      }
+
+      // Regroup the operands of n-ary And/Or nodes, as explained above.
+      void regroup()
+      {
+        for (unsigned id = 0; id != node.size(); ++id)
+          {
+            uvec& ch = children_[id];
+            if (ch.size() < 2 || !node[id].is(op::And, op::Or))
+              continue;
+            formula f = node[id];
+            std::unordered_set<unsigned> bops;  // Boolean operands of f
+            for (unsigned c : ch)
+              if (node[c].is_boolean())
+                bops.insert(c);
+            if (bops.empty())
+              continue;
+            // Existing Boolean nodes of the same kind whose operands
+            // are all Boolean operands of f are candidate groups.
+            uvec cand;
+            std::unordered_set<unsigned> seen;
+            for (unsigned c : bops)
+              for (unsigned pid : parents_[c])
+                {
+                  if (pid == id || !seen.insert(pid).second
+                      || node[pid].kind() != f.kind()
+                      || node[pid].size() < 2)
+                    continue;
+                  bool subset = true;
+                  for (unsigned c2 : children_[pid])
+                    if (!bops.count(c2))
+                      {
+                        subset = false;
+                        break;
+                      }
+                  if (subset)
+                    cand.push_back(pid);
+                }
+            if (cand.empty())
+              continue;
+            // Prefer the largest groups, and keep them disjoint.
+            std::sort(cand.begin(), cand.end(),
+                      [this](unsigned a, unsigned b)
+                      {
+                        if (node[a].size() != node[b].size())
+                          return node[a].size() > node[b].size();
+                        return node[a] < node[b];
+                      });
+            std::unordered_set<unsigned> used;
+            uvec groups;
+            for (unsigned m : cand)
               {
-                // cp[0] will contains non cut-points
-                // cp[1] will contain cut-points or atomic propositions
-                std::vector<formula> cp[2];
-                cp[0].reserve(fsz);
-                cp[1].reserve(fsz);
-                for (unsigned i = 0; i < fsz; ++i)
-                  {
-                    formula cf = f[i];
-                    cp[c.contains(cf)].push_back(cf);
-                  }
-                if (cp[0].empty()
-                    || cp[1].empty())
-                  // all children are cut-points or non-cut-points
-                  return rename(f);
-                formula cp1group = rename(formula::multop(f.kind(), cp[1]));
-                formula cp0group = visit(formula::multop(f.kind(), cp[0]));
-                return formula::multop(f.kind(), cp1group, cp0group);
+                bool ok = true;
+                for (unsigned c : children_[m])
+                  if (used.count(c))
+                    {
+                      ok = false;
+                      break;
+                    }
+                if (!ok)
+                  continue;
+                groups.push_back(m);
+                for (unsigned c : children_[m])
+                  used.insert(c);
+              }
+            if (groups.empty())
+              continue;
+            // Replace each grouped operand by its group, keeping the
+            // group at the position of its first operand.
+            std::unordered_map<unsigned, unsigned> pos;
+            for (unsigned i = 0; i != ch.size(); ++i)
+              pos.emplace(ch[i], i);
+            std::unordered_map<unsigned, unsigned> group_of;
+            std::unordered_map<unsigned, unsigned> first_pos;
+            for (unsigned m : groups)
+              for (unsigned c : children_[m])
+                {
+                  group_of.emplace(c, m);
+                  unsigned p = pos.at(c);
+                  auto it = first_pos.find(m);
+                  if (it == first_pos.end())
+                    first_pos.emplace(m, p);
+                  else if (p < it->second)
+                    it->second = p;
+                }
+            uvec res;
+            res.reserve(ch.size());
+            for (unsigned i = 0; i != ch.size(); ++i)
+              {
+                unsigned c = ch[i];
+                auto it = group_of.find(c);
+                if (it == group_of.end())
+                  res.push_back(c);
+                else if (first_pos.at(it->second) == i)
+                  res.push_back(it->second);
+              }
+            ch = std::move(res);
+          }
+      }
+
+      // Compute a topological order of the (regrouped) graph.
+      void sort(formula f)
+      {
+        root_ = idx.at(f);
+        order.clear();
+        seen_.assign(node.size(), 0);
+        stamp_.assign(node.size(), 0);
+        generation_ = 0;
+        order.reserve(node.size());
+        topo(root_);
+      }
+
+      // Return true iff all the occurrences of all the atomic
+      // propositions of n are inside n.
+      //
+      // This is decided exactly by checking which atomic propositions
+      // can be reached from the root without going through n.  The esc
+      // sets computed by compute_esc() over-approximate this: when two
+      // distinct siblings share a descendant (like "F(x)" and "G(x)"
+      // in "GF(x) & FG(x)"), the APs of one sibling are considered to
+      // occur outside the other, even though those occurrences are in
+      // fact inside it.
+      //
+      // The traversal ignores any subtree that cannot reach an atomic
+      // proposition of n, and uses a generation stamp instead of a hash
+      // set of formulas, so that it stays cheap even when called for
+      // many candidates.
+      bool exactly_closed(unsigned nid) const
+      {
+        const bitvect& target = aps(nid);
+        if (++generation_ == 0)
+          {
+            std::fill(stamp_.begin(), stamp_.end(), 0);
+            generation_ = 1;
+          }
+        stack_.clear();
+        stack_.push_back(root_);
+        while (!stack_.empty())
+          {
+            unsigned id = stack_.back();
+            stack_.pop_back();
+            if (id == nid || stamp_[id] == generation_)
+              continue;
+            stamp_[id] = generation_;
+            if (ap_bit[id] >= 0)
+              {
+                if (target.get(ap_bit[id]))
+                  return false;
+                continue;
+              }
+            for (unsigned cid : children_[id])
+              if (aps(cid).intersects(target))
+                stack_.push_back(cid);
+          }
+        return true;
+      }
+
+      void compute_aps()
+      {
+        for (unsigned id : order)         // operands are visited first
+          {
+            bitvect& v = aps(id);
+            if (ap_bit[id] >= 0)
+              {
+                v.set(ap_bit[id]);
+                continue;
+              }
+            for (unsigned cid : children_[id])
+              v |= aps(cid);
+          }
+      }
+
+      // Compute, for each subformula, the atomic propositions that
+      // occur outside of it.
+      void compute_esc()
+      {
+        // order is a post-order: iterate in reverse so that parents are
+        // processed before their operands.
+        for (auto it = order.rbegin(); it != order.rend(); ++it)
+          {
+            unsigned id = *it;
+            const uvec& ch = children_[id];
+            unsigned sz = ch.size();
+            if (sz == 0)
+              continue;
+            // esc(ch[i]) contains esc(n) and the APs of all the other
+            // operands of n: those before ch[i] in a first pass, and
+            // those after it in a second pass.
+            before_.clear_all();
+            for (unsigned i = 0; i != sz; ++i)
+              {
+                esc(ch[i]) |= esc(id);
+                esc(ch[i]) |= before_;
+                before_ |= aps(ch[i]);
+              }
+            after_.clear_all();
+            for (unsigned i = sz; i != 0; --i)
+              {
+                esc(ch[i - 1]) |= esc(id);
+                esc(ch[i - 1]) |= after_;
+                after_ |= aps(ch[i - 1]);
               }
           }
+      }
 
-        // Not a cut-point, recurse
-        unsigned sz = f.size();
-        if (sz <= 2)
-          return f.map([this](formula f)
-                       {
-                         return visit(f);
-                       });
+    private:
+      unsigned root_ = 0;
+      std::vector<uvec> parents_;       // And/Or parents
+      std::vector<char> seen_;
+      std::unique_ptr<bitvect_array> aps_;
+      std::unique_ptr<bitvect_array> esc_;
+      // Scratch space reused by compute_esc().
+      bitvect before_;
+      bitvect after_;
+      // Scratch space for exactly_closed(), see there.
+      mutable std::vector<unsigned> stack_;
+      mutable std::vector<unsigned> stamp_;
+      mutable unsigned generation_ = 0;
 
-        if (f.is_boolean() && sz > 2)
-          // If we have a Boolean formula with more than two
-          // children, like (a & b & c & d) where some children
-          // (assume {a,b}) are used only once, but some other
-          // (assume {c,d}) are used multiple time in the formula,
-          // then split that into ((a & b) & (c & d)) to give
-          // (a & b) a chance to be relabeled as a whole.
-          if (auto pair = split_used_once(f, subcount); pair.second)
-            {
-              formula left = visit(pair.first);
-              formula right = visit(pair.second);
-              return formula::multop(f.kind(), left, right);
-            }
-        /// If we have a formula like (a & b & Xc), consider
-        /// it as ((a & b) & Xc) in the graph to isolate the
-        /// Boolean operands as a single node.
-        unsigned i = 0;
-        std::vector<formula> res;
-        formula b = f.boolean_operands(&i);
-        if (b && b != f)
+      void topo(unsigned id)
+      {
+        if (seen_[id])
+          return;
+        seen_[id] = 1;
+        for (unsigned cid : children_[id])
+          topo(cid);
+        order.push_back(id);
+      }
+    };
+
+    class bse_relabeler
+    {
+      // An operand of an n-ary node, after grouping.
+      struct piece
+      {
+        formula f;    // the subformula to use as operand
+        unsigned id;  // its node index, unless whole
+        bool whole;   // whether f must be relabeled as a whole
+      };
+
+    public:
+      // Renaming an unsatisfiable (or tautological) piece would hide
+      // its nature: the fresh proposition could be satisfied freely,
+      // so we keep false/true for those.  This semantic check is done
+      // only on the pieces that are renamed, and it is skipped for
+      // read-once pieces, as decided by read_once().
+      tl_simplifier tl;
+
+      bse_relabeler(ap_generator* gen, relabeling_map* m,
+                    const subformula_graph& g,
+                    const std::vector<char>& selected)
+        : gen_(gen), oldnames_(m), g_(g), selected_(selected),
+          read_marks_(g.nap), visit_(g.node.size(), 0),
+          memo_(g.node.size())
+      {
+        owner_.assign(g.nap, ~0u);
+      }
+
+      ~bse_relabeler()
+      {
+        delete gen_;
+      }
+
+      // Return true iff each atomic proposition occurs at most once in
+      // f expanded as a tree.  A formula that contains a constant, or
+      // no atomic proposition at all, is not read-once, so a positive
+      // answer guarantees that f is neither true nor false.
+      bool read_once(formula f)
+      {
+        read_marks_.clear_all();
+        read_count_ = 0;
+        return read_once_tree(f) && read_count_ != 0;
+      }
+
+      bool read_once_tree(formula f)
+      {
+        if (f.is_constant())
+          return false;
+        if (f.is(op::ap))
           {
-            res.reserve(sz - i + 1);
-            res.emplace_back(visit(b));
+            unsigned bit = g_.ap_bit[g_.idx.at(f)];
+            if (read_marks_.get(bit))
+              return false;
+            read_marks_.set(bit);
+            ++read_count_;
+            return true;
+          }
+        unsigned sz = f.size();
+        for (unsigned i = 0; i != sz; ++i)
+          if (!read_once_tree(f[i]))
+            return false;
+        return true;
+      }
+
+      formula rename(formula old)
+      {
+        if (!old.is(op::ap))
+          {
+            // A group built by partition() may coincide with an
+            // existing node that was already visited: keep that
+            // expansion instead of hiding the node behind a name.
+            auto it = g_.idx.find(old);
+            if (it != g_.idx.end() && visit_[it->second])
+              return memo_[it->second];
+          }
+        auto r = renamed_.emplace(old, nullptr);
+        if (!r.second)
+          return r.first->second;
+        // A read-once formula, in which each atomic proposition
+        // occurs at most once, is neither true nor false, so the BDD
+        // check is useless for it.
+        if (!read_once(old))
+          {
+            bdd b = tl.as_bdd(old);
+            if (b == bddtrue)
+              return r.first->second = formula::tt();
+            if (b == bddfalse)
+              return r.first->second = formula::ff();
+          }
+        formula res = gen_->next();
+        if (oldnames_)
+          (*oldnames_)[res] = old;
+        r.first->second = res;
+        return res;
+      }
+
+      formula visit(unsigned id)
+      {
+        formula f = g_.node[id];
+        if (g_.ap_bit[id] >= 0 || selected_[id])
+          return rename(f);
+        if (visit_[id])
+          return memo_[id];
+        if (f.is_boolean())
+          {
+            // As in rename(): a group of partition() can be equal to
+            // an existing Boolean node that was already visited.
+            auto it = renamed_.find(f);
+            if (it != renamed_.end())
+              return it->second;
+          }
+        formula res;
+        if (f.size() > 1 && f.is(op::And, op::Or))
+          {
+            fvec operands;
+            operands.reserve(f.size());
+            for (const piece& p : partition(id))
+              operands.push_back(p.whole ? rename(p.f) : visit(p.id));
+            res = formula::multop(f.kind(), std::move(operands));
           }
         else
           {
-            i = 0;
-            res.reserve(sz);
+            // Compute the relabeled operands first, then let map()
+            // rebuild the node without looking any of them up.
+            fvec operands;
+            operands.reserve(f.size());
+            for (unsigned cid : g_.children(id))
+              operands.push_back(visit(cid));
+            unsigned k = 0;
+            res = f.map([&k, &operands](formula)
+                        {
+                          return operands[k++];
+                        });
           }
-        for (; i < sz; ++i)
-          res.emplace_back(visit(f[i]));
-        return formula::multop(f.kind(), res);
+        visit_[id] = 1;
+        memo_[id] = res;
+        return res;
       }
+
+      formula visit(formula f)
+      {
+        return visit(g_.idx.at(f));
+      }
+
+    private:
+      // Split the operands of the n-ary node f into pieces.  Boolean
+      // operands whose atomic propositions do not occur elsewhere are
+      // grouped in a single piece that is relabeled as a whole.
+      std::vector<piece> partition(unsigned id)
+      {
+        formula f = g_.node[id];
+        const uvec& ch = g_.children(id);
+        unsigned sz = ch.size();
+        // APs that will stay visible whatever grouping we choose.
+        bitvect& out = out_;
+        out = g_.esc(id);
+        for (unsigned i = 0; i != sz; ++i)
+          if (!g_.node[ch[i]].is_boolean())
+            out |= g_.aps(ch[i]);
+        // Group Boolean operands that share atomic propositions.
+        uf_.reset(sz);
+        opnd_.assign(sz, false);
+        touched_.clear();
+        for (unsigned i = 0; i != sz; ++i)
+          if ((opnd_[i] = g_.node[ch[i]].is_boolean()))
+            g_.aps(ch[i]).foreach_set_index(
+              [&](unsigned a)
+              {
+                unsigned& o = owner_[a];
+                if (o == ~0u)
+                  {
+                    o = i;
+                    touched_.push_back(a);
+                  }
+                else
+                  uf_.unite(i, o);
+              });
+        // Give each component of the union-find a dense index.
+        comp_.assign(sz, ~0u);
+        unsigned ncomp = 0;
+        for (unsigned i = 0; i != sz; ++i)
+          if (opnd_[i])
+            {
+              unsigned r = uf_.find(i);
+              if (comp_[r] == ~0u)
+                comp_[r] = ncomp++;
+              comp_[i] = comp_[r];
+            }
+        // An operand cannot be grouped if its component contains an
+        // operand of the same kind (formula::multop() would flatten
+        // it) or an atomic proposition that stays visible.
+        flat_.assign(ncomp, false);
+        visible_.assign(ncomp, false);
+        for (unsigned i = 0; i != sz; ++i)
+          if (opnd_[i])
+            {
+              if (g_.node[ch[i]].kind() == f.kind())
+                flat_[comp_[i]] = true;
+              if (g_.aps(ch[i]).intersects(out))
+                visible_[comp_[i]] = true;
+            }
+        // Group the operands that can be.
+        groupable_.assign(sz, false);
+        merged_.clear();
+        unsigned first_merged = sz;
+        for (unsigned i = 0; i != sz; ++i)
+          if (opnd_[i] && !flat_[comp_[i]] && !visible_[comp_[i]])
+            {
+              groupable_[i] = true;
+              merged_.push_back(g_.node[ch[i]]);
+              if (i < first_merged)
+                first_merged = i;
+            }
+        bool whole = merged_.size() > 1;
+        formula grp = nullptr;
+        unsigned grp_id = ~0u;
+        if (!merged_.empty())
+          {
+            if (whole)
+              grp = formula::multop(f.kind(), merged_);
+            else
+              {
+                grp = merged_.front();
+                grp_id = ch[first_merged];
+              }
+          }
+        std::vector<piece> res;
+        res.reserve(sz - merged_.size() + (merged_.empty() ? 0 : 1));
+        for (unsigned i = 0; i != sz; ++i)
+          {
+            if (i == first_merged)
+              res.push_back(piece{grp, grp_id, whole});
+            if (!groupable_[i])
+              res.push_back(piece{g_.node[ch[i]], ch[i], false});
+          }
+        for (unsigned a : touched_)
+          owner_[a] = ~0u;
+        touched_.clear();
+        return res;
+      }
+
+      ap_generator* gen_;
+      relabeling_map* oldnames_;
+      const subformula_graph& g_;
+      const std::vector<char>& selected_;
+      std::vector<unsigned> owner_;    // AP -> first operand index
+      std::vector<unsigned> touched_;  // APs set in owner_
+      bitvect out_;                    // scratch space for partition()
+      bitvect read_marks_;             // APs seen by read_once()
+      unsigned read_count_ = 0;        // APs seen by read_once()
+      // Scratch space reused by partition().
+      union_find uf_;
+      std::vector<char> opnd_;
+      std::vector<unsigned> comp_;
+      std::vector<char> flat_;
+      std::vector<char> visible_;
+      std::vector<char> groupable_;
+      fvec merged_;
+      std::vector<char> visit_;        // node has been visited
+      std::vector<formula> memo_;      // result for a visited node
+      std::unordered_map<formula, formula> renamed_;
     };
   }
-
 
   formula
   relabel_bse(formula f, relabeling_style style, relabeling_map* m)
   {
-    fgraph g;
-    sub_formula_count_t subcount;
+    subformula_graph g;
+    g.scan(f);
+    g.regroup();
+    g.sort(f);
+    g.allocate_sets();
+    g.compute_aps();
+    g.compute_esc();
 
-    // Scan f for sub-formulas used once.
-    sub_formula_collect(f, &subcount);
-
-    // Build the graph g from the formula f.
+    // Select the subformulas to relabel: those that are closed and
+    // hide the most atomic propositions, while never sharing an atomic
+    // proposition with another selected subformula.
+    struct candidate
     {
-      formula_to_fgraph conv(g, subcount);
-      conv.visit(f);
-    }
+      unsigned id;
+      unsigned index;
+      unsigned count;   // number of APs, cached for the sort
+    };
+    std::vector<candidate> cand;
+    for (unsigned i = 0; i != g.order.size(); ++i)
+      {
+        unsigned id = g.order[i];
+        formula n = g.node[id];
+        if (!n.is_boolean() || g.ap_bit[id] >= 0)
+          continue;
+        unsigned count = g.aps(id).count();
+        if (count < 2)
+          continue;
+        // Disjointness of aps(n) and esc(n) is a cheap sufficient
+        // condition for n being closed.
+        if (g.aps(id).intersects(g.esc(id)) && !g.exactly_closed(id))
+          continue;
+        cand.push_back({id, i, count});
+      }
+    std::sort(cand.begin(), cand.end(),
+              [](const candidate& a, const candidate& b)
+              {
+                if (a.count != b.count)
+                  return a.count > b.count;
+                return a.index < b.index;
+              });
+    std::vector<char> selected(g.node.size(), 0);
+    bitvect hidden(g.nap);
+    for (const candidate& c : cand)
+      if (!g.aps(c.id).intersects(hidden))
+        {
+          selected[c.id] = 1;
+          hidden |= g.aps(c.id);
+        }
 
-    //// Uncomment to print the graph.
-    // for (auto& [f, sv]: g)
-    //   {
-    //     std::cerr << f << ":\n";
-    //     for (auto& s: sv)
-    //       std::cerr << "  " << s << '\n';
-    //   }
-
-    // Compute its cut-points
-    fset c;
-    cut_points(g, c, f);
-
-    // std::cerr << "cut-points\n";
-    // for (formula cp: c)
-    //   std::cerr << "  - " << cp << '\n';
-
-    // Relabel the formula recursively, stopping
-    // at cut-points or atomic propositions.
     ap_generator* gen = nullptr;
     switch (style)
       {
@@ -657,7 +971,7 @@ namespace spot
         gen = new abc_generator;
         break;
       }
-    bse_relabeler rel(gen, c, m, subcount);
+    bse_relabeler rel(gen, m, g, selected);
     return rel.visit(f);
   }
 
