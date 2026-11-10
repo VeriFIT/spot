@@ -1421,6 +1421,31 @@ namespace spot
   // calling it.
   bdd simple_ltl_translator::propeq_encode(formula f, int level)
   {
+    // Record that `enc` is the encoding of the negation of `orig`.
+    // This lets propeq_representative() use ¬orig as the label of the
+    // state when a Boolean connective erases all the other operands:
+    // α→ff, α↔ff, and α⊕tt are all ¬α, and ¬α (e.g. ¬Gi, which is a
+    // guarantee) has a meaningful acceptance status, while α→ff (e.g.
+    // Gi→ff) might be misclassified by obligation_is_accepting().
+    //
+    // Only level 0 is handled: deeper levels use anonymous variables
+    // that encode `orig` in the future, so they cannot be used as the
+    // label of the current state.
+    auto register_complement = [&](bdd enc, formula orig)
+    {
+      if (level != 0)
+        return;
+      bdd neg = bdd_not(enc);
+      // Constants are already handled by propeq_representative().
+      if (neg == bddtrue || neg == bddfalse)
+        return;
+      formula nf = orig.is(op::Not) ? orig[0] : formula::Not(orig);
+      // Insert in both acceptance classes, since either one may be
+      // used to look up this encoding later.
+      propositional_equiv_[false].emplace(neg, nf);
+      propositional_equiv_[true].emplace(neg, nf);
+    };
+
     auto encode_new = [&] (formula f) -> bdd
     {
       switch (f.kind())
@@ -1443,9 +1468,6 @@ namespace spot
                 return bddtrue;
               if (level == 0)
                 return bdd_nithvar(dict_->register_proposition(f[0], this));
-              else
-                return bdd_nithvar(dict_->register_anonymous_variables(1,
-                                                                       this));
             }
           return bdd_not(propeq_encode(f[0], level));
         case op::And:
@@ -1465,17 +1487,33 @@ namespace spot
         case op::Xor:
           {
             bdd left = propeq_encode(f[0], level);
-            return left ^ propeq_encode(f[1], level);
+            bdd right = propeq_encode(f[1], level);
+            // α⊕tt ≡ ¬α, and tt⊕β ≡ ¬β
+            if (right == bddtrue)
+              register_complement(left, f[0]);
+            else if (left == bddtrue)
+              register_complement(right, f[1]);
+            return left ^ right;
           }
         case op::Implies:
           {
             bdd left = propeq_encode(f[0], level);
-            return left >> propeq_encode(f[1], level);
+            bdd right = propeq_encode(f[1], level);
+            // α→ff ≡ ¬α
+            if (right == bddfalse)
+              register_complement(left, f[0]);
+            return left >> right;
           }
         case op::Equiv:
           {
             bdd left = propeq_encode(f[0], level);
-            return bdd_biimp(left, propeq_encode(f[1], level));
+            bdd right = propeq_encode(f[1], level);
+            // α↔ff ≡ ¬α, and ff↔β ≡ ¬β
+            if (right == bddfalse)
+              register_complement(left, f[0]);
+            else if (left == bddfalse)
+              register_complement(right, f[1]);
+            return bdd_biimp(left, right);
           }
         case op::X:
         case op::strong_X:
