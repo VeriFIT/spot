@@ -2290,15 +2290,29 @@ namespace spot
     {
     private:
       std::map<formula, std::pair<std::set<formula>, std::set<formula>>> data_;
-      std::vector<std::string> outs_;
+      // Keep the output APs alive: APIDs are recycled as soon as an AP
+      // is destroyed, and outs_ below is indexed by APID.
+      std::vector<formula> outs_aps_;
+      std::vector<char> outs_;
 
     public:
 
-      formula_2_inout_props(std::vector<std::string> outs)
-        : outs_(std::move(outs))
-      {}
+      explicit formula_2_inout_props(const std::vector<std::string>& outs)
+      {
+        outs_aps_.reserve(outs.size());
+        for (const std::string& out: outs)
+          outs_aps_.push_back(formula::ap(out));
+        outs_.assign(formula::apid_count(), 0);
+        for (formula ap: outs_aps_)
+          outs_[ap.apid()] = 1;
+      }
 
-      std::pair<std::set<formula>, std::set<formula>>
+      /// \brief Input and output propositions of \a f.
+      ///
+      /// The result is cached in a node-based container, so callers
+      /// should bind it to a const reference: copying the two sets on
+      /// every call used to be a significant cost of the decomposition.
+      const std::pair<std::set<formula>, std::set<formula>>&
       aps_of(formula f)
       {
         auto cache_value = data_.find(f);
@@ -2309,18 +2323,17 @@ namespace spot
                   {
                     if (f.is(op::ap))
                     {
-                      auto cache_value =
-                        std::find(outs_.begin(), outs_.end(), f.ap_name());
-                      if (cache_value != outs_.end())
+                      unsigned apid = f.apid();
+                      if (apid < outs_.size() && outs_[apid])
                         outs_f.insert(f);
                       else
                         ins_f.insert(f);
                     }
                     return false;
                   });
-        std::pair<std::set<formula>, std::set<formula>> res({ins_f, outs_f});
-        data_.insert({f, res});
-        return res;
+        return data_.emplace(f, std::pair(std::move(ins_f),
+                                          std::move(outs_f)))
+          .first->second;
       }
     };
   }
@@ -2506,7 +2519,7 @@ namespace spot
         std::swap(left_outs, right_outs);
       }
 
-      std::set<formula> g_outs = form2props.aps_of(f_g).second;
+      const std::set<formula>& g_outs = form2props.aps_of(f_g).second;
       if (are_intersecting(g_outs, right_outs))
         return ret_sol_maybe();
 
@@ -2545,7 +2558,7 @@ namespace spot
       res->prop_complete(trival::maybe());
 
       bdd output_bdd = bddtrue;
-      auto [is, os] = form2props.aps_of(f);
+      const auto& [is, os] = form2props.aps_of(f);
       for (auto i : is)
         res->register_ap(i);
       for (auto o : os)
@@ -2631,7 +2644,7 @@ namespace spot
       res->prop_weak(true);
 
       bdd output_bdd = bddtrue;
-      std::set<formula> ins_f = form2props.aps_of(f_g).first;
+      const std::set<formula>& ins_f = form2props.aps_of(f_g).first;
       for (auto &out : output_aps)
         output_bdd &= bdd_ithvar(res->register_ap(out));
 
@@ -2686,7 +2699,7 @@ namespace // anonymous for subsformula
                 continue;
               }
             auto f = assumptions[first_free];
-            auto o = form2props.aps_of(f).second;
+            const auto& o = form2props.aps_of(f).second;
             if (!o.empty())
               return true;
             ++first_free;
@@ -2702,7 +2715,7 @@ namespace // anonymous for subsformula
             todo.pop();
             const formula& current_form = assumptions[current_index];
             done[current_index] = true;
-            auto [ins_current, outs_current]
+            const auto& [ins_current, outs_current]
               = form2props.aps_of(current_form);
             result.first.insert(ins_current.begin(), ins_current.end());
             result.second.insert(outs_current.begin(), outs_current.end());
@@ -2711,7 +2724,7 @@ namespace // anonymous for subsformula
                 if (done[i])
                   continue;
                 const formula& other_form = assumptions[i];
-                auto [ins_other, outs_other]
+                const auto& [ins_other, outs_other]
                   = form2props.aps_of(other_form);
                 if (are_intersecting(ins_current, ins_other) ||
                     are_intersecting(outs_current, outs_other))
@@ -2764,7 +2777,8 @@ namespace // anonymous for subsformula
               done[current_index] = true;
               auto current_form = forms[current_index];
               current_res = formula::And(current_res, current_form);
-              auto [ins_f, outs_f] = form2props.aps_of(current_form);
+              const auto& [ins_f, outs_f]
+                = form2props.aps_of(current_form);
               std::set<formula> ins_f_dec, outs_f_dec;
               std::set_intersection(ins_f.begin(), ins_f.end(),
                                     decRelProps_ins.begin(),
@@ -2780,7 +2794,8 @@ namespace // anonymous for subsformula
                 {
                   if (done[i])
                     continue;
-                  auto [ins_i, outs_i] = form2props.aps_of(forms[i]);
+                  const auto& [ins_i, outs_i]
+                    = form2props.aps_of(forms[i]);
                   if (are_intersecting(ins_i, ins_f_dec)
                       || are_intersecting(outs_i, outs_f_dec))
                     todo.emplace(i);
@@ -2817,7 +2832,7 @@ namespace // anonymous for subsformula
                         std::vector<bool> &done_right)
     {
       left_res = formula::And(left_res, f);
-      auto [ins_f, outs_f] = form2props.aps_of(f);
+      const auto& [ins_f, outs_f] = form2props.aps_of(f);
       std::set<formula> f_ins_dec, f_outs_dec;
       std::set_intersection(ins_f.begin(), ins_f.end(), ins_dec.begin(),
                             ins_dec.end(), std::inserter(f_ins_dec,
@@ -2831,7 +2846,7 @@ namespace // anonymous for subsformula
         if (done_right[i])
           continue;
         auto f2 = dst_vect[i];
-        auto [f2_ins, f2_outs] = form2props.aps_of(f2);
+        const auto& [f2_ins, f2_outs] = form2props.aps_of(f2);
         if (are_intersecting(f2_ins, f_ins_dec)
           || are_intersecting(f2_outs, f_outs_dec))
         {
@@ -2860,7 +2875,7 @@ namespace // anonymous for subsformula
         // An assumption is free when it shares no decomposition-critical
         // proposition with the other formulas: both its inputs and its
         // outputs have to be considered.
-        auto [ass_ins, ass_outs] = form2props.aps_of(ass);
+        const auto& [ass_ins, ass_outs] = form2props.aps_of(ass);
         if (!are_intersecting(ass_ins, decRelProps_ins)
             && !are_intersecting(ass_outs, decRelProps_outs))
           free_assumptions = formula::And(free_assumptions, ass);
@@ -2900,9 +2915,17 @@ namespace // anonymous for subsformula
     if (f.is(op::And))
       {
         std::vector<formula> children;
+        bool changed = false;
         for (formula fi: f)
-          children.push_back(rec(fi));
-        return formula::And(children);
+          {
+            formula child = rec(fi);
+            changed |= child != fi;
+            children.push_back(child);
+          }
+        // Rebuilding an unchanged conjunction would only sort all its
+        // children again, which is expensive on the flat conjunctions
+        // produced by the distribution below.
+        return changed ? formula::And(children) : f;
       }
     else if (f.is(op::Not))
     {
@@ -3019,41 +3042,66 @@ namespace spot
     // For each conj, we calculate the set of output AP
     for (auto child : f)
       children_outs.push_back(form2props.aps_of(child).second);
-    unsigned nb_children = f.size();
-    // flag to test if a conj is in a "class"
-    std::vector<bool> children_class(nb_children, false);
-    // The first element not in a class
-    unsigned first_free = 0;
-    std::stack<unsigned> todo;
-    while (first_free < nb_children)
+    const unsigned nb_children = f.size();
+    // Group the children that share an output proposition: two children
+    // belong to the same class when a chain of children shares output
+    // propositions.  A union-find over the output propositions computes
+    // these classes in time linear in the number of (child, output)
+    // pairs, instead of the quadratic scan over all pairs of children
+    // that used to dominate the decomposition of specifications with
+    // thousands of top-level conjuncts.
+    std::vector<unsigned> parent(nb_children);
+    for (unsigned i = 0; i < nb_children; ++i)
+      parent[i] = i;
+    auto find_root = [&parent](unsigned i)
       {
-        todo.emplace(first_free);
-        std::vector<formula> current_and;
-        std::set<formula> current_outs;
-        while (!todo.empty())
+        while (parent[i] != i)
           {
-            auto current = todo.top();
-            todo.pop();
-            children_class[current] = true;
-            current_and.push_back(f[current]);
-            current_outs.insert(children_outs[current].begin(),
-                                children_outs[current].end());
-            for (unsigned i = 0; i < nb_children; ++i)
-              if (!children_class[i]
-                    && are_intersecting(children_outs[current],
-                                      children_outs[i]))
-                {
-                  todo.emplace(i);
-                  children_class[i] = true;
-                }
+            parent[i] = parent[parent[i]];
+            i = parent[i];
           }
-        auto elem = formula::And(current_and);
-        res.push_back(elem);
-        res_outs.push_back(current_outs);
-
-        while (first_free < nb_children && children_class[first_free])
-          ++first_free;
+        return i;
+      };
+    // First child seen for each output proposition.
+    std::map<formula, unsigned> out_owner;
+    for (unsigned i = 0; i < nb_children; ++i)
+      for (const formula& out: children_outs[i])
+        {
+          auto [it, inserted] = out_owner.emplace(out, i);
+          if (!inserted)
+            {
+              unsigned r1 = find_root(it->second);
+              unsigned r2 = find_root(i);
+              if (r1 != r2)
+                parent[r2] = r1;
+            }
+        }
+    // Collect the members of each class, in order of their first member.
+    std::vector<std::vector<formula>> class_children;
+    std::vector<unsigned> class_index(nb_children, unsigned(-1));
+    for (unsigned i = 0; i < nb_children; ++i)
+      {
+        unsigned r = find_root(i);
+        if (class_index[r] == unsigned(-1))
+          {
+            class_index[r] = class_children.size();
+            class_children.emplace_back();
+            res_outs.emplace_back();
+          }
+        unsigned idx = class_index[r];
+        class_children[idx].push_back(f[i]);
+        res_outs[idx].insert(children_outs[i].begin(),
+                             children_outs[i].end());
       }
+    res.reserve(class_children.size());
+    if (class_children.size() == 1)
+      // All the children are in the same class, so their conjunction
+      // is f itself.  Rebuilding it would sort all the children again.
+      res.push_back(f);
+    else
+      for (auto& children: class_children)
+        res.push_back(children.size() == 1
+                      ? children.front() : formula::And(children));
     assert(res.size() == res_outs.size());
 
     return {res, res_outs};
