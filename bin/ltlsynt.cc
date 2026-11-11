@@ -499,7 +499,9 @@ namespace
                 const std::vector<std::string>& output_aps,
                 const std::vector<std::string>& unobs_aps)
   {
-    gi->moore = (opt_semantics == semantics_moore);
+    gi->semantics = (opt_semantics == semantics_moore)
+      ? spot::synthesis_semantics::Moore
+      : spot::synthesis_semantics::Mealy;
     gi->decompose = opt_decompose_ltl;
     gi->use_bypass = opt_bypass;
     gi->obligation_synthesis = opt_obligation_synthesis;
@@ -515,8 +517,8 @@ namespace
 
     auto sync_stats = [&]()
       {
-        if (p.options().bv)
-          gi->bv = *p.options().bv;
+        if (gi->bv)
+          gi->bv = p.statistics();
       };
 
     if (want_game())

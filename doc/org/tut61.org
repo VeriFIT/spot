@@ -398,45 +398,44 @@ $txt
 * Additional comments
 
 All the examples above use the default settings of
-[[file:ltlsynt.org][=ltlsynt=]].  The tuning options such as =--algo=, =--decompose=, or =--semantics=,
-are not parameters of =synthesis_problem=: they are fields of the
-=spot::synthesis_info= structure, which the constructor accepts as its
-last argument.  That structure is the one used internally by
-=ltlsynt=, so the correspondence is direct.
+[[file:ltlsynt.org][=ltlsynt=]].  The tuning options such as =--algo=,
+=--decompose=, or =--semantics= are selected with =set_*=() methods on
+the =synthesis_problem= object.  They must be set before the problem
+is solved, decomposed, or turned into games: the setters raise an
+exception afterwards.
 
-| =ltlsynt= option    | ~spot::synthesis_info~ field             |
-|---------------------+------------------------------------------|
-| =--algo=sd=         | ~si.s = synthesis_info::algo::SPLIT_DET~ |
-| =--algo=ds=         | ~si.s = synthesis_info::algo::DET_SPLIT~ |
-| =--algo=ps=         | ~si.s = synthesis_info::algo::DPA_SPLIT~ |
-| =--algo=lar=        | ~si.s = synthesis_info::algo::LAR~       |
-| =--algo=lar.old=    | ~si.s = synthesis_info::algo::LAR_OLD~   |
-| =--algo=acd=        | ~si.s = synthesis_info::algo::ACD~       |
-| =--decompose=no=    | ~si.decompose = false~                   |
-| =--semantics=Moore= | ~si.moore = true~                        |
+| =ltlsynt= option           | =synthesis_problem= method                  |
+|----------------------------+---------------------------------------------|
+| =--algo=sd=                | =set_algo(synthesis_algo::SPLIT_DET)=       |
+| =--algo=ds=                | =set_algo(synthesis_algo::DET_SPLIT)=       |
+| =--algo=ps=                | =set_algo(synthesis_algo::DPA_SPLIT)=       |
+| =--algo=lar=               | =set_algo(synthesis_algo::LAR)=             |
+| =--algo=lar.old=           | =set_algo(synthesis_algo::LAR_OLD)=         |
+| =--algo=acd=               | =set_algo(synthesis_algo::ACD)=             |
+| =--decompose=no=           | =set_decompose(false)=                      |
+| =--semantics=Moore=        | =set_semantics(synthesis_semantics::Moore)= |
+| =--bypass=no=              | =set_use_bypass(false)=                     |
+| =--obligation-synthesis=no= | =set_obligation_synthesis(false)=          |
+| =--simplify=N=             | =set_minimize_level(N)=                     |
 
 The defaults are those of =ltlsynt=: =--algo=lar=, =--decompose=yes=,
-and =--semantics=Mealy=, which correspond to =LAR=, =true=, and
-=false= in the structure.  In Python, a fresh structure is built with
-=spot.synthesis_info()=, the enumeration members are spelled
-=spot.synthesis_info.algo_DPA_SPLIT= and so on, and the two Booleans
-take =True= or =False=.  The structure is copied by the constructor,
-so modifying =si= afterwards has no effect on the problem.
+and =--semantics=Mealy=, i.e., =LAR=, =true=, and =Mealy= in the
+methods above.  In Python the enumeration members are spelled
+=spot.synthesis_info.algo_DPA_SPLIT= and
+=spot.synthesis_semantics_Moore=, and the setters return the problem
+so that they can be chained.
 
 The program below solves our specification with =--algo=ps=,
-=--decompose=no=, and =--semantics=Moore=.  In Python, the fourth
-argument of the constructor is the list of unobservable inputs, which
-is =None= here, and the structure comes last.
+=--decompose=no=, and =--semantics=Moore=.
 
 #+BEGIN_SRC python
 import spot
 
 f = spot.formula('G(i -> (o <-> X!o)) & G(!i -> X!o) & !o')
-si = spot.synthesis_info()
-si.s = spot.synthesis_info.algo_DPA_SPLIT  # --algo=ps
-si.decompose = False                       # --decompose=no
-si.moore = True                            # --semantics=Moore
-pr = spot.synthesis_problem(f, ['i'], ['o'], None, si)
+pr = spot.synthesis_problem(f, ['i'], ['o'])
+pr.set_algo(spot.synthesis_info.algo_DPA_SPLIT)  # --algo=ps
+pr.set_decompose(False)                          # --decompose=no
+pr.set_semantics(spot.synthesis_semantics_Moore)  # --semantics=Moore
 machine = pr.strategy()
 if machine is None:
     print('UNREALIZABLE')
@@ -485,14 +484,12 @@ int main()
   if (pf.format_errors(std::cerr))
     return 1;
 
-  spot::synthesis_info si;
-  si.s = spot::synthesis_info::algo::DPA_SPLIT;  // --algo=ps
-  si.decompose = false;                          // --decompose=no
-  si.moore = true;                               // --semantics=Moore
-
   std::vector<std::string> ins{"i"};
   std::vector<std::string> outs{"o"};
-  spot::synthesis_problem p(pf.f, &ins, &outs, nullptr, si);
+  spot::synthesis_problem p(pf.f, &ins, &outs);
+  p.set_algo(spot::synthesis_algo::DPA_SPLIT)       // --algo=ps
+   .set_decompose(false)                            // --decompose=no
+   .set_semantics(spot::synthesis_semantics::Moore);  // --semantics=Moore
   spot::twa_graph_ptr machine = p.strategy();
   if (!machine)
     {
@@ -522,17 +519,22 @@ State: 1
 --END--
 #+end_example
 
-Finally, =pr.options()= returns the =synthesis_info= that was used, so
-a caller can check which settings were in effect, and
+Finally, the getters (=algo()=, =decompose()=, =semantics()=,
+=use_bypass()=, ...) return the settings in effect, and
 =pr.statistics()= returns the benchmarking data collected while
-solving, i.e., the counters that =--csv= reports in =ltlsynt=.  The
-other fields of the structure (=use_bypass=, =polarity=,
-=global_equiv=, =minimize_lvl=, ...) drive the remaining fine-tuning
-options; they are documented in =spot/twaalgos/synthesis.hh=.
+solving, i.e., the counters that =--csv= reports in =ltlsynt=.  All
+the fine-tuning options have a setter and a getter; they are
+documented in =spot/twaalgos/synthesis.hh=.
+
+The lower-level entry points, such as =ltl_to_game()= and
+=solve_game()=, still take a =spot::synthesis_info= structure: that
+structure is what =synthesis_problem= fills internally, and the
+constructor still accepts one as its optional last argument for code
+that already has one.
 
 #  LocalWords:  utf AIGER ltlsynt LTL TLSF html ite isop aag Mealy sd
 #  LocalWords:  unrealizable iostream DPA LAR ACD args HOA SRC acc si
 #  LocalWords:  svg txt aiger encodings aig twa str realizability ds
 #  LocalWords:  pydot pyaig nullptr cppmealy cppaig ccdot ccaig algo
 #  LocalWords:  ps lar acd moore Booleans unobservable benchmarking
-#  LocalWords:  csv lvl
+#  LocalWords:  csv lvl synthesis_algo synthesis_semantics

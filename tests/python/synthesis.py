@@ -131,8 +131,23 @@ tc.assertFalse(pr.assumptions_violated())
 tc.assertEqual(len(pr.sub_specifications()), 1)
 tc.assertEqual(list(pr.sub_outputs()[0]), ["o1"])
 tc.assertEqual(len(pr.games()), 1)
-tc.assertTrue(pr.options().decompose)
+tc.assertTrue(pr.decompose())
 pr.verify_strategy()
+
+# The fine-tuning options are set on the problem itself, and are
+# frozen as soon as a service has run.
+pr = spot.synthesis_problem(spot.formula("G(i -> o)"), ["i"], ["o"])
+tc.assertEqual(pr.algo(), spot.synthesis_info.algo_LAR)
+tc.assertEqual(pr.semantics(), spot.synthesis_semantics_Mealy)
+pr.set_algo(spot.synthesis_info.algo_DPA_SPLIT)
+pr.set_semantics(spot.synthesis_semantics_Moore)
+pr.set_decompose(False)
+tc.assertEqual(pr.algo(), spot.synthesis_info.algo_DPA_SPLIT)
+tc.assertEqual(pr.semantics(), spot.synthesis_semantics_Moore)
+tc.assertFalse(pr.decompose())
+tc.assertIsNotNone(pr.aig("ite"))
+tc.assertRaises(RuntimeError, pr.set_semantics,
+                spot.synthesis_semantics_Mealy)
 
 # The proposition lists are read like ltlsynt's --ins and --outs: each
 # element is either a name or a /regex/, None means the list was not

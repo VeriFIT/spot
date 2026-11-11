@@ -32,6 +32,19 @@ namespace spot
 {
 
   /// \ingroup synthesis
+  /// \brief Semantics of a synthesized controller.
+  ///
+  /// Under Mealy semantics, the controller reads the inputs before
+  /// choosing its outputs, so its outputs may depend on the current
+  /// inputs.  Under Moore semantics, it chooses its outputs first, so
+  /// they may only depend on the inputs seen so far.
+  enum class synthesis_semantics
+  {
+    Mealy,  ///< Read the inputs, then choose the outputs (default).
+    Moore,  ///< Choose the outputs, then read the inputs.
+  };
+
+  /// \ingroup synthesis
   /// \brief Benchmarking data and options for synthesis
   struct SPOT_API synthesis_info
   {
@@ -133,7 +146,6 @@ namespace spot
           sp{splittype::AUTO},
           bv{},
           verbose_stream{nullptr},
-          moore{false},
           dict(make_bdd_dict())
     {
     }
@@ -145,7 +157,8 @@ namespace spot
     std::optional<bench_var> bv; ///< Benchmarking data.
     std::ostream* verbose_stream; ///< Verbose output stream.
     option_map opt; ///< Additional options.
-    bool moore; ///< Use Moore (output-first) semantics instead of Mealy.
+    /// \brief Semantics of the controller to synthesize.
+    synthesis_semantics semantics = synthesis_semantics::Mealy;
     bdd_dict_ptr dict; ///< BDD dictionary.
     /// \brief Whether to decompose the specification into independent
     /// sub-specifications.
@@ -171,6 +184,17 @@ namespace spot
     /// an output cannot be recovered by patch_game().
     bool game_output_only = false;
   };
+
+  /// \brief Algorithm selection for synthesis.
+  ///
+  /// This is a shorter spelling for synthesis_info::algo, for code
+  /// that should not have to mention synthesis_info.
+  using synthesis_algo = synthesis_info::algo;
+  /// \brief Splitting strategy for 2-step games.
+  using synthesis_splittype = synthesis_info::splittype;
+  /// \brief When to apply realizability-preserving simplifications.
+  using synthesis_simplification_stage =
+    synthesis_info::simplification_stage;
 
   /// \addtogroup synthesis Reactive Synthesis
   /// \ingroup twa_algorithms
@@ -434,8 +458,12 @@ namespace spot
   ///
   /// This object stores a specification, the partition of its atomic
   /// propositions into inputs and outputs (plus optional unobservable
-  /// inputs), and a #spot::synthesis_info structure controlling the
-  /// synthesis pipeline.
+  /// inputs), and the options controlling the synthesis pipeline.
+  ///
+  /// The options default to those of ltlsynt and are changed with the
+  /// set_*() methods below.  They must be set before any of the
+  /// solving, game, or decomposition services is called: the setters
+  /// throw std::runtime_error afterwards.
   ///
   /// The expensive stages (simplification, decomposition, solving,
   /// strategy extraction, and AIG encoding) are performed lazily and
@@ -491,7 +519,8 @@ namespace spot
     /// \param unobservable_aps Patterns selecting additional
     ///        unobservable input propositions, or nullptr when they are
     ///        not specified.
-    /// \param si Synthesis options and statistics.
+    /// \param si Internal: options carrier.  Prefer the set_*()
+    ///        methods; this argument is an implementation detail.
     synthesis_problem(formula f,
                       const std::vector<std::string>* input_aps = nullptr,
                       const std::vector<std::string>* output_aps = nullptr,
@@ -574,10 +603,77 @@ namespace spot
     /// violate, so the flag is false for it.
     bool assumptions_violated() const;
 
-    // --- Configuration and statistics -----------------------------
+    // --- Configuration --------------------------------------------
 
-    /// \brief Return the options used by this problem.
-    const synthesis_info& options() const;
+    /// \brief Select the LTL-to-game algorithm, as --algo.
+    synthesis_problem& set_algo(synthesis_algo a);
+    /// \brief Return the selected LTL-to-game algorithm.
+    synthesis_algo algo() const;
+
+    /// \brief Select the splitting strategy of 2-step games.
+    synthesis_problem& set_splittype(synthesis_splittype sp);
+    /// \brief Return the splitting strategy of 2-step games.
+    synthesis_splittype splittype() const;
+
+    /// \brief Decompose the specification into independent conjuncts,
+    /// as --decompose.
+    synthesis_problem& set_decompose(bool val);
+    bool decompose() const;
+
+    /// \brief Select Mealy or Moore semantics, as --semantics.
+    synthesis_problem& set_semantics(synthesis_semantics s);
+    /// \brief Return Mealy or Moore semantics.
+    synthesis_semantics semantics() const;
+
+    /// \brief Try the direct-strategy bypass before building a game.
+    synthesis_problem& set_use_bypass(bool val);
+    /// \brief Return whether the direct-strategy bypass is tried.
+    bool use_bypass() const;
+
+    /// \brief Use the on-the-fly obligation synthesis when possible.
+    synthesis_problem& set_obligation_synthesis(bool val);
+    /// \brief Return whether on-the-fly obligation synthesis is used.
+    bool obligation_synthesis() const;
+
+    /// \brief Force state-based acceptance.
+    synthesis_problem& set_force_sbacc(bool val);
+    /// \brief Return whether state-based acceptance is forced.
+    bool force_sbacc() const;
+
+    /// \brief When to remove atomic propositions with a single polarity.
+    synthesis_problem&
+    set_polarity_simplification(synthesis_simplification_stage st);
+    /// \brief Return when atomic propositions with a single polarity are
+    /// removed.
+    synthesis_simplification_stage polarity_simplification() const;
+
+    /// \brief When to remove atomic propositions that are always
+    /// equivalent to another one.
+    synthesis_problem&
+    set_global_equiv_simplification(synthesis_simplification_stage st);
+    /// \brief Return when atomic propositions always equivalent to another
+    /// are removed.
+    synthesis_simplification_stage global_equiv_simplification() const;
+
+    /// \brief Select the strategy minimization level, as --simplify.
+    synthesis_problem& set_minimize_level(int lvl);
+    /// \brief Return the strategy minimization level.
+    int minimize_level() const;
+
+    /// \brief Restrict the global-equivalence simplification to
+    /// output/output pairs, as required before printing a game.
+    synthesis_problem& set_game_output_only(bool val);
+    /// \brief Return whether global-equivalence simplification is restricted
+    /// to output/output pairs.
+    bool game_output_only() const;
+
+    /// \brief Set the stream receiving the trace (not owned), or
+    /// nullptr to disable tracing.
+    synthesis_problem& set_verbose(std::ostream* os);
+    /// \brief Return the trace stream.
+    std::ostream* verbose() const;
+
+    // --- Statistics -----------------------------------------------
 
     /// \brief Return benchmarking data collected while solving.
     const synthesis_info::bench_var& statistics() const;

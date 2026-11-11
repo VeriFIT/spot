@@ -1755,7 +1755,7 @@ namespace spot
                         get_synthesis_outputs(aut),
                         true,
                         gi.sp,
-                        gi.moore);
+                        gi.semantics == synthesis_semantics::Moore);
   }
 
   twa_graph_ptr
@@ -2181,7 +2181,8 @@ namespace spot
     if (!get_state_winner(arena, arena->get_init_state_number()))
       return nullptr;
 
-    auto m = apply_strategy(arena, false, false, gi.moore);
+    auto m = apply_strategy(arena, false, false,
+                            gi.semantics == synthesis_semantics::Moore);
 
     m->prop_universal(true);
 
@@ -2530,7 +2531,8 @@ namespace spot
       auto trans = create_translator(gi);
 
       trans.set_pref(postprocessor::Deterministic | postprocessor::Complete
-               | (gi.moore ? postprocessor::SBAcc : 0));
+               | (gi.semantics == synthesis_semantics::Moore
+                  ? postprocessor::SBAcc : 0));
       if (combin < 2)
         trans.set_type(postprocessor::Buchi);
       else
@@ -2576,7 +2578,7 @@ namespace spot
 
       bool is_true_acc = ((combin < 2) && res->acc().is_t())
                 || ((combin > 1) && res->acc().is_f());
-      if (gi.moore)
+      if (gi.semantics == synthesis_semantics::Moore)
         {
           // For Moore all accepting states should have
           // outgoing edges labeled by b, regardless of whether
@@ -3329,6 +3331,7 @@ namespace spot
     aig_ptr aig_;
 
     unsigned simplification_options() const;
+    void check_options_mutable() const;
     void prepare_global();
     void prepare_sub();
     void merge_sub_mappings();
@@ -3355,10 +3358,19 @@ namespace spot
     if (si.global_equiv != synthesis_info::simplification_stage::never)
       opt |= si.game_output_only
         ? realizability_simplifier::global_equiv_output_only
-        : (si.moore
+        : (si.semantics == synthesis_semantics::Moore
            ? realizability_simplifier::global_equiv_moore
            : realizability_simplifier::global_equiv);
     return opt;
+  }
+
+  void
+  synthesis_problem::data::check_options_mutable() const
+  {
+    if (prepared_global || prepared_sub || solved || games_built)
+      throw std::runtime_error("synthesis_problem: options must be set "
+                               "before solving, decomposing, or building "
+                               "games");
   }
 
   void
@@ -3474,7 +3486,7 @@ namespace spot
                  before_and_after_decomposition)
           opt |= si.game_output_only
             ? realizability_simplifier::global_equiv_output_only
-            : (si.moore
+            : (si.semantics == synthesis_semantics::Moore
                ? realizability_simplifier::global_equiv_moore
                : realizability_simplifier::global_equiv);
         if (si.verbose_stream)
@@ -3510,7 +3522,7 @@ namespace spot
         std::vector<unsigned char> come_first;
         come_first.resize(formula::apid_count(), 0U);
 
-        unsigned val = si.moore ? 2 : 1;
+        unsigned val = si.semantics == synthesis_semantics::Moore ? 2 : 1;
         for (const std::string& s: input_aps)
           come_first[formula::ap(s).apid()] = val;
         val = 3 - val;
@@ -3538,7 +3550,8 @@ namespace spot
         // we have already registered output variables, but if
         // quantified variables are used, let's register input
         // variables too, so that quantified variables are put below.
-        if (si.moore && (!unobs_aps.empty() || f.is_quantified()))
+        if (si.semantics == synthesis_semantics::Moore
+            && (!unobs_aps.empty() || f.is_quantified()))
           {
             f.traverse([&](const formula& f) {
               if (!f.is(op::ap))
@@ -3627,7 +3640,7 @@ namespace spot
         if (!unobs_vec.empty())
           sf = formula::forall(unobs_vec, sf);
         mtdswa_ptr aut =
-          obligation_synthesis(sf, si.dict, outs_str,
+          spot::obligation_synthesis(sf, si.dict, outs_str,
                                !want_strategy);
         if (bv)
           {
@@ -3683,7 +3696,8 @@ namespace spot
             auto spptr =
               arena->get_named_prop<std::vector<bool>>("state-player");
             assert(spptr);
-            assert((spptr->at(arena->get_init_state_number()) == si.moore)
+            assert((spptr->at(arena->get_init_state_number())
+                    == (si.semantics == synthesis_semantics::Moore))
                    && "incorrect first player");
 #endif
             if (bv)
@@ -3957,7 +3971,7 @@ namespace spot
   synthesis_problem::data::check_strategy(const twa_graph_ptr& strategy) const
   {
     const char* incomplete_machine =
-      si.moore
+      si.semantics == synthesis_semantics::Moore
       ? "Strategy is not an output-complete Moore machine"
       : "Strategy is not an input-complete Mealy machine";
     const char* nondeterministic_machine =
@@ -3990,7 +4004,7 @@ namespace spot
     // must agree on the output), plus input-completeness and
     // input-determinism.
     // For Mealy: we check input-completeness and input-determinism.
-    if (si.moore)
+    if (si.semantics == synthesis_semantics::Moore)
       {
         bdd bdd_ins = bdd_exist(strategy->ap_vars(), bdd_outs);
         for (unsigned state = 0; state < num_states; ++state)
@@ -4442,10 +4456,174 @@ namespace spot
     return data_->assumptions_violated;
   }
 
-  const synthesis_info&
-  synthesis_problem::options() const
+  synthesis_problem&
+  synthesis_problem::set_algo(synthesis_algo a)
   {
-    return data_->si;
+    data_->check_options_mutable();
+    data_->si.s = a;
+    return *this;
+  }
+
+  synthesis_algo
+  synthesis_problem::algo() const
+  {
+    return data_->si.s;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_splittype(synthesis_splittype sp)
+  {
+    data_->check_options_mutable();
+    data_->si.sp = sp;
+    return *this;
+  }
+
+  synthesis_splittype
+  synthesis_problem::splittype() const
+  {
+    return data_->si.sp;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_decompose(bool val)
+  {
+    data_->check_options_mutable();
+    data_->si.decompose = val;
+    return *this;
+  }
+
+  bool
+  synthesis_problem::decompose() const
+  {
+    return data_->si.decompose;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_semantics(synthesis_semantics s)
+  {
+    data_->check_options_mutable();
+    data_->si.semantics = s;
+    return *this;
+  }
+
+  synthesis_semantics
+  synthesis_problem::semantics() const
+  {
+    return data_->si.semantics;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_use_bypass(bool val)
+  {
+    data_->check_options_mutable();
+    data_->si.use_bypass = val;
+    return *this;
+  }
+
+  bool
+  synthesis_problem::use_bypass() const
+  {
+    return data_->si.use_bypass;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_obligation_synthesis(bool val)
+  {
+    data_->check_options_mutable();
+    data_->si.obligation_synthesis = val;
+    return *this;
+  }
+
+  bool
+  synthesis_problem::obligation_synthesis() const
+  {
+    return data_->si.obligation_synthesis;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_force_sbacc(bool val)
+  {
+    data_->check_options_mutable();
+    data_->si.force_sbacc = val;
+    return *this;
+  }
+
+  bool
+  synthesis_problem::force_sbacc() const
+  {
+    return data_->si.force_sbacc;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_polarity_simplification(
+      synthesis_simplification_stage st)
+  {
+    data_->check_options_mutable();
+    data_->si.polarity = st;
+    return *this;
+  }
+
+  synthesis_simplification_stage
+  synthesis_problem::polarity_simplification() const
+  {
+    return data_->si.polarity;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_global_equiv_simplification(
+      synthesis_simplification_stage st)
+  {
+    data_->check_options_mutable();
+    data_->si.global_equiv = st;
+    return *this;
+  }
+
+  synthesis_simplification_stage
+  synthesis_problem::global_equiv_simplification() const
+  {
+    return data_->si.global_equiv;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_minimize_level(int lvl)
+  {
+    data_->check_options_mutable();
+    data_->si.minimize_lvl = lvl;
+    return *this;
+  }
+
+  int
+  synthesis_problem::minimize_level() const
+  {
+    return data_->si.minimize_lvl;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_game_output_only(bool val)
+  {
+    data_->check_options_mutable();
+    data_->si.game_output_only = val;
+    return *this;
+  }
+
+  bool
+  synthesis_problem::game_output_only() const
+  {
+    return data_->si.game_output_only;
+  }
+
+  synthesis_problem&
+  synthesis_problem::set_verbose(std::ostream* os)
+  {
+    data_->check_options_mutable();
+    data_->si.verbose_stream = os;
+    return *this;
+  }
+
+  std::ostream*
+  synthesis_problem::verbose() const
+  {
+    return data_->si.verbose_stream;
   }
 
   const synthesis_info::bench_var&
