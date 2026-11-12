@@ -1,0 +1,147 @@
+# -*- coding: utf-8 -*-
+#+TITLE: Solving a TLSF specification
+#+DESCRIPTION: Solving a TLSF specification with ltlsynt, Python, and C++
+#+INCLUDE: setup.org
+#+HTML_LINK_UP: tut.html
+#+PROPERTY: header-args:sh :results verbatim :exports both
+#+PROPERTY: header-args:python :results output :exports both
+#+PROPERTY: header-args:C+++ :results verbatim :exports both
+
+[[file:tlsf.org][TLSF]] is a format for describing reactive-synthesis problems: it
+declares the input and output propositions, the parameters of the
+specification, the semantics of the controller, and the assumptions
+and guarantees.  The tools that read LTL formulas also accept TLSF
+specifications directly, so there is no need to convert them to LTL by
+hand.  This page solves the same specification with [[file:ltlsynt.org][=ltlsynt=]], with
+the =synthesis_problem= class of the Python bindings, and with the C++
+interface.
+
+* The example specification
+
+The example is the [[https://en.wikipedia.org/wiki/Chomp][chomp]] game, already used on the [[file:tlsf.org][TLSF page]].  Two
+players take turns choosing an available square of an N×M chocolate
+bar, and eat every square below and to the right of it; the player
+forced to take the poisoned square at position (0,0) loses.  The file
+[[file:chomp.tlsf][=chomp.tlsf=]] describes this game with the parameters
+=N = 3= and =M = 3=.
+That file declares =SEMANTICS: Mealy,Finite=, because it was written
+for [[file:ltlfsynt.org][=ltlfsynt=]], which synthesizes controllers for finite traces.
+[[file:ltlsynt.org][=ltlsynt=]] and =synthesis_problem= work on infinite traces instead, so
+this page uses [[file:chomp-ltl.tlsf][=chomp-ltl.tlsf=]], an otherwise identical copy of the
+file that only changes the semantics declaration:
+
+#+BEGIN_SRC tlsf
+INFO {
+  TITLE:       "Chomp Game"
+  DESCRIPTION: "Parameteric Chomp Game over a NxM grid"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+#+END_SRC
+
+* Shell command
+
+Passing the specification to [[file:ltlsynt.org][=ltlsynt=]] with =--tlsf= is enough: the
+partition, the parameters, and the semantics are all read from the
+file.  The strategy has more than twenty atomic propositions, so it is
+not very readable; adding =--realizability= asks only for the verdict.
+
+#+BEGIN_SRC sh
+ltlsynt --tlsf chomp-ltl.tlsf --realizability
+#+END_SRC
+
+#+RESULTS:
+: REALIZABLE
+
+Parameters can be changed by appending =/NAME=VALUE= pairs to the file
+name.  On a 1×1 chocolate bar the controller plays first and has no
+choice but to take the poisoned square, so the specification becomes
+unrealizable:
+
+#+BEGIN_SRC sh
+ltlsynt --tlsf chomp-ltl.tlsf/N=1,M=1 --realizability
+#+END_SRC
+
+#+RESULTS:
+: UNREALIZABLE
+
+* Python bindings
+
+The =synthesis_problem.from_tlsf()= factory parses the file and
+translates it to LTL, and the resulting object is used like one built
+from a formula: =is_realizable()= returns the verdict, while
+=strategy()= and =aig()= build the controller.
+
+#+BEGIN_SRC python
+import spot
+
+pr = spot.synthesis_problem.from_tlsf('chomp-ltl.tlsf')
+print('REALIZABLE' if pr.is_realizable() else 'UNREALIZABLE')
+#+END_SRC
+
+#+RESULTS:
+: REALIZABLE
+
+The optional second argument maps parameter names to values, exactly
+like the =/NAME=VALUE= suffix of =--tlsf=:
+
+#+BEGIN_SRC python
+import spot
+
+pr = spot.synthesis_problem.from_tlsf('chomp-ltl.tlsf',
+                                      {'N': 1, 'M': 1})
+print('REALIZABLE' if pr.is_realizable() else 'UNREALIZABLE')
+#+END_SRC
+
+#+RESULTS:
+: UNREALIZABLE
+
+A specification held in memory is handled by =from_tlsf_string()=,
+which takes the contents of the file as its first argument and an
+optional name, used in diagnostics, as its last argument.  Both
+factories throw =ValueError= when the specification declares finite
+semantics or when the partition does not cover the formula, and
+=RuntimeError= (with the parser diagnostics) when the file cannot be
+parsed or translated.
+
+* C++
+
+The C++ interface is the same, except that the optional parameter
+overrides are pointers, where =nullptr= means "use the declaration of
+the file".
+
+#+NAME: tut62cpp
+#+BEGIN_SRC C++
+#include <iostream>
+#include <map>
+#include <spot/twaalgos/synthesis.hh>
+
+int main()
+{
+  try
+    {
+      spot::synthesis_problem_ptr p =
+        spot::synthesis_problem::from_tlsf("chomp-ltl.tlsf");
+      std::cout << (p->is_realizable() ? "REALIZABLE\n" : "UNREALIZABLE\n");
+
+      std::map<std::string, int> overrides{{"N", 1}, {"M", 1}};
+      spot::synthesis_problem_ptr q =
+        spot::synthesis_problem::from_tlsf("chomp-ltl.tlsf", &overrides);
+      std::cout << (q->is_realizable() ? "REALIZABLE\n" : "UNREALIZABLE\n");
+    }
+  catch (const std::exception& e)
+    {
+      std::cerr << e.what() << '\n';
+      return 1;
+    }
+}
+#+END_SRC
+
+After [[file:compile.org][compiling and running]] this program, we get:
+
+#+RESULTS: tut62cpp
+: REALIZABLE
+: UNREALIZABLE
+
+#  LocalWords:  utf chomp TLSF ltlsynt ltlfsynt NxM Mealy realizability
+#  LocalWords:  tlsf regex nullptr iostream

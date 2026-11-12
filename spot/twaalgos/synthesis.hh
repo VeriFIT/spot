@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -453,6 +454,10 @@ namespace spot
                     game_relabeling_map& rel_maps);
 
 
+  class synthesis_problem;
+  /// \brief Shared ownership of a synthesis problem.
+  typedef std::shared_ptr<synthesis_problem> synthesis_problem_ptr;
+
   /// \ingroup synthesis
   /// \brief One reactive-synthesis problem.
   ///
@@ -532,6 +537,69 @@ namespace spot
 
     synthesis_problem(const synthesis_problem&) = delete;
     synthesis_problem& operator=(const synthesis_problem&) = delete;
+
+    // --- Construction from TLSF ------------------------------------
+
+    /// \brief Build a reactive-synthesis problem from a TLSF file.
+    ///
+    /// The specification is parsed with \a overrides as the values of
+    /// its GLOBAL { PARAMETERS { ... } } section, like the
+    /// /NAME=VALUE suffix accepted by ltlsynt's --tlsf option.  The
+    /// same values are used during translation, where they take
+    /// precedence over the values declared in the file.
+    ///
+    /// The input and output propositions default to the ones declared
+    /// by the specification.  A non-null \a input_aps (resp.
+    /// \a output_aps) replaces that side of the partition; a null
+    /// pointer keeps the declaration of the file, while a pointer to
+    /// an empty vector means that this side is empty.  Elements are
+    /// proposition names or /regex/ patterns, as in the constructor,
+    /// and are matched against the flattened signal names
+    /// (event_0, ...).  TLSF has no notion of unobservable inputs, so
+    /// \a unobservable_aps defaults to none.
+    ///
+    /// The controller semantics is taken from the TARGET declaration
+    /// of the file, as in ltlsynt.  Use set_semantics() on the
+    /// returned problem to change it: that only selects the model of
+    /// the controller and does not re-translate the specification.
+    ///
+    /// Throws std::invalid_argument when the specification declares
+    /// Finite semantics (this class only handles infinite traces) or
+    /// when the requested partition is inconsistent.  Throws
+    /// std::runtime_error, with the parser diagnostics, when the file
+    /// cannot be parsed or translated.
+    ///
+    /// \param filename The TLSF file to read ("-" for standard input).
+    /// \param overrides Values overriding the GLOBAL PARAMETERS
+    ///        section, or nullptr for the values declared in the file.
+    /// \param input_aps Patterns selecting the inputs, or nullptr to
+    ///        use the INPUTS declaration of the file.
+    /// \param output_aps Patterns selecting the outputs, or nullptr to
+    ///        use the OUTPUTS declaration of the file.
+    /// \param unobservable_aps Patterns selecting additional
+    ///        unobservable inputs, or nullptr for none.
+    static synthesis_problem_ptr
+    from_tlsf(const std::string& filename,
+              const std::map<std::string, int>* overrides = nullptr,
+              const std::vector<std::string>* input_aps = nullptr,
+              const std::vector<std::string>* output_aps = nullptr,
+              const std::vector<std::string>* unobservable_aps = nullptr);
+
+    /// \brief Build a reactive-synthesis problem from a TLSF
+    /// specification held in memory.
+    ///
+    /// This is like from_tlsf(), except that the specification is read
+    /// from \a contents, and \a name is only used in diagnostics.
+    /// \a name comes last because it is the least likely argument to
+    /// be given.
+    static synthesis_problem_ptr
+    from_tlsf_string(const std::string& contents,
+                     const std::map<std::string, int>* overrides = nullptr,
+                     const std::vector<std::string>* input_aps = nullptr,
+                     const std::vector<std::string>* output_aps = nullptr,
+                     const std::vector<std::string>* unobservable_aps
+                     = nullptr,
+                     const std::string& name = "<string>");
 
     // --- Solving services -----------------------------------------
 

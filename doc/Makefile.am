@@ -98,6 +98,7 @@ ORG_FILES = \
   org/csv.org \
   org/citing.org \
   org/chomp.tlsf \
+  org/chomp-ltl.tlsf \
   org/compile.org \
   org/concepts.org \
   org/dstar2tgba.org \
@@ -147,6 +148,7 @@ ORG_FILES = \
   org/tut52.org \
   org/tut60.org \
   org/tut61.org \
+  org/tut62.org \
   org/tut90.org \
   org/tut91.org \
   org/upgrade2.org \

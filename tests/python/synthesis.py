@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import tempfile
+
 import spot
 from unittest import TestCase
 tc = TestCase()
@@ -205,3 +207,140 @@ for ins in (["i"], None):
     pr = spot.synthesis_problem(spot.formula("G((i & u) -> o)"),
                                 ins, ["o"], ["u"])
     tc.assertTrue(pr.is_realizable())
+
+# Building a synthesis_problem from TLSF.  The factory parses and
+# translates the specification, uses its INPUTS/OUTPUTS declarations
+# unless they are overridden, and takes the controller model from
+# TARGET.
+tlsf_simple = """INFO {
+  TITLE:       "tlsf test"
+  DESCRIPTION: "used by tests/python/synthesis.py"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  PARAMETERS {}
+}
+MAIN {
+  INPUTS  { i; }
+  OUTPUTS { o; }
+  ASSUME  { G(i); }
+  GUARANTEE { G(F(o)); }
+}
+"""
+
+pr = spot.synthesis_problem.from_tlsf_string(tlsf_simple)
+tc.assertEqual(pr.semantics(), spot.synthesis_semantics_Mealy)
+pr.set_algo(spot.synthesis_info.algo_DPA_SPLIT)
+tc.assertEqual(pr.algo(), spot.synthesis_info.algo_DPA_SPLIT)
+tc.assertTrue(pr.is_realizable())
+tc.assertIsNotNone(pr.strategy())
+
+# from_tlsf() reads the same specification from a file.
+with tempfile.NamedTemporaryFile('w', dir='.', suffix='.tlsf',
+                                 delete=True) as fp:
+    fp.write(tlsf_simple)
+    fp.flush()
+    pr = spot.synthesis_problem.from_tlsf(fp.name)
+    tc.assertTrue(pr.is_realizable())
+
+# The partition declared by the file is used by default; overriding
+# it as empty inputs plus two outputs makes the specification
+# realizable.
+tlsf_partition = """INFO {
+  TITLE:       "tlsf test"
+  DESCRIPTION: "used by tests/python/synthesis.py"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  PARAMETERS {}
+}
+MAIN {
+  INPUTS  { i; }
+  OUTPUTS { o; }
+  GUARANTEE { G(i) && G(o); }
+}
+"""
+tc.assertFalse(spot.synthesis_problem.from_tlsf_string(
+    tlsf_partition).is_realizable())
+pr = spot.synthesis_problem.from_tlsf_string(tlsf_partition, None, [],
+                                             ["i", "o"])
+tc.assertTrue(pr.is_realizable())
+
+# TARGET selects the controller model, as in ltlsynt.
+tlsf_moore = """INFO {
+  TITLE:       "tlsf test"
+  DESCRIPTION: "used by tests/python/synthesis.py"
+  SEMANTICS:   Moore
+  TARGET:      Moore
+}
+GLOBAL {
+  PARAMETERS {}
+}
+MAIN {
+  INPUTS  { i; }
+  OUTPUTS { o; }
+  ASSUME  { G(i); }
+  GUARANTEE { G(F(o)); }
+}
+"""
+pr = spot.synthesis_problem.from_tlsf_string(tlsf_moore)
+tc.assertEqual(pr.semantics(), spot.synthesis_semantics_Moore)
+tc.assertTrue(pr.is_realizable())
+
+# The parameter overrides reach both the parser (bus width) and the
+# translator (index in the formula).
+tlsf_param = """INFO {
+  TITLE:       "tlsf test"
+  DESCRIPTION: "used by tests/python/synthesis.py"
+  SEMANTICS:   Mealy
+  TARGET:      Mealy
+}
+GLOBAL {
+  PARAMETERS { N = 2; }
+}
+MAIN {
+  INPUTS  { event[N]; }
+  OUTPUTS { done; }
+  ASSUME  { G(event[N - 1]); }
+  GUARANTEE { G(done); }
+}
+"""
+for overrides, expected, unexpected in [(None, "event_1", "event_3"),
+                                        ({}, "event_1", "event_3"),
+                                        ({"N": 4}, "event_3", "event_1")]:
+    pr = spot.synthesis_problem.from_tlsf_string(tlsf_param, overrides)
+    # patch_game() requires the output-only restriction of the
+    # global-equivalence simplification.
+    pr.set_game_output_only(True)
+    aps = list(pr.games()[0].ap())
+    tc.assertIn(expected, aps)
+    tc.assertNotIn(unexpected, aps)
+
+# A specification that declares Finite semantics cannot be handled by
+# synthesis_problem.
+tlsf_finite = """INFO {
+  TITLE:       "tlsf test"
+  DESCRIPTION: "used by tests/python/synthesis.py"
+  SEMANTICS:   Mealy,Finite
+  TARGET:      Mealy
+}
+GLOBAL {
+  PARAMETERS {}
+}
+MAIN {
+  INPUTS  { i; }
+  OUTPUTS { o; }
+  GUARANTEE { G(o); }
+}
+"""
+tc.assertRaises(ValueError, spot.synthesis_problem.from_tlsf_string,
+                tlsf_finite)
+
+# Parse errors are reported as RuntimeError, with the name used in
+# diagnostics (the last argument of from_tlsf_string).
+with tc.assertRaises(RuntimeError) as cm:
+    spot.synthesis_problem.from_tlsf_string(
+        "INFO {", None, None, None, None, "broken.tlsf")
+tc.assertIn("broken.tlsf", str(cm.exception))

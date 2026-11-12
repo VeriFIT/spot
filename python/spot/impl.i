@@ -37,11 +37,39 @@
 // file (prefix used here: `map_ssi` for std::map<string, int>).
 %template(map_ssi) std::map<std::string, int>;
 
+// The synthesis_problem::from_tlsf*() factories take the parameter
+// overrides as a std::map pointer, so that a null pointer means "use
+// the values declared in the file".  std_map.i has no typemap for a
+// map passed by pointer, so accept a dict (or None) explicitly.  The
+// map is copied into a local because swig::asptr() may build one from
+// the dict, and that temporary has to be freed here.
+%typemap(in) const std::map<std::string, int>*
+  (std::map<std::string, int> temp)
+{
+  if ($input == Py_None)
+    {
+      $1 = nullptr;
+    }
+  else
+    {
+      std::map<std::string, int>* ptr = nullptr;
+      int res = swig::asptr($input, &ptr);
+      if (!SWIG_IsOK(res))
+        SWIG_exception_fail(SWIG_ArgError(SWIG_ERROR),
+                            "expected a dict of parameter overrides");
+      temp = *ptr;
+      if (SWIG_IsNewObj(res))
+        delete ptr;
+      $1 = &temp;
+    }
+}
+
 // git grep 'typedef.*std::shared_ptr' | grep -v const |
  //   sed 's/.*<\(.*\)>.*/%shared_ptr(spot::\1)/g'
 %shared_ptr(spot::dstar_aut)
 %shared_ptr(spot::parsed_aut)
 %shared_ptr(spot::parsed_tlsf)
+%shared_ptr(spot::synthesis_problem)
 %shared_ptr(spot::fair_kripke)
 %shared_ptr(spot::kripke)
 %shared_ptr(spot::kripke_graph)

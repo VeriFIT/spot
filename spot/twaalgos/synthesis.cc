@@ -39,6 +39,7 @@
 #include <spot/twaalgos/toparity.hh>
 #include <spot/twaalgos/remprop.hh>
 #include <spot/twaalgos/dualize.hh>
+#include <spot/parsetlsf/public.hh>
 #include <spot/tl/parse.hh>
 #include <algorithm>
 #include <cassert>
@@ -46,6 +47,7 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <stack>
@@ -4340,6 +4342,103 @@ namespace spot
   }
 
   synthesis_problem::~synthesis_problem() = default;
+
+  namespace
+  {
+    // Format the diagnostics of a failed parse or translation into the
+    // exception thrown by the from_tlsf*() factories.
+    [[noreturn]] void
+    throw_tlsf_diagnostics(const std::string& filename,
+                           const parse_tlsf_error_list& errors)
+    {
+      std::ostringstream os;
+      format_tlsf_diagnostics(os, filename, errors);
+      if (errors.empty())
+        os << filename << ": TLSF translation failed";
+      throw std::runtime_error(os.str());
+    }
+
+    // Shared tail of the two factories: reject specifications that do
+    // not fit synthesis_problem, translate them to LTL, and build the
+    // problem with the requested partition.
+    synthesis_problem_ptr
+    tlsf_to_problem(const parsed_tlsf_ptr& parsed,
+                    const std::string& filename,
+                    const std::map<std::string, int>* overrides,
+                    const std::vector<std::string>* input_aps,
+                    const std::vector<std::string>* output_aps,
+                    const std::vector<std::string>* unobservable_aps)
+    {
+      // synthesis_problem only works on infinite traces, so Finite
+      // semantics (LTLf) is out of scope.
+      if (parsed->semantics == tlsf_semantics::MealyFinite
+          || parsed->semantics == tlsf_semantics::MooreFinite)
+        throw std::invalid_argument(filename
+                                    + ": this specification declares "
+                                    "Finite semantics, which "
+                                    "synthesis_problem does not support; "
+                                    "use ltlfsynt instead");
+
+      tlsf_translator_options topts;
+      if (overrides)
+        topts.overrides = *overrides;
+      parse_tlsf_error_list errors;
+      tlsf_translation_result conv = tlsf_to_ltl(*parsed, topts, &errors);
+      if (!conv.full_formula || !errors.empty())
+        throw_tlsf_diagnostics(filename, errors);
+
+      const std::vector<std::string>& ins =
+        input_aps ? *input_aps : conv.inputs;
+      const std::vector<std::string>& outs =
+        output_aps ? *output_aps : conv.outputs;
+      synthesis_problem_ptr res =
+        std::make_shared<synthesis_problem>(conv.full_formula,
+                                            &ins, &outs,
+                                            unobservable_aps);
+      // As in ltlsynt, TARGET selects the model of the controller.
+      res->set_semantics(parsed->target == tlsf_target::Moore
+                         ? synthesis_semantics::Moore
+                         : synthesis_semantics::Mealy);
+      return res;
+    }
+  }
+
+  synthesis_problem_ptr
+  synthesis_problem::from_tlsf(
+      const std::string& filename,
+      const std::map<std::string, int>* overrides,
+      const std::vector<std::string>* input_aps,
+      const std::vector<std::string>* output_aps,
+      const std::vector<std::string>* unobservable_aps)
+  {
+    tlsf_parser_options popts;
+    if (overrides)
+      popts.overrides = *overrides;
+    parsed_tlsf_ptr parsed = parse_tlsf(filename, popts);
+    if (!parsed->errors.empty())
+      throw_tlsf_diagnostics(filename, parsed->errors);
+    return tlsf_to_problem(parsed, filename, overrides,
+                           input_aps, output_aps, unobservable_aps);
+  }
+
+  synthesis_problem_ptr
+  synthesis_problem::from_tlsf_string(
+      const std::string& contents,
+      const std::map<std::string, int>* overrides,
+      const std::vector<std::string>* input_aps,
+      const std::vector<std::string>* output_aps,
+      const std::vector<std::string>* unobservable_aps,
+      const std::string& name)
+  {
+    tlsf_parser_options popts;
+    if (overrides)
+      popts.overrides = *overrides;
+    parsed_tlsf_ptr parsed = parse_tlsf(contents, name, popts);
+    if (!parsed->errors.empty())
+      throw_tlsf_diagnostics(name, parsed->errors);
+    return tlsf_to_problem(parsed, name, overrides,
+                           input_aps, output_aps, unobservable_aps);
+  }
 
   bool
   synthesis_problem::is_realizable()

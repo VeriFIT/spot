@@ -157,7 +157,8 @@ New in spot 2.16.2.dev  (not yet released)
 
   - spot::synthesis_problem is a new class that exposes the whole
     synthesis pipeline used by ltlsynt.  See
-    http://spot.lre.epita.fr/tut61.html for some examples.
+    http://spot.lre.epita.fr/tut61.html and
+    http://spot.lre.epita.fr/tut62.html for some examples.
 
   Bug fixes:
 
