@@ -2289,6 +2289,21 @@ namespace spot
         }
       return false;
     }
+    // Number of distinct nodes in \a f.  Shared subformulas are
+    // counted once, so this is a cheap approximation of the size of a
+    // formula.
+    static unsigned
+    formula_node_count(formula f)
+    {
+      unsigned n = 0;
+      f.traverse([&n](const formula&)
+                 {
+                   ++n;
+                   return false;
+                 });
+      return n;
+    }
+
     class formula_2_inout_props
     {
     private:
@@ -4062,24 +4077,52 @@ namespace spot
     // it is kept in `disjuncts` for the grouping below, because a
     // disjunction of individually unrealizable disjuncts (X i | X !i)
     // may still be realizable.
+    //
+    // This cheap pass is performed on every disjunct before the first
+    // call to the solver, so that the decisions below are taken with
+    // the simplified formulas at hand.
     const unsigned simpl = simplification_options();
+    std::vector<formula> simplified;
+    std::vector<std::unique_ptr<realizability_simplifier>> simplifiers;
+    simplified.reserve(disjuncts.size());
+    simplifiers.resize(disjuncts.size());
+    for (unsigned i = 0; i < disjuncts.size(); ++i)
+      {
+        formula sd = disjuncts[i];
+        if (simpl)
+          {
+            simplifiers[i] = std::make_unique<realizability_simplifier>
+              (disjuncts[i], input_and_unobs, simpl);
+            sd = simplifiers[i]->simplified_formula();
+          }
+        simplified.push_back(sd);
+      }
+
+    // The disjunction is translated component-wise and combined with
+    // product_or(), so the whole specification is often cheaper to
+    // solve than one of its largest disjuncts: on SyntComp'23, one
+    // instance spends 61 s on a disjunct that the whole formula solves
+    // in 0.3 s.  Disjuncts whose size is comparable to the whole
+    // specification are therefore not solved on their own; that would
+    // be an unbounded amount of work with no reason to be cheaper than
+    // the solve of the whole specification.
+    const unsigned spec_size = formula_node_count(f);
+    // Small disjuncts are cheap enough to translate that solving them
+    // is worth a try even when they are comparable to the whole
+    // specification.
+    constexpr unsigned small_disjunct = 64;
+    std::vector<formula> skipped;
 
     // A strategy satisfying one disjunct satisfies the whole
     // specification, so stopping at the first realizable disjunct is
     // sound.
-    for (const formula& d: disjuncts)
+    unsigned ds = disjuncts.size();
+    for (unsigned i = 0; i < ds; ++i)
       {
+        const formula& d = disjuncts[i];
+        const formula& sd = simplified[i];
         if (si.verbose_stream)
           *si.verbose_stream << "trying disjunct " << d << '\n';
-
-        formula sd = d;
-        std::unique_ptr<realizability_simplifier> drs;
-        if (simpl)
-          {
-            drs = std::make_unique<realizability_simplifier>
-              (d, input_and_unobs, simpl);
-            sd = drs->simplified_formula();
-          }
 
         if (sd.is_ff())
           {
@@ -4097,6 +4140,23 @@ namespace spot
                                  << " simplifies to true and is "
                                     "trivially realizable\n";
           }
+        // A disjunct of the form !(A1 & A2 & ...) usually comes from
+        // an implication whose assumptions are A1 & ... & An: it is
+        // realizable as soon as the assumptions can be violated, which
+        // is exactly what the negated-assumption pre-check is about,
+        // so it should not be skipped even when it is large.
+        else if (unsigned dsize = formula_node_count(sd);
+                 dsize > small_disjunct
+                 && dsize * 2 >= spec_size
+                 && !(sd.is(op::Not) && sd[0].is(op::And)))
+          {
+            if (si.verbose_stream)
+              *si.verbose_stream << "disjunct " << d << " is not "
+                "significantly smaller than the whole specification; "
+                "not solving it alone\n";
+            skipped.push_back(d);
+            continue;
+          }
 
         mealy_like m = solve_one(sd, output_aps, want_strategy, split_out,
                                  false);
@@ -4104,7 +4164,7 @@ namespace spot
             && m.success
                  != mealy_like::realizability_code::REALIZABLE_DTGBA)
           continue;
-        accept(std::move(m), drs.get());
+        accept(std::move(m), simplifiers[i].get());
         return true;
       }
 
@@ -4140,6 +4200,20 @@ namespace spot
             accept(std::move(m), nullptr);
             return true;
           }
+
+        // A skipped disjunct of a singleton group has not been shown
+        // unrealizable, so the groups are not sufficient to conclude.
+        for (const std::vector<formula>& group: groups)
+          if (group.size() == 1)
+            for (const formula& sk: skipped)
+              if (sk == group[0])
+                {
+                  if (si.verbose_stream)
+                    *si.verbose_stream << "disjunct " << sk << " was "
+                      "not solved; falling back to the other "
+                      "decompositions\n";
+                  return false;
+                }
 
         if (si.verbose_stream)
           *si.verbose_stream
