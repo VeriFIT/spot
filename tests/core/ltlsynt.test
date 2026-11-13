@@ -1873,4 +1873,19 @@ for algo in ds sd acd lar lar.old; do
     ltlsynt -f 'o2 <-> (Fi1 <-> (1 U !Fo2))' --algo=$algo --verify || exit 1
 done
 
+# The parity game solver used to trip an assertion in fix_strat_acc()
+# when a state of the current subgame had an edge leading to an older
+# subgame with a higher priority of the same player.  Both
+# specifications below used to abort instead of being solved.
+f='((p0 && !p1 && !p2 && !p3) || (!p0 && p1 && !p2 && !p3)'
+f="$f || (!p0 && !p1 && p2 && !p3) || (!p0 && !p1 && !p2 && p3))"
+f="$f & ((G F a && F G b) <-> (G F p0 || (G F p2 && !G F p1)))"
+test REALIZABLE = "$(ltlsynt -f "$f" --ins=a,b --outs=p0,p1,p2,p3 \
+  --realizability --decompose=no)"
+
+f='((G F p0 || F G p1) && (G F p1 || F G p2)'
+f="$f && (G F p2 || G F p3) && G F p3) <-> G F acc"
+test UNREALIZABLE = "$(ltlsynt -f "$f" --ins=p0,p1,p2,p3 \
+  --outs=acc --realizability --decompose=no)"
+
 :

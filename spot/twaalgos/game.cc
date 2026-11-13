@@ -667,9 +667,13 @@ namespace spot
             for (const auto &e_fix : arena_->out(v))
               {
                 priority_t this_priority = to_priority(e_fix);
-                // This edge must have less than max_priority, otherwise it
-                // would have already been attracted.
-                assert((this_priority <= max_priority)
+                // An edge of the current subgame cannot carry more than
+                // max_priority, which is the highest priority of the
+                // subgame: it would have been attracted otherwise.  This
+                // does not hold for an edge leading to an older subgame,
+                // which is outside of the current subgame.
+                assert((subgame_[e_fix.dst] < rd)
+                       || (this_priority <= max_priority)
                        || (to_player(this_priority) != (max_priority&1)));
                 // If it is accepting and leads to the winning region, it is
                 // a valid fix.
