@@ -187,6 +187,11 @@ New in spot 2.16.2.dev  (not yet released)
     unrealizable although it was realizable by a strategy violating
     the assumptions.  (Issue #665.)
 
+  - The parity game solver used by ltlsynt could abort on an
+    assertion in fix_strat_acc() when a state of the current subgame
+    had an edge leading to an older subgame with a larger priority of
+    the same player.  This was a regression introduced in Spot 2.16.
+
   - Fix missing simplification during propositional equivalence of
     obligation formulas.  For instance G(i) -> G(i <-> XXX(0)) was
     reduced to !G(i) during the propositional equivalence, but because
