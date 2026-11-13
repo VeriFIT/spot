@@ -109,9 +109,10 @@ static const argp_option options[] =
     { "bypass", OPT_BYPASS, "yes|no", 0,
       "whether to try to avoid to construct a parity game "
       "(enabled by default)", 0},
-    { "decompose", OPT_DECOMPOSE, "yes|no", 0,
-      "whether to decompose the specification as multiple output-disjoint "
-      "problems to solve independently (enabled by default)", 0 },
+    { "decompose", OPT_DECOMPOSE, "yes|no|conjunctions|disjunctions", 0,
+      "whether to decompose the specification into independent problems "
+      "(conjunctions), to try each disjunct of a disjunction separately "
+      "(disjunctions), or both (enabled by default)", 0 },
     { "polarity", OPT_POLARITY, "yes|no|before-decompose", 0,
       "whether to remove atomic propositions that always have the same "
       "polarity in the formula to speed things up (enabled by default, "
@@ -299,7 +300,35 @@ static spot::synthesis_info::simplification_stage polarity_values[] =
   };
 ARGMATCH_VERIFY(polarity_args, polarity_values);
 
-bool opt_decompose_ltl = true;
+static const char* const decompose_args[] =
+  {
+    "yes", "true", "enabled", "1",
+    "no", "false", "disabled", "0",
+    "none", "all",
+    "conjunctions", "conj",
+    "disjunctions", "disj",
+    nullptr
+  };
+static spot::synthesis_info::decomposition decompose_values[] =
+  {
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::conjunctions,
+    spot::synthesis_info::decomposition::conjunctions,
+    spot::synthesis_info::decomposition::disjunctions,
+    spot::synthesis_info::decomposition::disjunctions,
+  };
+ARGMATCH_VERIFY(decompose_args, decompose_values);
+spot::synthesis_info::decomposition opt_decompose_ltl =
+  spot::synthesis_info::decomposition::all;
 spot::synthesis_info::simplification_stage opt_polarity =
   spot::synthesis_info::simplification_stage::
     before_and_after_decomposition;
@@ -913,7 +942,7 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_DECOMPOSE:
       opt_decompose_ltl = XARGMATCH("--decompose", arg,
-                                    yesno_args, yesno_values);
+                                    decompose_args, decompose_values);
       break;
     case OPT_FROM_PGAME:
       jobs.emplace_back(arg, job_type::AUT_FILENAME);

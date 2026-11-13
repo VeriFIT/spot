@@ -250,21 +250,40 @@ the following signals can be temporarily removed:
   i2 := 1
 new formula: GFi1 -> G(i1 <-> o0)
 there are 1 subformulas
-trying to create strategy directly for GFi1 -> G(i1 <-> o0)
-direct strategy might exist but was not found.
-translating formula done in X seconds
-automaton has 2 states and 1 colors
-LAR construction done in X seconds
-DPA has 2 states, 1 colors
-split inputs and outputs done in X seconds
-automaton has 6 states
-solving game with acceptance: co-Büchi
-game solved in X seconds
+the specification is a disjunction of 2 formulas
+trying disjunct !GFi1
+disjunct !GFi1 simplifies to false and is unrealizable on its own
+trying disjunct G(i1 <-> o0)
+disjunct G(i1 <-> o0) simplifies to true and is trivially realizable
+trying to create strategy directly for 1
+direct strategy was found.
 EOF
 ltlsynt -f "G(Fi0 && Fi1 && Fi2) -> G(i1 <-> o0)" --algo=lar \
         --verbose --realizability 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
+
+# --decompose accepts all, conjunctions, disjunctions, and none.
+for d in all conjunctions disjunctions none; do
+  ltlsynt -f 'G(i -> o)' --ins=i --outs=o --realizability \
+          --decompose=$d > out
+  test REALIZABLE = "`cat out`"
+done
+
+# Disjuncts with disjoint inputs are grouped: when no group is
+# realizable, the whole disjunction is unrealizable without being
+# solved as a whole.
+ltlsynt -f 'X i | X j' --ins=i,j --realizability \
+        --decompose=disjunctions --pol=no --global-equiv=no \
+        --verbose > out 2> err || true
+test UNREALIZABLE = "`cat out`"
+grep 'the groups of disjuncts have disjoint inputs' err
+
+# Disjuncts sharing an input are solved together, so X i | X !i
+# remains realizable even though neither disjunct is.
+ltlsynt -f 'X i | X !i | X j' --ins=i,j --realizability \
+        --decompose=disjunctions --pol=no --global-equiv=no > out
+test REALIZABLE = "`cat out`"
 
 
 for r in '' '--real'; do
@@ -825,7 +844,8 @@ there are 2 subformulas
 attempting to simplify subformulas
 considering subformula (b & (b | y)) -> y
 considering subformula (a | x) -> x
-checking the negation of the assumptions: !(b & (a | x) & (b | y))
+the specification is a disjunction of 2 formulas
+trying disjunct !(b & (a | x) & (b | y))
 trying to create strategy directly for !(b & (a | x) & (b | y))
 direct strategy might exist but was not found.
 translating formula done in X seconds
@@ -836,20 +856,8 @@ split inputs and outputs done in X seconds
 automaton has 6 states
 solving game with acceptance: co-Büchi
 game solved in X seconds
-working on subformula (b & (b | y)) -> y
-trying to create strategy directly for (b & (b | y)) -> y
-direct strategy might exist but was not found.
-translating formula done in X seconds
-automaton has 2 states and 0 colors
-LAR construction done in X seconds
-DPA has 2 states, 0 colors
-split inputs and outputs done in X seconds
-automaton has 4 states
-solving game with acceptance: all
-game solved in X seconds
-simplification took X seconds
-working on subformula (a | x) -> x
-trying to create strategy directly for (a | x) -> x
+trying disjunct x & y
+trying to create strategy directly for x & y
 direct strategy might exist but was not found.
 translating formula done in X seconds
 automaton has 2 states and 0 colors
@@ -866,6 +874,33 @@ ltlsynt -f '((a|x) & (b | y) & b) => (x & y)' --obligation=false \
         --outs="x,y" --aiger=ite --pol=no --verify --verbose 2> out
 sed 's/ [0-9.e-]* seconds/ X seconds/g' out > outx
 diff outx exp
+
+# The negation of the assumptions of a component is a disjunction,
+# which is solved one disjunct at a time.
+cat >exp <<EOF
+trying disjunct !Go1 of the negated assumptions
+EOF
+ltlsynt -f '((G(o1) & G(i)) -> (F o1 & F o2)) & (G r <-> G s)' \
+        --ins=i --outs=o1,o2,r,s --realizability --verbose --pol=no 2> err
+grep -F 'trying disjunct' err > out
+diff out exp
+
+# The negation of the assumptions is checked on each component: the
+# component Go1 -> Fo1 is not checked against Go2 -> Fo2.
+test 'REALIZABLE' = "$(ltlsynt -f '(G(o1) & G(o2)) -> (F o1 & F o2)' \
+  --ins=j --outs=o1,o2 --realizability --verbose --pol=no \
+  --global-equiv=no --decompose=conjunctions 2> err)"
+grep -F 'checking the negation of the assumptions: !Go1' err
+grep -F 'checking the negation of the assumptions: !Go2' err
+
+# Only a component of the form A -> G can be handled by the pre-check:
+# falsifying A then implies the component.  A component that conjoins
+# several implications has no such reading and is solved normally.
+f='(((G o1) -> (G p1)) & ((G p1) -> (F o1)))'
+f="$f & (G(o2 | p2) & G(!o2 | Fp2) & G(o2 | !p2))"
+test 'REALIZABLE' = "$(ltlsynt -f "$f" --outs=o1,p1,o2,p2 \
+  --realizability --verbose --decompose=conjunctions 2> err)"
+if grep -F 'checking the negation of the assumptions' err; then exit 1; fi
 
 cat >exp <<EOF
 the following signals can be temporarily removed:
@@ -986,7 +1021,8 @@ attempting to simplify subformulas
 considering subformula a -> b
 considering subformula a -> c
 considering subformula a -> d
-checking the negation of the assumptions: !a
+the specification is a disjunction of 2 formulas
+trying disjunct !a
 trying to create strategy directly for !a
 direct strategy might exist but was not found.
 translating formula done in X seconds
@@ -997,32 +1033,8 @@ split inputs and outputs done in X seconds
 automaton has 5 states
 solving game with acceptance: co-Büchi
 game solved in X seconds
-working on subformula a -> b
-trying to create strategy directly for a -> b
-direct strategy might exist but was not found.
-translating formula done in X seconds
-automaton has 2 states and 0 colors
-LAR construction done in X seconds
-DPA has 2 states, 0 colors
-split inputs and outputs done in X seconds
-automaton has 4 states
-solving game with acceptance: all
-game solved in X seconds
-simplification took X seconds
-working on subformula a -> c
-trying to create strategy directly for a -> c
-direct strategy might exist but was not found.
-translating formula done in X seconds
-automaton has 2 states and 0 colors
-LAR construction done in X seconds
-DPA has 2 states, 0 colors
-split inputs and outputs done in X seconds
-automaton has 4 states
-solving game with acceptance: all
-game solved in X seconds
-simplification took X seconds
-working on subformula a -> d
-trying to create strategy directly for a -> d
+trying disjunct b & c & d
+trying to create strategy directly for b & c & d
 direct strategy might exist but was not found.
 translating formula done in X seconds
 automaton has 2 states and 0 colors

@@ -120,7 +120,8 @@ static const argp_option options[] =
       " to order n-ary compositions: by increasing size, or trying to group"
       " operands based on their APs (the default).",
       0 },
-    { "decompose", OPT_DECOMPOSE, "yes|no", 0,
+    { "decompose", OPT_DECOMPOSE, "yes|no|all|conjunctions|disjunctions",
+      0,
       "whether to decompose the specification as multiple output-disjoint "
       "problems to solve independently (disabled by default, because it "
       "is bogus)", 0 },
@@ -269,14 +270,41 @@ static const char* const decompose_args[] =
   {
     "yes", "true", "enabled", "1",
     "no", "false", "disabled", "0",
+    "none", "all",
+    "conjunctions", "conj", "disjunctions", "disj",
     nullptr
   };
-static const bool decompose_values[] =
+static spot::synthesis_info::decomposition decompose_values[] =
+  {
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::none,
+    spot::synthesis_info::decomposition::all,
+    spot::synthesis_info::decomposition::conjunctions,
+    spot::synthesis_info::decomposition::conjunctions,
+    spot::synthesis_info::decomposition::disjunctions,
+    spot::synthesis_info::decomposition::disjunctions,
+  };
+ARGMATCH_VERIFY(decompose_args, decompose_values);
+// Boolean options used by --one-step and --simplify-formula.
+static const char* const bool_args[] =
+  {
+    "yes", "true", "enabled", "1",
+    "no", "false", "disabled", "0",
+    nullptr
+  };
+static const bool bool_values[] =
   {
     true, true, true, true,
     false, false, false, false,
   };
-ARGMATCH_VERIFY(decompose_args, decompose_values);
+ARGMATCH_VERIFY(bool_args, bool_values);
 static const char* const polarity_args[] =
   {
     "yes", "true", "enabled", "1",
@@ -318,7 +346,8 @@ static const dot_choice dot_values[] =
   };
 ARGMATCH_VERIFY(dot_args, dot_values);
 
-static bool opt_decompose_ltl = false;
+static spot::synthesis_info::decomposition opt_decompose_ltl =
+  spot::synthesis_info::decomposition::none;
 static polarity_choice opt_polarity = pol_yes;
 static polarity_choice opt_gequiv = pol_yes;
 static bool opt_realizability = false;
@@ -408,7 +437,7 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_ONE_STEP:
       opt_one_step = XARGMATCH("--one-step", arg,
-                               decompose_args, decompose_values);
+                               bool_args, bool_values);
       break;
     case OPT_OUTPUT:
       all_output_aps.emplace();
@@ -444,7 +473,7 @@ parse_opt(int key, char *arg, struct argp_state *)
       break;
     case OPT_SIMPLIFY_FORMULA:
       opt_simplify_ltl = XARGMATCH("--simplify-formula", arg,
-                                   decompose_args, decompose_values);
+                                   bool_args, bool_values);
       break;
     case 'q':
       automaton_format = Quiet;
@@ -558,7 +587,7 @@ namespace
 
     std::vector<spot::formula> sub_form;
     std::vector<std::set<spot::formula>> sub_outs;
-    if (opt_decompose_ltl)
+    if (opt_decompose_ltl != spot::synthesis_info::decomposition::none)
     {
       if (!f.is_syntactic_stutter_invariant())
         {

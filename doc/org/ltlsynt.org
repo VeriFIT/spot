@@ -341,8 +341,16 @@ LTL decomposition consist in splitting the specification into multiple
 smaller constraints on disjoint subsets of the output values (as
 described by [[https://arxiv.org/abs/2103.08459][Finkbeiner, Geier, and Passing]]), solve those constraints
 separately, and then combine them while encoding the AIGER circuit.
-This is enabled by default, but can be disabled by passing option
-=--decompose=no=.
+The tool also splits disjunctions, including implications =A -> B=
+(rewritten as =!A | B=) and negated conjunctions =!(A & B)=, and tries
+each disjunct separately: a strategy satisfying one disjunct satisfies
+the whole specification.  Disjuncts that share inputs are grouped and
+solved together, while groups with disjoint inputs are independent: if
+none of them is realizable, the disjunction is unrealizable and is not
+solved as a whole.  Both kinds of decomposition are enabled by
+default; =--decompose=conjunctions= or =--decompose=disjunctions=
+restrict the decomposition to one kind, and =--decompose=no= disables
+it.
 
 The two specialized constructions shown at the top are used when the
 specification has a specific shape.  They can be disabled by passing

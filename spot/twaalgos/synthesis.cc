@@ -3154,6 +3154,115 @@ namespace spot
     return formula::Not(formula::And(assumptions));
   }
 
+  namespace
+  {
+    // Whether the decomposition settings include the corresponding
+    // kind of split.
+    static bool
+    has_conjunction_decomposition(synthesis_info::decomposition d)
+    {
+      return d == synthesis_info::decomposition::conjunctions
+        || d == synthesis_info::decomposition::all;
+    }
+
+    static bool
+    has_disjunction_decomposition(synthesis_info::decomposition d)
+    {
+      return d == synthesis_info::decomposition::disjunctions
+        || d == synthesis_info::decomposition::all;
+    }
+
+    // Rewrite \a f as a disjunction and return its disjuncts.  The
+    // rewrite is exact: an implication A -> B becomes !A | B, and a
+    // negated conjunction becomes the disjunction of the negated
+    // conjuncts.  Returns an empty vector when \a f is not a
+    // disjunction.
+    static std::vector<formula>
+    disjuncts_of(formula f)
+    {
+      if (f.is(op::Or))
+        {
+          std::vector<formula> res;
+          for (formula c: f)
+            res.push_back(c);
+          return res;
+        }
+      if (f.is(op::Implies))
+        return {formula::Not(f[0]), f[1]};
+      if (f.is(op::Not) && f[0].is(op::And))
+        {
+          std::vector<formula> res;
+          for (formula c: f[0])
+            res.push_back(formula::Not(c));
+          return res;
+        }
+      return {};
+    }
+
+    // Partition \a disjuncts into groups connected by shared input
+    // propositions, so that two distinct groups never use the same
+    // input.  If every group's disjunction is unrealizable, the whole
+    // disjunction is unrealizable: for each group the adversary has a
+    // strategy falsifying it against all outputs, and since the groups
+    // only read disjoint inputs, those strategies can be played
+    // simultaneously.  This does not hold when the disjuncts share an
+    // input: X i | X !i is realizable although neither disjunct is.
+    static std::vector<std::vector<formula>>
+    group_disjuncts_by_inputs(const std::vector<formula>& disjuncts,
+                              const std::vector<std::string>& input_aps,
+                              const std::vector<std::string>& output_aps)
+    {
+      formula_2_inout_props form2props(output_aps);
+      std::set<formula> inputs;
+      for (const std::string& ap: input_aps)
+        inputs.insert(formula::ap(ap));
+
+      const unsigned n = disjuncts.size();
+      std::vector<unsigned> parent(n);
+      for (unsigned i = 0; i < n; ++i)
+        parent[i] = i;
+      auto find_root = [&parent](unsigned i)
+        {
+          while (parent[i] != i)
+            {
+              parent[i] = parent[parent[i]];
+              i = parent[i];
+            }
+          return i;
+        };
+      // First disjunct seen for each input proposition.
+      std::map<formula, unsigned> input_owner;
+      for (unsigned i = 0; i < n; ++i)
+        for (const formula& ap: form2props.aps_of(disjuncts[i]).first)
+          if (inputs.find(ap) != inputs.end())
+            {
+              auto [it, inserted] = input_owner.emplace(ap, i);
+              if (!inserted)
+                {
+                  unsigned r1 = find_root(it->second);
+                  unsigned r2 = find_root(i);
+                  if (r1 != r2)
+                    parent[r2] = r1;
+                }
+            }
+
+      // Collect the members of each group, in order of first member.
+      std::vector<std::vector<formula>> groups;
+      std::vector<unsigned> group_index(n, unsigned(-1));
+      for (unsigned i = 0; i < n; ++i)
+        {
+          unsigned r = find_root(i);
+          if (group_index[r] == unsigned(-1))
+            {
+              group_index[r] = groups.size();
+              groups.emplace_back();
+            }
+          groups[group_index[r]].push_back(disjuncts[i]);
+        }
+      return groups;
+    }
+  }
+
   bool
   solve_game(twa_graph_ptr arena, synthesis_info& gi)
   {
@@ -3306,13 +3415,6 @@ namespace spot
     std::vector<formula> unobs_vec;
     std::unique_ptr<bdd_dict_preorder> preorder;
 
-    // Negated-assumption pre-check state (item 1 of the report in
-    // issue #665).  This is computed at most once, and reused when the
-    // solution is rebuilt in another representation.
-    bool precheck_done = false;
-    bool precheck_accepted = false;
-    mealy_like precheck_machine;
-
     // Solving state.
     bool solved = false;
     bool solved_with_strategy = false;
@@ -3320,7 +3422,7 @@ namespace spot
     bool realizable = false;
     bool assumptions_violated = false;
     bool assumptions_checked = false;
-    bool precheck_used = false;
+    bool presolved = false;
     std::vector<mealy_like> mealy_machines;
     std::vector<twa_graph_ptr> raw_sub_strategies;
     std::vector<twa_graph_ptr> sub_strategies_;
@@ -3344,8 +3446,11 @@ namespace spot
                          bool want_strategy,
                          bool split_out,
                          bool use_obligation);
-    bool run_precheck();
-    void accept_precheck(bool want_strategy, bool split_out);
+    bool try_precheck(const formula& comp,
+                      const std::vector<std::string>& outs,
+                      mealy_like& result);
+    bool try_disjunctive_decomposition(bool want_strategy,
+                                       bool split_out);
     void solve_impl(bool want_strategy, bool split_out);
     void check_strategy(const twa_graph_ptr& strategy) const;
     void detect_assumptions_violated();
@@ -3399,7 +3504,7 @@ namespace spot
         f = rs->simplified_formula();
       }
 
-    if (si.decompose)
+    if (has_conjunction_decomposition(si.decompose))
       {
         auto subs = split_independent_formulas(f, output_aps);
         if (si.verbose_stream)
@@ -3597,7 +3702,7 @@ namespace spot
     realizable = false;
     assumptions_violated = false;
     assumptions_checked = false;
-    precheck_used = false;
+    presolved = false;
     mealy_machines.clear();
     raw_sub_strategies.clear();
     sub_strategies_.clear();
@@ -3754,24 +3859,24 @@ namespace spot
   }
 
   bool
-  synthesis_problem::data::run_precheck()
+  synthesis_problem::data::try_precheck(const formula& comp,
+                                        const std::vector<std::string>& outs,
+                                        mealy_like& result)
   {
-    if (precheck_done)
-      return precheck_accepted;
-    precheck_done = true;
-
-    // The pre-check is only needed when the syntactic decomposition
-    // would actually split the specification: otherwise the ordinary
-    // solver already handles the assumptions correctly.
-    if (!si.decompose || sub_form.size() <= 1)
+    // Theorem 5.2 only synthesizes the negated assumptions of a
+    // component of the form (A1 & ... & An) -> (G1 & ... & Gm), and
+    // such components are single implications: decomposing the
+    // guarantees of that formula yields (A1 & ... & An) -> Gi for each
+    // conjunct Gi of the guarantees.  Then the negation of the
+    // assumptions entails the component, so the synthesized strategy
+    // realizes the component and needs no further check.  An
+    // implication whose antecedent is unconstrained (i.e. whose
+    // negation is trivially realizable) is exactly the case the
+    // pre-check is meant to catch.
+    if (!comp.is(op::Implies))
       return false;
 
-    // rs holds the mapping of the global simplification only: the
-    // mappings of the subformulas are merged by merge_sub_mappings(),
-    // which runs after this pre-check, because they are not
-    // necessarily valid for the whole specification.  This also means
-    // the simplifier is run only once.
-    formula neg_ass = get_negated_assumptions(f);
+    formula neg_ass = get_negated_assumptions(comp);
     if (!neg_ass)
       return false;
 
@@ -3779,80 +3884,280 @@ namespace spot
       *si.verbose_stream << "checking the negation of the assumptions: "
                          << neg_ass << '\n';
 
-    // Solve the negation of the assumptions without decomposing it
-    // again.  There is no need for the on-the-fly obligation path
-    // here, and disabling it avoids having to set up the MTBDD
-    // variable preorder for this formula.
-    mealy_like m =
-      solve_one(neg_ass, output_aps, true, true, false);
+    // The negation of the assumptions is a disjunction.  Solve its
+    // disjuncts one at a time first: each is usually much smaller than
+    // the whole disjunction, and a strategy satisfying one disjunct is
+    // a strategy for the whole disjunction.  Disjuncts sharing inputs
+    // are grouped and solved together; if no group is realizable, the
+    // groups with disjoint inputs make the disjunction unrealizable.
+    bool neg_ass_unrealizable = false;
+    const unsigned simpl = simplification_options();
+    // Mapping of the per-disjunct simplification that produced the
+    // candidate, if any.  It is recorded for the accepted machine.
+    std::unique_ptr<realizability_simplifier> precheck_drs;
+    auto solve_negated_assumptions = [&]() -> mealy_like
+      {
+        std::vector<formula> disjuncts = disjuncts_of(neg_ass);
+        for (formula d: disjuncts)
+          {
+            if (si.verbose_stream)
+              *si.verbose_stream << "trying disjunct " << d
+                                 << " of the negated assumptions\n";
+
+            formula sd = d;
+            std::unique_ptr<realizability_simplifier> drs;
+            if (simpl)
+              {
+                drs = std::make_unique<realizability_simplifier>
+                  (d, input_and_unobs, simpl);
+                sd = drs->simplified_formula();
+              }
+
+            if (sd.is_ff())
+              {
+                if (si.verbose_stream)
+                  *si.verbose_stream << "disjunct " << d << " of the "
+                    "negated assumptions simplifies to false and is "
+                    "unrealizable on its own\n";
+                continue;
+              }
+
+            if (sd.is_tt() && si.verbose_stream)
+              *si.verbose_stream << "disjunct " << d << " of the "
+                "negated assumptions simplifies to true and is "
+                "trivially realizable\n";
+
+            mealy_like m = solve_one(sd, outs, true, true, false);
+            if (m.success
+                  == mealy_like::realizability_code::REALIZABLE_REGULAR
+                && m.mealy_like)
+              {
+                precheck_drs = std::move(drs);
+                return m;
+              }
+          }
+
+        std::vector<std::string> all_inputs = input_aps;
+        all_inputs.insert(all_inputs.end(), unobs_aps.begin(),
+                          unobs_aps.end());
+        std::vector<std::vector<formula>> groups
+          = group_disjuncts_by_inputs(disjuncts, all_inputs, outs);
+        if (groups.size() > 1)
+          {
+            for (const std::vector<formula>& group: groups)
+              {
+                // Singleton groups were already tried above.
+                if (group.size() == 1)
+                  continue;
+                formula d = formula::Or(group);
+                if (si.verbose_stream)
+                  *si.verbose_stream
+                    << "trying grouped disjuncts of the negated assumptions: "
+                    << d << '\n';
+                mealy_like m = solve_one(d, outs, true, true, false);
+                if (m.success
+                      == mealy_like::realizability_code::REALIZABLE_REGULAR
+                    && m.mealy_like)
+                  return m;
+              }
+            neg_ass_unrealizable = true;
+            return mealy_like{mealy_like::realizability_code::UNREALIZABLE,
+                              nullptr, bddfalse};
+          }
+        // All the disjuncts share inputs: a single strategy may still
+        // satisfy different disjuncts on different inputs, so solve
+        // the disjunction itself.
+        return solve_one(neg_ass, outs, true, true, false);
+      };
+    // There is no need for the on-the-fly obligation path here, and
+    // disabling it avoids having to set up the MTBDD variable preorder
+    // for this formula.
+    mealy_like m = has_disjunction_decomposition(si.decompose)
+      ? solve_negated_assumptions()
+      : solve_one(neg_ass, outs, true, true, false);
+    if (neg_ass_unrealizable)
+      return false;
     if (m.success != mealy_like::realizability_code::REALIZABLE_REGULAR
         || !m.mealy_like)
       return false;
 
-    // When several implications are conjoined, the candidate strategy
-    // may satisfy the negation of all assumptions while violating one
-    // of the guarantees.  Check it against the complete specification
-    // before accepting it.
-    twa_graph_ptr cand = m.mealy_like;
-    if (cand->get_named_prop<region_t>("state-player"))
-      cand = unsplit_mealy(cand);
-    cand = clone_graph(cand);
-    if (rs)
-      rs->patch_mealy(cand);
-    try
-      {
-        check_strategy(cand);
-      }
-    catch (const std::runtime_error&)
-      {
-        if (si.verbose_stream)
-          *si.verbose_stream
-            << "the negated-assumption strategy does not satisfy the "
-               "specification; falling back to decomposition\n";
-        return false;
-      }
+    // The mapping of the per-disjunct simplification is recorded so
+    // that the accepted machine can be patched.
+    if (precheck_drs && rs)
+      rs->merge_mapping(*precheck_drs);
 
-    precheck_machine = std::move(m);
-    precheck_accepted = true;
+    // The product strategy will falsify the conjunction of the
+    // assumptions of the whole specification.
+    assumptions_violated = true;
+    assumptions_checked = true;
+    result = std::move(m);
     return true;
   }
 
-  void
-  synthesis_problem::data::accept_precheck(bool want_strategy,
-                                           bool split_out)
+  bool
+  synthesis_problem::data::try_disjunctive_decomposition(bool want_strategy,
+                                                         bool split_out)
   {
-    assumptions_violated = true;
-    assumptions_checked = true;
-    precheck_used = true;
-    realizable = true;
-    if (si.bv)
-      si.bv->realizable = true;
+    if (!has_disjunction_decomposition(si.decompose))
+      return false;
 
-    if (want_strategy)
+    std::vector<formula> disjuncts = disjuncts_of(f);
+    if (disjuncts.size() <= 1)
+      return false;
+
+    if (si.verbose_stream)
+      *si.verbose_stream << "the specification is a disjunction of "
+                         << disjuncts.size() << " formulas\n";
+
+    // Accept a realizable object as a solution of the whole
+    // specification.  All the output propositions are still declared:
+    // those a disjunct does not use are free, and the solver assigns
+    // them arbitrary values.
+    auto accept = [&](mealy_like&& m,
+                      const realizability_simplifier* drs)
       {
-        if (split_out)
+        realizable = true;
+        presolved = true;
+        if (si.bv)
+          si.bv->realizable = true;
+
+        // The per-disjunct simplification is only valid inside the
+        // disjunct that was just solved, so its mapping is merged
+        // into the global one only now that the disjunct is known to
+        // solve the whole specification.
+        if (drs && rs)
+          rs->merge_mapping(*drs);
+
+        if (want_strategy)
           {
-            mealy_machines.clear();
-            mealy_machines.push_back(precheck_machine);
+            if (split_out)
+              {
+                mealy_machines.clear();
+                mealy_machines.push_back(std::move(m));
+              }
+            else
+              {
+                if (!m.mealy_like || !is_mealy(m.mealy_like))
+                  throw std::runtime_error
+                    ("synthesis_problem: strategy is not a Mealy machine");
+                strategy_ = clone_graph(m.mealy_like);
+                if (rs)
+                  rs->patch_mealy(strategy_);
+                sub_strategies_.clear();
+                sub_strategies_.push_back(clone_graph(strategy_));
+              }
+            solved_with_strategy = true;
+            solved_split = split_out;
           }
-        else
+        solved = true;
+      };
+
+    // A disjunct may use some APs with a single polarity, or contain
+    // equivalent APs, even when the whole specification does not.
+    // Applying the cheap realizability simplification to each
+    // disjunct separately may turn it into a constant, in which case
+    // there is no point in translating it: a true disjunct is
+    // trivially realizable, while a false disjunct is unrealizable on
+    // its own.  The latter is only skipped for the individual solve:
+    // it is kept in `disjuncts` for the grouping below, because a
+    // disjunction of individually unrealizable disjuncts (X i | X !i)
+    // may still be realizable.
+    const unsigned simpl = simplification_options();
+
+    // A strategy satisfying one disjunct satisfies the whole
+    // specification, so stopping at the first realizable disjunct is
+    // sound.
+    for (const formula& d: disjuncts)
+      {
+        if (si.verbose_stream)
+          *si.verbose_stream << "trying disjunct " << d << '\n';
+
+        formula sd = d;
+        std::unique_ptr<realizability_simplifier> drs;
+        if (simpl)
           {
-            twa_graph_ptr raw = precheck_machine.mealy_like;
-            if (raw->get_named_prop<region_t>("state-player"))
-              raw = unsplit_mealy(raw);
-            twa_graph_ptr patched = clone_graph(raw);
-            if (rs)
-              rs->patch_mealy(patched);
-            sub_strategies_.clear();
-            sub_strategies_.push_back(std::move(patched));
-            strategy_ = clone_graph(raw);
-            if (rs)
-              rs->patch_mealy(strategy_);
+            drs = std::make_unique<realizability_simplifier>
+              (d, input_and_unobs, simpl);
+            sd = drs->simplified_formula();
           }
-        solved_with_strategy = true;
-        solved_split = split_out;
+
+        if (sd.is_ff())
+          {
+            if (si.verbose_stream)
+              *si.verbose_stream << "disjunct " << d
+                                 << " simplifies to false and is "
+                                    "unrealizable on its own\n";
+            continue;
+          }
+
+        if (sd.is_tt())
+          {
+            if (si.verbose_stream)
+              *si.verbose_stream << "disjunct " << d
+                                 << " simplifies to true and is "
+                                    "trivially realizable\n";
+          }
+
+        mealy_like m = solve_one(sd, output_aps, want_strategy, split_out,
+                                 false);
+        if (m.success != mealy_like::realizability_code::REALIZABLE_REGULAR
+            && m.success
+                 != mealy_like::realizability_code::REALIZABLE_DTGBA)
+          continue;
+        accept(std::move(m), drs.get());
+        return true;
       }
-    solved = true;
+
+    // Disjuncts sharing inputs cannot be decided separately (X i | X !i
+    // is realizable although neither disjunct is), but disjuncts from
+    // different groups use disjoint inputs.  When every group's
+    // disjunction is unrealizable, the strategies falsifying them can
+    // be combined, so the whole disjunction is unrealizable and need
+    // not be solved as a whole.
+    std::vector<std::string> all_inputs = input_aps;
+    all_inputs.insert(all_inputs.end(), unobs_aps.begin(),
+                      unobs_aps.end());
+    std::vector<std::vector<formula>> groups
+      = group_disjuncts_by_inputs(disjuncts, all_inputs, output_aps);
+    if (groups.size() > 1)
+      {
+        for (const std::vector<formula>& group: groups)
+          {
+            // Singleton groups were already tried above.
+            if (group.size() == 1)
+              continue;
+            formula d = formula::Or(group);
+            if (si.verbose_stream)
+              *si.verbose_stream << "trying grouped disjuncts: " << d
+                                 << '\n';
+            mealy_like m = solve_one(d, output_aps, want_strategy,
+                                     split_out, false);
+            if (m.success
+                  != mealy_like::realizability_code::REALIZABLE_REGULAR
+                && m.success
+                  != mealy_like::realizability_code::REALIZABLE_DTGBA)
+              continue;
+            accept(std::move(m), nullptr);
+            return true;
+          }
+
+        if (si.verbose_stream)
+          *si.verbose_stream
+            << "the groups of disjuncts have disjoint inputs and none is "
+               "realizable; the specification is unrealizable\n";
+        realizable = false;
+        solved = true;
+        return true;
+      }
+
+    // All the disjuncts share inputs: a strategy may satisfy different
+    // disjuncts on different inputs, so fall back to the other
+    // decompositions instead of concluding that the specification is
+    // unrealizable.
+    if (si.verbose_stream)
+      *si.verbose_stream << "no disjunct is realizable; falling back "
+                            "to the other decompositions\n";
+    return false;
   }
 
   void
@@ -3879,19 +4184,15 @@ namespace spot
         si.bv->total_time = sw_total.stop();
     };
 
-    // Item 1 of the report in issue #665: before decomposing, check
-    // whether the negation of the assumptions is realizable.  If so,
-    // the strategy violating the assumptions also solves the
-    // specification.
-    if (run_precheck())
+    // Try the disjuncts of a disjunctive specification before the
+    // conjunctive decomposition.  A disjunct that is realizable on
+    // its own solves the whole specification.
+    if (try_disjunctive_decomposition(want_strategy, split_out))
       {
-        accept_precheck(want_strategy, split_out);
         finish();
         return;
       }
 
-    // Only a complete strategy needs the mappings of the subformulas;
-    // applying them any earlier would pollute the pre-check above.
     merge_sub_mappings();
 
     for (size_t i = 0; i < sub_form.size(); ++i)
@@ -3900,8 +4201,17 @@ namespace spot
           *si.verbose_stream << "working on subformula "
                              << sub_form[i] << '\n';
 
-        mealy_like m_like = solve_one(sub_form[i], sub_outs_str[i],
-                                      want_strategy, split_out, true);
+        // Item 1 of the report in issue #665: check whether the
+        // negation of the assumptions of this component is realizable.
+        // The strategy it produces only has to be checked against this
+        // component; the other components are solved independently.
+        mealy_like m_like;
+        bool prechecked = sub_form.size() > 1
+          && has_conjunction_decomposition(si.decompose)
+          && try_precheck(sub_form[i], sub_outs_str[i], m_like);
+        if (!prechecked)
+          m_like = solve_one(sub_form[i], sub_outs_str[i],
+                             want_strategy, split_out, true);
         switch (m_like.success)
           {
           case mealy_like::realizability_code::UNREALIZABLE:
@@ -4475,7 +4785,7 @@ namespace spot
     if (data_->si.bv)
       sw.start();
     std::vector<std::vector<std::string>> outs_for_aig;
-    if (data_->precheck_used)
+    if (data_->presolved)
       outs_for_aig.push_back(data_->output_aps);
     else
       outs_for_aig = data_->sub_outs_str;
@@ -4527,7 +4837,7 @@ namespace spot
   {
     static const std::vector<formula> empty;
     data_->prepare();
-    if (data_->precheck_used)
+    if (data_->presolved)
       return empty;
     return data_->sub_form;
   }
@@ -4537,7 +4847,7 @@ namespace spot
   {
     static const std::vector<std::vector<std::string>> empty;
     data_->prepare();
-    if (data_->precheck_used)
+    if (data_->presolved)
       return empty;
     return data_->sub_outs_str;
   }
@@ -4584,14 +4894,14 @@ namespace spot
   }
 
   synthesis_problem&
-  synthesis_problem::set_decompose(bool val)
+  synthesis_problem::set_decompose(synthesis_decomposition val)
   {
     data_->check_options_mutable();
     data_->si.decompose = val;
     return *this;
   }
 
-  bool
+  synthesis_decomposition
   synthesis_problem::decompose() const
   {
     return data_->si.decompose;

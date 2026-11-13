@@ -77,6 +77,22 @@ namespace spot
       before_and_after_decomposition  ///< Also simplify each sub-specification.
     };
 
+    /// \brief Which syntactic decompositions to attempt.
+    ///
+    /// Conjunctive decomposition splits the specification into
+    /// independent sub-specifications that must all be realized.
+    /// Disjunctive decomposition splits a disjunction (or an
+    /// implication, or a negated conjunction) into disjuncts that are
+    /// attempted separately: a strategy satisfying one disjunct also
+    /// satisfies the whole specification.
+    enum class decomposition
+    {
+      none,          ///< Do not decompose.
+      conjunctions,  ///< Split top-level conjunctions only.
+      disjunctions,  ///< Split top-level disjunctions only.
+      all            ///< Split both conjunctions and disjunctions.
+    };
+
     /// \brief Benchmarking variables tracking timing and counts for
     /// each step of synthesis.
     ///
@@ -161,9 +177,8 @@ namespace spot
     /// \brief Semantics of the controller to synthesize.
     synthesis_semantics semantics = synthesis_semantics::Mealy;
     bdd_dict_ptr dict; ///< BDD dictionary.
-    /// \brief Whether to decompose the specification into independent
-    /// sub-specifications.
-    bool decompose = true;
+    /// \brief Which syntactic decompositions to attempt.
+    decomposition decompose = decomposition::all;
     /// \brief Whether to try the direct-strategy bypass before building
     /// a game.
     bool use_bypass = true;
@@ -196,6 +211,8 @@ namespace spot
   /// \brief When to apply realizability-preserving simplifications.
   using synthesis_simplification_stage =
     synthesis_info::simplification_stage;
+  /// \brief Which syntactic decompositions to attempt.
+  using synthesis_decomposition = synthesis_info::decomposition;
 
   /// \addtogroup synthesis Reactive Synthesis
   /// \ingroup twa_algorithms
@@ -644,8 +661,10 @@ namespace spot
 
     /// \brief Return the sub-specifications used by the solver.
     ///
-    /// This is empty when the negated-assumption pre-check produced
-    /// the solution, because no sub-specification was solved then.
+    /// This is empty when the disjunctive decomposition produced the
+    /// solution, because no sub-specification was solved then.  The
+    /// negated-assumption pre-check is performed on each
+    /// sub-specification, so it does not make this empty.
     const std::vector<formula>& sub_specifications();
 
     /// \brief Return the output propositions of each sub-specification.
@@ -683,10 +702,11 @@ namespace spot
     /// \brief Return the splitting strategy of 2-step games.
     synthesis_splittype splittype() const;
 
-    /// \brief Decompose the specification into independent conjuncts,
-    /// as --decompose.
-    synthesis_problem& set_decompose(bool val);
-    bool decompose() const;
+    /// \brief Select which syntactic decompositions to attempt, as
+    /// --decompose.
+    synthesis_problem& set_decompose(synthesis_decomposition val);
+    /// \brief Return which syntactic decompositions to attempt.
+    synthesis_decomposition decompose() const;
 
     /// \brief Select Mealy or Moore semantics, as --semantics.
     synthesis_problem& set_semantics(synthesis_semantics s);

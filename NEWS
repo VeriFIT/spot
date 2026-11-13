@@ -88,6 +88,12 @@ New in spot 2.16.2.dev  (not yet released)
     they can be bounded with the new -x cc-max-states=N and
     -x cc-max-aps=N options.  (Issue #650.)
 
+  - ltlsynt's --decompose option now accepts options
+    no/conjunctions/disjunctions/yes.  In previous versions, only
+    --decompose=yes meant what --decomposition=conjunctions means in
+    this version.  Now --domcpose=yes (the default) splits on both
+    conjunctions and disjunctions.
+
   Library:
 
   - acc_cond::acc_code::rabin_like() and

@@ -412,14 +412,14 @@ exception afterwards.
 | =--algo=lar=               | =set_algo(synthesis_algo::LAR)=             |
 | =--algo=lar.old=           | =set_algo(synthesis_algo::LAR_OLD)=         |
 | =--algo=acd=               | =set_algo(synthesis_algo::ACD)=             |
-| =--decompose=no=           | =set_decompose(false)=                      |
+| =--decompose=no=           | =set_decompose(synthesis_decomposition::none)= |
 | =--semantics=Moore=        | =set_semantics(synthesis_semantics::Moore)= |
 | =--bypass=no=              | =set_use_bypass(false)=                     |
 | =--obligation-synthesis=no= | =set_obligation_synthesis(false)=          |
 | =--simplify=N=             | =set_minimize_level(N)=                     |
 
 The defaults are those of =ltlsynt=: =--algo=lar=, =--decompose=yes=,
-and =--semantics=Mealy=, i.e., =LAR=, =true=, and =Mealy= in the
+and =--semantics=Mealy=, i.e., =LAR=, =all=, and =Mealy= in the
 methods above.  In Python the enumeration members are spelled
 =spot.synthesis_info.algo_DPA_SPLIT= and
 =spot.synthesis_semantics_Moore=, and the setters return the problem
@@ -434,7 +434,7 @@ import spot
 f = spot.formula('G(i -> (o <-> X!o)) & G(!i -> X!o) & !o')
 pr = spot.synthesis_problem(f, ['i'], ['o'])
 pr.set_algo(spot.synthesis_info.algo_DPA_SPLIT)  # --algo=ps
-pr.set_decompose(False)                          # --decompose=no
+pr.set_decompose(spot.synthesis_info.decomposition_none)  # --decompose=no
 pr.set_semantics(spot.synthesis_semantics_Moore)  # --semantics=Moore
 machine = pr.strategy()
 if machine is None:
@@ -488,7 +488,7 @@ int main()
   std::vector<std::string> outs{"o"};
   spot::synthesis_problem p(pf.f, &ins, &outs);
   p.set_algo(spot::synthesis_algo::DPA_SPLIT)       // --algo=ps
-   .set_decompose(false)                            // --decompose=no
+   .set_decompose(spot::synthesis_info::decomposition::none) // --decompose=no
    .set_semantics(spot::synthesis_semantics::Moore);  // --semantics=Moore
   spot::twa_graph_ptr machine = p.strategy();
   if (!machine)
