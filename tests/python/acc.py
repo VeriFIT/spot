@@ -62,3 +62,9 @@ except RuntimeError as e:
     tc.assertIn('no Fin', str(e))
 else:
     report_missing_exception()
+
+# mark_t::set_checked() behaves like set(), but reports out-of-range sets.
+m = spot.mark_t()
+m.set_checked(2)
+tc.assertEqual(m.as_string(), '{2}')
+tc.assertRaises(RuntimeError, m.set_checked, spot.mark_t.max_accsets())

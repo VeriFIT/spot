@@ -189,6 +189,19 @@ namespace spot
         id.set(u);
       }
 
+      /// \brief Add acceptance set \a u to this mark, but report an
+      /// error if \a u is not a valid set number.
+      ///
+      /// Unlike set(), this method does not assume that \a u is
+      /// smaller than max_accsets().  It is meant for code that
+      /// builds marks from computed set numbers.
+      void set_checked(unsigned u)
+      {
+        if (SPOT_UNLIKELY(u >= max_accsets()))
+          report_too_many_sets();
+        id.set(u);
+      }
+
       /// Remove acceptance set \a u from this mark.
       void clear(unsigned u)
       {
