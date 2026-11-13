@@ -216,3 +216,9 @@ tc.assertEqual(spot.acc_code('Fin(0)|Inf(1)').strip(spot.mark_t([0]),
 # mark_t::as_string() prints the set of colors in braces.
 tc.assertEqual(spot.mark_t([0, 1, 5]).as_string(), '{0,1,5}')
 tc.assertEqual(spot.mark_t([]).as_string(), '{}')
+
+# mark_t::set_checked() behaves like set(), but reports out-of-range sets.
+m = spot.mark_t()
+m.set_checked(2)
+tc.assertEqual(m.as_string(), '{2}')
+tc.assertRaises(RuntimeError, m.set_checked, spot.mark_t.max_accsets())

@@ -292,7 +292,11 @@ namespace spot
             if (h != bddfalse)
               {
                 assert(bm_by_var[v] >= 0);
-                res.set(bm_by_var[v]);
+                // The number of colors is only limited here: the OTF
+                // interface can explore formulas with more promises
+                // than a mark_t can hold, as long as it does not
+                // build marks.
+                res.set_checked(bm_by_var[v]);
                 if (a == bddfalse)
                   a = h;
               }
@@ -343,7 +347,7 @@ namespace spot
               {
                 // a_set variable: accumulate acceptance marks.
                 if (positive)
-                  acc.set(mark);
+                  acc.set_checked(mark);
               }
             else if (v < static_cast<int>(next_formula_map.size())
                      && next_formula_map[v])

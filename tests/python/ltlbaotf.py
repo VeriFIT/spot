@@ -219,6 +219,34 @@ tc.assertEqual(spot.ltl_to_tgba_fm_otf(f, obl).num_colors(), 1)
 tc.assertEqual(spot.ltl_to_tgba_fm_otf(f,
                                        force_obligation=True).num_colors(), 1)
 
+# --- The number of colors is only limited when a mark_t is built. -----
+# A formula that promises more colors than a mark_t can hold can still
+# be explored with succ_as_bdd(); the limit is only reported when a
+# function builds marks.  The exploration used to be restricted as
+# soon as the extra color was allocated, and the marks were then built
+# with an out-of-range bit: an exception in debug builds (reported as
+# "bit index is out of bounds"), and undefined behavior otherwise.
+def cube_of_bits(i, nbits):
+    return ' & '.join(('p%d' % k) if (i >> k) & 1 else ('!p%d' % k)
+                      for k in range(nbits))
+
+
+n = spot.mark_t.max_accsets()
+f = spot.formula('G(' + ' & '.join('(%s -> F g%d)' % (cube_of_bits(i, 6), i)
+                                   for i in range(n + 1)) + ')')
+ex = spot.ltl_to_tgba_fm_otf(f)
+s = ex.init_state()
+tc.assertTrue(ex.succ_as_bdd(s) != buddy.bddfalse)
+tc.assertEqual(ex.num_colors(), n + 1)
+for fun in (ex.succ_as_edges, ex.succ_as_raw_edges):
+    try:
+        fun(s)
+    except RuntimeError as err:
+        tc.assertIn('Too many acceptance sets used.  The limit is',
+                    str(err))
+    else:
+        tc.fail('too many acceptance sets not reported')
+
 # build_nba() forwards its keyword arguments to the explorer.
 for text in ('a U b', 'G F a & G F b', 'F(a & X(!a & F b))'):
     f = spot.parse_formula(text)
