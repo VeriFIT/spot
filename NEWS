@@ -1,4 +1,4 @@
-New in spot 2.16.2.dev  (not yet released)
+New in spot 2.16.3.dev  (not yet released)
 
   Build:
 
@@ -180,12 +180,16 @@ New in spot 2.16.2.dev  (not yet released)
     same "-f ltlxba" or "-f ltlxba-fin" option as the formula, so that
     syfco is the one performing the lower-casing.  (Issue #654.)
 
-  - Hopefully fix some test-suite failures with Clang on OSX
-    (issue #609 again).
-
   - ltlsynt's decomposition could report a specification as
     unrealizable although it was realizable by a strategy violating
     the assumptions.  (Issue #665.)
+
+New in spot 2.16.3  (2026-11-15)
+
+  Bug fixes:
+
+  - Hopefully fix some test-suite failures with Clang on OSX
+    (issue #609 again).
 
   - The parity game solver used by ltlsynt could abort on an
     assertion in fix_strat_acc() when a state of the current subgame
