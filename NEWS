@@ -1,4 +1,6 @@
-New in spot 2.16.2.dev  (not yet released)
+New in spot 2.16.3  (2026-11-15)
+
+  Bug fixes:
 
   - Hopefully fix some test-suite failures with Clang on OSX
     (issue #609 again).
