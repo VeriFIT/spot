@@ -271,6 +271,45 @@ mingw-static:
       - ./**/*.log
       - ./**/core.*
 
+# Build the library with Emscripten, for applications that run Spot
+# in a web browser (e.g., the client-only build of spot-web-app).
+# The artifact spot-wasm.tar.gz contains the headers and static
+# libraries, installed under include/ and lib/.
+emscripten:
+  stage: build2
+  needs:
+    # Start from the tarball, so that we do not need the autotools.
+    - job: make-dist
+      artifacts: true
+  variables:
+    GIT_STRATEGY: none
+  only:
+    - branches
+  except:
+    - /wip/
+  image: emscripten/emsdk:7.0.0
+  script:
+    - VERSION=`cat VERSION`
+    - tar xf spot-$VERSION.tar.gz
+    - cd spot-$VERSION
+    # Spot reports errors using exceptions, so they must be enabled.
+    # The sleep test of gnulib never ends under Node.js.
+    - emconfigure ./configure --host=wasm32-unknown-emscripten --disable-shared --disable-python --disable-devel --disable-debug --prefix=$CI_PROJECT_DIR/spot-wasm CFLAGS='-O2 -fwasm-exceptions' CXXFLAGS='-O2 -fwasm-exceptions' LDFLAGS='-fwasm-exceptions' gl_cv_func_sleep_works=yes
+    - for d in cadical buddy lib ltdl spot; do emmake make -C $d || exit 1; done
+    - emmake make -C buddy install
+    - emmake make -C spot install
+    # Check that the library works by running ltl2tgba under Node.js.
+    - emmake make -C bin ltl2tgba LDFLAGS='-fwasm-exceptions -sNODERAWFS -sALLOW_MEMORY_GROWTH -sSTACK_SIZE=8MB'
+    - node bin/ltl2tgba 'GFa -> GFb' --stats='%s %e %a'
+    - test "`node bin/ltl2tgba 'GFa -> GFb' --stats='%s %e %a'`" = '3 6 1'
+    - cd $CI_PROJECT_DIR/spot-wasm
+    - tar cfz $CI_PROJECT_DIR/spot-wasm.tar.gz include lib
+  artifacts:
+    when: always
+    paths:
+      - ./spot-wasm.tar.gz
+      - ./**/*.log
+
 debpkg-stable:
   stage: build
   variables:
