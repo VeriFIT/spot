@@ -9,6 +9,24 @@ New in spot 2.16.3.dev  (not yet released)
     may affect the output of some minimization algorithms.
     (Issue #514.)
 
+  - Spot can be compiled to WebAssembly with Emscripten, for instance
+    with
+
+      emconfigure ./configure --host=wasm32-unknown-emscripten \
+        --disable-shared --disable-python --disable-debug \
+        CFLAGS='-O2 -fwasm-exceptions' \
+        CXXFLAGS='-O2 -fwasm-exceptions' LDFLAGS=-fwasm-exceptions \
+        gl_cv_func_sleep_works=yes
+      for d in cadical buddy lib ltdl spot; do emmake make -C $d; done
+      emmake make -C buddy install
+      emmake make -C spot install
+
+    This needed two missing #include <algorithm>, which LLVM's libc++
+    does not provide indirectly the way GNU's libstdc++ does.  A new
+    "emscripten" job of the CI builds the library this way, and keeps
+    the installed headers and libraries as an artifact, so that web
+    applications can be built against the latest version of Spot.
+
   Tools:
 
   - randaut's -A option, used to specify the acceptance condition to

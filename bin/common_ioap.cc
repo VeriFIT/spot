@@ -18,6 +18,7 @@
 
 #include "common_ioap.hh"
 #include "error.h"
+#include <algorithm>
 #include <fstream>
 #include <unordered_set>
 

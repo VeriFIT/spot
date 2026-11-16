@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <spot/misc/hashfunc.hh>
 #include <spot/misc/common.hh>
