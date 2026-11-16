@@ -159,6 +159,11 @@ namespace spot
           if (SPOT_UNLIKELY(!(opt & scc_info_options::TRACK_STATES)))
             throw std::invalid_argument(fname + ": scc_info should be "
                                         "built with TRACK_STATES"s);
+          // inner_edges_of() skips the edges the filter removes, so
+          // the determinism check could miss some of them.
+          if (SPOT_UNLIKELY(si->get_filter()))
+            throw std::invalid_argument(fname + ": scc_info should not "
+                                        "use an edge filter"s);
         }
 
       // Universal branching is not accounted for by

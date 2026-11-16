@@ -125,8 +125,8 @@ namespace spot
   ///
   /// \param sm an scc_info object for \a aut if available (it will
   /// be built otherwise).  It must have been built with the
-  /// scc_info_options::TRACK_STATES option, and without
-  /// scc_info_options::STOP_ON_ACC.
+  /// scc_info_options::TRACK_STATES option, without
+  /// scc_info_options::STOP_ON_ACC, and without edge filter.
   SPOT_API bool
   is_elevator_automaton(const const_twa_graph_ptr& aut, scc_info* sm = nullptr);
 
@@ -152,8 +152,8 @@ namespace spot
   ///
   /// \param sm an scc_info object for \a aut if available (it will
   /// be built otherwise).  It must have been built with the
-  /// scc_info_options::TRACK_STATES option, and without
-  /// scc_info_options::STOP_ON_ACC.
+  /// scc_info_options::TRACK_STATES option, without
+  /// scc_info_options::STOP_ON_ACC, and without edge filter.
   SPOT_API bool
   is_emerson_lei_elevator_automaton(const const_twa_graph_ptr& aut,
                                     scc_info* sm = nullptr);

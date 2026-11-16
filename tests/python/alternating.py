@@ -235,7 +235,7 @@ tc.assertFalse(spot.is_elevator_automaton(aut))
 tc.assertFalse(spot.is_emerson_lei_elevator_automaton(aut))
 
 # A user-supplied scc_info must be built for the same automaton, with
-# TRACK_STATES, and without STOP_ON_ACC.
+# TRACK_STATES, without STOP_ON_ACC, and without edge filter.
 aut = spot.automaton("""HOA: v1 States: 2 Start: 0 AP: 1 "a"
 Acceptance: 1 Inf(0) --BODY-- State: 0 [0] 1 [!0] 0 State: 1 [t] 1 {0}
 --END--""")
@@ -243,6 +243,8 @@ tc.assertTrue(spot.is_elevator_automaton(aut, spot.scc_info(aut)))
 tc.assertTrue(spot.is_emerson_lei_elevator_automaton(aut, spot.scc_info(aut)))
 other = spot.automaton("""HOA: v1 States: 1 Start: 0 AP: 0
 Acceptance: 1 Inf(0) --BODY-- State: 0 [t] 0 {0} --END--""")
+# This filter removes the edges in set 0.
+filt = spot.scc_and_mark_filter(aut, [0])
 for f in (spot.is_elevator_automaton, spot.is_emerson_lei_elevator_automaton):
     for si, msg in ((spot.scc_info(other), "another automaton"),
                     (spot.scc_info_with_options(
@@ -251,7 +253,8 @@ for f in (spot.is_elevator_automaton, spot.is_emerson_lei_elevator_automaton):
                      "STOP_ON_ACC"),
                     (spot.scc_info_with_options(aut,
                                                 spot.scc_info_options_NONE),
-                     "TRACK_STATES")):
+                     "TRACK_STATES"),
+                    (spot.scc_info(filt), "edge filter")):
         try:
             f(aut, si)
         except ValueError as e:
